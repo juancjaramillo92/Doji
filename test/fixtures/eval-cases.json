@@ -152,7 +152,7 @@
     "id": "build-term-at-unseen",
     "why": "at `unseen` the term is built from the ground up before it is used",
     "path": "reply",
-    "context": "It is Wednesday 14 October 2026, 15:10 in New York.\n\nWhere he stands on each channel:\n· the gap between rates and inflation — unseen\n· the dollar — used since 2 Oct\n· inflation itself — explained since 30 Sep\n· jobs — explained since 1 Oct\n· what central banks are buying — unseen\n\nWhat get_market and get_around returned: the market could not be read just now. Do not quote the dollar or yields from a search; say you do not have them.",
+    "context": "It is Wednesday 14 October 2026, 15:10 in New York.\n\nWhere he stands on each channel:\n· the gap between rates and inflation — unseen\n· the dollar — used since 2 Oct\n· inflation itself — explained since 30 Sep\n· jobs — explained since 1 Oct\n· what central banks are buying — unseen\n· what investors are buying — unseen\n\nWhat get_market and get_around returned: the market could not be read just now. Do not quote the dollar or yields from a search; say you do not have them.",
     "asked": "why did gold fall today when nothing happened?",
     "counts": { "emDash": true, "sentences": 4 },
     "judge": ["If the gap between rates and inflation (real yields) is part of the answer, it is built in plain words before it is used, never named bare"]

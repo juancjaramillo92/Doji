@@ -28,7 +28,7 @@ import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } fr
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, unwrap, foldCalendar,
   calendarWindow, foldBars, foldHeadlines, FOMC, contractMonths, foldRates, oddsOf, unlisted, zq, foldSessions,
-  readMarket, readRates,
+  readMarket, readRates, foldTrend, BACK,
 } from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
@@ -46,8 +46,10 @@ import {
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock,
+  releaseName, printsQuery, printsList, RELEASE_PRINTS,
   sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
-  volumeList, volumeBlock, keptMarket, storeMarket, storeRates, structureList, structureBlock, storeStructure,
+  volumeList, volumeBlock, keptMarket, storeMarket, storeRates, storeTrend, trendList, trendBlock,
+  structureList, structureBlock, storeStructure,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -708,7 +710,7 @@ test('a TradingView that stops answering costs the symbols not reached, not the 
     const market = await stubbed(async () => { globalThis.fetch = slowTradingView(3); return readMarket(); });
     // MARKET's first three: its order is what a slow morning keeps.
     assert.deepEqual(market.market.map(m => m.symbol), ['TVC:DXY', 'TVC:US02Y', 'TVC:US10Y']);
-    assert.deepEqual(market.missing.map(m => m.error), Array(11).fill('not reached in 35s'));
+    assert.deepEqual(market.missing.map(m => m.error), Array(13).fill('not reached in 35s'));
 
     const rates = await stubbed(async () => { globalThis.fetch = slowTradingView(1); return readRates(); });
     assert.equal(rates.ok, true);
@@ -748,7 +750,7 @@ test('the market is read three charts at a time and answered in its own order', 
   // Asked in the list's order and finished out of it.
   assert.deepEqual(answer.market.map(m => m.symbol), symbols, 'the answer is in the order the charts finished');
   assert.equal(answer.market[0].symbol, 'TVC:DXY');
-  assert.equal(answer.market.length, 14);
+  assert.equal(answer.market.length, 16);
   assert.deepEqual(answer.missing, []);
 });
 
@@ -833,8 +835,10 @@ test('the market is read ahead by the job, and a briefing reads the copy a faile
 
     world.doors.market = [AROUND, 200];
     world.doors.rates = [{ ok: true, ...RATES, missing: [] }, 200];
-    await Promise.all([storeMarket(), storeRates()]);
-    assert.match(await aroundBlock(), /Dollar index 102\.16/);
+    world.doors.trend = [TREND, 200];
+    await Promise.all([storeMarket(), storeRates(), storeTrend()]);
+    // The weeks ride with the market, so every reader of the one gets the other.
+    assert.match(await aroundBlock(), /Dollar index 102\.16[\s\S]*The weeks behind it[\s\S]*· Dollar index 101\.2 on 8 Oct/);
     assert.match(await ratesBlock(), /read at \d\d:\d\d ET:\n· 28 Oct: 73% no change/);
 
     // A pass that fails, or serves nothing, leaves the copy as it was.
@@ -845,9 +849,9 @@ test('the market is read ahead by the job, and a briefing reads the copy a faile
     assert.match(await ratesBlock(), /28 Oct: 73% no change/);
   });
   assert.deepEqual(world.rows.map(r => r.detail), [
-    'market: not read yet', 'rates: not read yet',
+    'trend: not read yet', 'market: not read yet', 'rates: not read yet',
     // The partial pass's VIX, written by the job that saw it, not the reader.
-    'market: TVC:VIX: TradingView mcp-tv-get-ohlcv: no answer',
+    'market: TVC:VIX: TradingView mcp-tv-get-ohlcv: no answer', 'trend: CBOE:GVZ: no bars',
     'market: TradingView market: not connected', 'rates: no meeting served',
   ]);
   assert.ok(world.rows.every(r => r.caller === 'market read' && r.ok === false));
@@ -1151,6 +1155,68 @@ test('a symbol the pass did not reach keeps the line the last pass read', () => 
   assert.deepEqual(keptMarket(fresh, null).missing.length, 2, 'a first pass invented lines');
 });
 
+/* ─── The weeks behind it ────────────────────────────────────────────────────
+   Sixty-four daily bars, one a day from 15 July, closes counting up from 100,
+   so each point's close says which bar it was taken from. */
+const DAILY = (n) => ({ success: true, bars: Array.from({ length: n }, (_, i) => ({
+  o: 100 + i, h: 100 + i, l: 100 + i, c: 100 + i, t: Date.UTC(2026, 6, 15 + i) / 1000, v: null })) });
+
+test('daily bars fold to the closes a week, a month and three months of sessions back, each dated', () => {
+  assert.deepEqual(BACK, [5, 21, 63]);
+  assert.deepEqual(foldTrend(DAILY(64)), [
+    { close: 158, at: '2026-09-11T00:00:00.000Z' },
+    { close: 142, at: '2026-08-26T00:00:00.000Z' },
+    { close: 100, at: '2026-07-15T00:00:00.000Z' }]);
+  // A short series keeps the points it reaches and invents none.
+  assert.deepEqual(foldTrend(DAILY(10)), [{ close: 104, at: '2026-07-19T00:00:00.000Z' }]);
+  assert.throws(() => foldTrend(DAILY(5)), /too few bars/);
+  assert.throws(() => foldTrend({ success: true }), /no bars/);
+});
+
+const TREND = { ok: true, market: [
+  { symbol: 'TVC:DXY', name: 'Dollar index', unit: '', points: [
+    { close: 101.2, at: '2026-10-08T00:00:00.000Z' }, { close: 99.5, at: '2026-09-16T00:00:00.000Z' },
+    { close: 97.8, at: '2026-07-16T00:00:00.000Z' }] },
+  { symbol: 'FRED:T10YIE', name: 'Ten-year breakeven inflation', unit: '%', points: [
+    { close: 2.41, at: '2026-10-07T00:00:00.000Z' }] },
+], missing: [{ symbol: 'CBOE:GVZ', name: 'Gold volatility index (GVZ)', error: 'no bars' }] };
+
+test('the weeks behind the market are levels on stated days, and no change is computed', () => {
+  const out = trendList(TREND);
+  assert.match(out, /daily closes a week, a month and three months back:/);
+  assert.match(out, /· Dollar index 101\.2 on 8 Oct, 99\.5 on 16 Sept?, 97\.8 on 16 Jul/);
+  assert.match(out, /· Ten-year breakeven inflation 2\.41% on 7 Oct/);
+  assert.match(out, /Not read: Gold volatility index \(GVZ\)\./);
+  assert.doesNotMatch(out, /\b(up|down|rose|fell|higher|lower)\b/);
+});
+
+/* ONCE A NEW YORK DAY. A daily close moves once a day, and sixteen charts a
+   quarter hour is the burst TradingView refuses: a copy read today is kept, one
+   from yesterday is read again, and what that pass misses carries. */
+test('the weeks are read once a New York day, and a symbol a pass misses keeps its last line', async () => {
+  const world = marketWorld();
+  let asked = 0;
+  const door = world.fetch;
+  world.fetch = async (url, init) => (url.includes('?trend=1') && asked++, door(url, init));
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString();
+  world.stored.set('trend', { door: 'trend', answer: TREND, read_at: yesterday });
+  world.doors.trend = [{ ok: true, market: [TREND.market[1]], missing: [
+    { symbol: 'TVC:DXY', name: 'Dollar index', error: 'not reached in 35s' }] }, 200];
+  await stubbed(async () => {
+    globalThis.fetch = world.fetch;
+    await storeTrend();
+    assert.equal(asked, 1, 'a copy from yesterday was not read again');
+    assert.match(trendList(world.stored.get('trend').answer), /Dollar index 101\.2 on 8 Oct/,
+      'the dollar this pass missed lost the line the last pass read');
+    await storeTrend();
+    assert.equal(asked, 1, 'a copy read today was read again');
+    assert.match(await trendBlock(), /The weeks behind it/);
+    world.stored.clear();
+    assert.match(await trendBlock(), /could not be read just now\. Do not quote a week's or a month's move/);
+  });
+  assert.deepEqual(world.rows.map(r => r.detail), ['trend: TVC:DXY: not reached in 35s', 'trend: not read yet']);
+});
+
 /* THE ODDS AGE OUT; THE LINES DO NOT NEED TO. Each market line carries its bar
    times, but the odds carry only when they were read, and a door that keeps
    refusing would otherwise leave its last answer standing for good. */
@@ -1255,7 +1321,9 @@ test('fed funds futures are read as FedWatch reads them, meeting by meeting', ()
   assert.equal(dec.after, 4.1423);
   assert.equal(dec.move_bp, 19.7);
   assert.equal(dec.total_bp, 26.6, 'the move since now is not measured from the rate before October');
-  assert.deepEqual(unread, ['2027-01-27'], 'a meeting whose months were not read is dropped rather than named');
+  // A year of meetings is asked for, and every one whose months were not read is named.
+  assert.deepEqual(unread, ['2027-01-27', '2027-03-17', '2027-04-28', '2027-06-09', '2027-07-28', '2027-09-15'],
+    'a meeting whose months were not read is dropped rather than named');
 });
 
 /* A CONTRACT EXPIRES ON THE LAST DAY OF ITS MONTH, so on 1 December the clear
@@ -1266,7 +1334,8 @@ test('fed funds futures are read as FedWatch reads them, meeting by meeting', ()
 test('a meeting with no clear month read beside it is solved off the meeting after it', () => {
   const prices = { '2026-12': 95.95, '2027-01': 95.80, '2027-02': 95.79, '2027-03': 95.75 };
   const { meetings, unread } = foldRates(prices, '2026-12-01');
-  assert.deepEqual(unread, []);
+  // Every meeting the prices reach resolves; the rest of the year is named.
+  assert.deepEqual(unread, ['2027-04-28', '2027-06-09', '2027-07-28', '2027-09-15', '2027-10-27']);
   const [dec, jan] = meetings;
   assert.equal(dec.after, jan.before, 'December is not solved off January');
   // (31 × 4.05 − 22 × after) / 9, with after = (31 × 4.20 − 4 × 4.21) / 27
@@ -1275,7 +1344,11 @@ test('a meeting with no clear month read beside it is solved off the meeting aft
 });
 
 test('the contracts are named months, each meeting with the clear one beside it', () => {
-  assert.deepEqual(contractMonths('2026-10-01'), ['2026-10', '2026-11', '2026-12', '2027-01', '2027-02']);
+  // A year of meetings, October to September, and every month between them clear or meeting.
+  assert.deepEqual(contractMonths('2026-10-01'), ['2026-10', '2026-11', '2026-12', '2027-01', '2027-02',
+    '2027-03', '2027-04', '2027-05', '2027-06', '2027-07', '2027-08', '2027-09']);
+  // Near the table's end the strip is as long as the table, never past it.
+  assert.deepEqual(contractMonths('2027-09-01'), ['2027-08', '2027-09', '2027-10', '2027-11']);
   assert.deepEqual(['2026-10', '2026-11', '2027-01'].map(zq), ['CBOT:ZQV2026', 'CBOT:ZQX2026', 'CBOT:ZQF2027']);
   // The table's last date is a boundary, never a meeting to price.
   assert.ok(!contractMonths(FOMC.at(-2)).includes(FOMC.at(-1).slice(0, 7)),
@@ -2953,7 +3026,7 @@ test('the spoken name works, because that is the one he is shown', () => {
 });
 
 test('the rung is the last word, not the second', () => {
-  /* Three of the five names are several words, so reading the rung from position
+  /* Most of the names are several words, so reading the rung from position
      two fails as "no such channel" — like a name he got wrong. */
   const multi = CHANNELS.filter(([, n]) => n.includes(' '));
   assert.ok(multi.length >= 3, 'the names are no longer multi-word — this test is asserting nothing');
@@ -4210,14 +4283,14 @@ test('how she reads him carries the day it last moved, and an absent one says no
 const READS = [
   { given_on: '2026-07-30', reading: 'a hot print is bad for gold', test: 'the two-year falls on it',
     verdict: 'wrong', evidence: 'the two-year fell eight basis points', firmness: 'firm',
-    lesson: 'I took the dollar as leading when the two-year was' },
+    lesson: 'I took the dollar as leading when the two-year was', channel: 'inflation' },
   { given_on: '2026-07-29', reading: 'claims do not move the Fed', test: 'December pricing moves',
-    verdict: 'held', evidence: 'December barely moved', firmness: 'light', lesson: null },
+    verdict: 'held', evidence: 'December barely moved', firmness: 'light', lesson: null, channel: 'jobs' },
   { given_on: '2026-07-28', reading: 'the dollar leads today', test: 'the dollar index falls',
-    verdict: 'untested', evidence: null, firmness: 'firm', lesson: null },
-  // Filed before firmness was asked: in the month, in neither half.
+    verdict: 'untested', evidence: null, firmness: 'firm', lesson: null, channel: 'inflation' },
+  // Filed before firmness and the channel were asked: in the month, in neither half, in no channel.
   ...['07-27', '07-24', '07-23'].map((d, i) => ({ given_on: `2026-${d}`, reading: `miss ${i}`,
-    test: 'a test', verdict: 'wrong', evidence: 'it fired', firmness: null, lesson: null })),
+    test: 'a test', verdict: 'wrong', evidence: 'it fired', firmness: null, lesson: null, channel: null })),
 ];
 
 test('her record counts every verdict and names the newest misses, three at most', () => {
@@ -4225,6 +4298,10 @@ test('her record counts every verdict and names the newest misses, three at most
   assert.match(out, /judged at night by the test you stated: 1 held, 4 proved wrong, 1 untested; /);
   assert.match(out, /said lightly, 1 held, 0 proved wrong, 0 untested; said firmly, 0 held, 1 proved wrong, 1 untested\./,
     'the record no longer splits by how firmly a read was said, or counts an unmarked read in a half');
+  // By spoken name, never the id, and a channel with no read is not listed.
+  assert.match(out, /By the channel each ran through, proved wrong of those filed: inflation itself 1 of 2, jobs 0 of 1\./,
+    'the record no longer says where her reading is weak, or counts an unmarked read in a channel');
+  assert.doesNotMatch(out, /the dollar \d/, 'a channel with no read is listed');
   assert.match(out, /Misread: I took the dollar as leading when the two-year was/,
     'a miss no longer says which link she misread');
   assert.match(out, /30 Jul: a hot print is bad for gold \(wrong if the two-year falls on it\) — the two-year fell/);
@@ -4366,6 +4443,55 @@ test('a landed release is never described as one still to come', () => {
   assert.match(out, /15:00 ET FOMC minutes, rated medium — due/);
   assert.doesNotMatch(out, /abroad/, 'a list of US releases is told some of it is from abroad');
   assert.equal(calendarList([]), '');
+});
+
+/* ─── How a release has run against expectations ─────────────────────────────
+   Five of core inflation's prints, the newest first as the read returns them,
+   one with no consensus and one in a unit the consensus is not in. */
+const print = (at, name, actual, consensus, prior = null) =>
+  ({ id: 1, at, name, country: 'US', importance: 'high', consensus, prior, actual });
+const PRINTS = [
+  print('2026-10-14T12:30:00Z', 'Core Inflation Rate MoM (Sep)', '0.4%', '0.3%', '0.3%'),
+  print('2026-09-11T12:30:00Z', 'Core Inflation Rate MoM (Aug)', '0.3%', '0.3%', '0.2%'),
+  print('2026-08-12T12:30:00Z', 'Core Inflation Rate MoM (Jul)', '0.2%', '0.3%'),
+  print('2026-07-15T12:30:00Z', 'Core Inflation Rate MoM (Jun)', '0.3%', null),
+  print('2026-06-10T12:30:00Z', 'Core Inflation Rate MoM (May)', '0.3%', '300K'),
+];
+
+test('a release\'s prints are told oldest first, and the tally against the consensus is counted', () => {
+  const out = printsList(PRINTS, 'Core Inflation Rate MoM');
+  const lines = out.split('\n').filter(l => l.startsWith('· '));
+  assert.deepEqual(lines.map(l => l.match(/\((\w+)\)/)[1]), ['May', 'Jun', 'Jul', 'Aug', 'Sep'],
+    'the prints are not told in the order they happened');
+  assert.match(out, /· 14 Oct 2026, Core Inflation Rate MoM \(Sep\): 0\.4% against 0\.3% expected, after 0\.3%/);
+  assert.match(out, /Core Inflation Rate MoM \(Jun\): 0\.3%, no consensus on file/);
+  // A figure against a consensus in another unit is counted apart, never compared.
+  assert.match(out, /1 above, 1 below, 1 on it; 2 with no consensus or no comparable figure\./);
+  assert.match(out, /arithmetic, not good or bad news/);
+  assert.doesNotMatch(out, /stops at its/, 'a short read says it was cut');
+
+  // A full read says how far back it reaches.
+  const full = Array.from({ length: RELEASE_PRINTS }, (_, i) =>
+    print(new Date(Date.UTC(2026, 9, 1) - i * 30 * 86_400_000).toISOString(), `NFP (${i})`, '200K', '180K'));
+  assert.match(printsList(full, 'NFP'), new RegExp(`${RELEASE_PRINTS} above, 0 below, 0 on it\\.[\\s\\S]*` +
+    `stops at its ${RELEASE_PRINTS} newest prints, so it reaches back only to \\d+ \\w+ 2024\\.`));
+});
+
+test('the prints read is bounded, newest first, and takes what she named as a value, never a pattern', () => {
+  const now = Date.parse('2026-10-15T12:00:00Z');
+  const q = printsQuery(releaseName('  Core *Inflation Rate MoM '), 6, now);
+  // Her wildcard is taken out; the one at the end is the code's.
+  assert.match(q, /&name=ilike\.Core%20Inflation%20Rate%20MoM\*&/);
+  assert.match(q, /&actual=not\.is\.null&at=gte\.2026-04-15T12:00:00\.000Z&at=lte\.2026-10-15T12:00:00\.000Z/);
+  assert.match(q, new RegExp(`&order=at\\.desc&limit=${RELEASE_PRINTS}$`));
+  // Clamped: nothing past ten years, nothing under a month, a default for nonsense.
+  assert.match(printsQuery('NFP', 999, now), /at=gte\.2016-10-15/);
+  assert.match(printsQuery('NFP', 0, now), /at=gte\.2024-10-15/);
+  assert.match(printsQuery('NFP', 'soon', now), /at=gte\.2024-10-15/);
+  assert.equal(releaseName('**'), '');
+  assert.equal(releaseName('x'.repeat(200)).length, 80);
+  // An ampersand she typed cannot open a second filter.
+  assert.match(printsQuery('A&order=id.asc', 12, now), /name=ilike\.A%26order%3Did\.asc\*/);
 });
 
 test('a calendar line from another day names the day, and today stays bare', () => {
@@ -4617,11 +4743,15 @@ test('a read is filed once, with a verdict the table accepts, and never without 
       { reading: 'a read', test: 'a test', verdict: 'held', evidence: 'x', firmness: 'firm',
         lesson: 'nothing' }), /Only a read that proved wrong carries a lesson/,
       'a read that held is filed with a lesson from nothing');
+    assert.match(await serve('record_read',
+      { reading: 'a read', test: 'a test', verdict: 'held', evidence: 'x', firmness: 'firm', channel: 'rates' }),
+      /"rates" is not a channel/, 'a channel the reference refuses is sent, and fails as a database fault');
     assert.equal(posts.length, 0, 'a refused read still reached the database');
 
     assert.equal(await serve('record_read',
       { reading: 'a hot print is bad for gold', test: 'the two-year falls', verdict: 'wrong',
-        evidence: 'it fell', firmness: 'firm', lesson: 'I read the dollar as leading' }), 'Filed.');
+        evidence: 'it fell', firmness: 'firm', lesson: 'I read the dollar as leading',
+        channel: 'rates_vs_inflation' }), 'Filed.');
   });
   // A retry's refiling lands on the unique index and is dropped, not doubled.
   assert.match(posts[0].url, /eugenia_reads\?on_conflict=given_on,reading$/);
@@ -4630,6 +4760,7 @@ test('a read is filed once, with a verdict the table accepts, and never without 
   assert.equal(row.verdict, 'wrong');
   assert.equal(row.firmness, 'firm');
   assert.equal(row.lesson, 'I read the dollar as leading');
+  assert.equal(row.channel, 'rates_vs_inflation');
   assert.match(row.given_on, /^\d{4}-\d\d-\d\d$/, 'the read is not filed under a New York civil day');
 });
 
@@ -5609,8 +5740,9 @@ const TOOL_CALLS = [
   ['open_loop',     { kind: 'question', body: 'a question' }],
   ['close_loop',    { id: 1, resolution: 'answered' }],
   ['record_read',   { reading: 'a read', test: 'the two-year falls', verdict: 'untested', evidence: 'no close',
-                      firmness: 'light' }],
+                      firmness: 'light', channel: 'dollar' }],
   ['make_call',     { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market' }],
+  ['get_releases',  { release: 'Core Inflation Rate MoM', months: 12 }],
 ];
 
 /* AND THE LIST IS HELD AGAINST THE SWITCH: a tool added to `serve` and not

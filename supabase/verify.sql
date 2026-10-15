@@ -210,12 +210,12 @@ from (values
 
   -- agree.test.mjs reads schema.sql's insert; only the database knows the
   -- rows are there. A missing one renders at the bottom rung forever.
-  ('all five channels are seeded',
+  ('all six channels are seeded',
    (select (xpath('/row/c/text()', query_to_xml(
              'select count(*) as c from public.eugenia_channels',
              false, true, '')))[1]::text
      where to_regclass('public.eugenia_channels') is not null),
-   '5'),
+   '6'),
 
   -- Read through pg_options_to_table, so `security_invoker = on` is not drift.
   ('eugenia_trades runs with the caller''s rights',
@@ -385,14 +385,14 @@ from (values
        and tgname in ('eugenia_thesis_keep', 'eugenia_portrait_keep') and not tgisinternal),
    'eugenia_portrait_keep,eugenia_thesis_keep'),
 
-  -- record_read writes both and the record reads both; missing, every filing
-  -- is a 400 she reports as unsaved and the record goes blank.
-  ('her record carries how firmly and what she misread',
+  -- record_read writes all three and the record reads them; missing, every
+  -- filing is a 400 she reports as unsaved and the record goes blank.
+  ('her record carries how firmly, what she misread and through which channel',
    (select coalesce(string_agg(column_name, ',' order by column_name), 'none')
       from information_schema.columns
      where table_schema = 'public' and table_name = 'eugenia_reads'
-       and column_name in ('firmness', 'lesson')),
-   'firmness,lesson'),
+       and column_name in ('channel', 'firmness', 'lesson')),
+   'channel,firmness,lesson'),
 
   ('RLS on eugenia_runs',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_runs')),

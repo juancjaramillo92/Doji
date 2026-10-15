@@ -400,7 +400,7 @@ single-sourced at run time:
 | the **two roles a turn may have** | `eugenia_turns_role_check` and every `role:` she writes |
 | Eugenia's **note length** | `writeNote`, the check constraint, the tool description |
 | Eugenia's **notes window** | `NOTES` in `index.ts`, and the *twenty* and the *fifteen* five short of it that `CONSOLIDATE` spells out |
-| the **five channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `schema.sql`; spoken names: `CHANNELS` and §2's headings in the strategy |
+| the **six channels**, in two vocabularies | ids: `CHANNELS` in `prompt.ts`, the check constraint and the seed in `schema.sql`; spoken names: `CHANNELS` and §2's headings in the strategy |
 | the **four rungs of the ladder** | `CHANNEL_STATES` in `prompt.ts`, the check constraint, and `PITCH` |
 | Eugenia's **search source vocabulary** | the `source` literals `eugenia_search` returns (`note`, `you`, `him`) and `searchList`'s three branches |
 | the **`eugenia_trades` column list** | the view in `schema.sql`, §8's inventory of a row, and `TradeRow` in `adherence.ts` — the only description of what `readDesk`'s `select=*` returns |
@@ -985,14 +985,17 @@ filed at midnight under `Calendar` must not be counted as a print. The event
 descriptions are dropped, since she would pay for each on every request.
 
 **`?market=1` is the market around gold, as bars**: the dollar index, the two-
-and ten-year yields, the ten-year real yield, silver, US crude, the S&P 500 and
-the VIX — and abroad the German, French, Italian, UK and Japanese ten-year
+and ten-year yields, the ten-year real yield and breakeven, silver, US crude, the
+S&P 500, the VIX and gold's volatility index (GVZ) — and abroad the German, French, Italian, UK and Japanese ten-year
 yields and EUR/USD, what the calendar's auctions and central banks are read
 against: France and Italy each against Germany is what lenders charge for the
 doubt, and the euro is more than half the dollar index. The quote batch refused on every probe with the scanners' 429, while the
 OHLCV read answered for every symbol, so each is twenty-five hourly bars folded by
 `foldBars` to where the first opened and where the last stands, each with its
-time. The real yield is FRED's daily series and is marked `daily`. Symbols, names
+time. The real yield and the breakeven are FRED's daily series and are marked
+`daily`: the inflation the bond market expects and what is left of the ten-year
+once it is taken out, the two halves strategy §2's table reads apart, which the
+ten-year alone cannot tell. Symbols, names
 and units live in one list, `MARKET`, most-needed first; a symbol that fails is
 named in `missing`.
 `aroundList` states every line as a level beside the level at a stated time and
@@ -1000,6 +1003,19 @@ computes no change, so a move cannot lose its window. The door is read ahead
 by the quarter-hourly job and she reads the copy (see *The market and the Fed's
 odds are read ahead*). A failed read is a sentence
 telling her not to quote the dollar or yields from a search.
+
+**`?trend=1` is the weeks behind it** — the same `MARKET` list as daily closes
+a week, a month and three months of sessions back (`BACK`, 5, 21 and 63), each
+dated, folded by `foldTrend`. The briefing is about the weeks behind his chart,
+and twenty-five hourly bars reach one day, so the dollar's trend and which force
+moved over a month could come only off a search page. Counted in sessions, so a
+holiday moves a date rather than the gap; a series too short for a point keeps
+the points it reaches. `trendList` states levels on days and computes no change,
+as `aroundList` does, and `aroundBlock` carries it, so every reader of the market
+gets the weeks behind it. **Read once a New York day**: a daily close moves once
+a day, and sixteen more charts every quarter hour is the burst TradingView
+refuses, so `storeTrend` keeps a copy read today and asks again on a new day,
+with what a pass misses carried as the hourly lines are.
 
 **`?news=1` is gold's and the dollar's headlines.** `foldHeadlines` merges the
 two feeds, a story on both being one headline, newest first with title, source
@@ -1010,7 +1026,8 @@ of headlines. Each feed is read to a fixed count and may not hold six hours, so
 where the shorter one stops the block says how far back it reaches; a line from
 another day names the day.
 
-**`?rates=1` is what fed funds futures price for the next three Fed meetings**,
+**`?rates=1` is what fed funds futures price for the Fed's meetings over the next
+year** (`MEETINGS_AHEAD`, eight),
 worked out the way CME's FedWatch does. A thirty-day contract's price is 100 less
 the month's average overnight rate; a meeting month averages the rates before
 and after the decision, weighted by days, and a neighbouring clear month pins one
@@ -1024,7 +1041,12 @@ unsolvable meeting is named in `unread`. The dates are `FOMC`, the Fed's
 published decision days; a test fails half a year before the table runs out and
 checks every date is a Wednesday, and the last date is never priced. Each read
 also asks the calendar for the month's rate decisions, and one the table does not
-hold refuses the whole answer.
+hold refuses the whole answer. **A year of meetings, because the path is the
+number for gold**: the next meeting says what the Fed does now, and how much is
+priced by a year out says how far the market thinks it goes, which moves the gap
+between rates and inflation before any meeting does. Up to twelve contracts,
+nearest first, so a slow morning keeps the meetings closest; where the table
+runs short of a year the strip is as long as the table.
 
 Checked against FedWatch on 1 October, on its own prices the October odds were
 identical (24.9%) and December within a point. `ratesList` states the first
@@ -1069,20 +1091,21 @@ for the seven economies abroad from 7 September to 4 November, read on 5 October
 — 459 kinds, 862 events, each with its country, rating, category and title — so
 what is filed from abroad is judged against the whole catalogue.
 
-**`?probe=` is fixed: nothing in the request reaches a tool.** It picks one of
-eight, every argument is written in the function, and each call's failure is its
-own answer:
+**`?probe=` is fixed: nothing in the request reaches a tool.** It picks one from
+the table below, every argument is written in the function, and each call's
+failure is its own answer:
 
 | `?probe=` | what it asks |
 |---|---|
 | `calendar` | the next three days of US events, and the past week at high importance, to see whether a release that printed carries its actual beside the forecast and the prior |
-| `quotes` | whether the quote batch answers for the dollar, the yields at home and abroad, the real yield, silver, oil, the S&P and the VIX with no forex symbol in it (the euro is left out) — it refused twice with the forex scanner's 429, taking the whole batch with it — and each one's last bars from the OHLCV read, which answered where the batch did not, with the bar times saying how fresh each feed is |
+| `quotes` | whether the quote batch answers for the dollar, the yields at home and abroad, the real yield, the breakeven, silver, oil, the S&P, the VIX and GVZ with no forex symbol in it (the euro is left out) — it refused twice with the forex scanner's 429, taking the whole batch with it — and each one's last bars from the OHLCV read, which answered where the batch did not, with the bar times saying how fresh each feed is |
 | `gold` | the broker's quote through the poller and TradingView's gold feeds read in the same second, plus the last three one-minute bars, which say how stale a TradingView quote is |
 | `news` | headlines for gold and the dollar, and what one carries |
 | `econ` | which US price and money series exist, the actual releases a calendar entry would be judged against |
 | `search` | the names gold's feeds and a real yield go by, for whatever `quotes` could not resolve |
 | `fedfunds` | whether thirty-day fed funds futures answer, under the continuous names (`ZQ1!` to `ZQ3!`) and under named contract months, and what a bar of them carries — the price `?rates=1` works the meeting odds out from |
 | `futures` | what a daily bar of gold's front month (`COMEX:GC1!`) carries — the bars `?volume=1` folds |
+| `flows` | which `ECONOMICS:` series carry gold reserves, at home and in China, and what GLD, the largest gold fund, answers — the central banks' and the investors' flows §2 names, which no reader serves until this shows what is there |
 
 **How the sign-in is found.** OAuth 2.1 as MCP specifies it, discovered rather
 than configured: the only TradingView address in the file is the endpoint, whose
@@ -1281,7 +1304,7 @@ pass has nothing to research.
   the day: the turns stay in the table, searchable.
 - **Nothing is sent and no turn is stored**; storing one would spend two of
   tomorrow's twelve turns on bookkeeping. `?consolidate=1` runs it on demand.
-- **It records where the five channels stand**, at the one moment a rung could
+- **It records where the six channels stand**, at the one moment a rung could
   have moved — the only meter on whether his understanding grows. A ladder that
   stopped moving looks exactly like one that never had to.
 - **It moves the story and closes what resolved.** `set_thesis` rewrites the
@@ -1522,6 +1545,23 @@ re-upserts every row each quarter hour, so the column says which of two rows
 carries the later content rather than when one was last filed. The trigger
 compares the row as `jsonb` less `updated_at`, so a column added later is
 compared without anyone remembering it.
+
+**What is filed is read back as a record: `get_releases`.** Every other read of
+the calendar reaches a day or a week, while the table holds every release the
+filing and the history door have reached, each with its consensus and its
+actual — how core inflation has run against the forecast for a year, out of her
+reach. `get_releases` takes a release as the calendar names it, less its period,
+matched on the start of the name, so a release from abroad, which leads with its
+country's code, never answers for one at home. It reads the newest twenty-four
+prints in the months asked (`RELEASE_PRINTS`; 1 to 120, two years by default),
+newest first under the limit and told oldest first, and a full read says how far
+back it reaches. **The tally is counted in code** (`printsList`): above, below
+or on the consensus, and a pair in different units or with no consensus counted
+apart rather than guessed. Above and below are arithmetic, and the list says so,
+since a higher unemployment rate is above consensus too. What she named goes out
+as a value: `*` is taken out and one put back at the end, and the rest is
+`encodeURIComponent`. In `CHAT_TOOLS`, so the briefing and a reply can both read
+it.
 
 **Every reply is read once more before it is sent**, as the briefing is.
 `CRITIC` reads the briefing; `TRIM` reads every reply. The reply is gated inside
@@ -1922,6 +1962,12 @@ makes a retry's refiling a no-op.
   she misread, which is what makes it teach rather than count; a lesson on a
   read that held is refused. Reads filed before either column existed count in
   the month and in neither half.
+- **Through which channel.** Each read is filed with the channel its chain ran
+  down, and the record counts the misses per channel by its spoken name, since a
+  count says how often she misses and only the channel says where her reading
+  is weak — the one to say less on until it holds. The column references
+  `eugenia_channels`, so the channels stay one list; reads filed before it are
+  in no channel.
 - **The record is hers.** A month of counts and the three newest misses go to the
   briefing and a reply, the two paths that give a read, and to the pass; never
   the trade look, which carries none and lands the moment a loss closes his day. It
@@ -2067,13 +2113,13 @@ closes; and the calendar and her record are the datasets here that compound.
 |---|---|---|---|
 | `eugenia_turns` | the conversation | last 12 turns | every exchange |
 | `eugenia_notes` | facts about him, what he has told her to do, and what he has committed to | last 20 of each kind | her `remember` tool |
-| `eugenia_channels` | where he stands on each of the five channels | all 5 rows, always | her `set_channel` tool, nightly |
+| `eugenia_channels` | where he stands on each of the six channels | all 6 rows, always | her `set_channel` tool, nightly |
 | `eugenia_thesis` | the running story the market is trading | 1 row, rewritten | her `set_thesis` tool, nightly |
 | `eugenia_portrait` | how she reads him — what his notes and trades add up to | 1 row, rewritten | her `set_portrait` tool, nightly |
 | `eugenia_reads` | every read she gave, with a verdict on the test she stated | the last 30 days | her `record_read` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
 | `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar` |
-| `eugenia_market` | the market around gold, the Fed's odds and her map of his charts, read ahead | 1 row per door, rewritten | the quarter-hourly job, `storeMarket`, `storeRates` and `storeStructure` |
+| `eugenia_market` | the market around gold, the weeks behind it, the Fed's odds and her map of his charts, read ahead | 1 row per door, rewritten | the quarter-hourly job, `storeMarket`, `storeTrend`, `storeRates` and `storeStructure` |
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
 | `eugenia_rewrites` | what the thesis and the portrait said before each rewrite | never handed to her | a trigger on both, `eugenia_keep_rewrite` |
 | `eugenia_calls` | every call she made, and how price scored it | the last 30 days | her `make_call` tool; scored by the nightly pass |
@@ -2273,7 +2319,7 @@ and the grants are held by tests; the rest shows up in use.
 
 ### Where he stands on each channel
 
-`eugenia_channels` is five rows, one per channel, and it never scrolls — a
+`eugenia_channels` is six rows, one per channel, and it never scrolls — a
 **census over a fixed set**, which makes it the only place an **absence** is
 legible. A channel he has never once used is a row saying `unseen`; in
 `eugenia_notes` it would be nothing written down, which nobody can notice. And
@@ -2318,15 +2364,26 @@ write: that rung says a channel never came up, and writing it back would report
 one she taught last week as never met. A channel he has lost goes to `explained`.
 
 **And `/channel` is the rung he moves himself.** `/channel <channel> <rung>` takes
-the id or the spoken name, with the rung as the last word, since three of the
-five names are several words. The ladder otherwise climbs only on him using a
+the id or the spoken name, with the rung as the last word, since four of the
+six names are several words. The ladder otherwise climbs only on him using a
 term back, so a reader who rarely answers would sit at `explained` — restate the
 mechanism every time — for ever. It goes through `setChannel`, so the one-way
 door and the unseeded-table check hold; and it is him saying where he is, not
 her reading of him, so `set_channel` stays out of `CHAT_TOOLS`.
 
-The five ids live in `prompt.ts`, read by the tool's enum and interpolated into
-her prose; the check constraint and the seed are the real second copies. §2 heads
+The six ids live in `prompt.ts`, read by the tool's enum and interpolated into
+her prose; the check constraint and the seed are the real second copies, and a
+read's channel references the table rather than copying it.
+
+**The sixth is what investors are buying** — gold funds and futures funds, the
+flow that turns fastest, where haven buying arrives, and where the rates channel
+actually lands, since Western investors are the buyers who care what a bond
+pays. Strategy v1.26 added it after the market from 2022 to 2025, which the five
+could not tell: the funds' holdings fell as real yields climbed while central
+banks held the price up. The CFTC's count is handed to her; the funds' holdings
+are read off the World Gold Council's and SPDR's own pages, dated and sourced. A
+database applied before it needs `upgrade.sql`, since the channel check is
+written inside `create table if not exists`, and then `schema.sql` seeds the row. §2 heads
 each channel with the **spoken** name, so `agree.test.mjs` resolves §2's headings
 against the names rather than the ids.
 
@@ -2494,15 +2551,16 @@ its door** — *TradingView calendar: no answer in 45s* — since the abort's ow
 message names nothing, and the meter rows are where an outage is read afterwards.
 
 **The market and the Fed's odds are read ahead, and she reads the copy.**
-`?market=1` makes fourteen chart calls and `?rates=1` six. Read while a briefing
+`?market=1` makes sixteen chart calls and `?rates=1` up to twelve. Read while a briefing
 waited, they were paid for out of its clock: on 12 October, with the news
 door's two calls taking 25 seconds, both outran her 45 and the briefing lost
 each block whole, and on 13 and 14 October, at five or six seconds a chart,
 it kept six lines of fourteen. Now the quarter-hourly job reads both after it
-files the calendar (`storeMarket`, `storeRates`) and keeps the answers in
-`eugenia_market`, one row per door; `aroundBlock` and `ratesBlock` read that
-row, so a briefing or a reply never waits on TradingView for them. A copy is a
-quarter hour old at most, of hourly and daily bars. **A symbol a pass misses
+files the calendar (`storeMarket`, `storeRates`), and the weeks behind the market
+once a day (`storeTrend`), and keeps the answers in `eugenia_market`, one row per
+door; `aroundBlock`, `trendBlock` and `ratesBlock` read that row, so a briefing
+or a reply never waits on TradingView for them. The hourly copy is a quarter
+hour old at most, of hourly and daily bars. **A symbol a pass misses
 keeps the line the last pass read** (`keptMarket`), with that pass's bar times
 on it, so one slow call leaves no gap; one never read is still named. The odds
 are replaced whole once a pass prices a meeting, since a fold does not merge,
@@ -2613,7 +2671,7 @@ is not there gets a `400` it swallows, and the only sign is a meter reading `0`
 — `planned`, `excursions` and `stops` in the poller's answer all read `0` on a
 healthy poll and on a missing column alike. `verify.sql` names a row for each,
 which is how to tell an unapplied change from a quiet day. Then check its row
-for **all five channels**: `setChannel` PATCHes by key, so a missing row is a
+for **all six channels**: `setChannel` PATCHes by key, so a missing row is a
 `200` with an empty body, and that channel would sit at the bottom rung for ever,
 looking like one he has never used.
 
@@ -3353,7 +3411,7 @@ job name, so a re-run makes the jobs match the file. Six jobs —
 |---|---|---|
 | `doji-mcp-sync` | `*/2 * * * *` | the poller |
 | `doji-eugenia` | `0 * * * *` | the briefing and the nightly pass — the function decides which, or neither |
-| `doji-eugenia-calendar` | `5,20,35,50 * * * *` | the calendar's filing, then the market, the Fed's odds and his charts read ahead |
+| `doji-eugenia-calendar` | `5,20,35,50 * * * *` | the calendar's filing, then the market, the weeks behind it, the Fed's odds and his charts read ahead |
 | `doji-dispatch-watch` | `*/10 * * * *` | `dispatch_watch`'s sweep |
 | `doji-pace-watch` | `37 * * * *` | `pace_watch`'s one-a-day warning |
 | `purge-cron-history` | `0 3 * * *` | trims `cron.job_run_details` |

@@ -229,7 +229,7 @@ const NOTES_TOOL = {
 } as const;
 
 /* ─── Where he stands on each channel ──────────────────────────────────────
-   The five channels her teaching is anchored to: five rows rather than a
+   The channels her teaching is anchored to: a row each rather than a
    window, so a channel he has never used is a row saying so — an absence
    nobody would write down as a note.
 
@@ -988,6 +988,108 @@ async function filed(now = Date.now()): Promise<void> {
   }
 }
 
+/* ─── How a release has run against expectations ───────────────────────────
+   The calendar is filed back as far as the history door has walked, each
+   release with its consensus and its actual, and every other read of it
+   reaches a day or a week: how core inflation has run against the forecast
+   for a year was on file and out of her reach. Past prints of one release,
+   oldest first, each beside what was expected. The tally is worked out here,
+   since lining up two dozen figures and their units by eye is what a model
+   does worst; a pair in different units, or one that is not a number, is
+   counted apart rather than guessed. Above and below are arithmetic, never
+   good or bad: a higher unemployment rate is above consensus too.
+
+   Matched on the start of the name, so the period every row carries is left
+   off and a release from abroad, which leads with its country's code, does not
+   answer for one at home.
+   ───────────────────────────────────────────────────────────────────────── */
+export const RELEASE_PRINTS = 24;
+
+const RELEASES_TOOL = {
+  name: "get_releases",
+  description:
+    `Past prints of one release from the calendar on file — the newest ${RELEASE_PRINTS} ` +
+    "inside the months asked, oldest first, each with its actual against the consensus " +
+    "and the prior — and a count of how many came in above, below or on the consensus. " +
+    "Name the release as the calendar lists it, without the period in brackets: " +
+    "'Core Inflation Rate MoM', 'Non Farm Payrolls', 'Fed Interest Rate Decision'. One " +
+    "from abroad starts with its country's code: 'EU Inflation Rate YoY Flash'. Use it " +
+    "when how a release has run against expectations changes what you say about the " +
+    "next one, and quote that history from here, never from a search.",
+  input_schema: {
+    type: "object",
+    properties: {
+      release: { type: "string", description: "The release's name as the calendar lists it, without its period." },
+      months: { type: "integer", description: "How far back to read, 1 to 120. Defaults to 24." },
+    },
+    required: ["release"],
+    additionalProperties: false,
+  },
+} as const;
+
+/* A boundary: cleaned and clamped, never thrown. `*` is PostgREST's wildcard,
+   so it is taken out of what she named and put back only at the end. */
+export const releaseName = (release: unknown) => String(release ?? "").replace(/\*/g, "").trim().slice(0, 80);
+
+export function printsQuery(name: string, months: unknown, now = Date.now()): string {
+  const n = Math.min(Math.max(Math.trunc(Number(months)) || 24, 1), 120);
+  const from = new Date(now);
+  from.setUTCMonth(from.getUTCMonth() - n);
+  return `eugenia_calendar?select=${RELEASE_COLUMNS}&name=ilike.${encodeURIComponent(name)}*` +
+         `&actual=not.is.null&at=gte.${from.toISOString()}&at=lte.${new Date(now).toISOString()}` +
+         `&order=at.desc&limit=${RELEASE_PRINTS}`;
+}
+
+// A figure as TradingView writes it — `0.3%`, `254K`, `-1.2B` — split into its
+// number and its unit, or null for anything else.
+const figureOf = (v: string | null) => {
+  const m = v?.match(/^(-?\d+(?:\.\d+)?)\s*([^\d\s]*)$/);
+  return m ? { n: Number(m[1]), unit: m[2] } : null;
+};
+
+const yearDay = (iso: string) => new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'America/New_York', day: 'numeric', month: 'short', year: 'numeric',
+}).format(new Date(iso));
+
+// Newest first as read, so the limit keeps the latest; told oldest first.
+export function printsList(rows: Release[], release: string): string {
+  const told = [...rows].reverse();
+  const tally = { above: 0, below: 0, on: 0, apart: 0 };
+  const lines = told.map(r => {
+    const a = figureOf(r.actual), c = figureOf(r.consensus);
+    if (a && c && a.unit === c.unit) tally[a.n > c.n ? 'above' : a.n < c.n ? 'below' : 'on']++;
+    else tally.apart++;
+    return `· ${yearDay(r.at)}, ${r.name}: ${r.actual}` +
+           (r.consensus ? ` against ${r.consensus} expected` : ", no consensus on file") +
+           (r.prior ? `, after ${r.prior}` : "");
+  });
+  const reach = rows.length === RELEASE_PRINTS
+    ? `\nThe read stops at its ${RELEASE_PRINTS} newest prints, so it reaches back only to ` +
+      `${yearDay(told[0].at)}.`
+    : "";
+  return `How "${release}" has printed against the consensus, oldest first, from the calendar on file:\n` +
+    `${lines.join("\n")}\nAgainst the consensus: ${tally.above} above, ${tally.below} below, ` +
+    `${tally.on} on it` + (tally.apart ? `; ${tally.apart} with no consensus or no comparable figure` : "") +
+    `. Above and below are arithmetic, not good or bad news.` + reach;
+}
+
+async function readPrints(release: unknown, months: unknown): Promise<string> {
+  const name = releaseName(release);
+  if (!name) return "Name the release as the calendar lists it, without its period.";
+  try {
+    const rows = await readRows<Release>('Prints', printsQuery(name, months));
+    return rows.length
+      ? printsList(rows, name)
+      : "Nothing on file starts with that name and carries a figure in that window. Check the " +
+        "name against the calendar, and say you have no record rather than that it never printed: " +
+        "the calendar holds only what was filed.";
+  } catch (err) {
+    console.error("doji-eugenia: prints read failed —", why(err));
+    return "The calendar on file could not be read just now. Do not take a release's history from a " +
+      "search; say you do not have it.";
+  }
+}
+
 /* ─── The price, read off the instrument ───────────────────────────────────
    Through the poller, never the broker: the endpoint that serves a price also
    serves create_order, so the token stays in doji-mcp-sync and she presents
@@ -1019,11 +1121,13 @@ const AROUND_TOOL = {
   name: "get_around",
   description:
     "The market around gold, from TradingView: the dollar index, the two- and " +
-    "ten-year yields, the real yield, silver, oil, the S&P 500 and the VIX, and " +
+    "ten-year yields, the real yield, the breakeven, silver, oil, the S&P 500, the VIX " +
+    "and gold's own volatility index, and " +
     "abroad the German, French, Italian, UK and Japanese ten-year yields and the " +
-    "euro, each a level now beside the level at a stated time; and gold's and the dollar's " +
+    "euro, each a level now beside the level at a stated time, and its daily close a week, " +
+    "a month and three months back; and gold's and the dollar's " +
     "headlines from the last six hours, titles only; what fed funds futures price for " +
-    "the next three Fed meetings; the CFTC's weekly count of " +
+    "the Fed's meetings over the next year; the CFTC's weekly count of " +
     "where the speculators stand in gold futures; and what COMEX gold futures traded in " +
     "the last finished session against the twenty before. Use it whenever you are about " +
     "to say what the dollar, yields or anything else around gold did, or what " +
@@ -1339,8 +1443,9 @@ const RECORD_TOOL = {
     "had its chance and did not, and what you were handed shows that; 'untested' " +
     "when the day did not settle it, what would settle it is not in front of you, " +
     "or the test was gold's own price. Judge only the test you stated, never where " +
-    "price went. Say how firmly you said it, read off your own words. On a read that " +
-    "proved wrong, name the one link in the chain you misread.",
+    "price went. Say how firmly you said it, read off your own words, and which " +
+    "channel it ran through. On a read that proved wrong, name the one link in the " +
+    "chain you misread.",
   input_schema: {
     type: "object",
     properties: {
@@ -1350,10 +1455,12 @@ const RECORD_TOOL = {
       evidence: { type: "string", description: `What in front of you settled it, or why nothing did, at most ${READ_MAX} characters.` },
       firmness: { type: "string", enum: READ_FIRMNESS,
                   description: "'firm' when you said it as a view you held with conviction; 'light' when you said it as a lean." },
+      channel: { type: "string", enum: CHANNELS.map(([id]) => id),
+                 description: "The channel the read's chain ran down — where gold was reached from." },
       lesson: { type: "string",
                 description: `Only when the verdict is wrong: the one link in the chain you misread, in a sentence of at most ${NOTE_MAX} characters — "I read the dollar as leading when the two-year was". Never "be more careful".` },
     },
-    required: ["reading", "test", "verdict", "evidence", "firmness"],
+    required: ["reading", "test", "verdict", "evidence", "firmness", "channel"],
     additionalProperties: false,
   },
 } as const;
@@ -1362,7 +1469,8 @@ const RECORD_TOOL = {
    check constraint answers a bad one with a 400 that reads as a database
    fault. */
 async function recordRead(reading: unknown, test: unknown, verdict: unknown,
-                          evidence: unknown, firmness: unknown, lesson: unknown): Promise<string> {
+                          evidence: unknown, firmness: unknown, lesson: unknown,
+                          channel: unknown): Promise<string> {
   const said = String(reading ?? "").trim().slice(0, READ_MAX);
   const against = String(test ?? "").trim().slice(0, READ_MAX);
   if (!said || !against) return "A read is filed with what would prove it wrong, or not at all.";
@@ -1379,6 +1487,10 @@ async function recordRead(reading: unknown, test: unknown, verdict: unknown,
   const learnt = String(lesson ?? "").trim().slice(0, NOTE_MAX);
   if (v === 'wrong' && !learnt) return "A read that proved wrong is filed with the link you misread.";
   if (v !== 'wrong' && learnt) return "Only a read that proved wrong carries a lesson. File it without one.";
+  const ran = String(channel ?? "");
+  if (!CHANNELS.some(([id]) => id === ran)) {
+    return `"${ran}" is not a channel. They are ${CHANNELS.map(([id]) => id).join(", ")}.`;
+  }
   try {
     // A retry after a pass that failed half-way files the same reads again;
     // the same words on the same day are one read.
@@ -1387,7 +1499,7 @@ async function recordRead(reading: unknown, test: unknown, verdict: unknown,
       body: JSON.stringify([{
         given_on: nyDate(new Date()), reading: said, test: against, verdict: v,
         evidence: String(evidence ?? "").trim().slice(0, READ_MAX) || null,
-        firmness: firm, lesson: learnt || null,
+        firmness: firm, lesson: learnt || null, channel: ran,
       }]),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1631,6 +1743,7 @@ const CHAT_TOOLS = [
   STRATEGY_TOOL,
   LOOP_TOOL,
   CALL_TOOL,
+  RELEASES_TOOL,
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, PORTRAIT_TOOL, CLOSE_TOOL,
                            RECORD_TOOL, CHECK_TOOL, STATS_TOOL];
@@ -1763,6 +1876,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case STRATEGY_TOOL.name: return readStrategy(input.section);
     case CHANNEL_TOOL.name:  return await setChannel(input.channel, input.state, input.evidence);
     case MARKET_TOOL.name:   return await readMarket();
+    case RELEASES_TOOL.name: return await readPrints(input.release, input.months);
     case AROUND_TOOL.name:
       return (await Promise.all([aroundBlock(), ratesBlock(), headlinesBlock(),
                                  positioningBlock(), volumeBlock()])).join("").trim();
@@ -1774,7 +1888,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case CALL_TOOL.name:     return await makeCall(input.direction, input.entry, input.stop, input.target,
                                                input.condition);
     case RECORD_TOOL.name:   return await recordRead(input.reading, input.test, input.verdict, input.evidence,
-                                                 input.firmness, input.lesson);
+                                                 input.firmness, input.lesson, input.channel);
     default:
       console.error(`doji-eugenia: no handler for tool "${name}"`);
       return unserved(name);
@@ -2387,7 +2501,7 @@ export function parseChannel(text: string): { channel: string; state: string } |
            `<${CHANNEL_STATES.slice(1).join('|')}>.`;
   }
 
-  // The rung is the last word and the channel the rest: three spoken names are
+  // The rung is the last word and the channel the rest: four spoken names are
   // several words long.
   const to = words[words.length - 1].toLowerCase();
   const wanted = words.slice(1, -1).join(' ').toLowerCase();
@@ -2423,7 +2537,7 @@ export function channelsList(rows: Channel[]): string {
 /* The read, apart from both renderings — one speaks to her, one to him. */
 async function readChannels(): Promise<Channel[]> {
   return readRows<Channel>('Channels',
-    // A limit that can never bite — the key sits on a five-value check — kept
+    // A limit that can never bite — the key sits on a check of CHANNELS — kept
     // because every read here carries one.
     `eugenia_channels?select=channel,state,evidence,moved_on` +
     `&limit=${CHANNELS.length}`);
@@ -2547,7 +2661,7 @@ export async function portraitBlock(): Promise<string> {
    come with it, because a count says how often and only the misses say what
    she keeps getting wrong. */
 type Read = { given_on: string; reading: string; test: string; verdict: string; evidence: string | null;
-              firmness: string | null; lesson: string | null };
+              firmness: string | null; lesson: string | null; channel: string | null };
 
 const RECORD_DAYS = 30;
 const RECORD_MISSES = 3;
@@ -2555,7 +2669,7 @@ const RECORD_MISSES = 3;
 // A read a message at most, so a month is never near the limit; it is there
 // because every read carries one.
 export function recordQuery(now = Date.now()): string {
-  return `eugenia_reads?select=given_on,reading,test,verdict,evidence,firmness,lesson` +
+  return `eugenia_reads?select=given_on,reading,test,verdict,evidence,firmness,lesson,channel` +
     `&given_on=gte.${nyDate(new Date(now - RECORD_DAYS * 86_400_000))}&order=id.desc&limit=200`;
 }
 
@@ -2570,6 +2684,19 @@ const tally = (rows: Read[]) => count(rows) + READ_FIRMNESS
   .filter(([, said]) => said.length)
   .map(([f, said]) => `; said ${f === 'firm' ? 'firmly' : 'lightly'}, ${count(said)}`).join("");
 
+/* And by the channel each ran through, by its spoken name: a count of misses
+   says how often, and only the channel says where her reading is weak. Reads
+   filed before the channel was asked are in no channel. */
+const byChannel = (rows: Read[]) => {
+  const ran = CHANNELS.map(([id, name]) => [name, rows.filter(r => r.channel === id)] as const)
+    .filter(([, reads]) => reads.length);
+  return ran.length
+    ? `\nBy the channel each ran through, proved wrong of those filed: ` +
+      ran.map(([name, reads]) => `${name} ${reads.filter(r => r.verdict === 'wrong').length} of ${reads.length}`)
+        .join(", ") + "."
+    : "";
+};
+
 const misses = (rows: Read[]) => rows.filter(r => r.verdict === 'wrong').slice(0, RECORD_MISSES)
   .map(r => `· ${civilDay(r.given_on)}: ${r.reading} (wrong if ${r.test}) — ${r.evidence ?? 'its test fired'}` +
             (r.lesson ? `. Misread: ${r.lesson}` : ""))
@@ -2579,7 +2706,7 @@ export function recordList(rows: Read[]): string {
   if (!rows.length) return "";
   const missed = misses(rows);
   return `\n\nYour record — every read of the last ${RECORD_DAYS} days, judged at night by the test ` +
-    `you stated: ${tally(rows)}.` + (missed ? `\nThe latest proved wrong:\n${missed}` : "");
+    `you stated: ${tally(rows)}.` + byChannel(rows) + (missed ? `\nThe latest proved wrong:\n${missed}` : "");
 }
 
 export async function recordBlock(): Promise<string> {
@@ -2856,8 +2983,8 @@ async function store(door: string, answer: unknown): Promise<void> {
 /* A symbol this pass did not reach keeps the line the last pass read, its own
    bar times on it, so one slow call leaves no gap; one never read stays named.
    Pure, so the carrying is driven. */
-export function keptMarket(fresh: { market: Around[]; missing: Missed[] },
-                           kept: { market: Around[] } | null) {
+export function keptMarket<T extends { symbol: string }>(fresh: { market: T[]; missing: Missed[] },
+                                                         kept: { market: T[] } | null) {
   const old = new Map((kept?.market ?? []).map(m => [m.symbol, m]));
   return {
     market: [...fresh.market, ...fresh.missing.flatMap(m => old.get(m.symbol) ?? [])],
@@ -2873,6 +3000,22 @@ export async function storeMarket(): Promise<void> {
     await store("market", keptMarket(answer, (await readStored("market"))?.answer ?? null));
   } catch (err) {
     await unread("market", why(err));
+  }
+}
+
+/* Daily closes move once a day, so a copy read today is kept and the door is
+   asked again only on a new New York day; what a pass misses carries, as the
+   hourly lines do. */
+export async function storeTrend(now = Date.now()): Promise<void> {
+  try {
+    const kept = await readStored("trend");
+    if (kept && nyDate(new Date(kept.read_at)) === nyDate(new Date(now))) return;
+    const answer = await tvRead("trend");
+    if (!answer.market?.length) throw new Error("no symbol served");
+    if (answer.missing.length) await unread("trend", missed(answer.missing));
+    await store("trend", keptMarket(answer, kept?.answer ?? null));
+  } catch (err) {
+    await unread("trend", why(err));
   }
 }
 
@@ -2915,13 +3058,13 @@ export async function storeStructure(): Promise<void> {
 }
 
 /* ─── The market around gold ───────────────────────────────────────────────
-   The dollar, yields, real yield, silver, oil, the S&P and the VIX, and abroad
-   four European ten-year yields, Japan's and the euro, for the briefing and
-   get_around, which explain gold against them.
+   The dollar, yields, real yield, breakeven, silver, oil, the S&P, the VIX and
+   GVZ, and abroad four European ten-year yields, Japan's and the euro, for the
+   briefing and get_around, which explain gold against them.
 
    Every line is a level now beside the level at a stated time, and no change
    is computed — quoteLine's lesson, applied here. The latest bar's time is
-   given, a bar not being a tick; the real yield is daily and dated.
+   given, a bar not being a tick; a daily series is dated.
 
    Never throws, and a failed read is a sentence, or she reaches for a search
    page. A symbol not served is named: an absent line reads as never asked.
@@ -2935,9 +3078,11 @@ const NO_AROUND =
   "\n\nThe market around gold could not be read just now. Do not quote the dollar " +
   "or yields from a search; say you do not have them.";
 
+// A level in its unit, the hourly lines and the weeks alike.
+const figure = (v: number, unit: string) => unit === "%" ? `${v}%` : unit === "$" ? `$${v}` : `${v}`;
+
 export function aroundList(answer: { market: Around[]; missing: { name: string }[] }, now = Date.now()): string {
   const today = nyDate(new Date(now));
-  const figure = (v: number, unit: string) => unit === "%" ? `${v}%` : unit === "$" ? `$${v}` : `${v}`;
   const when = (iso: string) => {
     const day = nyDate(new Date(iso));
     return `${nyTime(iso)} ET` + (day === today ? "" : ` on ${civilDay(day)}`);
@@ -2952,13 +3097,43 @@ export function aroundList(answer: { market: Around[]; missing: { name: string }
 }
 
 export async function aroundBlock(): Promise<string> {
+  const weeks = trendBlock();
   try {
     const kept = await readStored("market");
     if (!kept) throw new Error("not read yet");
-    return aroundList(kept.answer);
+    return aroundList(kept.answer) + await weeks;
   } catch (err) {
     await unread("market", why(err));
-    return NO_AROUND;
+    return NO_AROUND + await weeks;
+  }
+}
+
+/* ─── The weeks behind it ──────────────────────────────────────────────────
+   The same lines as daily closes a week, a month and three months back, each
+   dated, so the dollar's trend and which force moved over weeks are read off
+   numbers rather than a search page. Levels at stated days, and no change
+   computed, as above. Carried by aroundBlock, so every reader of the market
+   gets the weeks behind it; never throws.
+   ───────────────────────────────────────────────────────────────────────── */
+type Trend = { symbol: string; name: string; unit: string; points: { close: number; at: string }[] };
+
+export function trendList(answer: { market: Trend[]; missing: { name: string }[] }): string {
+  const lines = answer.market.map(m =>
+    `· ${m.name} ${m.points.map(p => `${figure(p.close, m.unit)} on ${civilDay(p.at.slice(0, 10))}`).join(", ")}`);
+  if (answer.missing.length) lines.push(`· Not read: ${answer.missing.map(m => m.name).join(", ")}.`);
+  return `\n\nThe weeks behind it, from TradingView's daily closes a week, a month and three months ` +
+    `back:\n${lines.join("\n")}`;
+}
+
+export async function trendBlock(): Promise<string> {
+  try {
+    const kept = await readStored("trend");
+    if (!kept) throw new Error("not read yet");
+    return trendList(kept.answer);
+  } catch (err) {
+    await unread("trend", why(err));
+    return "\n\nThe weeks behind the market could not be read just now. Do not quote a week's " +
+      "or a month's move from a search; say you do not have it.";
   }
 }
 
@@ -3362,11 +3537,11 @@ async function postScheduled(url: URL): Promise<Response> {
   try {
     if (url.searchParams.get("consolidate") === "1") { job = 'consolidate'; return await postConsolidation(); }
     // The calendar, on its own quarter-hourly job, so an actual lands within
-    // one, and the market and his charts read ahead after it; none of the four
-    // throws.
+    // one, and the market, its weeks and his charts read ahead after it; none
+    // of the five throws.
     if (url.searchParams.get("calendar") === "1") {
       await filed();
-      await Promise.all([storeMarket(), storeRates(), storeStructure()]);
+      await Promise.all([storeMarket(), storeRates(), storeTrend(), storeStructure()]);
       return json({ ok: true, filed: true });
     }
 

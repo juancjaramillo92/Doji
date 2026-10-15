@@ -39,3 +39,12 @@ alter table public.dispatch add constraint dispatch_job_check check (job in (
 -- his to weigh, so a trade opening no longer calls her. trades_eugenia_on_event
 -- stays, called on a close alone.
 drop trigger if exists trades_eugenia_opened on public.trades;
+
+-- The sixth channel, what investors are buying. The constraint written inside
+-- `create table if not exists` never changes on the live database; schema.sql
+-- seeds the row once it can be accepted.
+alter table public.eugenia_channels drop constraint if exists eugenia_channels_name_check;
+
+alter table public.eugenia_channels add constraint eugenia_channels_name_check check (channel in (
+  'rates_vs_inflation', 'dollar', 'inflation', 'jobs', 'central_bank_buying',
+  'investment_demand'));

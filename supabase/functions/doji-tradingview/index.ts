@@ -352,7 +352,7 @@ const tvCall = async (session: Record<string, string>, tool: AllowedTool, args: 
                       signal?: AbortSignal) =>
   unwrap(parseSse(await tvPost(session, tool, args, signal)), tool);
 
-/* What each of the two long doors may spend, so that it answers inside the
+/* What each of the three long doors may spend, so that it answers inside the
    READ_MS, 45 seconds, its caller waits, with what it has rather than with
    nothing: on 12 October the market's fourteen calls and the rates' six
    outran it, and a briefing and a reply lost both blocks whole. Ten seconds
@@ -446,8 +446,11 @@ export function foldCalendar(answer: any) {
    the current hour on the end — because the quote batch refused on every
    probe while the OHLCV read answered for every symbol.
 
-   The real yield is FRED's daily TIPS series, a day or more behind, and must
-   never read as live: `daily` says so to whoever renders it. Abroad, the
+   The real yield is FRED's daily TIPS series and the breakeven FRED's daily
+   inflation the bond market expects, each a day or more behind, and neither
+   may read as live: `daily` says so to whoever renders it. The two side by
+   side are strategy §2's table, which neither answers alone. GVZ is what gold
+   options price its swing at over the next month. Abroad, the
    ten-year yields she reads the calendar's auctions and central banks against
    — France and Italy each against Germany is what lenders charge for the doubt
    — and the euro, more than half the dollar index. The names live here, once,
@@ -457,10 +460,12 @@ const MARKET = [
   { symbol: "TVC:US02Y",   name: "Two-year Treasury yield",   unit: "%" },
   { symbol: "TVC:US10Y",   name: "Ten-year Treasury yield",   unit: "%" },
   { symbol: "FRED:DFII10", name: "Ten-year real yield (TIPS)", unit: "%", daily: true },
+  { symbol: "FRED:T10YIE", name: "Ten-year breakeven inflation", unit: "%", daily: true },
   { symbol: "TVC:SILVER",  name: "Silver",                    unit: "$" },
   { symbol: "TVC:USOIL",   name: "US crude oil",              unit: "$" },
   { symbol: "SP:SPX",      name: "S&P 500",                   unit: "" },
   { symbol: "TVC:VIX",     name: "VIX",                       unit: "" },
+  { symbol: "CBOE:GVZ",    name: "Gold volatility index (GVZ)", unit: "" },
   { symbol: "TVC:DE10Y",   name: "German ten-year yield",     unit: "%" },
   { symbol: "TVC:FR10Y",   name: "French ten-year yield",     unit: "%" },
   { symbol: "TVC:IT10Y",   name: "Italian ten-year yield",    unit: "%" },
@@ -492,6 +497,45 @@ export async function readMarket() {
       const bars = foldBars(await tvCall(session, "mcp-tv-get-ohlcv",
         { symbol: m.symbol, interval: m.daily ? "1D" : "1h", count: m.daily ? 2 : 25 }, signal));
       market[i] = { ...m, daily: !!m.daily, ...bars };
+    } catch (err) {
+      missing[i] = { symbol: m.symbol, name: m.name, error: unreached(signal, err) };
+    }
+  });
+  return { ok: true, market: market.filter(Boolean), missing: missing.filter(Boolean) };
+}
+
+/* ─── The weeks behind it ──────────────────────────────────────────────────
+   The same list, as daily closes a week, a month and three months back. The
+   briefing is about the weeks behind his chart, and twenty-five hourly bars
+   reach one day, so the dollar's trend could come only off a search page.
+   Counted in sessions, so a holiday moves a date rather than the gap, and every
+   close carries its date. Its own door, because a daily close moves once a day
+   and sixteen more charts every quarter hour is the burst TradingView refuses.
+   The answer's list is `market`, as the hourly door's is, since it is the same
+   list and one carry serves both.
+   ───────────────────────────────────────────────────────────────────────── */
+export const BACK = [5, 21, 63];
+
+export function foldTrend(answer: any) {
+  const bars = answer.bars;
+  if (!Array.isArray(bars)) throw new Error("no bars");
+  const last = bars.length - 1;
+  const points = BACK.filter(n => n <= last).map(n => ({
+    close: bars[last - n].c, at: new Date(bars[last - n].t * 1000).toISOString(),
+  }));
+  if (!points.length) throw new Error("too few bars");
+  return points;
+}
+
+export async function readTrend() {
+  const signal = AbortSignal.timeout(DOOR_MS);
+  const session = await tvSession();
+  const market: Record<string, unknown>[] = [], missing: Record<string, string>[] = [];
+  await inLanes(MARKET, async (m, i) => {
+    try {
+      const points = foldTrend(await tvCall(session, "mcp-tv-get-ohlcv",
+        { symbol: m.symbol, interval: "1D", count: Math.max(...BACK) + 1 }, signal));
+      market[i] = { symbol: m.symbol, name: m.name, unit: m.unit, points };
     } catch (err) {
       missing[i] = { symbol: m.symbol, name: m.name, error: unreached(signal, err) };
     }
@@ -543,8 +587,15 @@ async function readHeadlines() {
    Named months, never the continuous ones: `ZQ1!` rolls early and `ZQ3!` was
    refused.
 
+   A year of meetings, eight, because the path is the number for gold: the next
+   meeting says what the Fed does now, and how much is priced by a year out says
+   how far the market thinks it goes. Near months first, so a slow morning
+   keeps the meetings closest.
+
    The meeting dates are the Fed's published schedule — the calendar reaches a
-   month and the odds need three meetings. A test fails half a year before the
+   month and the odds need a year of meetings. Where the table runs short of a
+   year the strip is as long as the table, each meeting named by its date, and
+   a test fails half a year before the
    table runs out, and every read checks the calendar: a decision it lists that
    the table lacks refuses the answer, since odds against the wrong meeting are
    a confident wrong number. The decision day is the second of the two. */
@@ -553,7 +604,7 @@ export const FOMC = [
   "2027-01-27", "2027-03-17", "2027-04-28", "2027-06-09",
   "2027-07-28", "2027-09-15", "2027-10-27", "2027-12-08",
 ];
-const MEETINGS_AHEAD = 3;
+const MEETINGS_AHEAD = 8;
 const MONTH_CODES = "FGHJKMNQUVXZ";
 
 const shift = (ym: string, by: number) => {
@@ -724,6 +775,9 @@ async function readVolume() {
      fedfunds   fed funds futures under continuous and named months, and what
                 a bar carries
      futures    what a daily bar of gold's front month carries
+     flows      which ECONOMICS: series carry gold reserves, at home and in
+                China, and what GLD, the largest gold fund, answers — the two
+                flows §2 names and no reader yet serves
 
    Every argument is written here; none is read from the request. */
 const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
@@ -741,10 +795,9 @@ const PROBES: Record<string, () => Call[]> = {
   quotes: () => [
     // Without the euro: a forex symbol is what drew the scanner's 429.
     ["mcp-tv-get-symbol-data-batch", { symbols: AROUND.filter(s => !s.startsWith("FX:")) }],
-    // The real yield is daily; a 15m bar of it answers nothing.
-    ...AROUND.filter(s => s !== "FRED:DFII10")
-      .map((symbol): Call => ["mcp-tv-get-ohlcv", { symbol, interval: "15m", count: 2 }]),
-    ["mcp-tv-get-ohlcv", { symbol: "FRED:DFII10", interval: "1D", count: 3 }],
+    // A daily series' 15m bar answers nothing.
+    ...MARKET.map(({ symbol, daily }): Call =>
+      ["mcp-tv-get-ohlcv", { symbol, interval: daily ? "1D" : "15m", count: daily ? 3 : 2 }]),
   ],
   gold: () => [
     ["mcp-tv-get-symbol-data-batch", { symbols: GOLD }],
@@ -767,6 +820,12 @@ const PROBES: Record<string, () => Call[]> = {
   ],
   futures: () => [
     ["mcp-tv-get-ohlcv", { symbol: "COMEX:GC1!", interval: "1D", count: 3 }],
+  ],
+  flows: () => [
+    ["mcp-tv-get-economic-symbols", { search: "gold" }],
+    ["mcp-tv-get-economic-symbols", { country: "CN", search: "gold" }],
+    ["mcp-tv-search-symbols", { query: "GLD", type_filter: "etf" }],
+    ["mcp-tv-get-ohlcv", { symbol: "AMEX:GLD", interval: "1D", count: 3 }],
   ],
 };
 
@@ -836,8 +895,9 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return json({ ok: true, events: foldCalendar(answer) });
     }
 
-    // ?market=1, ?news=1, ?rates=1 and ?volume=1 read only what is fixed above.
+    // ?market=1, ?trend=1, ?news=1, ?rates=1 and ?volume=1 read only what is fixed above.
     if (url.searchParams.get("market") === "1") return json(await readMarket());
+    if (url.searchParams.get("trend") === "1") return json(await readTrend());
     if (url.searchParams.get("news") === "1") return json(await readHeadlines());
     if (url.searchParams.get("rates") === "1") return json(await readRates());
     if (url.searchParams.get("volume") === "1") return json(await readVolume());
@@ -850,7 +910,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return plain(await probe(asked));
     }
 
-    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1, ?news=1, ?rates=1, ?volume=1 or ?probe=" }, 400);
+    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1, ?trend=1, ?news=1, ?rates=1, ?volume=1 or ?probe=" }, 400);
   } catch (err) {
     console.error("doji-tradingview:", why(err));
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);

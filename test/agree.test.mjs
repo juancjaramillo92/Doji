@@ -612,7 +612,7 @@ test('the note length is one number on both sides of the wire', () => {
    is dead weight that reads as coverage.
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* ─── The five channels, in four places and two vocabularies ────────────────
+/* ─── The channels, in four places and two vocabularies ─────────────────────
    prompt.ts declares them and the prose interpolates the names. The tool's enum
    is what she may name, the constraint what the database accepts, and §2 the
    mechanism behind each. Offered and refused is a set_channel that 400s;
@@ -621,17 +621,17 @@ test('the note length is one number on both sides of the wire', () => {
    Either way she teaches a channel the census cannot see.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('the five channels are the same five in the prompt, the tool, the constraint and §2', () => {
+test('the channels are the same in the prompt, the tool, the constraint and §2', () => {
   const declared = [...(EUGENIA_PROMPT.match(/export const CHANNELS = \[([\s\S]*?)\] as const/)?.[1] ?? '')
     .matchAll(/\['([a-z_]+)',/g)].map(m => m[1]).sort();
   const enforced = [...(EUGENIA_SQL.match(/check \(channel in \(([^)]*)\)/i)?.[1] ?? '')
     .matchAll(/'([a-z_]+)'/g)].map(m => m[1]).sort();
 
   assert.deepEqual(declared,
-    ['central_bank_buying', 'dollar', 'inflation', 'jobs', 'rates_vs_inflation'],
+    ['central_bank_buying', 'dollar', 'inflation', 'investment_demand', 'jobs', 'rates_vs_inflation'],
     'the channels have changed — say so here, then check the constraint and the seed');
   assert.deepEqual(enforced, declared,
-    'the check constraint and prompt.ts no longer hold the same five channels');
+    'the check constraint and prompt.ts no longer hold the same channels');
 
   // The tool offers whatever prompt.ts declares rather than a list of its own,
   // which is what makes the tool's copy impossible rather than merely checked.
@@ -639,7 +639,7 @@ test('the five channels are the same five in the prompt, the tool, the constrain
     'set_channel names its channels literally again instead of reading CHANNELS');
 
   // §2 heads each channel with the name she says out loud, so the mechanism she
-  // reads and the rung she moves are the same five channels under two spellings.
+  // reads and the rung she moves are the same channels under two spellings.
   const spoken = [...(EUGENIA_PROMPT.match(/export const CHANNELS = \[([\s\S]*?)\] as const/)?.[1] ?? '')
     .matchAll(/\['[a-z_]+',\s*'([^']+)'\]/g)].map(m => m[1]);
   assert.equal(spoken.length, declared.length,
@@ -653,7 +653,7 @@ test('the five channels are the same five in the prompt, the tool, the constrain
   }
 });
 
-test('the five rows are seeded, or a channel is invisible rather than unseen', () => {
+test('every channel\'s row is seeded, or a channel is invisible rather than unseen', () => {
   /* A channel with no row drops out of her map, which hides exactly what the map
      exists to show. */
   const seeded = [...(EUGENIA_SQL.match(/insert into public\.eugenia_channels[\s\S]*?on conflict/)?.[0] ?? '')
@@ -3435,6 +3435,15 @@ test('a read is filed with the verdicts and lengths the table accepts', () => {
     'index.ts sends a firmness the table refuses, or never sends one it accepts');
   const lesson = SCHEMA_SQL.match(/eugenia_reads_lesson_length check \(char_length\(lesson\) between 1 and (\d+)\)/);
   assert.equal(NOTE_MAX, Number(lesson?.[1]), 'index.ts truncates a lesson past what the table accepts');
+  /* THE CHANNELS ARE ONE LIST. The read's channel references eugenia_channels
+     rather than checking a copy of its ids, and the tool offers CHANNELS' ids
+     rather than typing them, so a channel added in one place is one a read can
+     carry everywhere. */
+  assert.match(SCHEMA_SQL, /alter table public\.eugenia_reads add column if not exists channel text\s+references public\.eugenia_channels \(channel\);/,
+    'a read\'s channel is no longer held to the channels\' own table');
+  const tool = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const RECORD_TOOL = {'));
+  assert.match(tool.slice(0, tool.indexOf('} as const;')), /channel: \{ type: "string", enum: CHANNELS\.map\(\(\[id\]\) => id\)/,
+    'record_read offers channels from a list of its own');
 });
 
 /* NEVER BY PRICE. A read graded on where gold went is a forecast with a score,
@@ -5816,9 +5825,9 @@ test('every market read gives up at READ_MS rather than at the platform', () => 
 /* A LONG DOOR ANSWERS INSIDE ITS CALLER'S BOUND, or the deadline that keeps
    what was read lands after the caller has stopped listening and keeps
    nothing. Two files, one relation: ten seconds for the boot, the sign-in and
-   the wire. And every call the two doors make carries the deadline, the
+   the wire. And every call the three doors make carries the deadline, the
    calendar check included. */
-test('the two long doors answer inside READ_MS', () => {
+test('the three long doors answer inside READ_MS', () => {
   const tv = source('supabase/functions/doji-tradingview/index.ts');
   const ms = (src, name) => {
     const m = src.match(new RegExp(`const ${name} = ([\\d_]+);`));
@@ -5827,7 +5836,7 @@ test('the two long doors answer inside READ_MS', () => {
   };
   assert.ok(ms(EUGENIA_TS, 'READ_MS') - ms(tv, 'DOOR_MS') >= 10_000,
     'DOOR_MS leaves less than ten seconds of READ_MS — the door answers after she has given up on it');
-  for (const fn of ['readMarket', 'readRates']) {
+  for (const fn of ['readMarket', 'readTrend', 'readRates']) {
     const body = bodyOf(tv, `export async function ${fn}(`);
     assert.match(body, /const signal = AbortSignal\.timeout\(DOOR_MS\)/, `${fn} carries no deadline`);
     const calls = [...uncomment(body).matchAll(/tvCall\(session,[\s\S]*?\)\)/g)].map(m => m[0]);
@@ -5850,7 +5859,7 @@ test('every market read she goes without writes a row', () => {
     .filter(([, body]) => new RegExp(`tvRead\\("|fetch\\((${MARKET_URLS})`).test(uncomment(body)));
   assert.deepEqual(readers.map(([name]) => name).sort(),
     ['headlinesBlock', 'marketQuote', 'positioningBlock', 'readTvCalendar', 'storeMarket', 'storeRates',
-     'storeStructure', 'volumeBlock'],
+     'storeStructure', 'storeTrend', 'volumeBlock'],
     'the market reads have changed — declare the new one, and give it the meter');
   for (const [name, body] of readers) {
     if (name === 'readTvCalendar') continue;
@@ -5858,7 +5867,7 @@ test('every market read she goes without writes a row', () => {
       `${name}'s failure reaches the console and no row`);
   }
   // In part, too, where the door names what it did not read.
-  for (const name of ['storeMarket', 'storeRates']) {
+  for (const name of ['storeMarket', 'storeRates', 'storeTrend']) {
     assert.match(bodyOf(EUGENIA_TS, `export async function ${name}(`),
       /if \(answer\.missing\.length\) await unread\(/, `${name} keeps a partial read to itself`);
   }
@@ -5875,16 +5884,19 @@ test('the quarter-hourly job reads the market ahead, and nothing else writes the
   const run = bodyOf(EUGENIA_TS, 'async function postScheduled(');
   const door = run.slice(run.indexOf('get("calendar") === "1"'));
   assert.match(door.slice(0, door.indexOf('return json')),
-    /await filed\(\);\s*await Promise\.all\(\[storeMarket\(\), storeRates\(\), storeStructure\(\)\]\);/,
+    /await filed\(\);\s*await Promise\.all\(\[storeMarket\(\), storeRates\(\), storeTrend\(\), storeStructure\(\)\]\);/,
     'the quarter-hourly job no longer reads the market ahead, so every copy goes stale');
-  for (const name of ['aroundBlock', 'ratesBlock', 'structureBlock']) {
+  for (const name of ['aroundBlock', 'ratesBlock', 'trendBlock', 'structureBlock']) {
     assert.match(bodyOf(EUGENIA_TS, `export async function ${name}(`), /readStored\("/,
       `${name} no longer reads the copy the job keeps`);
   }
   assert.equal([...uncomment(EUGENIA_TS).matchAll(/eugenia_market\?/g)].length, 2,
     'eugenia_market is addressed somewhere other than readStored and store');
   const writers = [...uncomment(EUGENIA_TS).matchAll(/await store\("(\w+)"/g)].map(m => m[1]).sort();
-  assert.deepEqual(writers, ['market', 'rates', 'structure'], 'the copy has a writer other than the job\'s three');
+  assert.deepEqual(writers, ['market', 'rates', 'structure', 'trend'], 'the copy has a writer other than the job\'s four');
+  // The weeks ride inside the market's block, so no reader of the one goes without the other.
+  assert.match(bodyOf(EUGENIA_TS, 'export async function aroundBlock('), /trendBlock\(\)/,
+    'the market around gold is handed over without the weeks behind it');
 });
 
 test('the calendar is filed before the briefing reads it, and every filing is a row', () => {
