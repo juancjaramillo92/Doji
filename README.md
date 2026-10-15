@@ -961,14 +961,17 @@ filed at midnight under `Calendar` must not be counted as a print. The event
 descriptions are dropped, since she would pay for each on every request.
 
 **`?market=1` is the market around gold, as bars**: the dollar index, the two-
-and ten-year yields, the ten-year real yield, silver, US crude, the S&P 500 and
-the VIX — and abroad the German, French, Italian, UK and Japanese ten-year
+and ten-year yields, the ten-year real yield and breakeven, silver, US crude, the
+S&P 500, the VIX and gold's volatility index (GVZ) — and abroad the German, French, Italian, UK and Japanese ten-year
 yields and EUR/USD, what the calendar's auctions and central banks are read
 against: France and Italy each against Germany is what lenders charge for the
 doubt, and the euro is more than half the dollar index. The quote batch refused on every probe with the scanners' 429, while the
 OHLCV read answered for every symbol, so each is twenty-five hourly bars folded by
 `foldBars` to where the first opened and where the last stands, each with its
-time. The real yield is FRED's daily series and is marked `daily`. Symbols, names
+time. The real yield and the breakeven are FRED's daily series and are marked
+`daily`: the inflation the bond market expects and what is left of the ten-year
+once it is taken out, the two halves strategy §2's table reads apart, which the
+ten-year alone cannot tell. Symbols, names
 and units live in one list, `MARKET`, most-needed first; a symbol that fails is
 named in `missing`.
 `aroundList` states every line as a level beside the level at a stated time and
@@ -1052,7 +1055,7 @@ own answer:
 | `?probe=` | what it asks |
 |---|---|
 | `calendar` | the next three days of US events, and the past week at high importance, to see whether a release that printed carries its actual beside the forecast and the prior |
-| `quotes` | whether the quote batch answers for the dollar, the yields at home and abroad, the real yield, silver, oil, the S&P and the VIX with no forex symbol in it (the euro is left out) — it refused twice with the forex scanner's 429, taking the whole batch with it — and each one's last bars from the OHLCV read, which answered where the batch did not, with the bar times saying how fresh each feed is |
+| `quotes` | whether the quote batch answers for the dollar, the yields at home and abroad, the real yield, the breakeven, silver, oil, the S&P, the VIX and GVZ with no forex symbol in it (the euro is left out) — it refused twice with the forex scanner's 429, taking the whole batch with it — and each one's last bars from the OHLCV read, which answered where the batch did not, with the bar times saying how fresh each feed is |
 | `gold` | the broker's quote through the poller and TradingView's gold feeds read in the same second, plus the last three one-minute bars, which say how stale a TradingView quote is |
 | `news` | headlines for gold and the dollar, and what one carries |
 | `econ` | which US price and money series exist, the actual releases a calendar entry would be judged against |
@@ -2391,7 +2394,7 @@ its door** — *TradingView calendar: no answer in 45s* — since the abort's ow
 message names nothing, and the meter rows are where an outage is read afterwards.
 
 **The market and the Fed's odds are read ahead, and she reads the copy.**
-`?market=1` makes fourteen chart calls and `?rates=1` six. Read while a briefing
+`?market=1` makes sixteen chart calls and `?rates=1` six. Read while a briefing
 waited, they were paid for out of its clock: on 12 October, with the news
 door's two calls taking 25 seconds, both outran her 45 and the briefing lost
 each block whole, and on 13 and 14 October, at five or six seconds a chart,

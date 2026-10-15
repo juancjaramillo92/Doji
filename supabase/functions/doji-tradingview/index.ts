@@ -446,8 +446,11 @@ export function foldCalendar(answer: any) {
    the current hour on the end — because the quote batch refused on every
    probe while the OHLCV read answered for every symbol.
 
-   The real yield is FRED's daily TIPS series, a day or more behind, and must
-   never read as live: `daily` says so to whoever renders it. Abroad, the
+   The real yield is FRED's daily TIPS series and the breakeven FRED's daily
+   inflation the bond market expects, each a day or more behind, and neither
+   may read as live: `daily` says so to whoever renders it. The two side by
+   side are strategy §2's table, which neither answers alone. GVZ is what gold
+   options price its swing at over the next month. Abroad, the
    ten-year yields she reads the calendar's auctions and central banks against
    — France and Italy each against Germany is what lenders charge for the doubt
    — and the euro, more than half the dollar index. The names live here, once,
@@ -457,10 +460,12 @@ const MARKET = [
   { symbol: "TVC:US02Y",   name: "Two-year Treasury yield",   unit: "%" },
   { symbol: "TVC:US10Y",   name: "Ten-year Treasury yield",   unit: "%" },
   { symbol: "FRED:DFII10", name: "Ten-year real yield (TIPS)", unit: "%", daily: true },
+  { symbol: "FRED:T10YIE", name: "Ten-year breakeven inflation", unit: "%", daily: true },
   { symbol: "TVC:SILVER",  name: "Silver",                    unit: "$" },
   { symbol: "TVC:USOIL",   name: "US crude oil",              unit: "$" },
   { symbol: "SP:SPX",      name: "S&P 500",                   unit: "" },
   { symbol: "TVC:VIX",     name: "VIX",                       unit: "" },
+  { symbol: "CBOE:GVZ",    name: "Gold volatility index (GVZ)", unit: "" },
   { symbol: "TVC:DE10Y",   name: "German ten-year yield",     unit: "%" },
   { symbol: "TVC:FR10Y",   name: "French ten-year yield",     unit: "%" },
   { symbol: "TVC:IT10Y",   name: "Italian ten-year yield",    unit: "%" },
@@ -741,10 +746,9 @@ const PROBES: Record<string, () => Call[]> = {
   quotes: () => [
     // Without the euro: a forex symbol is what drew the scanner's 429.
     ["mcp-tv-get-symbol-data-batch", { symbols: AROUND.filter(s => !s.startsWith("FX:")) }],
-    // The real yield is daily; a 15m bar of it answers nothing.
-    ...AROUND.filter(s => s !== "FRED:DFII10")
-      .map((symbol): Call => ["mcp-tv-get-ohlcv", { symbol, interval: "15m", count: 2 }]),
-    ["mcp-tv-get-ohlcv", { symbol: "FRED:DFII10", interval: "1D", count: 3 }],
+    // A daily series' 15m bar answers nothing.
+    ...MARKET.map(({ symbol, daily }): Call =>
+      ["mcp-tv-get-ohlcv", { symbol, interval: daily ? "1D" : "15m", count: daily ? 3 : 2 }]),
   ],
   gold: () => [
     ["mcp-tv-get-symbol-data-batch", { symbols: GOLD }],

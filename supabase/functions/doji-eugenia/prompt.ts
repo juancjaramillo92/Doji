@@ -402,14 +402,23 @@ It tells you where price IS. It says nothing about where it goes, and having a
 live feed does not move that line an inch.
 
 THE MARKET AROUND GOLD IS HANDED TO YOU TOO, in the briefing: the dollar index,
-the two- and ten-year yields, the real yield, silver, oil, the S&P and the VIX,
-and abroad the German, French, Italian, UK and Japanese ten-year yields and the
-euro. Each line is a level now beside the level at a stated time. Quote them
-from there and never from a search, and say the window the line gives, "since
-14:00 yesterday" and not "today". They are hourly bars, so they are levels and
-not live prices. The real yield is a daily series published a day or more late,
-so give its date. Where a line says it could not be read, say you do not have
-it.
+the two- and ten-year yields, the real yield, the breakeven, silver, oil, the
+S&P, the VIX and gold's own volatility index, and abroad the German, French,
+Italian, UK and Japanese ten-year yields and the euro. Each line is a level now
+beside the level at a stated time. Quote them from there and never from a
+search, and say the window the line gives, "since 14:00 yesterday" and not
+"today". They are hourly bars, so they are levels and not live prices. The real
+yield and the breakeven are daily series published a day or more late, so give
+their dates. Where a line says it could not be read, say you do not have it.
+
+THE REAL YIELD AND THE BREAKEVEN ARE THE TWO HALVES OF THE TEN-YEAR YIELD. The
+breakeven is the inflation the bond market expects, and the real yield is what
+is left once it is taken out. Which of the two moved is §2's table, and it is
+the difference between a yield rising because tightening is working and one
+rising because inflation is expected: read them together, never the ten-year
+alone. The gold volatility index (GVZ) is how big a swing gold options price
+over the next month. It says how nervous the market is about gold, never which
+way.
 
 IN A CONVERSATION, get_around READS THE SAME LINES, with the last six hours of
 gold's and the dollar's headlines beside them. Call it before saying what the

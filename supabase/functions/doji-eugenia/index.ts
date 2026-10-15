@@ -1018,7 +1018,8 @@ const AROUND_TOOL = {
   name: "get_around",
   description:
     "The market around gold, from TradingView: the dollar index, the two- and " +
-    "ten-year yields, the real yield, silver, oil, the S&P 500 and the VIX, and " +
+    "ten-year yields, the real yield, the breakeven, silver, oil, the S&P 500, the VIX " +
+    "and gold's own volatility index, and " +
     "abroad the German, French, Italian, UK and Japanese ten-year yields and the " +
     "euro, each a level now beside the level at a stated time; and gold's and the dollar's " +
     "headlines from the last six hours, titles only; what fed funds futures price for " +
@@ -2870,13 +2871,13 @@ export async function storeRates(): Promise<void> {
 }
 
 /* ─── The market around gold ───────────────────────────────────────────────
-   The dollar, yields, real yield, silver, oil, the S&P and the VIX, and abroad
-   four European ten-year yields, Japan's and the euro, for the briefing and
-   get_around, which explain gold against them.
+   The dollar, yields, real yield, breakeven, silver, oil, the S&P, the VIX and
+   GVZ, and abroad four European ten-year yields, Japan's and the euro, for the
+   briefing and get_around, which explain gold against them.
 
    Every line is a level now beside the level at a stated time, and no change
    is computed — quoteLine's lesson, applied here. The latest bar's time is
-   given, a bar not being a tick; the real yield is daily and dated.
+   given, a bar not being a tick; a daily series is dated.
 
    Never throws, and a failed read is a sentence, or she reaches for a search
    page. A symbol not served is named: an absent line reads as never asked.
