@@ -11,7 +11,8 @@
    The cases are the failures the README records, and the rules his decisions
    added: a later meeting given a percentage, a cut in a hike week, a read
    beside an open position, the target that fixes a ratio, a filed call cut by
-   a gate, a commitment with no moment in it. test/fixtures/eval-cases.json.
+   a gate, a commitment with no moment in it, the map of his charts written
+   into a briefing's prose. test/fixtures/eval-cases.json.
 
    It spends money, so it is never in `npm test` and is run by hand. With
    `--plant` it first runs the cases a deliberately broken prompt should fail,
@@ -180,6 +181,13 @@ export const PLANTS = [
     breaks: (p) => ({
       ...p,
       TRIM: p.TRIM.replace(/YOUR CALL IS THE ONE\s+EXCEPTION:[\s\S]*?never changed\./, 'A call with levels in it comes out whole.'),
+    }) },
+  { why: 'the map of his charts kept out of the briefing\'s prose, gone from the critic and the writer',
+    cases: ['critic-keeps-map-out-of-prose'],
+    breaks: (p) => ({
+      ...p,
+      SYSTEM: p.SYSTEM.replace(/THE MAP OF HIS CHARTS IS THE HOURS ON IT,[\s\S]*?a call you file\.\n\n/, ''),
+      CRITIC: p.CRITIC.replace(/Is the map of his charts in the prose\?[\s\S]*?it comes out\.\n\n/, ''),
     }) },
 ];
 

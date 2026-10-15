@@ -636,6 +636,23 @@ weekday briefing naming tomorrow morning's prints is the other, and it stands.
 Narrowing it would change what the briefing knows, which nobody asked for.
 **Revisit if:** the briefing stops carrying tomorrow morning.
 
+### R-69 — indicators on her map
+**Why refused:** `doji-tradingview` could hand her RSI, MACD and the moving
+averages for one call (`mcp-tv-get-technicals-rating`), but his rules read
+none of them: R-08's four steps are bias, level, candle and the ratio, and
+she is told to hold him to what he wrote rather than to her idea of a setup.
+A number on her map is one she reasons from, so an oscillator there is a
+second strategy beside his, and her calls would be scored on rules that are
+not his. **Revisit if:** his strategy names an indicator.
+
+### R-70 — a picture of his chart instead of a map
+**Why refused:** she reads screenshots, so the bars could be drawn and sent to
+her as one. A model reading a level off pixels is the arithmetic she does
+worst, done blind, and the drawing would be a new dependency in a function
+that has none. The map hands her the numbers his chart would show, each one
+timed. **Revisit if:** a judgment his rules ask for turns out to need the
+shape and not the numbers.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

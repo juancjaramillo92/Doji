@@ -24,7 +24,7 @@
 
 import {
   env, secretMatches, json, marketOpen, nyDate, sbHeaders, heartbeat, mcpInit, parseSse,
-  SB_URL, SB_KEY, why, type Candle
+  SB_URL, SB_KEY, why, CHARTS, type Candle
 } from "../_shared/edge.ts";
 
 const MCP_URL   = env("CTRADER_MCP_URL") || "https://mcp.ctrader.com/trading/mcp";
@@ -582,8 +582,10 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     const marketRaw = url.searchParams.get("market") === "raw";
     const bars      = url.searchParams.get("bars") === "raw";
     const day       = url.searchParams.get("bars") === "1";
+    const structure = url.searchParams.get("structure") === "1";
     // The read-only probes answer over the weekend, when rows get looked at.
-    if (!force && !raw && !tools && !posns && !market && !marketRaw && !bars && !day && !marketOpen()) {
+    if (!force && !raw && !tools && !posns && !market && !marketRaw && !bars && !day && !structure &&
+        !marketOpen()) {
       // A skip is a completed run: unmarked, the heartbeat freezes over the
       // weekend close and reads as a dead sync every Sunday evening.
       await heartbeat("poller");
@@ -653,6 +655,30 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       const candles = foldCandles(await readBars(session, from, to));
       if (!candles) throw new Error("get_trendbars returned a bar that will not read");
       return json({ ok: true, symbol: SYMBOL_IDS[0], from, bars: candles });
+    }
+
+    /* ?structure=1 — his six charts, folded, for Eugenia's map. One chart at
+       a time, each failure its own, for ?bars=raw's reason below; a chart
+       that will not read is named rather than served short, and the rest are
+       still worth having. */
+    if (structure) {
+      const charts: Record<string, Candle[]> = {};
+      const missing: { period: string; error: string }[] = [];
+      for (const c of CHARTS) {
+        try {
+          const got = await mcpCall(session, "get_trendbars", {
+            symbolId: SYMBOL_IDS[0], period: c.period,
+            fromTimestamp: String(to - c.hours * 3600_000), toTimestamp: String(to),
+          });
+          const candles = foldCandles(got.trendbars ?? []);
+          if (!candles) throw new Error("a bar that will not read");
+          if (!candles.length) throw new Error("no bars");
+          charts[c.period] = candles;
+        } catch (err) {
+          missing.push({ period: c.period, error: why(err) });
+        }
+      }
+      return json({ ok: true, symbol: SYMBOL_IDS[0], at: to, charts, missing });
     }
 
     /* ?bars=raw — minute bars at six ages, raw: their shape, their scale, and

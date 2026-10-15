@@ -5475,7 +5475,7 @@ test("the nightly pass files the week, meters both outcomes, and check_rules rea
 
 test('Eugenia reaches a price through the poller and never holds the broker token', () => {
   /* THE SAME ENDPOINT THAT SERVES A PRICE SERVES create_order. doji-mcp-sync
-     holds the token and only ever answers with a quote; she presents the cron
+     holds the token and only ever answers with a quote or bars; she presents the cron
      secret she has. The token in her hands would put a market order one prompt
      injection away. Structural, not instructed. */
   const eugenia = source('supabase/functions/doji-eugenia/index.ts');
@@ -5489,14 +5489,16 @@ test('Eugenia reaches a price through the poller and never holds the broker toke
     'doji-eugenia addresses the broker directly, bypassing the allow-list that ' +
     'is the only thing keeping create_order out of reach');
 
-  // And it reaches a function that exists, by a path this repository deploys.
-  const url = eugenia.match(/const MARKET_URL = `\$\{SB_URL\}\/functions\/v1\/([\w-]+)/);
-  assert.ok(url, 'doji-eugenia no longer builds a market URL from SB_URL');
-  assert.ok(DEPLOYED.includes(url[1]),
-    `doji-eugenia reads a price from /functions/v1/${url[1]}, which is not a ` +
-    `function this repository deploys — every call is a 404`);
-  assert.match(eugenia, /MARKET_URL[\s\S]{0,400}?x-doji-key/,
-    'the market read presents no secret, so the poller will refuse it 401');
+  // And each reaches a function that exists, by a path this repository deploys.
+  for (const name of ['MARKET_URL', 'STRUCTURE_URL']) {
+    const url = eugenia.match(new RegExp(`const ${name} = \`\\$\\{SB_URL\\}\\/functions\\/v1\\/([\\w-]+)`));
+    assert.ok(url, `doji-eugenia no longer builds ${name} from SB_URL`);
+    assert.ok(DEPLOYED.includes(url[1]),
+      `doji-eugenia reads ${name} from /functions/v1/${url[1]}, which is not a ` +
+      `function this repository deploys — every call is a 404`);
+    assert.match(eugenia, new RegExp(`fetch\\(${name}[\\s\\S]{0,400}?x-doji-key`),
+      `${name}'s read presents no secret, so the poller will refuse it 401`);
+  }
 });
 
 /* ─── Only the TradingView filing makes a calendar row ───────────────────────
@@ -5593,6 +5595,60 @@ test('the Sunday briefing reads the week and tells it rather than lists it, in b
     'SYSTEM has Sunday list the week again, which he has on his own screen');
   assert.match(critic, /IS IT SUNDAY'S\? Then the week is told, not listed: a day-by-day list of releases comes out/,
     'CRITIC no longer takes the week\'s list out of a Sunday briefing, and it runs last');
+});
+
+/* ─── His charts, as her map ─────────────────────────────────────────────────
+   structureList is driven in fold.test.mjs and cannot see its callers or the
+   words around it. The map reaches the briefing for its call and a reply
+   through get_structure; the briefing is still the weeks behind his chart, so
+   the writer is told the map is for the call alone and the critic, which runs
+   last, takes it out of the prose. Each half without the other is the critic
+   undoing the writer, or letting through what the writer was told. */
+test('his charts reach the briefing for its call and a reply through get_structure, and nothing else', () => {
+  const brief = bodyOf(EUGENIA_TS, 'async function postBriefing(');
+  assert.match(brief, /marketBlock\(\), structureBlock\(\),/, 'the briefing no longer reads his charts');
+  assert.match(brief, /\bprice \+ chart \+ /, 'the briefing reads his charts and never hands them to her');
+  const sets = Object.fromEntries([...EUGENIA_TS.matchAll(/const (\w+_TOOLS)(?:: [^=]+)? = \[([\s\S]*?)\];/g)]
+    .map(m => [m[1], m[2]]));
+  assert.ok(Object.keys(sets).length >= 4, 'read too few tool sets — the reader has gone blind');
+  assert.deepEqual(Object.keys(sets).filter(k => /\bSTRUCTURE_TOOL\b/.test(sets[k])), ['CHAT_TOOLS'],
+    'get_structure is offered outside a conversation, or not in one');
+  const served = EUGENIA_TS.slice(EUGENIA_TS.indexOf('case STRUCTURE_TOOL.name:'));
+  assert.match(served.slice(0, served.indexOf('\n')), /structureBlock\(\)/,
+    'get_structure no longer reads the map the job keeps');
+  /* THE MAP IS SAID AS HERS, in every place it is said. */
+  const tool = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const STRUCTURE_TOOL = {'));
+  assert.match(tool.slice(0, tool.indexOf('} as const;')).replace(/" \+\s*"/g, ''),
+    /It is your map, computed the same way every time, and not his/);
+  assert.match(bodyOf(EUGENIA_TS, 'export function structureList('), /This is YOUR map/);
+});
+
+test('the map is hers, printed, built into her call, and kept out of the briefing\'s prose by both prompts', () => {
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  const critic = EUGENIA_PROMPT.match(/export const CRITIC = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  for (const [said, why] of [
+    [/IT IS YOUR MAP, NOT HIS\. His structure is drawn in TradingView and kept nowhere here/,
+     'she may present her computed levels as his'],
+    [/Where he sends a chart, his chart decides/, 'her map can overrule the chart he sends'],
+    [/EVERY FIGURE ON THE MAP HAS PRINTED, so it is a fact, and the rules for a printed level hold/,
+     'the map\'s levels are not held to the printed-level rule'],
+    [/nothing setup-flavoured comes off it in a message you start while he is in a position/,
+     'the map can put a level beside his open position'],
+    [/YOUR CALL IS BUILT ON THE MAP\. Its level is a turn or a quarter on it/,
+     'her call is no longer built on his charts'],
+    [/Break & Retest inside the range, Support & Resistance at its edge/,
+     'her call no longer takes the setup his rules name for where the level sits'],
+    [/THE MAP OF HIS CHARTS IS THE HOURS ON IT, and in the briefing it is there for your call and nothing else/,
+     'the briefing may turn the map into prose, against the weeks behind his chart'],
+    [/YOUR CALL, LAST, in two or three sentences, its levels off the map of his charts/,
+     'the briefing\'s call slot no longer builds on the map'],
+    [/With no chart, get_structure shows you the bias and where his level sits on your map, and you say it is yours/,
+     'a plan he brings without a chart is judged blind, or off a map not said to be hers'],
+  ]) assert.match(system, said, `SYSTEM: ${why}`);
+  assert.match(critic, /Is the map of his charts in the prose\? It was handed to the writer for the call and for nothing else/,
+    'CRITIC no longer takes the map out of the briefing\'s prose, and it runs last');
+  assert.match(critic, /reaches him in the briefing only as the levels of the filed call/,
+    'CRITIC takes the map out of the call too, and a filed call is never changed');
 });
 
 /* ─── The market around gold, in a conversation ──────────────────────────────
@@ -5697,9 +5753,23 @@ test('the rate odds reach the briefing and a conversation, said the way FedWatch
    the request at 150s. Nothing in the suite can hang a real request, so the
    reads are found by what they address — TradingView's doors, the broker's
    price, the CFTC's count — and a new one arriving without the bound fails. */
+/* THE MARKET'S ADDRESSES ARE FOUND, NOT LISTED: every URL constant in the file
+   is a market read but the one declared otherwise, so a door added as a fourth
+   constant is held by both censuses below on the day it arrives. */
+const URLS = [...EUGENIA_TS.matchAll(/^const (\w+_URL) = /gm)].map(m => m[1]);
+const NOT_MARKET = ['EMBED_URL'];
+const MARKET_URLS = URLS.filter(u => !NOT_MARKET.includes(u)).join('|');
+const MARKET_READ = new RegExp(`await fetch\\((\`\\$\\{SB_URL\\}\\/functions\\/v1\\/doji-tradingview[^\`]*\`|` +
+  `${MARKET_URLS})[\\s\\S]*?\\);`, 'g');
+
+test('every URL constant is a market read or declared not to be one', () => {
+  assert.deepEqual([...URLS].sort(), ['COT_URL', 'EMBED_URL', 'MARKET_URL', 'STRUCTURE_URL'],
+    'the URL constants have changed — say whether the new one is a market read');
+});
+
 test('every market read gives up at READ_MS rather than at the platform', () => {
-  const reads = [...EUGENIA_TS.matchAll(/await fetch\((`\$\{SB_URL\}\/functions\/v1\/doji-tradingview[^`]*`|MARKET_URL|COT_URL)[\s\S]*?\);/g)];
-  assert.equal(reads.length, 3, `read ${reads.length} market fetches — the reader has gone blind, or one was added`);
+  const reads = [...EUGENIA_TS.matchAll(MARKET_READ)];
+  assert.equal(reads.length, 4, `read ${reads.length} market fetches — the reader has gone blind, or one was added`);
   for (const { 0: call, index } of reads) {
     // Bound where it is made, or by a signal the enclosing function bounds —
     // tvRead holds its own, to name the door when it fires.
@@ -5744,9 +5814,10 @@ test('every market read she goes without writes a row', () => {
   const starts = [...EUGENIA_TS.matchAll(/^(?:export )?async function (\w+)\(/gm)];
   const readers = starts
     .map((m, i) => [m[1], EUGENIA_TS.slice(m.index, starts[i + 1]?.index)])
-    .filter(([, body]) => /tvRead\("|fetch\((MARKET_URL|COT_URL)/.test(uncomment(body)));
+    .filter(([, body]) => new RegExp(`tvRead\\("|fetch\\((${MARKET_URLS})`).test(uncomment(body)));
   assert.deepEqual(readers.map(([name]) => name).sort(),
-    ['headlinesBlock', 'marketQuote', 'positioningBlock', 'readTvCalendar', 'storeMarket', 'storeRates', 'volumeBlock'],
+    ['headlinesBlock', 'marketQuote', 'positioningBlock', 'readTvCalendar', 'storeMarket', 'storeRates',
+     'storeStructure', 'volumeBlock'],
     'the market reads have changed — declare the new one, and give it the meter');
   for (const [name, body] of readers) {
     if (name === 'readTvCalendar') continue;
@@ -5758,6 +5829,8 @@ test('every market read she goes without writes a row', () => {
     assert.match(bodyOf(EUGENIA_TS, `export async function ${name}(`),
       /if \(answer\.missing\.length\) await unread\(/, `${name} keeps a partial read to itself`);
   }
+  assert.match(bodyOf(EUGENIA_TS, 'export async function storeStructure('),
+    /if \(served\.missing\.length\) \{\s*await unread\(/, 'storeStructure keeps a chart it did not read to itself');
 });
 
 /* THE MARKET IS READ AHEAD BY ONE WRITER, AND READ BACK BY EVERYONE ELSE. A
@@ -5769,16 +5842,16 @@ test('the quarter-hourly job reads the market ahead, and nothing else writes the
   const run = bodyOf(EUGENIA_TS, 'async function postScheduled(');
   const door = run.slice(run.indexOf('get("calendar") === "1"'));
   assert.match(door.slice(0, door.indexOf('return json')),
-    /await filed\(\);\s*await Promise\.all\(\[storeMarket\(\), storeRates\(\)\]\);/,
+    /await filed\(\);\s*await Promise\.all\(\[storeMarket\(\), storeRates\(\), storeStructure\(\)\]\);/,
     'the quarter-hourly job no longer reads the market ahead, so every copy goes stale');
-  for (const name of ['aroundBlock', 'ratesBlock']) {
+  for (const name of ['aroundBlock', 'ratesBlock', 'structureBlock']) {
     assert.match(bodyOf(EUGENIA_TS, `export async function ${name}(`), /readStored\("/,
       `${name} no longer reads the copy the job keeps`);
   }
   assert.equal([...uncomment(EUGENIA_TS).matchAll(/eugenia_market\?/g)].length, 2,
     'eugenia_market is addressed somewhere other than readStored and store');
   const writers = [...uncomment(EUGENIA_TS).matchAll(/await store\("(\w+)"/g)].map(m => m[1]).sort();
-  assert.deepEqual(writers, ['market', 'rates'], 'the copy has a writer other than the job\'s two');
+  assert.deepEqual(writers, ['market', 'rates', 'structure'], 'the copy has a writer other than the job\'s three');
 });
 
 test('the calendar is filed before the briefing reads it, and every filing is a row', () => {

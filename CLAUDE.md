@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 743 tests, eight suites
+npm test      # 753 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -359,6 +359,12 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   writer's clock reads those two doors. One writer, so the market's
   read-then-write cannot race; `agree.test.mjs` holds it and the census of
   market reads.
+- **Her map of his charts is folded in `structure.ts`**, from bars the poller
+  serves on `CHARTS` — one list in `_shared/edge.ts` for both. The poller serves
+  bars; what a bar means to his rules is hers. It is her map, never his, every
+  figure printed, and in the briefing it is for the call alone — `SYSTEM` and
+  `CRITIC` each hold that, and `agree.test.mjs` reads both. The market reads are
+  derived from the URL constants, so a fourth door is held the day it arrives.
 - **`CAL_BACK`/`CAL_AHEAD` carry the 08:00 briefing past tomorrow's 10:00**, read
   and write alike; `fold.test.mjs` derives the reach from the source.
 - **The trade event is a close alone** — an open does not call her, and an
