@@ -3823,10 +3823,9 @@ async function recordChannels() {
    Still no verdict; she may say only his own rule, at the moment it applies:
    that fill took the day past −4%, and R-11 says the day ends there.
 
-   A close and nothing else. A print pending on an open is R-20's, his to
-   weigh, and the briefing has already named it; a message on every open was
-   noise he asked to be rid of. Decided from data before any model call, so an
-   ordinary fill costs nothing.
+   A close and nothing else: a print pending on an open is R-20's, his to
+   weigh, and the briefing has already named it. Decided from data before any
+   model call, so an ordinary fill costs nothing.
    ───────────────────────────────────────────────────────────────────────── */
 /* Exported so read, guard, decide is driven: every guard returns before a
    model call, and one that stopped returning looks like one never needed. */

@@ -256,15 +256,15 @@ function r02(rows: TradeRow[]): RuleResult {
 }
 
 /* ─── R-03 ─────────────────────────────────────────────────────────────────
-   No entry after a full-stop loss the same day, bar one sweep re-entry. §7:
-   within an open_day, at most one entry later than the fill of a loss with
-   |exit − entry| ≥ 20. A full stop is the stop at its $20 ceiling, by his
-   definition, so a smaller loss leaves the population.
+   No entry after a full-stop loss the same day. §7: within an open_day, no
+   entry later than the fill of a loss with |exit − entry| ≥ 20. A full stop
+   is the stop at its $20 ceiling, by his definition, so a smaller loss leaves
+   the population — and a sweep re-entry follows only a stop tighter than that
+   (v1.24), since a full stop is already the day's 4%.
 
    Unknown only where the answer could differ: an unpriced loss might be a full
-   stop, and one with no fill_time cannot be placed — but a day with fewer
-   than three entries cannot breach whatever they are. A known breach stands
-   regardless.
+   stop, and one with no fill_time cannot be placed — but a day with one entry
+   cannot breach whatever it is. A known breach stands regardless.
    ───────────────────────────────────────────────────────────────────────── */
 function r03(rows: TradeRow[]): RuleResult {
   const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
@@ -280,13 +280,13 @@ function r03(rows: TradeRow[]): RuleResult {
     const after = (t: TradeRow) =>
       t.fill_time ? entries.filter(at => at > +new Date(t.fill_time as string)).length : null;
 
-    if (full.some(t => (after(t) ?? 0) >= 2)) { fail.push(day); continue; }
-    const couldBreach = entries.length >= 3 &&
-      [...full, ...unmeasured].some(t => after(t) === null || (after(t) as number) >= 2);
+    if (full.some(t => (after(t) ?? 0) >= 1)) { fail.push(day); continue; }
+    const couldBreach = entries.length >= 2 &&
+      [...full, ...unmeasured].some(t => after(t) === null || (after(t) as number) >= 1);
     if (couldBreach) unknown.push(day);
     else if (full.length) pass.push(day);
   }
-  return result('R-03', `days with more than one entry after a full-stop loss — a loss $${FULL_STOP} or more from entry`,
+  return result('R-03', `days with an entry after a full-stop loss — a loss $${FULL_STOP} or more from entry`,
                 pass, fail, unknown);
 }
 

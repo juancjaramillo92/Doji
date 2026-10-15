@@ -603,7 +603,40 @@ briefing lost its calendar.
 **Revisit if:** a print's actual reaches the calendar later than the next
 filing, or the failures cluster before 08:00.
 
-### R-64 — indicators on her map
+### R-64 — dropping `event` from the trade-event wire
+**Why refused:** with the open trigger gone, every event the trigger sends is
+`closed`, so `postTradeEvent(id)` alone would do. But the `{trade}` door takes a
+body from a person too, and the guard on `event` is where that body enters; the
+trigger's body is SQL re-run by hand, so the change costs a manual step to
+remove one line that decides something.
+**Revisit if:** the door stops taking a body from anyone but the trigger.
+
+### R-65 — renaming `trades_eugenia_on_event` for the close it now serves
+**Why refused:** the name is still true — a close is an event — and a rename is
+a trigger body, a `verify.sql` row and the README's six-caller list edited by
+hand, for a word.
+**Revisit if:** a second event comes to need a function of its own.
+
+### R-66 — folding R-03 into R-11 now that a full stop is the day's 4%
+**Why refused:** on a linear ladder every full stop breaches R-11 as well, so
+the two agree on it. R-03 reads prices alone and decides a day whose rows carry
+no size, where R-11 is `unknown`; folding it loses the only verdict on those
+days.
+**Revisit if:** every row in the journal carries `size_oz`.
+
+### R-67 — the strategy's note that R-14 is retired
+**Kept on purpose.** "Free of archaeology" is for code. Her notes and turns
+can still cite R-14, and §7's line saying it is retired, and that its ID is not
+reused, is what stops her holding him to a rule he no longer keeps.
+**Revisit if:** nothing she has stored mentions R-14 any more.
+
+### R-68 — narrowing `CAL_AHEAD` now that no trade warning reads ahead
+**Why refused:** the warning on an open was one reason for the 28 hours; the
+weekday briefing naming tomorrow morning's prints is the other, and it stands.
+Narrowing it would change what the briefing knows, which nobody asked for.
+**Revisit if:** the briefing stops carrying tomorrow morning.
+
+### R-69 — indicators on her map
 **Why refused:** `doji-tradingview` could hand her RSI, MACD and the moving
 averages for one call (`mcp-tv-get-technicals-rating`), but his rules read
 none of them: R-08's four steps are bias, level, candle and the ratio, and
@@ -612,7 +645,7 @@ A number on her map is one she reasons from, so an oscillator there is a
 second strategy beside his, and her calls would be scored on rules that are
 not his. **Revisit if:** his strategy names an indicator.
 
-### R-65 — a picture of his chart instead of a map
+### R-70 — a picture of his chart instead of a map
 **Why refused:** she reads screenshots, so the bars could be drawn and sent to
 her as one. A model reading a level off pixels is the arithmetic she does
 worst, done blind, and the drawing would be a new dependency in a function
