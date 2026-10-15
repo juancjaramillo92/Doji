@@ -962,7 +962,9 @@ time. The real yield is FRED's daily series and is marked `daily`. Symbols, name
 and units live in one list, `MARKET`, most-needed first; a symbol that fails is
 named in `missing`.
 `aroundList` states every line as a level beside the level at a stated time and
-computes no change, so a move cannot lose its window. A failed read is a sentence
+computes no change, so a move cannot lose its window. The door is read ahead
+by the quarter-hourly job and she reads the copy (see *The market and the Fed's
+odds are read ahead*). A failed read is a sentence
 telling her not to quote the dollar or yields from a search.
 
 **`?news=1` is gold's and the dollar's headlines.** `foldHeadlines` merges the
@@ -1290,8 +1292,13 @@ are none.
 
 **The calendar is the one place the prose rule is relaxed** — a plain `Today:`
 label and one line per item, times in ET, one fact each, on weekdays only. It is
-that day's releases, and a line from abroad only where the story runs through it. The list
-holds times and names, `NAMED AND NOTHING MORE`: no mechanism goes in it,
+that day's releases **rated high**, and a line from abroad only where the story
+runs through it; a day with none says so in a line. The rest are hers to watch,
+and one that surprises goes into the next morning's story rather than onto the
+list — his instruction of 13 October, after seven lines for the one release that
+mattered. `calendarList` puts the rating on every line, since the slot lists by
+it, and `CRITIC` takes a lower-rated line off the list, since it runs last. The
+list holds times and names, `NAMED AND NOTHING MORE`: no mechanism goes in it,
 because that slot is where a second chain hides.
 
 **On Sunday the briefing is about the week it opens** (`weekBlock`). It files the
@@ -1304,7 +1311,7 @@ and the teaching block walks the release most likely to move it. **The week is
 told, not listed**: there is no calendar slot on Sunday. The release that carries
 the week is named with its day, and the rest is a sentence or two on which force
 the week tests and what it could change; the calendar is on his own screen, and
-each weekday morning lists that day's releases with their times. `CRITIC` holds
+each weekday morning lists that day's high-rated releases with their times. `CRITIC` holds
 the same rule, since it runs last.
 
 **Length is a rule, and what makes it safe is what sits beside it.** A ceiling
@@ -1425,7 +1432,9 @@ fifteen minutes of printing for the dashboard card and the trade event's warning
 between briefings. It is a second job rather than a faster one, because the
 hourly predicates all test `hour ===` and a `*/15` job would run four briefings.
 Every filing is an `eugenia_runs` row under `calendar`, failed or not, since a
-calendar that stopped moving looks like a quiet week.
+calendar that stopped moving looks like a quiet week. After it files, the same
+job reads the market around gold and the Fed's odds ahead into `eugenia_market`
+(see *The market and the Fed's odds are read ahead*).
 
 **One release is one row, whatever it is called**, because the key is
 TradingView's id and nothing she can call creates a row. Keyed on a name the
@@ -1875,6 +1884,7 @@ datasets here that compound.
 | `eugenia_reads` | every read she gave, with a verdict on the test she stated | the last 30 days | her `record_read` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
 | `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar` |
+| `eugenia_market` | the market around gold and the Fed's odds, read ahead | 1 row per door, rewritten | the quarter-hourly job, `storeMarket` and `storeRates` |
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
 
 **Notes are how he corrects her, and the only way he can.** There is no settings
@@ -2259,16 +2269,35 @@ means, so a dead feed now costs 45 seconds and that sentence. **A timeout names
 its door** — *TradingView calendar: no answer in 45s* — since the abort's own
 message names nothing, and the meter rows are where an outage is read afterwards.
 
-**The two doors that read one chart at a time answer by `DOOR_MS`, 35 seconds.**
-`?market=1` makes fourteen calls and `?rates=1` six, one after another, and on
-12 October, with the news door's two taking 25 seconds, both outran her 45 and
-a briefing and a reply lost each block whole, the symbols that had answered
-with it. Now one deadline covers each door's calls: the call in flight is
-aborted, every one after it is named in `missing` as *not reached in 35s*, and
-the door answers with what it has. `MARKET` and the contract months run
-most-needed first, so a slow morning keeps the dollar, the yields and the
-nearest meeting. They stay one at a time, since TradingView refuses a burst and
-a deadline already bounds the wait.
+**The market and the Fed's odds are read ahead, and she reads the copy.**
+`?market=1` makes fourteen chart calls and `?rates=1` six. Read while a briefing
+waited, they were paid for out of its clock: on 12 October, with the news
+door's two calls taking 25 seconds, both outran her 45 and the briefing lost
+each block whole, and on 13 and 14 October, at five or six seconds a chart,
+it kept six lines of fourteen. Now the quarter-hourly job reads both after it
+files the calendar (`storeMarket`, `storeRates`) and keeps the answers in
+`eugenia_market`, one row per door; `aroundBlock` and `ratesBlock` read that
+row, so a briefing or a reply never waits on TradingView for them. A copy is a
+quarter hour old at most, of hourly and daily bars. **A symbol a pass misses
+keeps the line the last pass read** (`keptMarket`), with that pass's bar times
+on it, so one slow call leaves no gap; one never read is still named. The odds
+are replaced whole once a pass prices a meeting, since a fold does not merge,
+and **odds read more than two hours ago are not handed to her** (`ODDS_HOURS`):
+each market line carries its own times, but the odds carry only when they were
+read, and a door that kept refusing would leave its last answer standing. A
+pass that fails leaves the copy as it was. Only the job writes the table, a
+quarter hour apart, so the market's read-then-write has no second writer.
+
+**Each door reads three charts at a time, inside `DOOR_MS`, 35 seconds.** One by
+one, fourteen did not fit at a slow morning's pace; all at once is the burst
+TradingView refuses. `inLanes` keeps three in flight, each call catching its
+own failure, so one refusal never takes the rest (under a bare `Promise.all`,
+one 504 once took all six of the poller's `?bars=raw` reads), and writes into
+the item's own slot, so the answer keeps `MARKET`'s order, most-needed first.
+Each request carries its own JSON-RPC id, since three share a session. At the
+deadline the calls in flight are aborted, every one not reached is named in
+`missing` as *not reached in 35s*, and the door answers with what it has —
+inside the 45 seconds the job gives it.
 
 **A failed briefing tries again** at 09:00, 10:00 and 11:00 ET — and on a Sunday
 at 18:00, 19:00 and 20:00, the three hours after its own open, two clear of the
@@ -2328,13 +2357,14 @@ it: a quiet day is a branch, and an early return is how both meters once skipped
 every night nobody spoke. The census stays after the pass, the only thing that
 can move a rung.
 
-**A market read she went without is a row**, `caller: 'market read'`, `ok:
-false`, the read and the reason in `detail`: the broker's price, the market
-around gold, the rate odds, the headlines, the speculators' count and COMEX
-volume, whole or — for the two doors that name a `missing` list — in part. The
-briefing or the reply still goes out and its own row reads ok, so on 12 October
-the Edge log was the only place a briefing written without the dollar and the
-Fed showed. Failures only: a row for every read that answered would be several
+**A market read that came back short is a row**, `caller: 'market read'`, `ok:
+false`, the read and the reason in `detail`: the broker's price, the headlines,
+the speculators' count and COMEX volume as a briefing or a reply reads them;
+the market around gold and the rate odds as the job reads them ahead, whole or
+— those two doors name a `missing` list — in part; and a copy a block could not
+hand her, not yet read or odds too old. The briefing or the reply still goes
+out and its own row reads ok, so on 12 October the Edge log was the only place
+a briefing written without the dollar and the Fed showed. Failures only: a row for every read that answered would be several
 a briefing saying nothing. The calendar's reads are left to `filed()` and
 `filedWeek()`, which already write both outcomes.
 
@@ -3077,7 +3107,7 @@ job name, so a re-run makes the jobs match the file. Six jobs —
 |---|---|---|
 | `doji-mcp-sync` | `*/2 * * * *` | the poller |
 | `doji-eugenia` | `0 * * * *` | the briefing and the nightly pass — the function decides which, or neither |
-| `doji-eugenia-calendar` | `5,20,35,50 * * * *` | the calendar's filing |
+| `doji-eugenia-calendar` | `5,20,35,50 * * * *` | the calendar's filing, then the market and the Fed's odds read ahead |
 | `doji-dispatch-watch` | `*/10 * * * *` | `dispatch_watch`'s sweep |
 | `doji-pace-watch` | `37 * * * *` | `pace_watch`'s one-a-day warning |
 | `purge-cron-history` | `0 3 * * *` | trims `cron.job_run_details` |
