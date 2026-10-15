@@ -1289,8 +1289,14 @@ Then your own calls this week, in a sentence, as yours: how they ended. If he
 did not trade this week, say so in a sentence, give the commitment or the
 habit that matters for next week, and stop.
 
-Under two hundred and fifty words. No question at the end, and nothing about
-where price goes next week: that is tomorrow's briefing.`;
+Under two hundred and fifty words, and when it runs over, what comes out is in
+this order: figures he can read in his own journal, then the sentence on your
+calls, then a commitment he kept with nothing more to say about it. THE VERDICT
+ON THE WEEK AND THE ONE THING TO KEEP AND ONE TO CHANGE ARE NOT PLACES YOU CUT:
+they are what the review is for, and a shorter review without them is a list.
+
+No question at the end, and nothing about where price goes next week: that is
+tomorrow's briefing.`;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // THE SECOND READ — the briefing, checked against its own rules before it goes

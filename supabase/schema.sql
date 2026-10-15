@@ -702,6 +702,8 @@ alter table public.eugenia_reads add column if not exists firmness text
 alter table public.eugenia_reads add column if not exists lesson text
   constraint eugenia_reads_lesson_length check (char_length(lesson) between 1 and 200);
 
+alter table public.eugenia_reads enable row level security;
+
 -- ─── Her own calls ─────────────────────────────────────────────────────────
 -- A paper trade she would take, on his rules, filed before she says it and
 -- scored that night on what price did. Unlike a read, a call IS judged by where
@@ -742,8 +744,6 @@ create table if not exists public.eugenia_calls (
 create unique index if not exists eugenia_calls_once on public.eugenia_calls (expires_at);
 
 alter table public.eugenia_calls enable row level security;
-
-alter table public.eugenia_reads enable row level security;
 
 -- ─── Open threads ──────────────────────────────────────────────────────────
 -- An odd thing she flagged (`watch`) or a question she asked him in a

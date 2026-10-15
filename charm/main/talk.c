@@ -224,7 +224,7 @@ bool talk_ready(void (*lit)(void)) {
 }
 
 int talk_briefing(void) {
-    tapped();  // a press during the journal before it is not a word to her
+    tapped();  // a press left over from before — during her confused face — is not a word to her
     face_set_mode(FACE_THINKING);
     int status = knock(EUGENIA_DOOR "?briefing=today", NULL, 0, NULL);
     if (status > 0 && status != 200 && status != 204) confused();

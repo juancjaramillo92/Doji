@@ -534,6 +534,75 @@ turns and twenty notes, her memory is her own tables, and the nightly pass is a
 tool loop that a single batch request cannot run.
 **Revisit if:** a window is ever widened past what a request carries cheaply.
 
+### R-56 — interpolating the call rules into `SYSTEM`
+**Why refused:** `SYSTEM` tells her the rules her calls are held to in words —
+*twenty dollars*, *twenty-five to thirty*, *one and a half times* — and
+`make_call`'s description interpolates the same constants. Interpolating
+`SYSTEM` too would single-source the numbers, but it changes the prompt she
+reads, which is a behaviour change to be run through `scripts/eval.mjs`, for a
+fact that has not moved. The words stay, and `agree.test.mjs` holds them to
+`callProblem`'s constants.
+**Revisit if:** one of the call rules changes, when the edit is a prompt change
+anyway.
+
+### R-57 — several Opus packets to an Ogg page on the charm
+**Deferred, not refused.** `ogg.c` writes one 20 ms packet a page, and each
+page's head is 28 bytes against a packet of about 60 at 24 kbit/s, so a
+quarter or more of a five-minute file is heads — about 1.3 MB where packing
+pages would make it under a megabyte. It fits her door's 3 MB and the room
+`talk.c` gives it, and one packet a page is what the test can read against
+the specification page by page. **Revisit if:** the upload's time shows in
+how long he waits for her, or the room on the board proves short.
+
+### R-58 — the five-minute tick without a gap in the recording
+**Deferred, not refused.** The tick half a minute before the end plays on the
+same task that reads the microphones, so about a fifth of a second of his
+voice is not recorded while it sounds. Playing it beside the recording means
+a second task on a codec pair that is opened and closed together. **Revisit
+if:** a transcript is seen to lose the words said over the tick.
+
+### R-59 — one wait for the sleep screen reaching the panel
+**Why refused:** `main.c`'s `LAST_FRAME_MS` (200 ms) and the journal's two
+face frames both wait for the dark to be drawn, but before different things:
+the first before deep sleep stops the chip, which the panel must have
+finished with, the second only before the journal object is hidden over a
+dark that is already drawing. The first has no frame to count and keeps a
+margin the second does not need. **Revisit if:** the sleep screen is ever
+seen half drawn after she sleeps, or a flash is seen when the journal leaves.
+
+### R-60 — reading all fourteen charts at once
+**Why refused:** one at a time, fourteen outran `DOOR_MS` at the five or six
+seconds a chart took on 13 and 14 October; all at once is the burst TradingView
+refuses — its scanner answered 429 on every quote batch, and its calendar
+refuses past about thirty reads a minute — on one session. `inLanes` keeps
+three in flight. Three is a reading, not a fact.
+**Revisit if:** the `market read` rows name refusals from the job's reads (go
+to two), or still name *not reached* at three.
+
+### R-61 — a bound on how old a kept market line may be
+**Why refused:** the odds carry `ODDS_HOURS` because they carry only the time
+they were read. Each market line carries its own bar times, so a line kept
+from an earlier pass reads as old where it is old, and a bound would drop a
+true reading for its age. A job that has stopped is the dispatch watcher's to
+report.
+**Revisit if:** a briefing quotes a kept line as though it were current.
+
+### R-62 — a job of its own for the read-ahead
+**Why refused:** it rides the quarter-hourly calendar job, after the filing.
+Its own job is a new name in `dispatch_job_check` (an `upgrade.sql` step), a
+seventh schedule and the counts in `verify.sql`, for the same cadence. The
+cost is a job whose name says only *calendar*.
+**Revisit if:** the market and the calendar want different cadences, or the
+job's worst case — 45s filing, then 45s reading — nears its 120s timeout.
+
+### R-63 — a longer bound for the quarter-hourly calendar read
+**Deferred, not refused.** About thirteen of some 270 filings from 12 to 15
+October got no answer in 45 seconds, most of them overnight. Each window
+overlaps the next, so the filing a quarter hour later catches up, and no
+briefing lost its calendar.
+**Revisit if:** a print's actual reaches the calendar later than the next
+filing, or the failures cluster before 08:00.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

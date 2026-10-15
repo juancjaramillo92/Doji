@@ -24,7 +24,7 @@
 
 import {
   env, secretMatches, json, marketOpen, nyDate, sbHeaders, heartbeat, mcpInit, parseSse,
-  SB_URL, SB_KEY, why
+  SB_URL, SB_KEY, why, type Candle
 } from "../_shared/edge.ts";
 
 const MCP_URL   = env("CTRADER_MCP_URL") || "https://mcp.ctrader.com/trading/mcp";
@@ -457,7 +457,7 @@ async function recordStops(plans: OpenPlan[]): Promise<number> {
    Bars are in PIPETTES, like the spot read — the second place fromPipettes
    applies. Pure and exported; barSpan sizes the request, and the filter keeps
    a broker that answers wider than asked from putting an edge bar in. */
-export interface Bar { timestamp: number; high: number; low: number }
+export interface Bar { timestamp: number; open: number; high: number; low: number; close: number }
 const MINUTE = 60_000;
 
 export function barSpan(entryMs: number, closeMs: number): { from: number; to: number } | null {
@@ -507,16 +507,13 @@ async function readBars(session: Record<string, string>, from: number, to: numbe
    them all, as bestPrice refuses a figure: a dropped bar could hold the stop. */
 export const CALL_HOURS = 30;
 
-export interface Candle { t: number; open: number; high: number; low: number; close: number }
-
-export function foldCandles(bars: any[]): Candle[] | null {
-  const out = (bars ?? []).map(b => ({
-    t: Number(b?.timestamp), open: Number(b?.open), high: Number(b?.high),
-    low: Number(b?.low), close: Number(b?.close),
+export function foldCandles(bars: Bar[]): Candle[] | null {
+  const out: Candle[] = bars.map(b => ({
+    t: Number(b.timestamp), open: Number(b.open), high: Number(b.high),
+    low: Number(b.low), close: Number(b.close),
   }));
-  const readable = (c: Candle) => Number.isFinite(c.t) &&
-    [c.open, c.high, c.low, c.close].every(n => Number.isFinite(n) && n > 0);
-  if (!out.every(readable)) return null;
+  if (!out.every(c => Number.isFinite(c.t) &&
+                      [c.open, c.high, c.low, c.close].every(n => Number.isFinite(n) && n > 0))) return null;
   // Chunks meet at their edges, so a bar can come back twice.
   const byMinute = new Map(out.map(c => [c.t, c]));
   return [...byMinute.values()].sort((a, b) => a.t - b.t).map(c => ({

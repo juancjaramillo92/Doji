@@ -352,13 +352,13 @@ const tvCall = async (session: Record<string, string>, tool: AllowedTool, args: 
                       signal?: AbortSignal) =>
   unwrap(parseSse(await tvPost(session, tool, args, signal)), tool);
 
-/* What a door that reads one chart at a time may spend, so that it answers
-   inside her READ_MS, 45 seconds, with what it has rather than with nothing.
-   On 12 October the news door's two calls took 25 seconds, the market's
-   fourteen and the rates' six outran her, and a briefing and a reply lost
-   both blocks whole. Ten seconds are left for the boot, the sign-in and the wire. Whatever the
-   deadline cuts short, the call in flight and every one after, is named as
-   not reached; the lists run most-needed first, so a slow morning keeps those. */
+/* What each of the two long doors may spend, so that it answers inside the
+   READ_MS, 45 seconds, its caller waits, with what it has rather than with
+   nothing: on 12 October the market's fourteen calls and the rates' six
+   outran it, and a briefing and a reply lost both blocks whole. Ten seconds
+   are left for the boot, the sign-in and the wire. Whatever the deadline cuts
+   short, the calls in flight and every one not yet asked, is named as not
+   reached; the lists run most-needed first, so a slow morning keeps those. */
 const DOOR_MS = 35_000;
 
 const unreached = (signal: AbortSignal, err: unknown) =>
