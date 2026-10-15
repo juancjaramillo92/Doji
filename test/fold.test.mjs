@@ -58,7 +58,7 @@ import {
   SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, HIGH, HOME, weekOf, STOP_GRACE_MIN,
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import {
-  turns, biasOf, sweepsOf, foldStructure, READINGS, GRID,
+  turns, biasOf, sweepsOf, poolsOf, foldStructure, READINGS, GRID, CANDLES,
 } from '../supabase/functions/doji-eugenia/structure.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts';
@@ -909,6 +909,44 @@ test('a sweep is a wick through a standing turn that closed back', () => {
     [{ period: 'M_15', at: 7 * HOUR, level: 1, kind: 'low', wick: 0.5, close: 6 }]);
 });
 
+/* His step 2's liquidity pool: two highs that printed level, apart, with price
+   gone away between them and nothing trading through since. The second of the
+   two is never a turn, so the pool is read off the bars. */
+test('a pool is two equal highs, apart, that price left and has not taken since', () => {
+  assert.deepEqual([READINGS.EQUAL, READINGS.TURN, READINGS.ON_GRID], [1.5, 3, 3], 'the fixtures are drawn for these');
+  const flat = 4000;
+  const bars = (highs, lows) => series(0, HOUR, highs, lows ?? highs.map(h => h - 1));
+  // 4010 then 4009, five bars apart, with lows of 4000 between: one pool at 4010.
+  const top = [4010, 4005, 4004, 4003, 4004, 4009, 4006];
+  const lows = [4008, flat, flat, flat, flat, 4007, 4005];
+  assert.deepEqual(poolsOf('H_1', bars(top, lows)).filter(p => p.kind === 'high'),
+    [{ price: 4010, kind: 'high', periods: ['H_1'], touches: [0, 5 * HOUR] }]);
+  // Taken: a bar since has traded above it by more than EQUAL. One within EQUAL
+  // of the ceiling is another touch of it, and lifts the pool to its high.
+  assert.deepEqual(poolsOf('H_1', bars([...top, 4012], [...lows, 4005])).filter(p => p.kind === 'high'), []);
+  assert.deepEqual(poolsOf('H_1', bars([...top, 4011], [...lows, 4005])).filter(p => p.kind === 'high')
+    .map(p => [p.price, p.touches.length]), [[4011, 2]]);
+  // Too close together: three bars apart is one move, not two failures.
+  assert.deepEqual(poolsOf('H_1', bars([4010, 4005, 4004, 4009.5, 4006], [4008, flat, flat, 4007, 4005]))
+    .filter(p => p.kind === 'high'), []);
+  // Price never left: lows of 4008 are not $3 from a 4010 ceiling.
+  assert.deepEqual(poolsOf('H_1', bars(top, lows.map(l => Math.max(l, 4008)))).filter(p => p.kind === 'high'), []);
+  // A third touch joins the pool rather than making a second.
+  const triple = poolsOf('H_1', bars([...top, 4003, 4002, 4003, 4002, 4009.8], [...lows, flat, flat, flat, flat, 4007]))
+    .filter(p => p.kind === 'high');
+  assert.deepEqual(triple.map(p => [p.price, p.touches.length]), [[4010, 3]]);
+  // Through the whole fold, a pool is drawn only within REACH of price.
+  const at = { M_5: [candle(10 * HOUR, 4001, 3999, 4000)] };
+  const highs = (charts) => foldStructure({ ...charts, ...at }, 11 * HOUR).pools.filter(p => p.kind === 'high');
+  assert.deepEqual(highs({ H_1: bars(top, lows) }).map(p => p.price), [4010]);
+  assert.deepEqual(highs({ H_1: bars(top.map(h => h + 100), lows.map(l => l + 100)) }), [],
+    `a pool more than $${READINGS.REACH} from price is on the map`);
+  // Mirrored: equal lows with price gone above between them.
+  const floor = poolsOf('M_30', bars([4002, 4010, 4010, 4010, 4010, 4002, 4003], [3990, 4004, 4005, 4004, 4005, 3990.5, 3995]))
+    .filter(p => p.kind === 'low');
+  assert.deepEqual(floor.map(p => [p.price, p.kind]), [[3990, 'low']]);
+});
+
 /* The map's fixture, at 10:07 New York on Thursday 15 October 2026. The 1H
    holds a high turn at 4049 (the week's top), a low at 3980 (its bottom) and a
    high at 4024.5; the 30m a low at 4023 that is newer and the same level, and
@@ -957,9 +995,16 @@ test('the map reads his level charts in his words, off printed bars only', () =>
   // Over the weekend the newest daily bar has closed, and there is no today.
   const weekend = foldStructure({ D_1: MAP_CHARTS.D_1 }, Date.UTC(2026, 9, 17, 12));
   assert.deepEqual([weekend.adr, weekend.today], [45, null]);
-  // The last CLOSED candle of each entry chart, never the one forming.
-  assert.deepEqual(map.candles.map(c => [c.period, c.bar.t]),
-    [['M_15', MAP_HOUR - HOUR / 4], ['M_5', MAP_HOUR]]);
+  // The last CLOSED candles of each entry chart, oldest first, never the one
+  // forming: four 15m, and the two 5m the fixture has closed.
+  assert.equal(CANDLES, 4);
+  assert.deepEqual(map.candles.map(c => [c.period, c.bars.map(b => b.t)]), [
+    ['M_15', [0, 1, 2, 3].map(i => MAP_HOUR - HOUR + i * HOUR / 4)],
+    ['M_5', [MAP_HOUR - 5 * 60_000, MAP_HOUR]],
+  ]);
+  // The 30m lows at 4024 and 4023, five bars apart with price gone $3 above
+  // between them and nothing under since, are one pool at the lower.
+  assert.deepEqual(map.pools.map(p => [p.price, p.kind, p.periods, p.touches.length]), [[4023, 'low', ['M_30'], 2]]);
   // A session's range so far includes the bar still forming.
   assert.equal(map.sessions.at(-1).to, MAP_HOUR + HOUR / 4);
   assert.equal(map.sessions.at(-1).low, 4020);
@@ -980,7 +1025,11 @@ test('the map is said as hers, with every price timed and nothing about what com
   assert.match(out, /No wick through a turn closed back in the last day\./);
   assert.match(out, /09:00 ET to 10:15 so far, 4020 to 4031/);
   assert.match(out, /averaged \$50 over the last 14 sessions; this session has covered \$30 so far\./);
-  assert.match(out, /The last closed 5m candle opened at 10:00 ET: open 4026, high 4028, low 4024, close 4026\./);
+  assert.match(out, /The last closed 5m candles, oldest first: 09:55 ET open 4025, high 4027, low 4023, close 4025; 10:00 ET open 4026, high 4028, low 4024, close 4026\./);
+  assert.match(out, /The last closed 15m candles, oldest first: 09:00 ET open 4026/);
+  assert.match(out, /· 4023 — equal lows, on the 30m, touched 05:00 ET, 07:30 ET/);
+  assert.match(structureList({ ...foldStructure(MAP_CHARTS, MAP_NOW), pools: [] }, MAP_NOW),
+    /No equal highs or lows still rest within \$60\./);
   assert.match(out, /Not read just now: the 4H\. Say so rather than judging a step off a chart you do not have\./);
   assert.doesNotMatch(out, /\b(will|next|likely|expect|should)\b/i);
   // A map with no bar at all is said as no map.

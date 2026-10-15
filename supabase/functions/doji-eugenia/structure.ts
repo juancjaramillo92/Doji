@@ -28,11 +28,18 @@ export const READINGS = {
   // As far from price as the map is drawn: a call waits for its level and then
   // reaches $30 beyond it, so twice the target.
   REACH: 60,
+  // Two highs this close are one ceiling price has failed at twice, and the
+  // stops above it rest there until a bar trades through: his step 2's
+  // liquidity pool. A low, mirrored.
+  EQUAL: 1.5,
 };
 export type Readings = typeof READINGS;
 
 // The newest wicks through a turn that closed back, the last day's only.
 export const SWEEPS = 3;
+// The closed candles of each entry chart handed over, oldest first: three can
+// make a pattern, which one never does.
+export const CANDLES = 4;
 
 // §4's grid: 00 and 50 round, 25 and 75 the quarters between.
 export const GRID = 25;
@@ -47,16 +54,18 @@ export interface Level {
 }
 export interface Quarter { price: number; round: boolean; turned: boolean }
 export interface Sweep { period: Period; at: number; level: number; kind: 'high' | 'low'; wick: number; close: number }
+export interface Pool { price: number; kind: 'high' | 'low'; periods: Period[]; touches: number[] }
 export interface Session { name: string; from: number; to: number; high: number; low: number }
 export interface Structure {
   last: Candle | null;
   bias: Bias[];
   range: { high: Turn; low: Turn } | null;
   levels: Level[];
+  pools: Pool[];
   grid: Quarter[];
   sweeps: Sweep[];
   sessions: Session[];
-  candles: { period: Period; bar: Candle }[];
+  candles: { period: Period; bars: Candle[] }[];
   adr: number | null;
   today: number | null;
   missing: Period[];
@@ -113,6 +122,36 @@ export function sweepsOf(period: Period, bars: Candle[], since: number, turn = R
       if (above ? b.close > s.price : b.close < s.price) break;
       if (b.t >= since && (above ? b.high > s.price : b.low < s.price)) {
         out.push({ period, at: b.t, level: s.price, kind: s.kind, wick: above ? b.high : b.low, close: b.close });
+      }
+    }
+  }
+  return out;
+}
+
+/* Two highs within EQUAL, more than TURN bars apart, with price gone at least
+   ON_GRID away between them and nothing trading above either since the first:
+   the stops above are still resting. The second of two equal highs is never a
+   turn, which is why a pool is read off the bars and not the turns. A low,
+   mirrored. Touches of one pool are merged, so a triple top is one line, and a
+   bar within EQUAL above the ceiling is another touch that lifts it: only one
+   further is the pool taken. */
+export function poolsOf(period: Period, bars: Candle[], r = READINGS): Pool[] {
+  const out: Pool[] = [];
+  for (const kind of ['high', 'low'] as const) {
+    const at = (b: Candle) => kind === 'high' ? b.high : b.low;
+    const through = (b: Candle, level: number) => kind === 'high' ? b.high > level : b.low < level;
+    const away = (b: Candle, level: number) =>
+      kind === 'high' ? b.low <= level - r.ON_GRID : b.high >= level + r.ON_GRID;
+    for (let j = 0; j < bars.length; j++) {
+      for (let i = 0; i < j - r.TURN; i++) {
+        if (Math.abs(at(bars[i]) - at(bars[j])) > r.EQUAL) continue;
+        const level = kind === 'high' ? Math.max(at(bars[i]), at(bars[j])) : Math.min(at(bars[i]), at(bars[j]));
+        const between = bars.slice(i + 1, j);
+        if (!between.some(b => away(b, level)) || bars.slice(i + 1).some(b => through(b, level))) continue;
+        const pool = out.find(p => p.kind === kind && Math.abs(p.price - level) <= r.EQUAL);
+        if (!pool) { out.push({ price: level, kind, periods: [period], touches: [bars[i].t, bars[j].t] }); continue; }
+        pool.price = kind === 'high' ? Math.max(pool.price, level) : Math.min(pool.price, level);
+        pool.touches = [...new Set([...pool.touches, bars[i].t, bars[j].t])].sort((a, b) => a - b);
       }
     }
   }
@@ -185,6 +224,16 @@ export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: nu
   } : null;
 
   const levels = last ? levelsOf(charts, now, last.close, range, r) : [];
+  // One line for a pool both level charts show.
+  const pools: Pool[] = [];
+  for (const p of (['H_1', 'M_30'] as const).flatMap(p => poolsOf(p, read(p), r))) {
+    if (!last || Math.abs(p.price - last.close) > r.REACH) continue;
+    const same = pools.find(q => q.kind === p.kind && Math.abs(q.price - p.price) <= r.EQUAL);
+    if (!same) { pools.push(p); continue; }
+    same.periods.push(...p.periods.filter(x => !same.periods.includes(x)));
+    same.touches = [...new Set([...same.touches, ...p.touches])].sort((a, b) => a - b);
+  }
+  pools.sort((a, b) => b.price - a.price);
   const grid: Quarter[] = [];
   if (last) {
     for (let q = Math.ceil((last.close - r.REACH) / GRID) * GRID; q <= last.close + r.REACH; q += GRID) {
@@ -201,12 +250,13 @@ export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: nu
       .filter(([, bars]) => bars.length).map(([p, bars]) => biasOf(p, bars, r.TURN)),
     range,
     levels,
+    pools,
     grid,
     sweeps: (['H_1', 'M_15'] as const).flatMap(p => sweepsOf(p, read(p), since, r.TURN))
       .sort((a, b) => b.at - a.at).slice(0, SWEEPS),
     sessions: sessionsOf(charts.M_15 ?? [], 'M_15', since),
-    candles: (['M_15', 'M_5'] as const).map(p => ({ period: p, bar: read(p).at(-1) }))
-      .filter((c): c is { period: Period; bar: Candle } => !!c.bar),
+    candles: (['M_15', 'M_5'] as const).map(p => ({ period: p, bars: read(p).slice(-CANDLES) }))
+      .filter(c => c.bars.length),
     adr: daily.length
       ? round2(daily.slice(-ADR_SESSIONS).reduce((s, b) => s + b.high - b.low, 0) / Math.min(daily.length, ADR_SESSIONS))
       : null,

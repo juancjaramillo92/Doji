@@ -1934,13 +1934,19 @@ broker token stays in the poller, as for `get_market` — and `foldStructure` in
   00 and 50 round, where a turn on a quarter is §4's stronger level.
 - **R-05 against R-06**: the week of hourly bars is the range, and a level
   within `EDGE` ($5) of its high or low is at its edge, the rest inside it.
+- **Step 2's liquidity pools** (`poolsOf`): two highs within `EQUAL` ($1.50),
+  more than three bars apart, with price gone $3 away between them and nothing
+  trading through since — the stops above still resting. Read off the bars, not
+  the turns, since the second of two equal highs is never a turn; a third touch
+  joins the pool, and a low is mirrored.
 - **§4.2's sweep**: a wick through a standing turn on the 1H or 15m that closed
   back, in the last day — not once a bar has closed through it.
 - **The sessions** over the last day on the 15m, by `sessionAt`, the bar still
   forming included; **the average daily range** over fourteen sessions and what
-  this one has covered; **the last closed 15m and 5m candles**.
+  this one has covered; **the last four closed 15m and 5m candles** (`CANDLES`),
+  oldest first, since three can make a pattern and one never does.
 
-`TURN`, `ON_GRID`, `EDGE` and `REACH` are readings rather than facts, kept in
+`TURN`, `ON_GRID`, `EDGE`, `REACH` and `EQUAL` are readings rather than facts, kept in
 one object, `READINGS`, so each can be argued with and the calibration can fold
 under others. `structureList` says the map with every price timed,
 and says it is **hers**: his structure is drawn in TradingView and deliberately
