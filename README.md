@@ -1796,22 +1796,21 @@ I'm running out of battery. Charge me when you can."* is spoken after her
 answer, and is neither copied to Telegram nor stored. The charm asks once a
 charge — told, it does not ask again until a cable is in.
 
-**One request, answered at once.** The response starts before the turn does
-and is the audio itself, in **frames**: a kind byte, three bytes of length,
+**One request, answered at once.** The response starts before the turn does and
+is the audio itself, in **frames**: a kind byte, three bytes of length,
 big-endian, then that many bytes (`FRAME`, `charmFrame`). A voice frame is the
 vendor's raw **`pcm` — 24 kHz, 16-bit little-endian, mono**: no decoder on the
 device, and the parts of a long answer join end to end where a file format's
 header would not; `chunk()` splits it at `TTS_LIMIT` as for a voice note. A
-volume frame, one byte from 0 to 100, goes ahead of her voice when she set
-one, so she already sounds that way — it cannot be a header, since the
-response starts before she has decided anything. **While she thinks, the wire carries silence**:
-a tenth of a second of zeros at once and every fifteen seconds (`BEAT`,
-`BEAT_MS`), because a turn can run for minutes and a response quiet that long is
-closed by a proxy on the way — the shortest such limit known is a hundred
-seconds. Zeros are silence in this format, so the device plays them like
-anything else and its face tells thinking from speaking by the level alone.
-The work is kept past a charm that hangs up, so the copy and the memory still
-land.
+volume frame, one byte from 0 to 100, goes ahead of her voice when she set one,
+so she already sounds that way — it cannot be a header, since the response
+starts before she has decided anything. **While she thinks, the wire carries
+silence**: a tenth of a second of zeros at once and every fifteen seconds
+(`BEAT`, `BEAT_MS`), because a turn can run for minutes and a response quiet
+that long is closed by a proxy on the way — the shortest such limit known is a
+hundred seconds. Zeros are silence in this format, so the device plays them like
+anything else and its face tells thinking from speaking by the level alone. The
+work is kept past a charm that hangs up, so the copy and the memory still land.
 
 **Telegram gets the text as a copy**, his words first — `«what she heard»`, a
 blank line, her answer — so a mishearing shows where he can scroll back. It is
@@ -1828,15 +1827,15 @@ request's wall clock with the turn — a turn that runs to its five minutes
 leaves the voice what is left of four hundred seconds.
 
 **The briefing reaches the charm without waking it.** The charm sleeps with its
-radio off, so nothing can be pushed to it: after the briefing's hour it wakes and
-asks **`?briefing=ready`** (a `GET` with the same key), which answers with her
-line *"Your briefing is ready, jefe."* in the same frames, or a `204` while no briefing is
-stored for today. Writing takes up to six minutes, so the charm asks again every
-few minutes until it lands. Then it shows a still purple dot until he presses,
-and asks **`?briefing=today`** for the briefing itself. Both read today's
-briefing through `storedBriefing`, the speaking worker's own find-and-pair, so
-the charm says exactly what Telegram received: Sunday's on a Sunday, the weekday
-one otherwise.
+radio off, so nothing can be pushed to it: after the briefing's hour it wakes
+and asks **`?briefing=ready`** (a `GET` with the same key), which answers with
+her line *"Your briefing is ready, jefe."* in the same frames, or a `204` while
+no briefing is stored for today. Writing takes up to six minutes, so the charm
+asks again every few minutes until it lands. Then it shows a still purple dot
+until he presses, and asks **`?briefing=today`** for the briefing itself. Both
+read today's briefing through `storedBriefing`, the speaking worker's own
+find-and-pair, so the charm says exactly what Telegram received: Sunday's on a
+Sunday, the weekday one otherwise.
 
 **The door refuses before it works**: a wrong key is a 401 like any other; a
 right key without `STT_URL`, `STT_KEY` and `TTS_KEY` is a 503 naming them, since
@@ -2852,21 +2851,21 @@ the bootloader at the wake after, to the app that was (`charm/main/ota.c`).
 Only a power-on chimes, so neither an update nor the setup's restart wakes
 anyone.
 
-**A face is a render plus a drawing.** Eugenia's render is a still
-466 × 466 image, embedded as the RGB565 bytes the screen draws
-(`charm/tools/art.py` makes them from `charm/art/eugenia.png`), so nothing is decoded
-at boot. Her eyes, highlight, smile and cheeks are drawn live on top, measured
-from the render: blinks, glances, the mouth following the loudness of what
-plays; thinking, she looks up and away from one side to the other under three
-thought dots; when something goes wrong, her eyes go uneven and her smile turns
-down; going to sleep, her eyes close slowly. Only the face's own patch is
-redrawn on a frame; the rings round the rim — Doji's purples turning slowly while
-she listens, and the one emptying while PWR is held — are the only things that
-redraw the full screen, and only while they show. **Nothing
-flashes between screens**: whatever comes up first is the only thing seen, so
-no face shows for a moment before the journal's questions or after them. Her
-state — a low battery, no internet — is never an expression on her face; it is
-a mark on the sleep screen. The design was settled in playgrounds before any of this — the claude.ai artifacts
+**A face is a render plus a drawing.** Eugenia's render is a still 466 × 466
+image, embedded as the RGB565 bytes the screen draws (`charm/tools/art.py` makes
+them from `charm/art/eugenia.png`), so nothing is decoded at boot. Her eyes,
+highlight, smile and cheeks are drawn live on top, measured from the render:
+blinks, glances, the mouth following the loudness of what plays; thinking, she
+looks up and away from one side to the other under three thought dots; when
+something goes wrong, her eyes go uneven and her smile turns down; going to
+sleep, her eyes close slowly. Only the face's own patch is redrawn on a frame;
+the rings round the rim — Doji's purples turning slowly while she listens, and
+the one emptying while PWR is held — are the only things that redraw the full
+screen, and only while they show. **Nothing flashes between screens**: whatever
+comes up first is the only thing seen, so no face shows for a moment before the
+journal's questions or after them. Her state — a low battery, no internet — is
+never an expression on her face; it is a mark on the sleep screen. The design
+was settled in playgrounds before any of this — the claude.ai artifacts
 *Eugenia, on the charm*, *Gladys, on the charm* and *Your charm* — and the
 numbers here are theirs.
 
@@ -2885,39 +2884,38 @@ answer: she tries the network for eight seconds, wakes properly if it answers,
 and otherwise sleeps again with the mark still up.
 
 **The setup is the only way anything gets onto a board**, the playground's
-(*Charm setup*). With no Wi-Fi network or without both keys — a board fresh
-from flashing — or after BOOT is held for five seconds, she becomes her own
-Wi-Fi network, named for her address like *Charm-4F2A* and **locked with a
-password made up for that setup**, and shows a **QR code** carrying both,
-centred on her screen with the name under it. A phone's camera joins it in one
-tap, and the page opens by itself: every name the phone asks for resolves to
-the charm and every page but its own redirects there. The page
-(`charm/main/setup.html`) is set in Doji's typeface, which the charm serves
-herself (`charm/main/setup.woff2`, made by `charm/tools/fonts.sh`) since the
-phone has no internet while it is on her network, and it is built for a
-phone: thumb-sized buttons, the main one at the bottom, the keyboard's return
-key saying what it does, no auto-correct on passwords or keys, and every
-result read out to a screen reader. It asks for **her Wi-Fi networks** — the
-ones in range, each with its signal and a lock when it has a password, the
-phone's hotspot recognised by its name and offered first so she has internet
-anywhere, a scan again on request, and "Other network" for one that is hidden
-or not in range — and **the two keys**, `EUGENIA_CHARM_SECRET` and
-`GLADYS_CHARM_SECRET`. **Each is
-tried before it is saved**: a network by joining it, a key by asking its door —
+(*Charm setup*). With no Wi-Fi network or without both keys — a board fresh from
+flashing — or after BOOT is held for five seconds, she becomes her own Wi-Fi
+network, named for her address like *Charm-4F2A* and **locked with a password
+made up for that setup**, and shows a **QR code** carrying both, centred on her
+screen with the name under it. A phone's camera joins it in one tap, and the
+page opens by itself: every name the phone asks for resolves to the charm and
+every page but its own redirects there. The page (`charm/main/setup.html`) is
+set in Doji's typeface, which the charm serves herself
+(`charm/main/setup.woff2`, made by `charm/tools/fonts.sh`) since the phone has
+no internet while it is on her network, and it is built for a phone: thumb-sized
+buttons, the main one at the bottom, the keyboard's return key saying what it
+does, no auto-correct on passwords or keys, and every result read out to a
+screen reader. It asks for **her Wi-Fi networks** — the ones in range, each with
+its signal and a lock when it has a password, the phone's hotspot recognised by
+its name and offered first so she has internet anywhere, a scan again on
+request, and "Other network" for one that is hidden or not in range — and **the
+two keys**, `EUGENIA_CHARM_SECRET` and `GLADYS_CHARM_SECRET`. **Each is tried
+before it is saved**: a network by joining it, a key by asking its door —
 Eugenia's with an empty recording, which a right key is refused with a `400`
-for, Gladys's with what waits — while her screen shows a spinner, then a tick
-or a cross. While she tests a network her radio moves to its channel, so the
-phone can drop off her network for a moment; the page says it is
-reconnecting and carries on by itself. Coming back later, the page shows what
-she has: her networks in the order she tries them, each with Remove behind a
-second tap, a way to add one, and Replace for either key, checked before the
-old one goes. She keeps four networks: a fifth is refused until one is
-removed, never swapped in silently. Finishing ends on "All set", since the
-page cannot close itself. Everything is kept in her own flash (NVS, namespace `charm`), and
-finishing restarts her as herself. The addresses of the two doors are the
-repository's — in `charm/main/net.h`, which `agree.test.mjs` reads with every
-other caller — and only the keys are secret, so a lost charm is cut off by
-changing them in Supabase.
+for, Gladys's with what waits — while her screen shows a spinner, then a tick or
+a cross. While she tests a network her radio moves to its channel, so the phone
+can drop off her network for a moment; the page says it is reconnecting and
+carries on by itself. Coming back later, the page shows what she has: her
+networks in the order she tries them, each with Remove behind a second tap, a
+way to add one, and Replace for either key, checked before the old one goes. She
+keeps four networks: a fifth is refused until one is removed, never swapped in
+silently. Finishing ends on "All set", since the page cannot close itself.
+Everything is kept in her own flash (NVS, namespace `charm`), and finishing
+restarts her as herself. The addresses of the two doors are the repository's —
+in `charm/main/net.h`, which `agree.test.mjs` reads with every other caller —
+and only the keys are secret, so a lost charm is cut off by changing them in
+Supabase.
 
 **Switched on**, she comes up as Eugenia, her face alive at 75% brightness,
 and chimes, as only a power-on does; joins her Wi-Fi and sets her clock to New
@@ -2925,46 +2923,44 @@ York, clock changes included, since the briefing is 08:00 there all year. The
 first serial line names the flash size, the PSRAM the chip actually has and
 what woke it.
 
-**She lives in short waking spells: lift to look, press to talk.** Awake,
-she feels about once a second whether she is **held up to look**, which keeps
-her awake, or **has been put down** — lying flat and still, either way up, or
-face down — which puts her to sleep a couple of seconds later (`lift_hold` in
+**She lives in short waking spells: lift to look, press to talk.** Awake, she
+feels about once a second whether she is **held up to look**, which keeps her
+awake, or **has been put down** — lying flat and still, either way up, or face
+down — which puts her to sleep a couple of seconds later (`lift_hold` in
 `charm/main/lift.c`). Anything else, a pocket or a hand at his side, leaves it
 to thirty seconds without a press. Then her eyes close and the chip goes into
-deep sleep, where it wakes as if switched on again: **lifted to look**, on a
-tap on the screen, PWR, the BOOT button, or a time. A lift is the motion sensor's: armed before every
-sleep, on GPIO21 (Waveshare's schematic for the 1.75C), it wakes the chip on a
-movement, which then takes two readings a moment apart and keeps her awake
-only when the screen is tilted up toward him and held still
+deep sleep, where it wakes as if switched on again: **lifted to look**, on a tap
+on the screen, PWR, the BOOT button, or a time. A lift is the motion sensor's:
+armed before every sleep, on GPIO21 (Waveshare's schematic for the 1.75C), it
+wakes the chip on a movement, which then takes two readings a moment apart and
+keeps her awake only when the screen is tilted up toward him and held still
 (`charm/main/lift.c`); a swing on the keyring or a bump in a pocket sends her
 straight back to sleep without lighting the screen, and rests the sensor for
-twenty seconds, so a keyring swinging all day cannot keep waking her.
-What shows first is decided before the screen lights: **a trade waiting puts
-its questions up straight from the dark**, with no face before them. The
-journal ends on the dark and she goes back to sleep, unless a briefing waits
-too; then Eugenia comes up from black and reads it at once
-(`?briefing=today`), as she does whenever she wakes with a briefing waiting.
-**Woken by PWR**, she listens first instead, since a press means he wants to
-talk, and a waiting briefing is read after her answer. **The conversation
-comes first; a trade waits for it to end.** A trade that waits, or comes in
-while they talk — Gladys's door is asked after each answer — is never put
-between her words, nor before a waiting briefing. **The conversation is over
-when he stops**: held up to look and quiet for eight seconds after her last
-word (`QUIET_MS`), her eyes close to the dark and the trade's questions come up
-from it, then she sleeps, so walking away from them holds; put down, or thirty
-seconds without being held up, she sleeps with the trade under its ring, and
-its questions come up from the dark at the next lift. **PWR while the questions
-are up closes them** and she listens, the trade waiting again until the
-conversation is over — on waking too, where the press puts a waiting briefing
-after her answer. **Put down while she thinks, she finishes**: nothing reads
-the motion sensor while she listens, thinks or speaks, so setting her on the
-table to listen costs nothing, and a waiting briefing is still read after her
-answer, since he is near.
-The panel's reset and select pins and the touch
-controller's reset are held through sleep, so the sleep screen needs no chip
-awake to stay up and a tap can still wake her. **Each waking joins her Wi-Fi
-in the background**, the network she was last on first, asked directly on its
-own channel and access point so no scan is needed, then each saved one in
+twenty seconds, so a keyring swinging all day cannot keep waking her. What shows
+first is decided before the screen lights: **a trade waiting puts its questions
+up straight from the dark**, with no face before them. The journal ends on the
+dark and she goes back to sleep, unless a briefing waits too; then Eugenia comes
+up from black and reads it at once (`?briefing=today`), as she does whenever she
+wakes with a briefing waiting. **Woken by PWR**, she listens first instead,
+since a press means he wants to talk, and a waiting briefing is read after her
+answer. **The conversation comes first; a trade waits for it to end.** A trade
+that waits, or comes in while they talk — Gladys's door is asked after each
+answer — is never put between her words, nor before a waiting briefing. **With a
+trade waiting, the conversation is over when he stops**: held up to look and
+quiet for eight seconds after her last word (`QUIET_MS`), her eyes close to the
+dark and the trade's questions come up from it, then she sleeps, so walking away
+from them holds; put down, or thirty seconds without being held up, she sleeps
+with the trade under its ring, and its questions come up from the dark at the
+next lift. **PWR while the questions are up closes them** and she listens, the
+trade waiting again until the conversation is over — on waking too, where the
+press puts a waiting briefing after her answer. **Put down while she thinks, she
+finishes**: nothing reads the motion sensor while she listens, thinks or speaks,
+so setting her on the table to listen costs nothing, and a waiting briefing is
+still read after her answer, since he is near. The panel's reset and select pins
+and the touch controller's reset are held through sleep, so the sleep screen
+needs no chip awake to stay up and a tap can still wake her. **Each waking joins
+her Wi-Fi in the background**, the network she was last on first, asked directly
+on its own channel and access point so no scan is needed, then each saved one in
 turn; nothing waits for it but the moment something must be sent. Leaving an
 attempt that failed is never taken for the next network refusing her.
 
@@ -2979,27 +2975,27 @@ change, so most errands never touch it. The briefing's hours are a copy of the
 server's (`charm/main/briefing.c`), held by `agree.test.mjs`, and the compiled
 watch is driven against the server's own functions by `test/charm.test.mjs`.
 
-**PWR is the talk button.** A press, and **two quick rising notes** say she
-is listening — from sleep the press that wakes her is enough, and she listens
-even while she is still joining her Wi-Fi, the recording waiting for it, not
-him. The ring shows round the rim and follows his voice. **His pauses are his
-own**: nothing ends his turn but the next press, so he can stop to think as
-long as he needs; **two falling notes** say his words are on their way. A
-press with nothing said for thirty seconds is dropped quietly. **A turn runs
-to five minutes**, a soft tick half a minute before the end; the recording is
-encoded as he speaks — Opus at 24 kbit/s, 16 kHz mono, in an Ogg file built in
-memory (`charm/main/ogg.c`), one packet a page, about a megabyte and a half
-for the whole five — and goes to her door with her battery, the cable and
-her volume in its headers, and the battery line asked for once a charge when
-she is low. Asked to speak up or down, she sets the volume before she
-answers, and keeps it, as the dial does. The answer is read out of its frames
-(`charm/main/frames.c`) and played as it streams in (*The charm — her voice on his keyring*):
-her face thinks through the silence and speaks when her voice starts, since
-the silence is exact zeros. A press while she thinks or speaks cuts her off;
-the copy in Telegram is the whole of it. The screen is not for talking: a tap
-on it answers a journal question, and asleep wakes her to look. Losing the network sends her back to the sleep
-screen, where the no-internet mark says why; a door that answers with an
-error, or refuses her key, shows her confused for four seconds.
+**PWR is the talk button.** A press, and **two quick rising notes** say she is
+listening — from sleep the press that wakes her is enough, and she listens even
+while she is still joining her Wi-Fi, the recording waiting for it, not him. The
+ring shows round the rim and follows his voice. **His pauses are his own**:
+nothing ends his turn but the next press, so he can stop to think as long as he
+needs; **two falling notes** say his words are on their way. A press with
+nothing said for thirty seconds is dropped quietly. **A turn runs to five
+minutes**, a soft tick half a minute before the end; the recording is encoded as
+he speaks — Opus at 24 kbit/s, 16 kHz mono, in an Ogg file built in memory
+(`charm/main/ogg.c`), one packet a page, about a megabyte and a half for the
+whole five — and goes to her door with her battery, the cable and her volume in
+its headers, and the battery line asked for once a charge when she is low. Asked
+to speak up or down, she sets the volume before she answers, and keeps it, as
+the dial does. The answer is read out of its frames (`charm/main/frames.c`) and
+played as it streams in (*The charm — her voice on his keyring*): her face
+thinks through the silence and speaks when her voice starts, since the silence
+is exact zeros. A press while she thinks or speaks cuts her off; the copy in
+Telegram is the whole of it. The screen is not for talking: a tap on it answers
+a journal question, and asleep wakes her to look. Losing the network sends her
+back to the sleep screen, where the no-internet mark says why; a door that
+answers with an error, or refuses her key, shows her confused for four seconds.
 
 **The journal asks what waits**, through Gladys's door, and while a
 trade waits the questions take the whole screen, the playground's: the setup
