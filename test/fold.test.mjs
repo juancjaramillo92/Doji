@@ -5571,10 +5571,9 @@ test('a full calendar read says it stopped, and a short one says nothing', async
 });
 
 /* ─── The trade look speaks on a close alone ─────────────────────────────────
-   A print pending beside an open is R-20's, his to weigh. An "opened" event —
-   the retired trigger still firing on a database upgrade.sql has not reached,
-   or a person at the door — returns before any read, with a print pending,
-   the one case in which it would have spoken.
+   A print pending beside an open is R-20's, his to weigh. Any event but a close
+   — a person at the door can send one — returns before any read, driven here
+   with a print pending, the case in which it would most want to speak.
    ─────────────────────────────────────────────────────────────────────────── */
 test('an opened event reads nothing and says nothing; a close past the limit reaches the model', async () => {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());

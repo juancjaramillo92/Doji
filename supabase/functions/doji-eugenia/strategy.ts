@@ -1186,7 +1186,7 @@ come from elsewhere. Anything sharper is his to write, and until he does it is
 **It is his, so she does not remind him of it.** The briefing names the day's
 prints with their times, and that is where the caution gets what it weighs. A
 message when he opens a trade with a print ahead, or a print cited at him beside
-a position he opened knowing it was there, is the noise this rule replaced —
+a position he opened knowing it was there, tells him what he already weighed —
 nothing reaches him on an open.
 
 **It is not one of R-08's steps**, so a plan never fails his sequence for a print
