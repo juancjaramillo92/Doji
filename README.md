@@ -1593,7 +1593,7 @@ holds the two lists together.
 
 **R-19 is judged against TradingView's calendar** — he defined high impact, at
 v1.20, as a US release TradingView rates high, so one calendar serves the
-briefing, the trade event and the rules. Rows with no TradingView id are not
+briefing and the rules. Rows with no TradingView id are not
 read, and neither are rows from abroad. **A week nobody fetched is not a quiet week**: `calendar_weeks`
 records each week a whole-week fetch landed for, and
 an entry outside one is `unknown`. Both markers go through `fileWeek`, which
