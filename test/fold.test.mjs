@@ -1486,7 +1486,7 @@ const timetable = (briefed, passFails = false) => {
   return owed;
 };
 
-test('an ordinary week owes one briefing and one nightly pass a day, and nothing else', () => {
+test('an ordinary week owes one briefing and one nightly pass a day, and the Saturday review', () => {
   // August, so EDT: 08:00 ET is 12:00 UTC, Sunday's 17:00 is 21:00, and 22:00
   // ET is 02:00 UTC the NEXT day.
   assert.deepEqual(timetable(true), [
@@ -1496,7 +1496,7 @@ test('an ordinary week owes one briefing and one nightly pass a day, and nothing
     '2026-08-19T02:00 consolidate', '2026-08-19T12:00 weekday',
     '2026-08-20T02:00 consolidate', '2026-08-20T12:00 weekday',
     '2026-08-21T02:00 consolidate', '2026-08-21T12:00 weekday',
-    '2026-08-22T02:00 consolidate',
+    '2026-08-22T02:00 consolidate', '2026-08-22T14:00 review',
   ]);
 });
 
@@ -1513,7 +1513,7 @@ test('a week of failed briefings owes the retry hours', () => {
     '2026-08-16T02:00 consolidate', '2026-08-16T21:00 sunday',
     '2026-08-16T22:00 sunday', '2026-08-16T23:00 sunday', '2026-08-17T00:00 sunday',
     ...day('17'), ...day('18'), ...day('19'), ...day('20'), ...day('21'),
-    '2026-08-22T02:00 consolidate',
+    '2026-08-22T02:00 consolidate', '2026-08-22T14:00 review',
   ]);
 });
 

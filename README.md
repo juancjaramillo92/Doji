@@ -1393,6 +1393,25 @@ handed the failures and told when nothing broke. A breach gets the fact, her
 verdict and the lesson in three short sentences, then back to the market. Closed
 trades only: a verdict on an open one is a hard prohibition.
 
+### Saturday, a review of his week
+
+**Every coach has a cadence that is not about one trade**; otherwise she speaks
+about his trading only when a rule breaks. So at 10:00 New York on
+Saturday, the one morning no market is open and nothing else is due
+(`reviewDue`, composed into `dueNow`), she reviews his week: how he followed
+the rules a row can check, his own answers — how often he marked his rules
+broken and how many he left blank, the one record of entering on the touch —
+what he committed to and whether he kept it, one thing to keep and one to
+change, and her own calls in a sentence. Process, never P&L as the measure,
+and nothing about where price goes next week, which is Sunday's briefing.
+
+She is handed the week computed — `get_stats`' summary with his answers,
+`check_rules`' verdicts, her calls and her record — with his notes, the
+portrait and what he has on, and may read a trade or a section of his rules
+(`REVIEW_TOOLS`). `TRIM` gates it, it is spoken through `sayAloud`, and it is
+stored under `[saturday review]`. **No retry**: a review a day late is about a
+week already behind him, so a failure apologises and `?review=1` runs it by hand.
+
 ### The calendar — filed for her every quarter hour
 
 **The calendar is filed for her, from TradingView.** `fileCalendar` reads
@@ -2010,8 +2029,8 @@ before it is sent: when the forward look is empty, the newest two rows inside th
 speaking worker's budget are taken only if they are a briefing and its marker
 sharing one instant — otherwise no quote rather than a wrong one.
 
-**Who gets what.** `notesBlock()` reaches **all four paths** — the briefing, a
-reply, the nightly pass and the trade look — and its absence would be silent:
+**Who gets what.** `notesBlock()` reaches **every path** — the briefing, a
+reply, the nightly pass, the Saturday review and the trade look — and its absence would be silent:
 she carries on ignoring an instruction he believes she took. `portraitBlock()`,
 `recordBlock()` and `callsBlock()` go to the briefing, a reply and the pass, and a
 test asserts none reaches the trade look: it lands while he is in a position, where *"he

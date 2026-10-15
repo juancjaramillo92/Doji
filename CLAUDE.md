@@ -312,9 +312,9 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
 - **Every read of a growing table carries a limit and takes the newest rows.**
   Select newest-first and reverse, as `recent()` does. `agree.test.mjs` refuses
   `order=id.asc` under a limit.
-- **`notesBlock()` reaches all four paths, `portraitBlock()` all but the trade
-  look, `channelsBlock()` the three that teach, `recent()` the three that speak**
-  (not the nightly pass), `positionsBlock()` three.
+- **`notesBlock()` reaches every path, `portraitBlock()` all but the trade
+  look, `channelsBlock()` the three that teach, `recent()` everything that
+  speaks** (not the nightly pass), `positionsBlock()` four.
   The trade look's reads sit after its early returns. `agree.test.mjs` reads every
   body, and asserts the absences too.
 - **Loops close.** `readLoops` takes the newest ten, so a loop that cannot close

@@ -1233,6 +1233,43 @@ Then reply with one short line saying what you did, for the log. Nobody reads it
 but you, tomorrow, and it is not a message to him.`;
 
 // ═══════════════════════════════════════════════════════════════════════════
+// THE WEEKLY REVIEW — Saturday, his week's process, as a coach reviews it
+// ───────────────────────────────────────────────────────────────────────────
+// A user message under SYSTEM, so the writing rules and the prohibitions hold.
+// Process, never P&L as the measure; nothing about where price goes next week,
+// which is Sunday's briefing.
+// ═══════════════════════════════════════════════════════════════════════════
+export const REVIEW = `It is Saturday and the market is shut. This is your weekly
+review of his trading: the one time you look at his week as a whole rather than
+at one trade or one morning. Below it is his week, computed from the rows.
+
+IT IS ABOUT PROCESS, NEVER THE P&L. A green week that broke his rules was a bad
+week that paid; a red one inside them was a good week. Say which this was.
+
+Walk through what you are handed, in prose, three or four short paragraphs:
+
+  HOW HE FOLLOWED HIS RULES. The ones a row can check, from what you are
+  handed, each broken one as the fact and then your verdict. Say plainly that
+  the judgment rules cannot be seen from a row.
+
+  HIS OWN ANSWERS. How often he marked his rules broken, and how many trades he
+  left unanswered. This is the one record of entering on the touch, the thing
+  he is working on. A week of blanks says nothing about his discipline, and
+  you say so.
+
+  WHAT HE COMMITTED TO, kept or broken, and on which trade.
+
+  ONE THING TO KEEP AND ONE TO CHANGE next week, each as specific as you can
+  make it: a moment and what he does in it, never a resolution to be better.
+
+Then your own calls this week, in a sentence, as yours: how they ended. If he
+did not trade this week, say so in a sentence, give the commitment or the
+habit that matters for next week, and stop.
+
+Under two hundred and fifty words. No question at the end, and nothing about
+where price goes next week: that is tomorrow's briefing.`;
+
+// ═══════════════════════════════════════════════════════════════════════════
 // THE SECOND READ — the briefing, checked against its own rules before it goes
 // ───────────────────────────────────────────────────────────────────────────
 // A user message under SYSTEM, with no tools. It returns the briefing rather

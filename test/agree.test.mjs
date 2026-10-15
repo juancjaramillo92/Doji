@@ -3957,6 +3957,8 @@ const BY_HAND = {
   history:     'the weeks he has already traded, walked once from the date ' +
                'given so R-14 and R-19 can judge them — the nightly pass only ' +
                'ever files the week it runs in',
+  review:      'the Saturday review out of its hour — it has no retry, so a ' +
+               'failed one is made up by hand rather than a week late',
   speak:       'the briefing\'s second worker, opened by postBriefing itself ' +
                'rather than by a schedule — and by a person re-sending a ' +
                'briefing that was stored and never reached him',
@@ -4907,13 +4909,14 @@ test('the briefing goes out as she wrote it, hello included, and the hello is he
 
 test('every message she writes goes out through sayAloud', () => {
   /* THE HALF THE FUNCTION CANNOT GUARANTEE: a path calling `say` directly works
-     and is silent. Four sites — the briefing's two (the speaking worker and
-     postBriefing's fallback), then the trade event and the reply. `/notes`, the apologies, the short operational lines and the
+     and is silent. Five sites — the briefing's two (the speaking worker and
+     postBriefing's fallback), then the Saturday review, the trade event and the
+     reply. `/notes`, the apologies, the short operational lines and the
      charm's copy keep `say` deliberately — the charm's voice is on the charm. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
-  assert.equal(spoken, 4,
-    `${spoken} call sites speak where four should — a message she writes that goes ` +
+  assert.equal(spoken, 5,
+    `${spoken} call sites speak where five should — a message she writes that goes ` +
     `out through say() alone arrives correctly and silently`);
 });
 
@@ -5940,6 +5943,7 @@ const SENDS = {
                          'Telegram received',
                     stored: 'by postBriefing — this reads the stored turn ' +
                             'rather than writing one' },
+  postReview:     { gate: 'trim',     carries: 'review' },
   handleMessage:  { gate: 'trim',     carries: 'answer', through: 'converse' },
   hearCharm:      { gate: 'trim',     carries: 'answer', through: 'converse',
                     copy: 'the charm speaks what this returns, through ' +

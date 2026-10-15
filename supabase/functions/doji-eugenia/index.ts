@@ -28,7 +28,7 @@
 // Secrets:  EUGENIA_BOT_TOKEN, EUGENIA_WEBHOOK_SECRET, TELEGRAM_CHAT_ID,
 //           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
-import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
+import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, TRADE_EVENT, REVIEW, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // Pure and imported, so the parts that decide are testable.
 import {
@@ -93,12 +93,21 @@ export function consolidateRetryDue(now: Date): boolean {
   return nyClock(now).hour === 23;
 }
 
+/* The weekly review: Saturday at 10:00 New York, the one morning no market is
+   open and nothing else is due. No retry: a review a day late is about a week
+   already behind him. A failure apologises, and ?review=1 runs it by hand. */
+export function reviewDue(now: Date): boolean {
+  const { wd, hour } = nyClock(now);
+  return wd === 6 && hour === 10;
+}
+
 /* What this hour owes — one answer, because the schedules overlap and each
    being right alone settles nothing. */
 export function dueNow(now: Date, briefed: boolean, consolidated: boolean):
-    Brief | 'consolidate' | null {
+    Brief | 'consolidate' | 'review' | null {
   const brief = briefDue(now);
   if (brief) return brief;
+  if (reviewDue(now)) return 'review';
   const retry = retryDue(now);
   if (retry && !briefed) return retry;
   // The gate makes 23:00 a retry rather than a second pass.
@@ -3115,6 +3124,7 @@ export const APOLOGY: Record<string, string> = {
   trade:        "Something broke while I was looking at your position, jefe.",
   embed:        "I could not file what I remember for searching, jefe.",
   speak:        "Your briefing is written, jefe, but I could not send it. Ask me for it.",
+  review:       "Your weekly review broke on my side, jefe. Ask me and I will go through your week.",
   reply:        "Something broke on my side, jefe. Try again in a moment.",
 };
 
@@ -3147,6 +3157,9 @@ async function postScheduled(url: URL): Promise<Response> {
     const speak = url.searchParams.get("speak");
     if (speak) { job = 'speak'; return await postSpeak(speak); }
 
+    // The weekly review, by hand: a failed Saturday has no retry.
+    if (url.searchParams.get("review") === "1") { job = 'review'; return await postReview(); }
+
     const now = new Date();
     if (url.searchParams.get("force") === "1") {
       return await postBriefing(briefDue(now) ?? briefKind(now));
@@ -3156,6 +3169,7 @@ async function postScheduled(url: URL): Promise<Response> {
     const [briefed, consolidated] = await Promise.all([briefedToday(), consolidatedToday()]);
     const due = dueNow(now, briefed, consolidated);
     if (due === 'consolidate') { job = 'consolidate'; return await postConsolidation(); }
+    if (due === 'review') { job = 'review'; return await postReview(); }
     if (due) return await postBriefing(due);
 
     return json({ ok: true, skipped: "nothing due this hour" });
@@ -3414,6 +3428,32 @@ export async function postSpeak(due: string): Promise<Response> {
     detail: `${heard ? "spoken" : "sent as text"} in ${Math.round((spoken - opened) / 1000)}s`,
   });
   return json({ ok: true, spoke: due, heard });
+}
+
+/* ─── The weekly review ────────────────────────────────────────────────────
+   Every coach has a cadence that is not about one trade: a look at the week's
+   process. Saturday, when no market is open, so it lands on nothing he is in
+   the middle of. She is handed the week computed — his stats with his own
+   answers, his rules, her calls — so nothing in it is counted by eye. TRIM
+   gates it, as every message she starts but the briefing and the trade look.
+   ───────────────────────────────────────────────────────────────────────── */
+export const reviewMarker = '[saturday review]';
+
+// His journal and his rules, to look at one trade or read why a rule exists.
+const REVIEW_TOOLS = [TRADES_TOOL, STRATEGY_TOOL];
+
+async function postReview(): Promise<Response> {
+  const [history, notes, portrait, stats, rules, calls, record, desk, story] = await Promise.all([
+    recent(), notesBlock(), portraitBlock(), readStats(7), checkAdherence(7), callsBlock(), recordBlock(),
+    positionsBlock(), thesisBlock(),
+  ]);
+  const asked = `${REVIEW}\n\nHis week, computed from the rows:\n${stats}\n\nHis rules over the week:\n${rules}` +
+    notes + portrait + calls + record + desk;
+  const draft = await ask([...history, { role: 'user', content: asked }], 'high', 'saturday review', REVIEW_TOOLS);
+  const review = await trim(draft, desk, story);
+  await remember([{ role: 'user', content: reviewMarker }, { role: 'assistant', content: review }]);
+  await sayAloud(review);
+  return json({ ok: true, reviewed: review.length });
 }
 
 /* How silence is said. The whole reply, allowing a full stop; "Nothing much
