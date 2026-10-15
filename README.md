@@ -980,6 +980,19 @@ by the quarter-hourly job and she reads the copy (see *The market and the Fed's
 odds are read ahead*). A failed read is a sentence
 telling her not to quote the dollar or yields from a search.
 
+**`?trend=1` is the weeks behind it** — the same `MARKET` list as daily closes
+a week, a month and three months of sessions back (`BACK`, 5, 21 and 63), each
+dated, folded by `foldTrend`. The briefing is about the weeks behind his chart,
+and twenty-five hourly bars reach one day, so the dollar's trend and which force
+moved over a month could come only off a search page. Counted in sessions, so a
+holiday moves a date rather than the gap; a series too short for a point keeps
+the points it reaches. `trendList` states levels on days and computes no change,
+as `aroundList` does, and `aroundBlock` carries it, so every reader of the market
+gets the weeks behind it. **Read once a New York day**: a daily close moves once
+a day, and sixteen more charts every quarter hour is the burst TradingView
+refuses, so `storeTrend` keeps a copy read today and asks again on a new day,
+with what a pass misses carried as the hourly lines are.
+
 **`?news=1` is gold's and the dollar's headlines.** `foldHeadlines` merges the
 two feeds, a story on both being one headline, newest first with title, source
 and time.
@@ -1973,7 +1986,7 @@ closes; and the calendar and her record are the datasets here that compound.
 | `eugenia_reads` | every read she gave, with a verdict on the test she stated | the last 30 days | her `record_read` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
 | `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar` |
-| `eugenia_market` | the market around gold and the Fed's odds, read ahead | 1 row per door, rewritten | the quarter-hourly job, `storeMarket` and `storeRates` |
+| `eugenia_market` | the market around gold and the Fed's odds, read ahead | 1 row per door, rewritten | the quarter-hourly job, `storeMarket`, `storeTrend` and `storeRates` |
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
 | `eugenia_rewrites` | what the thesis and the portrait said before each rewrite | never handed to her | a trigger on both, `eugenia_keep_rewrite` |
 | `eugenia_calls` | every call she made, and how price scored it | the last 30 days | her `make_call` tool; scored by the nightly pass |
@@ -2399,10 +2412,11 @@ waited, they were paid for out of its clock: on 12 October, with the news
 door's two calls taking 25 seconds, both outran her 45 and the briefing lost
 each block whole, and on 13 and 14 October, at five or six seconds a chart,
 it kept six lines of fourteen. Now the quarter-hourly job reads both after it
-files the calendar (`storeMarket`, `storeRates`) and keeps the answers in
-`eugenia_market`, one row per door; `aroundBlock` and `ratesBlock` read that
-row, so a briefing or a reply never waits on TradingView for them. A copy is a
-quarter hour old at most, of hourly and daily bars. **A symbol a pass misses
+files the calendar (`storeMarket`, `storeRates`), and the weeks behind the market
+once a day (`storeTrend`), and keeps the answers in `eugenia_market`, one row per
+door; `aroundBlock`, `trendBlock` and `ratesBlock` read that row, so a briefing
+or a reply never waits on TradingView for them. The hourly copy is a quarter
+hour old at most, of hourly and daily bars. **A symbol a pass misses
 keeps the line the last pass read** (`keptMarket`), with that pass's bar times
 on it, so one slow call leaves no gap; one never read is still named. The odds
 are replaced whole once a pass prices a meeting, since a fold does not merge,
@@ -3251,7 +3265,7 @@ job name, so a re-run makes the jobs match the file. Six jobs —
 |---|---|---|
 | `doji-mcp-sync` | `*/2 * * * *` | the poller |
 | `doji-eugenia` | `0 * * * *` | the briefing and the nightly pass — the function decides which, or neither |
-| `doji-eugenia-calendar` | `5,20,35,50 * * * *` | the calendar's filing, then the market and the Fed's odds read ahead |
+| `doji-eugenia-calendar` | `5,20,35,50 * * * *` | the calendar's filing, then the market, the weeks behind it and the Fed's odds read ahead |
 | `doji-dispatch-watch` | `*/10 * * * *` | `dispatch_watch`'s sweep |
 | `doji-pace-watch` | `37 * * * *` | `pace_watch`'s one-a-day warning |
 | `purge-cron-history` | `0 3 * * *` | trims `cron.job_run_details` |

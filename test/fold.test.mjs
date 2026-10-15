@@ -27,7 +27,7 @@ import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } fr
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, unwrap, foldCalendar,
   calendarWindow, foldBars, foldHeadlines, FOMC, contractMonths, foldRates, oddsOf, unlisted, zq, foldSessions,
-  readMarket, readRates,
+  readMarket, readRates, foldTrend, BACK,
 } from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
@@ -46,7 +46,7 @@ import {
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock,
   sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
-  volumeList, volumeBlock, keptMarket, storeMarket, storeRates,
+  volumeList, volumeBlock, keptMarket, storeMarket, storeRates, storeTrend, trendList, trendBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -827,8 +827,10 @@ test('the market is read ahead by the job, and a briefing reads the copy a faile
 
     world.doors.market = [AROUND, 200];
     world.doors.rates = [{ ok: true, ...RATES, missing: [] }, 200];
-    await Promise.all([storeMarket(), storeRates()]);
-    assert.match(await aroundBlock(), /Dollar index 102\.16/);
+    world.doors.trend = [TREND, 200];
+    await Promise.all([storeMarket(), storeRates(), storeTrend()]);
+    // The weeks ride with the market, so every reader of the one gets the other.
+    assert.match(await aroundBlock(), /Dollar index 102\.16[\s\S]*The weeks behind it[\s\S]*· Dollar index 101\.2 on 8 Oct/);
     assert.match(await ratesBlock(), /read at \d\d:\d\d ET:\n· 28 Oct: 73% no change/);
 
     // A pass that fails, or serves nothing, leaves the copy as it was.
@@ -839,9 +841,9 @@ test('the market is read ahead by the job, and a briefing reads the copy a faile
     assert.match(await ratesBlock(), /28 Oct: 73% no change/);
   });
   assert.deepEqual(world.rows.map(r => r.detail), [
-    'market: not read yet', 'rates: not read yet',
+    'trend: not read yet', 'market: not read yet', 'rates: not read yet',
     // The partial pass's VIX, written by the job that saw it, not the reader.
-    'market: TVC:VIX: TradingView mcp-tv-get-ohlcv: no answer',
+    'market: TVC:VIX: TradingView mcp-tv-get-ohlcv: no answer', 'trend: CBOE:GVZ: no bars',
     'market: TradingView market: not connected', 'rates: no meeting served',
   ]);
   assert.ok(world.rows.every(r => r.caller === 'market read' && r.ok === false));
@@ -861,6 +863,68 @@ test('a symbol the pass did not reach keeps the line the last pass read', () => 
     'the fresh line lost to the old, or the old one was dropped');
   assert.deepEqual(out.missing.map(m => m.symbol), ['FX:EURUSD']);
   assert.deepEqual(keptMarket(fresh, null).missing.length, 2, 'a first pass invented lines');
+});
+
+/* ─── The weeks behind it ────────────────────────────────────────────────────
+   Sixty-four daily bars, one a day from 15 July, closes counting up from 100,
+   so each point's close says which bar it was taken from. */
+const DAILY = (n) => ({ success: true, bars: Array.from({ length: n }, (_, i) => ({
+  o: 100 + i, h: 100 + i, l: 100 + i, c: 100 + i, t: Date.UTC(2026, 6, 15 + i) / 1000, v: null })) });
+
+test('daily bars fold to the closes a week, a month and three months of sessions back, each dated', () => {
+  assert.deepEqual(BACK, [5, 21, 63]);
+  assert.deepEqual(foldTrend(DAILY(64)), [
+    { close: 158, at: '2026-09-11T00:00:00.000Z' },
+    { close: 142, at: '2026-08-26T00:00:00.000Z' },
+    { close: 100, at: '2026-07-15T00:00:00.000Z' }]);
+  // A short series keeps the points it reaches and invents none.
+  assert.deepEqual(foldTrend(DAILY(10)), [{ close: 104, at: '2026-07-19T00:00:00.000Z' }]);
+  assert.throws(() => foldTrend(DAILY(5)), /too few bars/);
+  assert.throws(() => foldTrend({ success: true }), /no bars/);
+});
+
+const TREND = { ok: true, market: [
+  { symbol: 'TVC:DXY', name: 'Dollar index', unit: '', points: [
+    { close: 101.2, at: '2026-10-08T00:00:00.000Z' }, { close: 99.5, at: '2026-09-16T00:00:00.000Z' },
+    { close: 97.8, at: '2026-07-16T00:00:00.000Z' }] },
+  { symbol: 'FRED:T10YIE', name: 'Ten-year breakeven inflation', unit: '%', points: [
+    { close: 2.41, at: '2026-10-07T00:00:00.000Z' }] },
+], missing: [{ symbol: 'CBOE:GVZ', name: 'Gold volatility index (GVZ)', error: 'no bars' }] };
+
+test('the weeks behind the market are levels on stated days, and no change is computed', () => {
+  const out = trendList(TREND);
+  assert.match(out, /daily closes a week, a month and three months back:/);
+  assert.match(out, /· Dollar index 101\.2 on 8 Oct, 99\.5 on 16 Sept?, 97\.8 on 16 Jul/);
+  assert.match(out, /· Ten-year breakeven inflation 2\.41% on 7 Oct/);
+  assert.match(out, /Not read: Gold volatility index \(GVZ\)\./);
+  assert.doesNotMatch(out, /\b(up|down|rose|fell|higher|lower)\b/);
+});
+
+/* ONCE A NEW YORK DAY. A daily close moves once a day, and sixteen charts a
+   quarter hour is the burst TradingView refuses: a copy read today is kept, one
+   from yesterday is read again, and what that pass misses carries. */
+test('the weeks are read once a New York day, and a symbol a pass misses keeps its last line', async () => {
+  const world = marketWorld();
+  let asked = 0;
+  const door = world.fetch;
+  world.fetch = async (url, init) => (url.includes('?trend=1') && asked++, door(url, init));
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString();
+  world.stored.set('trend', { door: 'trend', answer: TREND, read_at: yesterday });
+  world.doors.trend = [{ ok: true, market: [TREND.market[1]], missing: [
+    { symbol: 'TVC:DXY', name: 'Dollar index', error: 'not reached in 35s' }] }, 200];
+  await stubbed(async () => {
+    globalThis.fetch = world.fetch;
+    await storeTrend();
+    assert.equal(asked, 1, 'a copy from yesterday was not read again');
+    assert.match(trendList(world.stored.get('trend').answer), /Dollar index 101\.2 on 8 Oct/,
+      'the dollar this pass missed lost the line the last pass read');
+    await storeTrend();
+    assert.equal(asked, 1, 'a copy read today was read again');
+    assert.match(await trendBlock(), /The weeks behind it/);
+    world.stored.clear();
+    assert.match(await trendBlock(), /could not be read just now\. Do not quote a week's or a month's move/);
+  });
+  assert.deepEqual(world.rows.map(r => r.detail), ['trend: TVC:DXY: not reached in 35s', 'trend: not read yet']);
 });
 
 /* THE ODDS AGE OUT; THE LINES DO NOT NEED TO. Each market line carries its bar

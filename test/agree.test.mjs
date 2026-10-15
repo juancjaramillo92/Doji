@@ -5713,9 +5713,9 @@ test('every market read gives up at READ_MS rather than at the platform', () => 
 /* A LONG DOOR ANSWERS INSIDE ITS CALLER'S BOUND, or the deadline that keeps
    what was read lands after the caller has stopped listening and keeps
    nothing. Two files, one relation: ten seconds for the boot, the sign-in and
-   the wire. And every call the two doors make carries the deadline, the
+   the wire. And every call the three doors make carries the deadline, the
    calendar check included. */
-test('the two long doors answer inside READ_MS', () => {
+test('the three long doors answer inside READ_MS', () => {
   const tv = source('supabase/functions/doji-tradingview/index.ts');
   const ms = (src, name) => {
     const m = src.match(new RegExp(`const ${name} = ([\\d_]+);`));
@@ -5724,7 +5724,7 @@ test('the two long doors answer inside READ_MS', () => {
   };
   assert.ok(ms(EUGENIA_TS, 'READ_MS') - ms(tv, 'DOOR_MS') >= 10_000,
     'DOOR_MS leaves less than ten seconds of READ_MS — the door answers after she has given up on it');
-  for (const fn of ['readMarket', 'readRates']) {
+  for (const fn of ['readMarket', 'readTrend', 'readRates']) {
     const body = bodyOf(tv, `export async function ${fn}(`);
     assert.match(body, /const signal = AbortSignal\.timeout\(DOOR_MS\)/, `${fn} carries no deadline`);
     const calls = [...uncomment(body).matchAll(/tvCall\(session,[\s\S]*?\)\)/g)].map(m => m[0]);
@@ -5746,7 +5746,8 @@ test('every market read she goes without writes a row', () => {
     .map((m, i) => [m[1], EUGENIA_TS.slice(m.index, starts[i + 1]?.index)])
     .filter(([, body]) => /tvRead\("|fetch\((MARKET_URL|COT_URL)/.test(uncomment(body)));
   assert.deepEqual(readers.map(([name]) => name).sort(),
-    ['headlinesBlock', 'marketQuote', 'positioningBlock', 'readTvCalendar', 'storeMarket', 'storeRates', 'volumeBlock'],
+    ['headlinesBlock', 'marketQuote', 'positioningBlock', 'readTvCalendar', 'storeMarket', 'storeRates', 'storeTrend',
+     'volumeBlock'],
     'the market reads have changed — declare the new one, and give it the meter');
   for (const [name, body] of readers) {
     if (name === 'readTvCalendar') continue;
@@ -5754,7 +5755,7 @@ test('every market read she goes without writes a row', () => {
       `${name}'s failure reaches the console and no row`);
   }
   // In part, too, where the door names what it did not read.
-  for (const name of ['storeMarket', 'storeRates']) {
+  for (const name of ['storeMarket', 'storeRates', 'storeTrend']) {
     assert.match(bodyOf(EUGENIA_TS, `export async function ${name}(`),
       /if \(answer\.missing\.length\) await unread\(/, `${name} keeps a partial read to itself`);
   }
@@ -5769,16 +5770,19 @@ test('the quarter-hourly job reads the market ahead, and nothing else writes the
   const run = bodyOf(EUGENIA_TS, 'async function postScheduled(');
   const door = run.slice(run.indexOf('get("calendar") === "1"'));
   assert.match(door.slice(0, door.indexOf('return json')),
-    /await filed\(\);\s*await Promise\.all\(\[storeMarket\(\), storeRates\(\)\]\);/,
+    /await filed\(\);\s*await Promise\.all\(\[storeMarket\(\), storeRates\(\), storeTrend\(\)\]\);/,
     'the quarter-hourly job no longer reads the market ahead, so every copy goes stale');
-  for (const name of ['aroundBlock', 'ratesBlock']) {
+  for (const name of ['aroundBlock', 'ratesBlock', 'trendBlock']) {
     assert.match(bodyOf(EUGENIA_TS, `export async function ${name}(`), /readStored\("/,
       `${name} no longer reads the copy the job keeps`);
   }
   assert.equal([...uncomment(EUGENIA_TS).matchAll(/eugenia_market\?/g)].length, 2,
     'eugenia_market is addressed somewhere other than readStored and store');
   const writers = [...uncomment(EUGENIA_TS).matchAll(/await store\("(\w+)"/g)].map(m => m[1]).sort();
-  assert.deepEqual(writers, ['market', 'rates'], 'the copy has a writer other than the job\'s two');
+  assert.deepEqual(writers, ['market', 'rates', 'trend'], 'the copy has a writer other than the job\'s three');
+  // The weeks ride inside the market's block, so no reader of the one goes without the other.
+  assert.match(bodyOf(EUGENIA_TS, 'export async function aroundBlock('), /trendBlock\(\)/,
+    'the market around gold is handed over without the weeks behind it');
 });
 
 test('the calendar is filed before the briefing reads it, and every filing is a row', () => {

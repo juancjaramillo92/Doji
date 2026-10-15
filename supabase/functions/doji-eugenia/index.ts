@@ -1021,7 +1021,8 @@ const AROUND_TOOL = {
     "ten-year yields, the real yield, the breakeven, silver, oil, the S&P 500, the VIX " +
     "and gold's own volatility index, and " +
     "abroad the German, French, Italian, UK and Japanese ten-year yields and the " +
-    "euro, each a level now beside the level at a stated time; and gold's and the dollar's " +
+    "euro, each a level now beside the level at a stated time, and its daily close a week, " +
+    "a month and three months back; and gold's and the dollar's " +
     "headlines from the last six hours, titles only; what fed funds futures price for " +
     "the next three Fed meetings; the CFTC's weekly count of " +
     "where the speculators stand in gold futures; and what COMEX gold futures traded in " +
@@ -2837,8 +2838,8 @@ async function store(door: string, answer: unknown): Promise<void> {
 /* A symbol this pass did not reach keeps the line the last pass read, its own
    bar times on it, so one slow call leaves no gap; one never read stays named.
    Pure, so the carrying is driven. */
-export function keptMarket(fresh: { market: Around[]; missing: Missed[] },
-                           kept: { market: Around[] } | null) {
+export function keptMarket<T extends { symbol: string }>(fresh: { market: T[]; missing: Missed[] },
+                                                         kept: { market: T[] } | null) {
   const old = new Map((kept?.market ?? []).map(m => [m.symbol, m]));
   return {
     market: [...fresh.market, ...fresh.missing.flatMap(m => old.get(m.symbol) ?? [])],
@@ -2854,6 +2855,22 @@ export async function storeMarket(): Promise<void> {
     await store("market", keptMarket(answer, (await readStored("market"))?.answer ?? null));
   } catch (err) {
     await unread("market", why(err));
+  }
+}
+
+/* Daily closes move once a day, so a copy read today is kept and the door is
+   asked again only on a new New York day; what a pass misses carries, as the
+   hourly lines do. */
+export async function storeTrend(now = Date.now()): Promise<void> {
+  try {
+    const kept = await readStored("trend");
+    if (kept && nyDate(new Date(kept.read_at)) === nyDate(new Date(now))) return;
+    const answer = await tvRead("trend");
+    if (!answer.market?.length) throw new Error("no symbol served");
+    if (answer.missing.length) await unread("trend", missed(answer.missing));
+    await store("trend", keptMarket(answer, kept?.answer ?? null));
+  } catch (err) {
+    await unread("trend", why(err));
   }
 }
 
@@ -2891,9 +2908,11 @@ const NO_AROUND =
   "\n\nThe market around gold could not be read just now. Do not quote the dollar " +
   "or yields from a search; say you do not have them.";
 
+// A level in its unit, the hourly lines and the weeks alike.
+const figure = (v: number, unit: string) => unit === "%" ? `${v}%` : unit === "$" ? `$${v}` : `${v}`;
+
 export function aroundList(answer: { market: Around[]; missing: { name: string }[] }, now = Date.now()): string {
   const today = nyDate(new Date(now));
-  const figure = (v: number, unit: string) => unit === "%" ? `${v}%` : unit === "$" ? `$${v}` : `${v}`;
   const when = (iso: string) => {
     const day = nyDate(new Date(iso));
     return `${nyTime(iso)} ET` + (day === today ? "" : ` on ${civilDay(day)}`);
@@ -2908,13 +2927,43 @@ export function aroundList(answer: { market: Around[]; missing: { name: string }
 }
 
 export async function aroundBlock(): Promise<string> {
+  const weeks = trendBlock();
   try {
     const kept = await readStored("market");
     if (!kept) throw new Error("not read yet");
-    return aroundList(kept.answer);
+    return aroundList(kept.answer) + await weeks;
   } catch (err) {
     await unread("market", why(err));
-    return NO_AROUND;
+    return NO_AROUND + await weeks;
+  }
+}
+
+/* ─── The weeks behind it ──────────────────────────────────────────────────
+   The same lines as daily closes a week, a month and three months back, each
+   dated, so the dollar's trend and which force moved over weeks are read off
+   numbers rather than a search page. Levels at stated days, and no change
+   computed, as above. Carried by aroundBlock, so every reader of the market
+   gets the weeks behind it; never throws.
+   ───────────────────────────────────────────────────────────────────────── */
+type Trend = { symbol: string; name: string; unit: string; points: { close: number; at: string }[] };
+
+export function trendList(answer: { market: Trend[]; missing: { name: string }[] }): string {
+  const lines = answer.market.map(m =>
+    `· ${m.name} ${m.points.map(p => `${figure(p.close, m.unit)} on ${civilDay(p.at.slice(0, 10))}`).join(", ")}`);
+  if (answer.missing.length) lines.push(`· Not read: ${answer.missing.map(m => m.name).join(", ")}.`);
+  return `\n\nThe weeks behind it, from TradingView's daily closes a week, a month and three months ` +
+    `back:\n${lines.join("\n")}`;
+}
+
+export async function trendBlock(): Promise<string> {
+  try {
+    const kept = await readStored("trend");
+    if (!kept) throw new Error("not read yet");
+    return trendList(kept.answer);
+  } catch (err) {
+    await unread("trend", why(err));
+    return "\n\nThe weeks behind the market could not be read just now. Do not quote a week's " +
+      "or a month's move from a search; say you do not have it.";
   }
 }
 
@@ -3231,7 +3280,7 @@ async function postScheduled(url: URL): Promise<Response> {
     // one, and the market read ahead after it; none of the three throws.
     if (url.searchParams.get("calendar") === "1") {
       await filed();
-      await Promise.all([storeMarket(), storeRates()]);
+      await Promise.all([storeMarket(), storeRates(), storeTrend()]);
       return json({ ok: true, filed: true });
     }
 

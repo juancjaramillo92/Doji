@@ -352,7 +352,7 @@ const tvCall = async (session: Record<string, string>, tool: AllowedTool, args: 
                       signal?: AbortSignal) =>
   unwrap(parseSse(await tvPost(session, tool, args, signal)), tool);
 
-/* What each of the two long doors may spend, so that it answers inside the
+/* What each of the three long doors may spend, so that it answers inside the
    READ_MS, 45 seconds, its caller waits, with what it has rather than with
    nothing: on 12 October the market's fourteen calls and the rates' six
    outran it, and a briefing and a reply lost both blocks whole. Ten seconds
@@ -497,6 +497,45 @@ export async function readMarket() {
       const bars = foldBars(await tvCall(session, "mcp-tv-get-ohlcv",
         { symbol: m.symbol, interval: m.daily ? "1D" : "1h", count: m.daily ? 2 : 25 }, signal));
       market[i] = { ...m, daily: !!m.daily, ...bars };
+    } catch (err) {
+      missing[i] = { symbol: m.symbol, name: m.name, error: unreached(signal, err) };
+    }
+  });
+  return { ok: true, market: market.filter(Boolean), missing: missing.filter(Boolean) };
+}
+
+/* ─── The weeks behind it ──────────────────────────────────────────────────
+   The same list, as daily closes a week, a month and three months back. The
+   briefing is about the weeks behind his chart, and twenty-five hourly bars
+   reach one day, so the dollar's trend could come only off a search page.
+   Counted in sessions, so a holiday moves a date rather than the gap, and every
+   close carries its date. Its own door, because a daily close moves once a day
+   and sixteen more charts every quarter hour is the burst TradingView refuses.
+   The answer's list is `market`, as the hourly door's is, since it is the same
+   list and one carry serves both.
+   ───────────────────────────────────────────────────────────────────────── */
+export const BACK = [5, 21, 63];
+
+export function foldTrend(answer: any) {
+  const bars = answer.bars;
+  if (!Array.isArray(bars)) throw new Error("no bars");
+  const last = bars.length - 1;
+  const points = BACK.filter(n => n <= last).map(n => ({
+    close: bars[last - n].c, at: new Date(bars[last - n].t * 1000).toISOString(),
+  }));
+  if (!points.length) throw new Error("too few bars");
+  return points;
+}
+
+export async function readTrend() {
+  const signal = AbortSignal.timeout(DOOR_MS);
+  const session = await tvSession();
+  const market: Record<string, unknown>[] = [], missing: Record<string, string>[] = [];
+  await inLanes(MARKET, async (m, i) => {
+    try {
+      const points = foldTrend(await tvCall(session, "mcp-tv-get-ohlcv",
+        { symbol: m.symbol, interval: "1D", count: Math.max(...BACK) + 1 }, signal));
+      market[i] = { symbol: m.symbol, name: m.name, unit: m.unit, points };
     } catch (err) {
       missing[i] = { symbol: m.symbol, name: m.name, error: unreached(signal, err) };
     }
@@ -840,8 +879,9 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return json({ ok: true, events: foldCalendar(answer) });
     }
 
-    // ?market=1, ?news=1, ?rates=1 and ?volume=1 read only what is fixed above.
+    // ?market=1, ?trend=1, ?news=1, ?rates=1 and ?volume=1 read only what is fixed above.
     if (url.searchParams.get("market") === "1") return json(await readMarket());
+    if (url.searchParams.get("trend") === "1") return json(await readTrend());
     if (url.searchParams.get("news") === "1") return json(await readHeadlines());
     if (url.searchParams.get("rates") === "1") return json(await readRates());
     if (url.searchParams.get("volume") === "1") return json(await readVolume());
@@ -854,7 +894,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return plain(await probe(asked));
     }
 
-    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1, ?news=1, ?rates=1, ?volume=1 or ?probe=" }, 400);
+    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1, ?trend=1, ?news=1, ?rates=1, ?volume=1 or ?probe=" }, 400);
   } catch (err) {
     console.error("doji-tradingview:", why(err));
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
