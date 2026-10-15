@@ -194,7 +194,7 @@ async function claude(body) {
   const out = await res.json();
   if (out.stop_reason === 'refusal' || out.stop_reason === 'max_tokens') throw new Error(`stopped: ${out.stop_reason}`);
   return { text: (out.content ?? []).filter(b => b.type === 'text').map(b => b.text).join('').trim(),
-           usage: out.usage ?? {} };
+           usage: { model: body.model, ...out.usage } };
 }
 
 export async function grade(c, prompts = PROMPTS, ask = claude) {
@@ -209,10 +209,12 @@ export async function grade(c, prompts = PROMPTS, ask = claude) {
   return { id: c.id, text: sent.text, failed, usage };
 }
 
-// Per million tokens, Opus 5.5's: a read a twentieth of input, a five-minute
-// write 1.25×. The trim cases run on Sonnet and are counted at these, so the
-// figure printed leans high.
-const RATE = { in: 4, out: 20, read: 0.2, write: 5 };
+// Per million tokens, each model's list price: a five-minute write is 1.25×
+// input, and a read is $0.20 on both.
+const RATE = {
+  [MODEL.opus]:   { in: 4, out: 20, read: 0.2, write: 5 },
+  [MODEL.sonnet]: { in: 2, out: 10, read: 0.2, write: 2.5 },
+};
 
 async function main(argv) {
   if (!KEY) throw new Error('ANTHROPIC_API_KEY is not set; this eval calls the model and costs money');
@@ -244,8 +246,9 @@ async function main(argv) {
     if (result.failed.length) console.log(`      she wrote: ${result.text.replace(/\s+/g, ' ').slice(0, 400)}`);
   }
   const cost = usage.reduce((sum, u) => sum +
-    ((u.input_tokens ?? 0) * RATE.in + (u.output_tokens ?? 0) * RATE.out +
-     (u.cache_read_input_tokens ?? 0) * RATE.read + (u.cache_creation_input_tokens ?? 0) * RATE.write) / 1e6, 0);
+    ((u.input_tokens ?? 0) * RATE[u.model].in + (u.output_tokens ?? 0) * RATE[u.model].out +
+     (u.cache_read_input_tokens ?? 0) * RATE[u.model].read +
+     (u.cache_creation_input_tokens ?? 0) * RATE[u.model].write) / 1e6, 0);
   console.log(`\n${red} of ${CASES.length} failed; this run cost about $${cost.toFixed(2)}`);
   process.exitCode = red ? 1 : 0;
 }
