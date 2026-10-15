@@ -19,7 +19,7 @@
    interpolates it — the copy here was the unreachable one. */
 import { PITCH } from "./prompt.ts";
 
-export const VERSION = "v1.23";
+export const VERSION = "v1.24";
 
 /* The whole strategy said once, interpolated into ALWAYS and §0. */
 const SUMMARY = `XAUUSD only, intraday to multi-session, positions held for the move they were
@@ -29,12 +29,13 @@ Resistance trades the reversal** off an outer extreme that is holding. Take
 profit is **$30 from entry by default**, $25 by exception where the level looks
 hard to reach. The stop is a **ceiling of $20** and is set at entry from where
 the chart shows the idea to be wrong, so it is usually tighter — it is never
-moved tighter once the trade is on. Reward-to-risk must be at least 1:1.5 to
+widened, and tightened only under R-19. Reward-to-risk must be at least 1:1.5 to
 enter, which the default $30 target satisfies at any permitted stop. Stop moves
 to break-even once price has travelled $20 toward the target. **Stop and target are
 always resting orders and a position is never closed by hand.** **At most one entry
-per day** — two only when the second is a sweep re-entry — and one position at a
-time. One full stop ends the day, as does −4% of account. **He trades at any
+per day** — two only when the second is a sweep re-entry after a stop tighter
+than $20 — and one position at a time. One full stop ends the day, as does −4% of
+account; at every rung those are the same loss. **He trades at any
 hour, and a top-priority release makes him cautious rather than absent.** **No
 position across a Friday close, no entries on known low-volume days.** Position
 size is on the row in ounces; lots are ounces ÷ 100 and \`account = lots ×
@@ -84,7 +85,7 @@ counts as kept just because nothing contradicted it.
 |---|---|---|---|---|---|---|---|
 | R-01 | Take profit $30 from entry price, or $25 where the level looks hard to reach | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) < 25\`, except a Friday close-out, which is \`unknown\` | §5 | v1.0 |
 | R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` — the CAP only, see §7 | §5 | v1.0 |
-| R-03 | No entry after a full-stop loss on the same day, except one sweep re-entry | day | \`followed_rules\` | journal | within an \`open_day\`, at most one \`entry_time\` later than the \`fill_time\` of a loss with \`abs(exit − entry) ≥ 20\` | §5 | v1.0 |
+| R-03 | No entry after a full-stop loss on the same day — a sweep re-entry follows only a stop tighter than $20 | day | \`followed_rules\` | journal | within an \`open_day\`, no \`entry_time\` later than the \`fill_time\` of a loss with \`abs(exit − entry) ≥ 20\` | §5 | v1.0 |
 | R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | journal | no loss beyond the ±$3 scratch band on a trade whose \`best_price\` was $20 or more in his favour; \`unknown\` where \`best_price\` is null | §6 | v1.0 |
 | R-05 | Break & Retest at interior levels only — marked by the grid or by a previous price reaction — never at an extreme | trade | \`followed_rules\` | judgment | *"Was this at an extreme or in the interior?"* | §4.1 | v1.0 |
 | R-06 | Support & Resistance at the outer extremes of the range only | trade | \`followed_rules\` | judgment | *"Was this the outer boundary, or a level inside the range?"* | §4.2 | v1.0 |
@@ -92,7 +93,7 @@ counts as kept just because nothing contradicted it.
 | R-08 | Pre-trade sequence run in order; a failed step ends it rather than being weighed | trade | \`followed_rules\` | judgment | *"Which step did you stop at, if any?"* | §6 | v1.0 |
 | R-10 | One position at a time — no scaling in, no adding, no second trade open | trade | \`followed_rules\` | journal | no two rows whose \`entry_time\`→\`fill_time\` spans overlap | §5 | v1.9 |
 | R-11 | The day ends at −4% of account, however it was reached | day | \`followed_rules\` | journal | within an \`open_day\`, no \`entry_time\` later than the \`fill_time\` of the loss that took cumulative P&L past −4% of \`size_oz × 500\` | §5 | v1.9 |
-| R-12 | At most one entry per day; two only when the second is a sweep re-entry within 15 minutes | day | \`followed_rules\` | journal | no \`open_day\` with three or more entries; a second entry before the prior \`fill_time\`, or while the prior trade is still open, is a \`fail\`, as is one more than 15 min after it; within 15 min is \`unknown\` | §5 | v1.10 |
+| R-12 | At most one entry per day; two only when the second is a sweep re-entry within 15 minutes, after a stop tighter than $20 | day | \`followed_rules\` | journal | no \`open_day\` with three or more entries; a second entry before the prior \`fill_time\`, or while the prior trade is still open, is a \`fail\`, as is one more than 15 min after it; within 15 min is \`unknown\` | §5 | v1.10 |
 | R-13 | The sizing rung moves only between months, never inside one | month | \`followed_rules\` | journal | one distinct \`size_oz\` per calendar month, over rows carrying one | §5 | v1.10 |
 | R-15 | No position held across the Friday close; a live trade is closed at market right before it | trade | \`followed_rules\` | journal | no \`entry_time\` before and \`fill_time\` after a Friday 17:00 New York close | §6 | v1.11 |
 | R-16 | No trading on known low-volume days — US market and bank holidays, the Christmas-to-New-Year stretch | day | \`followed_rules\` | journal | no \`entry_time\` on a US market or bank holiday, or in the Christmas-to-New-Year stretch | §5 | v1.11 |
@@ -109,7 +110,7 @@ export const SECTIONS: Record<string, string> = {
 
   "0": `## 0 · Header
 
-**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.22
+**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.23
 
 ### Summary
 
@@ -237,6 +238,10 @@ change, never inferred into one, and never in a message that lands mid-trade.`,
 **NOT HIS DECISIONS.** Researched reference material, written for him because he
 is learning macro deliberately. Treat it as shared vocabulary, never as something
 he has committed to.
+
+**Every figure here is dated.** Correlations move with the window and the regime,
+and the tonnage is the World Gold Council's through 2025. Quote one as of its
+year, never as today's.
 
 **This section assumes the foundation. §3 is the foundation.** If a term here
 needs building rather than naming — real yield, breakeven, core, the dot plot —
@@ -943,7 +948,7 @@ back inside is a liquidity sweep: the stops resting beyond the level were taken 
 price refused anyway, which is the level holding rather than failing.
 
 That is why §6 allows re-entry after a sweep takes the stop and price comes rapidly
-back. It is not an exception to the rules and not a revenge trade — the idea was
+back — a stop tighter than $20, since a full one has already spent the day. It is not an exception to the rules and not a revenge trade — the idea was
 never invalidated, the stop was simply inside the sweep. The trade being stopped
 out and the idea being wrong are two different events at an extreme, and only the
 second one ends it.
@@ -1006,14 +1011,14 @@ not the statistics.**
 
 ### The day also ends at 4%, and a full stop is the usual way of reaching it
 
-**Two rules, not one seen twice.** A full stop is the stop taken at its $20
-ceiling (§12), so R-03 and R-11 can disagree in both directions: a full stop at a
-small rung ends the day under R-03 having spent well under the limit, and several
-smaller losses — a tighter stop taken, or a hand-cut exit — can spend the limit
-without R-03 firing.
+**A full stop is the day's 4%, at every rung.** The ladder is linear, so a $20 stop
+on \`size_oz\` ounces loses \`20 × size_oz\` against an account of \`500 × size_oz\`
+— 4% exactly, before commission. R-03 and R-11 agree on every full stop.
 
-**R-11 is the limit. R-03 is the usual shape of hitting it.** In practice R-12's
-one-entry cap reaches first on most days.
+**Two rules all the same.** Several smaller losses — a tighter stop taken, or a
+hand-cut exit — can spend the 4% without R-03 firing, which is R-11's half. And R-03
+reads prices alone, so it decides a day whose rows carry no size, where R-11 is
+\`unknown\`. In practice R-12's one-entry cap reaches first on most days.
 
 ### Nothing else caps a loss, and that is deliberate
 
@@ -1090,30 +1095,27 @@ the new rung is 4% of the new account, not a larger share of the old one.
 
 ### Coming down a rung
 
-**When the implied account has halved, he drops to the previous rung** — at the
-next month boundary, like every other move.
+**His judgment, with no number, at a month boundary** like every other move (R-13).
+What he is keeping is *the maximum stop at about 4% of what is actually there*: when
+the capital behind the size has shrunk far enough that a full stop is a much larger
+share of it, he steps down.
 
-Not arbitrary and not really a drawdown threshold. The rungs are 0.02 lots per
-$1,000, so **the rung below sits at half the account**: halving is where the current
-size stops fitting the capital behind it. Better read as *keep the maximum stop at
-4% of what is actually there*.
-
-**Measured against the implied account, not the broker balance.** \`size_oz × 500\`
-is the base the ladder was applied to and includes what is held off-broker. Using
-the balance would delay the step while reserve capital sat unused.
+**Not measurable here, and deliberately so.** \`size_oz × 500\` is the account the
+size implies, so it cannot fall while the size stays put, and the capital he holds
+off-broker is on no row. A threshold written for him would be a number he never
+set.
 
 His reason is the psychological half of the same arithmetic: he does not want each
-trade's risk large relative to the account. Holding a rung through a halved account
-turns a 4% stop into an 8% one, and those are the same trade at different sizes —
-the second much harder to take properly.
+trade's risk large relative to the account. A 4% stop held through a shrunken
+account is an 8% one at the same size, and the second is much harder to take
+properly.
 
 **The downward step is not funded.** The account shrank by what was lost, not to the
 lower rung's level, so trading the lower rung risks *less* than 4%. That is the
 brake working.
 
-Unlike the upward move it leaves a trace: a size the implied account no longer
-supports is visible. Not a violation — the move is by hand and there is a lag — but
-a question the data can raise.
+**She does not raise it.** When to step down is his call; asked, she can say what a
+full stop now costs against what he tells her he holds.
 
 ### Known low-volume days
 
@@ -1303,23 +1305,24 @@ plus whatever the gap adds. Tightening reduces the exposure that is actually the
 - **Never wider**, ever
 
 **Read narrowly or it becomes a door.** Written as a general tool it makes "there is
-news later" a reason to touch any position — the same shape as the sweep exception
-in R-03, which §7 already flags as pushable. It applies to a position inherited from
+news later" a reason to touch any position — the same shape as the sweep re-entry,
+which §7 already flags as pushable. It applies to a position inherited from
 an earlier session and to nothing else.
 
-### Re-entry after a sweep, and it is bounded twice
+### Re-entry after a sweep, and it is bounded three times
 
-Where a liquidity sweep takes the stop and price comes rapidly back, he may enter
-again. **Same level, same direction, and it has to be a true sweep** — the same
+Where a liquidity sweep takes a stop tighter than $20 and price comes rapidly back,
+he may enter again. **Never after a full stop**: $20 is the day's 4% (§5), so R-03
+and R-11 have both ended the day. **Same level, same direction, and it has to be a true sweep** — the same
 trade re-entered because the idea was never invalidated, not another go at a loss.
 
 **Rapidly back means a couple of 5-minute candles, three at most** — about fifteen
 minutes from the sweep to the return. Past that it is not a sweep re-entry; it is a
 new idea.
 
-**Once.** One re-entry and the day is over regardless, which is R-12's second entry
-and the whole of the exception to R-03. Without the cap the reasoning is reusable,
-and a violent session would swallow the day one "sweep" at a time.
+**Once.** One re-entry and the day is over regardless, which is R-12's second entry.
+Without the cap the reasoning is reusable, and a violent session would swallow the
+day one "sweep" at a time.
 
 **The fifteen minutes is checkable and the rest is not.** \`entry_time\` on the second
 trade against \`fill_time\` on the first gives the gap directly, so a late re-entry is
@@ -1417,7 +1420,7 @@ the row keeps only the first and the broker only the last. The population is a
 position a high-rated US release landed on in a session later than the one it opened in —
 the one path the rule is written for. Read generally it turns "there is news later"
 into a reason to touch any position, which is the same door §7 already flags on
-R-03's sweep exception.
+the sweep re-entry.
 
 **What it can and cannot part.** A stop at break-even or better passes, whichever
 way the trade stood — a losing trade cannot hold a stop past its entry. An
@@ -1476,13 +1479,14 @@ $20. A loss $20 or more from entry is one, anything smaller is not, and the rule
 runs over every row that carries both prices. A loss past $20 is also R-02's
 breach, and it is still a full stop — the stop is what ended the day. A day whose
 losses cannot be measured, or whose full stop carries no \`fill_time\` to count
-later entries from, is \`unknown\` wherever it holds enough entries to breach.
+later entries from, is \`unknown\` wherever it holds a second entry.
 
-**Its exception is real and it opens a door.** One re-entry is permitted after a
-sweep, so the predicate allows a second entry and fails on a third. But nothing
-separates a genuine sweep re-entry from a rationalised one — *"that was just a
-sweep"* is available every time. R-11, R-12 and R-17 are the backstops; the honesty
-is his.
+**It has no exception.** A sweep re-entry follows only a stop tighter than $20,
+which is not a full stop, so it never reaches this population; one entry after a
+full stop is a \`fail\`. That closes the door the exception used to open on a full
+stop. On a tighter one it stays open — nothing separates a genuine sweep re-entry
+from a rationalised one, and *"that was just a sweep"* is available every time.
+R-11, R-12 and R-17 are the backstops there; the honesty is his.
 
 **R-04 is \`journal\` because the broker keeps the path.** This section called it
 unrecoverable — the prices on a row are endpoints — and the broker's minute bars go
@@ -2062,9 +2066,9 @@ taken and price refused anyway. The level held. Distinguished from a close beyon
 level, which is the level failing.
 
 **Sweep re-entry.** Re-entering the same level in the same direction after a sweep
-took the stop and price came back **within about three 5-minute candles**. Permitted
-once per day, and the only exception to R-03. Past fifteen minutes it is a new idea;
-inside it, indistinguishable in the data from a revenge trade.
+took a stop tighter than $20 and price came back **within about three 5-minute
+candles**. Permitted once per day, never after a full stop. Past fifteen minutes it
+is a new idea; inside it, indistinguishable in the data from a revenge trade.
 
 **High-impact release** — top priority, in his words. A scheduled economic print or
 decision capable of moving gold sharply — NFP, CPI, PCE, FOMC. **For R-19 and R-20,
@@ -2077,7 +2081,7 @@ Calendar-known rather than judged at the screen (R-16).
 
 **Rung.** A step on the sizing ladder. \`account = lots × 50,000\`, continuous — 0.02
 lots per $1,000 at every size. Moves only between months (R-13): up by deposit, down
-when the implied account has halved.
+by his judgment when the capital behind it has shrunk.
 
 **Implied account.** \`size_oz × 500\` — the capital the ladder was applied to,
 including what is held off-broker. Distinct from \`balance\`, the deployed portion. The
@@ -2107,6 +2111,7 @@ it stays as written, because correcting the record would falsify it.
 
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
+| v1.24 | [decide] | **A sweep re-entry follows only a stop tighter than $20.** A full stop is $20 on a linear ladder, so it is the day's 4% at every rung, and R-11 had already ended the day R-03's one exception was meant to continue — a re-entry after a full stop could only ever breach R-11. R-03 now allows no entry after a full stop, and §5's claim that a full stop at a small rung spends well under the limit is corrected. **Coming down a rung is his judgment**: "the implied account has halved" could not be measured, since \`size_oz × 500\` moves only with the size, so the rule names no number and she does not raise it. The summary says the stop is never widened and tightened only under R-19, where it said never tightened. §2's figures are marked as dated. R-19 stays narrow, by his decision. | A point-by-point review with him |
 | v1.23 | [decide] | **R-14 retired, and R-20 in its place: he trades at any hour, cautious around a top-priority release** — a US release TradingView rates high — rather than out of the market. The thirty minutes before one and the stand-aside until the news had confirmed something both go. Caution has no number, so R-20 is \`judgment\` and \`check_rules\` evaluates twelve rules. R-19 is unchanged and now reads as the print he did not take on at entry; a position opened in the session the print lands in is R-20's. §5 says why a holiday still stands him aside and a release does not. R-14's ID is not reused. **And she stops messaging him about prints on an open**: the warning that fired when he opened a trade with a high-rated print ahead goes with the rule — it was the unnecessary message the change was for. **The document also stops pretending she has no view.** She gives a read, files calls and judges a plan he brings, so §0 draws the line — her view sits beside his rules and is measured against them, never written into them — and gives the loop its inbound edge: a case the record makes is put to him as her proposal. §2's chain may end in her read, labelled, tested by a link, with no level; her read is not his step-1 bias. §6 and §7 record that she runs R-08 with him before the fact and that her judgment of a setup is never a \`pass\`. §8's *no scheduled moment* is corrected: her Saturday review reads the week whole. §9 moves his probe before the click. | His decision, and Eugenia's view widening |
 | v1.22 | [decide] | **Corrections, no rule changed.** Statements written before the poller began recording the stop and target as first seen still said no row could carry the plan: §6's step 4 and its $25 pairing, §6's *Recording*, R-02's note in §7 and §12's R:R now say the plan is on the rows since, and only there. \`open_day\` rolls at midnight New York, not at 17:00, in §4 and §12. §8's list of what \`followed_rules\` covers named fewer rules than the table maps to it. | Reading the document against the system |
 | v1.21 | [decide] | **R-16 reads bank holidays as well as market ones**, as its rule always said. The check had stopped at the exchanges' list, so Columbus Day and Veterans Day — the two days the banks close and the market trades — passed an entry the rule forbids. Veterans Day follows the Fed's observance: a Sunday moves to the Monday, a Saturday is not moved. **R-12 fails a second entry taken while the first was still open**, which had read as \`unknown\` because a negative gap counted as "within fifteen minutes". A sweep re-entry follows the first trade closing; one taken before it is a second position, and he trades one entry at a time. | His decisions, when the two gaps between the rules and their checks were put to him |

@@ -2309,11 +2309,13 @@ past $20, never that stops were respected.
 
 **R-10 and R-11** — one position at a time; the day ends at −4% of the account —
 come out of broker columns alone: overlapping entry-to-fill spans, and cumulative
-P&L against `size_oz × 500`. R-11 is not R-03: a full stop at a small rung ends
-the day under R-03 having spent well under 4%, and three smaller losses can spend
-the 4% without R-03 seeing anything. His definition of a full stop, settled at
-v1.14, is what made R-03 `journal`. **R-12** caps him at one entry a day, two only
-for a sweep re-entry; **R-13** pins a rung change to a month boundary; **R-15**
+P&L against `size_oz × 500`. On a linear ladder a full stop is 4% at every rung,
+so R-03 and R-11 agree on it; they part where three smaller losses spend the 4%
+without R-03 seeing anything, and where a day's rows carry no size, which R-03
+decides off prices alone. His definition of a full stop, settled at v1.14, is what
+made R-03 `journal`, and since v1.24 nothing follows one: a sweep re-entry comes
+only after a stop tighter than $20. **R-12** caps him at one entry a day, two only
+for that re-entry; **R-13** pins a rung change to a month boundary; **R-15**
 closes anything live before the Friday close; **R-16** keeps him off low-volume
 days; **R-17** stops him
 when the trading itself deteriorates — behaviour rather than a number, so
