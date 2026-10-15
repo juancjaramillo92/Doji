@@ -121,17 +121,16 @@ test('verify.sql passes every check against the database schema.sql builds', () 
 
 /* ─── The trades triggers ───────────────────────────────────────────────── */
 
-test('a position opening reaches Gladys and Eugenia, and the ledger records both', () => {
+test('a position opening reaches Gladys alone, and the ledger records it', () => {
+  // Never Eugenia: a print pending beside an open is R-20's, his to weigh.
   sql(RESET + trade('PID1'));
-  assert.equal(sent(), 'doji-eugenia,doji-gladys');
-  assert.equal(sql(`select string_agg(job, ',' order by job) from public.dispatch`), 'gladys,trade-event');
-  assert.equal(sql(`select body->>'event' from net.sent where url like '%doji-eugenia'`), 'opened');
+  assert.equal(sent(), 'doji-gladys');
+  assert.equal(sql(`select string_agg(job, ',' order by job) from public.dispatch`), 'gladys');
 
-  // A backfill an hour old is not news to Gladys; a row that is not the
-  // broker's is not Eugenia's.
+  // A backfill an hour old is not news to Gladys.
   sql(RESET + `insert into public.trades (id, user_id, direction, entry_time)
                values ('PID2', '${U}', 'BUY', now() - interval '2 hours');`);
-  assert.equal(sent(), 'doji-eugenia');
+  assert.equal(sent(), '');
   sql(RESET + trade('M1'));
   assert.equal(sent(), 'doji-gladys');
 });
@@ -159,6 +158,7 @@ test('a close reaches Eugenia once, however often the poller re-upserts it', () 
                truncate net.sent;
                update public.trades set fill_time = now(), exit_price = 2410 where id = 'PID4';`);
   assert.equal(sql(`select string_agg(body->>'event', ',') from net.sent`), 'closed');
+  assert.equal(sql(`select string_agg(job, ',' order by job) from public.dispatch`), 'trade-event');
   sql(`truncate net.sent; update public.trades set fill_time = now() + interval '1 second' where id = 'PID4';`);
   assert.equal(sent(), '', 'a second write to a closed row tells her it closed again');
 });

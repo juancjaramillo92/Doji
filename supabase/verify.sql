@@ -289,12 +289,12 @@ from (values
    (select (prosrc like '%doji-gladys%')::text from pg_proc where proname = 'trades_telegram'),
    'true'),
 
-  -- Named, not counted: five is still five when one is renamed and another
+  -- Named, not counted: four is still four when one is renamed and another
   -- added. agree.test.mjs reads this list against the numbered SQL.
-  ('exactly the five triggers on trades',
+  ('exactly the four triggers on trades',
    (select string_agg(tgname, ',' order by tgname) from pg_trigger
      where tgrelid = to_regclass('public.trades') and not tgisinternal),
-   'trades_eugenia_closed,trades_eugenia_opened,trades_telegram_on_answer,' ||
+   'trades_eugenia_closed,trades_telegram_on_answer,' ||
    'trades_telegram_on_open,trades_touch_updated_at'),
 
   -- Without it the redraw trigger's WHEN never passes, silently.

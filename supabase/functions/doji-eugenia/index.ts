@@ -790,10 +790,11 @@ async function readStats(days: unknown): Promise<string> {
    the cron secret she already holds.
 
    A rolling window rather than a civil day — the Sunday briefing is about a
-   week not yet started. The forward reach is the half to keep: aheadToday can
-   only warn about what is filed, and at twenty-four hours the 08:00 briefing
-   left tomorrow's 08:30 print unfiled until tomorrow. Twenty-eight carries it
-   past tomorrow's 10:00. Read and write share the constant.
+   week not yet started. The forward reach is the half to keep: the weekday
+   briefing carries tomorrow morning's prints, and at twenty-four hours the
+   08:00 briefing left tomorrow's 08:30 print unfiled until tomorrow.
+   Twenty-eight carries it past tomorrow's 10:00. Read and write share the
+   constant.
    ───────────────────────────────────────────────────────────────────────── */
 const CAL_BACK = 12, CAL_AHEAD = 28;
 
@@ -3692,80 +3693,51 @@ async function recordChannels() {
 }
 
 /* ─── The trade she hears about in two minutes ─────────────────────────────
-   Still no verdict; she may say only his own rules, at the moment they apply:
+   Still no verdict; she may say only his own rule, at the moment it applies:
+   that fill took the day past −4%, and R-11 says the day ends there.
 
-     opened — a high-impact US print is pending and he is now in a position:
-              R-20's caution, and R-19 if it runs into a later session. Citing
-              them is hers; deciding what he does is not.
-     closed — that fill took the day past −4%: R-11 says the day ends there.
-
-   Both branches decide from data before any model call, so an ordinary fill
-   costs nothing.
+   A close and nothing else. A print pending on an open is R-20's, his to
+   weigh, and the briefing has already named it; a message on every open was
+   noise he asked to be rid of. Decided from data before any model call, so an
+   ordinary fill costs nothing.
    ───────────────────────────────────────────────────────────────────────── */
-// Beyond this a print is tomorrow's, and the briefing carries it.
-const PENDING_AHEAD_H = 8;
-
-async function aheadToday(now = Date.now()): Promise<Release[]> {
-  const to = new Date(now + PENDING_AHEAD_H * 3600_000).toISOString();
-  return readRows<Release>('Calendar',
-    `eugenia_calendar?select=${RELEASE_COLUMNS}` +
-    `&importance=eq.high&country=eq.${HOME}&at=gt.${new Date(now).toISOString()}&at=lte.${to}` +
-    `&order=at.asc&limit=5`);
-}
-
 /* Exported so read, guard, decide is driven: every guard returns before a
    model call, and one that stopped returning looks like one never needed. */
 export async function postTradeEvent(id: string, event: string): Promise<Response> {
+  if (event !== 'closed') return json({ ok: true, trade: id, skipped: "not a close" });
+
   const [row] = await readRows<TradeRow>('Trade',
     `eugenia_trades?id=eq.${encodeURIComponent(id)}&limit=1`);
   // Soft-deleted: nothing to say.
   if (!row) return json({ ok: true, skipped: "no such trade" });
 
-  /* Both things this path may say are about today, and the trigger fires on a
-     transition, not a clock — anything stamping an old close fires it for an
-     old day, and once reported August's losses in the present tense. A
-     property of the event, so it guards both branches. An overnight hold
+  /* What this path says is about today, and the trigger fires on a transition,
+     not a clock — anything stamping an old close fires it for an old day, and
+     once reported August's losses in the present tense. An overnight hold
      closing this morning is yesterday's and skipped too: R-11 forbids a LATER
      entry, and a finished day has none. */
-  if (row.open_day !== nyDate(new Date())) {
+  const day = row.open_day;
+  if (day !== nyDate(new Date())) {
     return json({ ok: true, trade: id, skipped: "not today" });
   }
 
-  let situation: string;
-
-  if (event === 'opened') {
-    // Opened and closed inside one poll arrives as an open event about a
-    // position he is out of; the close event that follows is the true one.
-    if (!isOpen(row)) return json({ ok: true, trade: id, skipped: "already closed" });
-    const ahead = await aheadToday();
-    if (!ahead.length) return json({ ok: true, trade: id, said: "nothing pending" });
-    situation =
-      `He has just opened a ${row.direction ?? "position"}` +
-      (row.entry_price ? ` at ${row.entry_price}` : "") + ".\n" +
-      `Still ahead today:\n` +
-      ahead.map(r => `· ${nyTime(r.at)} ET ${r.name}` +
-                     (r.consensus ? `, ${r.consensus} expected` : "")).join("\n");
-  } else {
-    // The day as it stands, computed, through the same view.
-    const day = row.open_day;
-    if (!day) return json({ ok: true, skipped: "no filing day" });
-    const standing = dayStanding(await readRows<TradeRow>('Day',
-      `eugenia_trades?open_day=eq.${day}&limit=50`), day);
-    if (!standing || !standing.breached) {
-      return json({ ok: true, trade: id, said: "day is inside its limit" });
-    }
-    situation =
-      `That fill closed his day at ${standing.pnl.toFixed(2)} against an account of ` +
-      `${standing.account.toFixed(0)} implied by his size — past the ${DAY_LOSS * 100}% ` +
-      `R-11 sets. Read R-11 in the strategy before you say anything about it.`;
+  // The day as it stands, computed, through the same view.
+  const standing = dayStanding(await readRows<TradeRow>('Day',
+    `eugenia_trades?open_day=eq.${day}&limit=50`), day);
+  if (!standing || !standing.breached) {
+    return json({ ok: true, trade: id, said: "day is inside its limit" });
   }
+  const situation =
+    `That fill closed his day at ${standing.pnl.toFixed(2)} against an account of ` +
+    `${standing.account.toFixed(0)} implied by his size — past the ${DAY_LOSS * 100}% ` +
+    `R-11 sets. Read R-11 in the strategy before you say anything about it.`;
 
   /* The reads come after the early returns, so an ordinary fill costs nothing.
-     History matters most here: the print this warns about is the one the
-     briefing likely named, and without the window she repeats herself. Notes,
-     or his instructions are obeyed everywhere but mid-trade. Neither the
-     portrait nor her record: a reading of how he trades, reaching a man in a
-     position, is how a sentence becomes an order. */
+     History matters here: a second close past the limit on the same day finds
+     R-11 already said, and without the window she says it again. Notes,
+     or his instructions are obeyed everywhere but here. Neither the portrait
+     nor her record: a reading of how he trades, reaching him the moment a loss
+     closes his day, is how a sentence becomes an order. */
   const [history, notes] = await Promise.all([recent(), notesBlock()]);
 
   const said = await ask(
@@ -4253,7 +4225,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
          call that never ran. Answering first makes a non-2xx mean what it
          says. The body names the job, since the response row carries no URL. */
       if (sent?.trade) {
-        background(postTradeEvent(String(sent.trade), String(sent.event ?? 'opened'))
+        background(postTradeEvent(String(sent.trade), String(sent.event ?? 'closed'))
           .catch(err => jobFailed('trade', err)));
         return json({ ok: true, accepted: "trade event" });
       }

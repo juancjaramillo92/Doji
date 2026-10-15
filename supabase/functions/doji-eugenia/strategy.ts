@@ -1168,14 +1168,20 @@ levels stay his.
 
 **R-20: he trades at any hour, and is cautious around a top-priority release.** A
 top-priority release is **a US release TradingView rates high** — his decision
-since v1.20, so one calendar serves the briefing, the warnings and the rules. No
-window keeps him out, before the print or after it.
+since v1.20, so one calendar serves the briefing and the rules. No window keeps
+him out, before the print or after it.
 
 **The caution is a judgment, and it is not a number.** It is the print weighed
 into the read: knowing it is due and what is priced, and judging whether the level
 can carry a trade through it. It changes no size (§5) and no stop — both already
 come from elsewhere. Anything sharper is his to write, and until he does it is
 \`[decide]\` and never supplied for him.
+
+**It is his, so she does not remind him of it.** The briefing names the day's
+prints with their times, and that is where the caution gets what it weighs. A
+message when he opens a trade with a print ahead, or a print cited at him beside
+a position he opened knowing it was there, is the noise this rule replaced —
+nothing reaches him on an open.
 
 **It is not one of R-08's steps**, so a plan never fails his sequence for a print
 being due. Whether she would take it with the print ahead is part of her own
@@ -2101,7 +2107,7 @@ it stays as written, because correcting the record would falsify it.
 
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
-| v1.23 | [decide] | **R-14 retired, and R-20 in its place: he trades at any hour, cautious around a top-priority release** — a US release TradingView rates high — rather than out of the market. The thirty minutes before one and the stand-aside until the news had confirmed something both go. Caution has no number, so R-20 is \`judgment\` and \`check_rules\` evaluates twelve rules. R-19 is unchanged and now reads as the print he did not take on at entry; a position opened in the session the print lands in is R-20's. §5 says why a holiday still stands him aside and a release does not. R-14's ID is not reused. **The document also stops pretending she has no view.** She gives a read, files calls and judges a plan he brings, so §0 draws the line — her view sits beside his rules and is measured against them, never written into them — and gives the loop its inbound edge: a case the record makes is put to him as her proposal. §2's chain may end in her read, labelled, tested by a link, with no level; her read is not his step-1 bias. §6 and §7 record that she runs R-08 with him before the fact and that her judgment of a setup is never a \`pass\`. §8's *no scheduled moment* is corrected: her Saturday review reads the week whole. §9 moves his probe before the click. | His decision, and Eugenia's view widening |
+| v1.23 | [decide] | **R-14 retired, and R-20 in its place: he trades at any hour, cautious around a top-priority release** — a US release TradingView rates high — rather than out of the market. The thirty minutes before one and the stand-aside until the news had confirmed something both go. Caution has no number, so R-20 is \`judgment\` and \`check_rules\` evaluates twelve rules. R-19 is unchanged and now reads as the print he did not take on at entry; a position opened in the session the print lands in is R-20's. §5 says why a holiday still stands him aside and a release does not. R-14's ID is not reused. **And she stops messaging him about prints on an open**: the warning that fired when he opened a trade with a high-rated print ahead goes with the rule — it was the unnecessary message the change was for. **The document also stops pretending she has no view.** She gives a read, files calls and judges a plan he brings, so §0 draws the line — her view sits beside his rules and is measured against them, never written into them — and gives the loop its inbound edge: a case the record makes is put to him as her proposal. §2's chain may end in her read, labelled, tested by a link, with no level; her read is not his step-1 bias. §6 and §7 record that she runs R-08 with him before the fact and that her judgment of a setup is never a \`pass\`. §8's *no scheduled moment* is corrected: her Saturday review reads the week whole. §9 moves his probe before the click. | His decision, and Eugenia's view widening |
 | v1.22 | [decide] | **Corrections, no rule changed.** Statements written before the poller began recording the stop and target as first seen still said no row could carry the plan: §6's step 4 and its $25 pairing, §6's *Recording*, R-02's note in §7 and §12's R:R now say the plan is on the rows since, and only there. \`open_day\` rolls at midnight New York, not at 17:00, in §4 and §12. §8's list of what \`followed_rules\` covers named fewer rules than the table maps to it. | Reading the document against the system |
 | v1.21 | [decide] | **R-16 reads bank holidays as well as market ones**, as its rule always said. The check had stopped at the exchanges' list, so Columbus Day and Veterans Day — the two days the banks close and the market trades — passed an entry the rule forbids. Veterans Day follows the Fed's observance: a Sunday moves to the Monday, a Saturday is not moved. **R-12 fails a second entry taken while the first was still open**, which had read as \`unknown\` because a negative gap counted as "within fifteen minutes". A sweep re-entry follows the first trade closing; one taken before it is a second position, and he trades one entry at a time. | His decisions, when the two gaps between the rules and their checks were put to him |
 | v1.20 | [decide] | **High impact is a US release TradingView rates high**, for R-14 and R-19 alike — one calendar for the briefing, the warnings and the rules, where two had been read. TradingView's ratings differ from Forex Factory's folders in places (it rates average hourly earnings and jobless claims medium, and a summit high), so a past verdict can move; a calendar marker with no release time is not a release and counts for neither rule. Its data goes back to 2003, so the weeks already traded are fetched once and R-14 stops reading them as unfetched. | His decision, to stop reading the same calendar from two services |

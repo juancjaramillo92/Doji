@@ -4098,11 +4098,10 @@ test('a calendar line from another day names the day, and today stays bare', () 
 });
 
 test('the calendar filed at the weekday briefing reaches the next morning\'s prints', () => {
-  /* A trade opened before tomorrow's briefing is checked against what is filed
-     today, by `aheadToday` alone, so the window must carry the 08:00 briefing
-     past tomorrow's 10:00 — or the London session never hears of the 08:30
-     print. Derived from the source, so narrowing the window or moving the
-     briefing later fails here. */
+  /* The weekday briefing carries tomorrow morning's prints, so the window must
+     carry the 08:00 briefing past tomorrow's 10:00 — or the 08:30 print is
+     unfiled until tomorrow. Derived from the source, so narrowing the window or
+     moving the briefing later fails here. */
   const src = readFileSync(
     new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
   const ahead = Number(src.match(/const CAL_BACK = \d+, CAL_AHEAD = (\d+);/)?.[1]);
@@ -4111,8 +4110,8 @@ test('the calendar filed at the weekday briefing reaches the next morning\'s pri
   const LAST_MORNING_PRINT = 10;   // 10:00 New York: ISM, Michigan, JOLTS
   assert.ok(hour + ahead > 24 + LAST_MORNING_PRINT,
     `the ${hour}:00 briefing files ${ahead}h ahead, which stops before tomorrow's ` +
-    `${LAST_MORNING_PRINT}:00 — a trade opened before tomorrow's briefing is ` +
-    `checked against a calendar with nothing on it`);
+    `${LAST_MORNING_PRINT}:00 — the briefing names tomorrow morning off a ` +
+    `calendar with nothing on it`);
 });
 
 test('the critic cannot destroy a briefing it was meant to check', () => {
@@ -5567,12 +5566,13 @@ test('a full calendar read says it stopped, and a short one says nothing', async
   assert.doesNotMatch(await block(39), /stops at/);
 });
 
-/* ─── A position opened and closed inside one poll ───────────────────────────
-   A scalp under two minutes is inserted already carrying its exit, so the
-   "opened" event arrives about a trade that is over. Driven with a print
-   pending, the only case in which it would have spoken.
+/* ─── The trade look speaks on a close alone ─────────────────────────────────
+   A print pending beside an open is R-20's, his to weigh. An "opened" event —
+   the retired trigger still firing on a database upgrade.sql has not reached,
+   or a person at the door — returns before any read, with a print pending,
+   the one case in which it would have spoken.
    ─────────────────────────────────────────────────────────────────────────── */
-test('an opened event for a trade already closed says nothing and reads no calendar', async () => {
+test('an opened event reads nothing and says nothing; a close past the limit reaches the model', async () => {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
   const row = (o) => ({ id: 'PID9', direction: 'BUY', entry_time: new Date().toISOString(),
     fill_time: null, entry_price: 4000, exit_price: null, pnl: null, open_day: today,
@@ -5581,7 +5581,7 @@ test('an opened event for a trade already closed says nothing and reads no calen
   const pending = [{ id: 1, at: new Date(Date.now() + 3600_000).toISOString(), name: 'US CPI',
     importance: 'high', consensus: '0.3%', prior: null, actual: null }];
 
-  const run = (trade) => {
+  const run = (trade, event) => {
     const asked = [];
     return withFetch(async (url) => {
       asked.push(String(url));
@@ -5591,20 +5591,21 @@ test('an opened event for a trade already closed says nothing and reads no calen
       if (String(url).includes('anthropic')) return new Response(JSON.stringify(
         { content: [{ type: 'text', text: 'NOTHING' }], stop_reason: 'end_turn', usage: {} }), { status: 200 });
       return new Response('[]', { status: 200 });
-    }, async () => ({ said: await (await postTradeEvent('PID9', 'opened')).json(), asked }));
+    }, async () => ({ said: await (await postTradeEvent('PID9', event)).json(), asked }));
   };
 
-  const closed = await run(row({ exit_price: 4001, pnl: 3.86 }));
-  assert.equal(closed.said.skipped, 'already closed',
-    'an opened event about a trade already out told him he had just opened it');
-  assert.ok(!closed.asked.some(u => u.includes('eugenia_calendar') || u.includes('anthropic')),
-    'a closed trade still read the calendar or called the model on its opened event');
+  const opened = await run(row(), 'opened');
+  assert.equal(opened.said.skipped, 'not a close');
+  assert.deepEqual(opened.asked, [],
+    'an opened event read the journal, the calendar or the model — every open is a message again');
 
-  // The other side: a position genuinely open, with a print pending, gets past
-  // the guard to the calendar — the guard must not swallow the case it sits in.
-  const open = await run(row());
-  assert.ok(open.asked.some(u => u.includes('eugenia_calendar')),
-    'an open position with a print pending never reached the calendar');
+  // The other side: a close that took the day past −4% of the 2,000 its size
+  // implies gets past every guard to the model — the guard must not swallow it.
+  const closed = await run(row({ exit_price: 3980, fill_time: new Date().toISOString(), pnl: -90, net_pnl: -90 }),
+                           'closed');
+  assert.ok(closed.asked.some(u => u.includes('anthropic')),
+    'a close past the day\'s limit never reached the model');
+  assert.equal(closed.said.said, 'quiet');
 });
 
 /* ─── A trades read that reached its bound ───────────────────────────────────

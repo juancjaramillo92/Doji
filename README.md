@@ -156,7 +156,7 @@ or closes — never by a clock she keeps herself.
  │                         │        │ strategy.ts      no write path     │
  │ Telegram  he writes     │        │ the web          search and fetch  │
  │ charm     he talks      │        │ the broker's price, via the poller │
- │ trades    opened/closed │        │ calendar, market   via TradingView │
+ │ trades    closed        │        │ calendar, market   via TradingView │
  └────────────┬────────────┘        └─────────────────┬──────────────────┘
               └───────────────┬───────────────────────┘
                               ▼
@@ -1250,7 +1250,7 @@ pass has nothing to research.
   limit at the oldest end would distil the morning and drop the evening, where a
   late instruction lives. `agree.test.mjs` refuses `order=id.asc` under a limit
   on every read of her tables. Ordering by a clock is a different question — the
-  trade event reads `at.asc` because the next release is the earliest.
+  Sunday week reads `at.asc` because the week is read in the order it happens.
 - **Twenty-four hours, no watermark**, since the window and the gap between runs
   are the same length. A missed night loses that day's distillation and never
   the day: the turns stay in the table, searchable.
@@ -1449,7 +1449,7 @@ surveys high. About 12 events a week, out of more than 100 listed. China's gold
 imports are not on TradingView's calendar. A row from abroad carries its country
 at the head of its name (*FR Inflation Rate YoY Prel (Sep)*), because three
 economies publish that title in one hour. **None of it is one of his**: R-19
-and the trade event's warning both read `country=eq.US` (`HOME`, beside
+reads `country=eq.US` (`HOME`, beside
 `HIGH` in `adherence.ts`), and a list that carries a line from abroad tells her
 so once. The rolling list and the Sunday week carry it; the week takes only what
 is rated high, so abroad that is the central banks' decisions and headline
@@ -1457,8 +1457,8 @@ inflation.
 
 **The briefing files before it reads, and a quarter-hourly job files on its
 own** — `doji-eugenia-calendar`, on `?calendar=1` — so an actual lands within
-fifteen minutes of printing for the dashboard card and the trade event's warning
-between briefings. It is a second job rather than a faster one, because the
+fifteen minutes of printing for the dashboard card and for a reply between
+briefings. It is a second job rather than a faster one, because the
 hourly predicates all test `hour ===` and a `*/15` job would run four briefings.
 Every filing is an `eugenia_runs` row under `calendar`, failed or not, since a
 calendar that stopped moving looks like a quiet week. After it files, the same
@@ -1481,10 +1481,9 @@ null.** `merge-duplicates` writes exactly the keys present, so `actual: null`
 would erase an actual already filed. Rows go up grouped by the columns they
 carry, since PostgREST refuses a bulk insert whose objects differ.
 
-**The window reaches past tomorrow's morning prints.** A trade opened before
-tomorrow's briefing is checked only against what is filed, so the briefing files
-today and tomorrow up to noon New York; filed at twenty-four hours, the London
-session would never hear of the 08:30. Read and write share one bound, and every
+**The window reaches past tomorrow's morning prints.** The weekday briefing
+carries tomorrow morning's prints, so it files today and tomorrow up to noon New
+York; filed at twenty-four hours, the 08:30 would stay unfiled until tomorrow. Read and write share one bound, and every
 calendar line from another day names its day — two mornings each have an 08:30.
 
 **The row records when its content was last written.** `updated_at` moves through
@@ -1524,7 +1523,7 @@ handed the odds, so it takes the percentage out and keeps which way futures
 lean rather than inventing a figure.
 
 **The trade event stays out of the gate.** `TRIM` **rewrites**, and this message
-reaches him in a position or just past his day's limit, where a paraphrased
+reaches him just past his day's limit, where a paraphrased
 citation of his rule is how a sentence becomes an order. `TRADE_EVENT` is also
 the most constrained prompt in the file — two sentences, the fact then the rule,
 `NOTHING` as a way out. `isSilent()` matches that bare word only, so *"Nothing
@@ -1546,21 +1545,22 @@ swaps, after a reply came back with `TRIM`'s own notes on top of it.
 **What is remembered is what the gate returned**, never the draft — a draft
 stored is a message he never read, resent as hers for six exchanges.
 
-**A trade reaches her in two minutes.** A trigger on `trades` calls her when the
-poller writes a position, and the two things she may say are both **his own
-rules read back at the moment they apply**:
+**A closed trade reaches her in two minutes.** A trigger on `trades` calls her
+when the poller stamps a close, and the one thing she may say is **his own rule
+read back at the moment it applies**: that fill took the day past −4% of the
+account his size implies, and R-11 says the day ends there. Naming the rule is
+citation; saying what he should do is not hers, and the prompt says so.
 
-| Event | What she may say |
-|---|---|
-| opened | a high-impact US print is pending and he is now in a position — R-20 is his caution around one, R-19 about a position inherited into one |
-| closed | that fill took the day past −4% of the account his size implies, and R-11 says the day ends there |
+**An open does not call her.** A high-impact print pending beside a position he
+opened is R-20's, his to weigh, and the briefing has already named it; a message
+on every open was noise he asked to be rid of. `postTradeEvent` returns on any
+event but `closed` before it reads anything, and `upgrade.sql` drops the open
+trigger from the live database.
 
-Naming the rule is citation; saying what he should do is not hers, and the
-prompt says so. **Silence is the common case and costs nothing**: both branches
-decide from data *before* any model call. Both are about **today**, so a trade
-filed under another day returns first — anything stamping an old close would
-otherwise report it in the present tense — and an "opened" event for a trade
-already carrying its exit (a scalp inside one poll) says nothing.
+**Silence is the common case and costs nothing**: the close decides from data
+*before* any model call. It is about **today**, so a trade filed under another
+day returns first — anything stamping an old close would otherwise report it in
+the present tense.
 
 The trigger fires on the transition, not every poll. `fill_time` is null on every
 open position, so the close clause uses `is distinct from` — `<>` is NULL there
@@ -1896,7 +1896,7 @@ makes a retry's refiling a no-op.
   the month and in neither half.
 - **The record is hers.** A month of counts and the three newest misses go to the
   briefing and a reply, the two paths that give a read, and to the pass; never
-  the trade look, which carries none and arrives while he is in a position. It
+  the trade look, which carries none and lands the moment a loss closes his day. It
   sets how firmly she holds a view — a run of misses on one kind of day is a
   reason to say less on the next — and she never cites it to him as a reason to
   believe one, never gives a read to improve it, and never holds one back to
@@ -2051,15 +2051,15 @@ sharing one instant — otherwise no quote rather than a wrong one.
 reply, the nightly pass, the Saturday review and the trade look — and its absence would be silent:
 she carries on ignoring an instruction he believes she took. `portraitBlock()`,
 `recordBlock()` and `callsBlock()` go to the briefing, a reply and the pass, and a
-test asserts none reaches the trade look: it lands while he is in a position, where *"he
-cuts winners early"* reads as an order about the trade he is in. The portrait is
+test asserts none reaches the trade look: it lands the moment a loss closes his day,
+where *"he cuts winners early"* reads as an order about the next trade. The portrait is
 its own block so a failed read costs the paragraph and never his instructions. `channelsBlock()`
 goes to the three asked to build a term, since what moves gold runs through a
 channel and a message saying the dollar came off teaches nothing to someone for
 whom the dollar is `unseen`. The conversation window goes to everything that
 speaks — not the nightly pass, which reads its own twenty-four hours. It matters
-most on the trade look, whose R-19/R-20 line fires on the print the briefing is
-likeliest to have named. Its reads sit *after* its early returns, so an ordinary
+most on the trade look, where a second close past the limit finds R-11 already
+said. Its reads sit *after* its early returns, so an ordinary
 fill costs nothing. A test reads every one of these.
 
 ### What he has on right now
@@ -2090,8 +2090,10 @@ The trade look is reached *from* the position and already holds its row.
 
 **What she may do with it is narrower than what she can see, by design.**
 Unprompted it stops anything setup-flavoured while a position is open, and lets
-her name a collision his own rules name — a high-impact US print against an open
-position (R-19, R-20), or a day past R-11. When *he* raises the position she
+her name a collision his own rules name — a high-impact US print landing on a
+position from an earlier session (R-19), or a day past R-11. A print beside a
+position he opened knowing it was there is R-20's, and not hers to repeat at
+him. When *he* raises the position she
 discusses it properly and refuses one thing: what to do with it. **His levels
 never appear in a message she starts** — a briefing framed around the number he
 is long from reads as relevance and is the opposite. That guard is a prompt

@@ -804,11 +804,12 @@ create index if not exists eugenia_notes_trgm
 create index if not exists eugenia_turns_trgm
   on public.eugenia_turns using gin (content gin_trgm_ops);
 
--- ─── A position opened or closed ───────────────────────────────────────────
+-- ─── A position closed ─────────────────────────────────────────────────────
 -- Tells her within two minutes of the poller seeing it. What she may say is his
--- own rules read back — R-19/R-20 on a print pending against an open position,
--- R-11 on a close that took the day past its limit — and the function decides
--- from data before any model call, so the common case costs nothing.
+-- own rule read back — R-11 on a close that took the day past its limit — and
+-- the function decides from data before any model call, so the common case
+-- costs nothing. An open is not hers to speak on: a print pending beside one is
+-- R-20's, his to weigh, and the briefing has already named it.
 create or replace function public.trades_eugenia_on_event()
 returns trigger
 language plpgsql
@@ -817,22 +818,15 @@ security definer
 set search_path = ''
 as $$
 declare
-  kind text;
-  req  bigint;
+  req bigint;
 begin
-  if tg_op = 'INSERT' then
-    kind := 'opened';
-  else
-    kind := 'closed';
-  end if;
-
   req := net.http_post(
     url     := 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-eugenia',
     headers := jsonb_build_object(
                  'Content-Type', 'application/json',
                  'x-doji-key',   (select decrypted_secret from vault.decrypted_secrets
                                   where name = 'doji_cron_secret')),
-    body    := jsonb_build_object('trade', new.id, 'event', kind),
+    body    := jsonb_build_object('trade', new.id, 'event', 'closed'),
     timeout_milliseconds := 60000
   );
 
@@ -846,16 +840,10 @@ begin
 end;
 $$;
 
--- Broker rows only, never a soft-deleted one.
-create or replace trigger trades_eugenia_opened
-  after insert on public.trades
-  for each row
-  when (new.id like 'PID%' and new.deleted = false and new.fill_time is null)
-  execute function public.trades_eugenia_on_event();
-
--- On the transition only: the poller re-upserts every two minutes and would
--- fire it on every tick otherwise. `is distinct from`, since `<>` is null
--- against the null it is moving away from.
+-- Broker rows only, never a soft-deleted one, and on the transition only: the
+-- poller re-upserts every two minutes and would fire it on every tick
+-- otherwise. `is distinct from`, since `<>` is null against the null it is
+-- moving away from.
 create or replace trigger trades_eugenia_closed
   after update on public.trades
   for each row
