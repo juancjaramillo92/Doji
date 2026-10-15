@@ -317,13 +317,17 @@ async function tvSession() {
   }, { name: "doji", version: "1" });
 }
 
+/* Each request its own id: the protocol asks that no two in flight on one
+   session share one, and the long doors read three at a time. */
+let rpc = 1;
+
 // The only place a tool name becomes a request, as with the poller's mcpPost.
 async function tvPost(session: Record<string, string>, tool: AllowedTool,
                       args: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
   if (!ALLOWED_TOOLS.includes(tool)) throw new Error(`Tool not permitted: ${tool}`);
   const res = await fetch(TV_URL, {
     method: "POST", headers: session, signal,
-    body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: tool, arguments: args } }),
+    body: JSON.stringify({ jsonrpc: "2.0", id: ++rpc, method: "tools/call", params: { name: tool, arguments: args } }),
   });
   if (!res.ok) throw new Error(`MCP ${tool}: HTTP ${res.status}`);
   return res.text();
@@ -359,6 +363,23 @@ const DOOR_MS = 35_000;
 
 const unreached = (signal: AbortSignal, err: unknown) =>
   signal.aborted ? `not reached in ${DOOR_MS / 1000}s` : why(err);
+
+/* Three at a time. One by one, at the five or six seconds a chart took on 13
+   and 14 October, fourteen could not fit inside DOOR_MS. `read` catches its
+   own failure, so one refusal never takes the rest — under a bare Promise.all,
+   one 504 once took all six of the poller's ?bars=raw reads — and writes into
+   the item's own slot, so the answer keeps the list's order. */
+const LANES = 3;
+
+async function inLanes<T>(items: T[], read: (item: T, i: number) => Promise<void>) {
+  let next = 0;
+  await Promise.all(Array.from({ length: LANES }, async () => {
+    while (next < items.length) {
+      const i = next++;
+      await read(items[i], i);
+    }
+  }));
+}
 
 /* ─── The calendar ─────────────────────────────────────────────────────────
    The releases as data, each with an id TradingView keeps — the key her
@@ -459,23 +480,23 @@ export function foldBars(answer: any) {
   return { from: first.o, since: iso(first.t), last: last.c, at: iso(last.t) };
 }
 
-/* One at a time, for the poller's ?bars=raw reason, inside DOOR_MS; a symbol
-   that fails or is not reached is named, not dropped. Exported so the
-   deadline is driven. */
+/* In lanes, inside DOOR_MS; a symbol that fails or is not reached is named,
+   not dropped. Each list is written by slot, so what the other holds is a
+   hole, which filter skips. Exported so the deadline is driven. */
 export async function readMarket() {
   const signal = AbortSignal.timeout(DOOR_MS);
   const session = await tvSession();
   const market: Record<string, unknown>[] = [], missing: Record<string, string>[] = [];
-  for (const m of MARKET) {
+  await inLanes(MARKET, async (m, i) => {
     try {
       const bars = foldBars(await tvCall(session, "mcp-tv-get-ohlcv",
         { symbol: m.symbol, interval: m.daily ? "1D" : "1h", count: m.daily ? 2 : 25 }, signal));
-      market.push({ ...m, daily: !!m.daily, ...bars });
+      market[i] = { ...m, daily: !!m.daily, ...bars };
     } catch (err) {
-      missing.push({ symbol: m.symbol, name: m.name, error: unreached(signal, err) });
+      missing[i] = { symbol: m.symbol, name: m.name, error: unreached(signal, err) };
     }
-  }
-  return { ok: true, market, missing };
+  });
+  return { ok: true, market: market.filter(Boolean), missing: missing.filter(Boolean) };
 }
 
 /* ─── The headlines ────────────────────────────────────────────────────────
@@ -627,25 +648,26 @@ export function unlisted(listed: string[], meetings = FOMC): string[] {
   return listed.filter(d => !meetings.includes(d));
 }
 
-/* One at a time, inside DOOR_MS, nearest month first. A failed contract is
-   named; an unreadable calendar leaves the table unchecked and says so with a
-   null rather than costing the odds. Exported so the deadline is driven. */
+/* In lanes, inside DOOR_MS, nearest month first, written by slot as the
+   market is. A failed contract is named; an unreadable calendar leaves the
+   table unchecked and says so with a null rather than costing the odds.
+   Exported so the deadline is driven. */
 export async function readRates() {
   const signal = AbortSignal.timeout(DOOR_MS);
   const session = await tvSession();
   const today = nyDate(new Date());
   const prices: Record<string, number> = {};
   const contracts: Record<string, unknown>[] = [], missing: Record<string, string>[] = [];
-  for (const ym of contractMonths(today)) {
+  await inLanes(contractMonths(today), async (ym, i) => {
     const symbol = zq(ym);
     try {
       const bars = foldBars(await tvCall(session, "mcp-tv-get-ohlcv", { symbol, interval: "1D", count: 2 }, signal));
       prices[ym] = bars.last;
-      contracts.push({ symbol, price: bars.last, at: bars.at });
+      contracts[i] = { symbol, price: bars.last, at: bars.at };
     } catch (err) {
-      missing.push({ symbol, error: unreached(signal, err) });
+      missing[i] = { symbol, error: unreached(signal, err) };
     }
-  }
+  });
   let calendar: string[] | null = null;
   try {
     const events = foldCalendar(await tvCall(session, "mcp-tv-get-economic-calendar",
@@ -661,7 +683,8 @@ export async function readRates() {
     return { ok: false, error: `TradingView's calendar lists a Fed decision on ${moved.join(", ")}, ` +
                                `which the table of meetings does not hold`, calendar };
   }
-  return { ok: true, today, ...foldRates(prices, today), contracts, missing, calendar };
+  return { ok: true, today, ...foldRates(prices, today), contracts: contracts.filter(Boolean),
+           missing: missing.filter(Boolean), calendar };
 }
 
 /* ─── What COMEX gold futures traded ───────────────────────────────────────

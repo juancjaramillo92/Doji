@@ -25,7 +25,7 @@ any change that touches it.
 | the Apps Script's Gmail half | `gs.mjs` reaches the parser only |
 | an Edge Function path no test can drive | `types.test.mjs` for the names in it; the rest by reading |
 | whether a prompt still behaves | `scripts/eval.mjs`, run by hand with his key — nothing in `npm test` calls the model |
-| the charm's firmware beyond its pure C | the charm workflow's build for the rest of its code; the board itself for what it does |
+| the charm's firmware beyond its pure C | `charm.test.mjs`'s census for the names in it; the charm workflow's build for the rest of its code; the board itself for what it does |
 
 ---
 
@@ -47,7 +47,7 @@ argued, so the reason lives once, in the document every session reads.
 | R-10 — regenerating `golden.json` or `golden-fold.json` to make a red run go away | regenerate deliberately, never to make a red run go away |
 | R-18 — a per-caller cache window in place of the tool array | the cache window is derived from the tool array; do not move a window on an argument |
 | R-25 — grading a read by where gold went, or handing her record to the trade look | her record is judged by the test she stated, never by where price went, and it is hers |
-| R-33 — handing the portrait to the trade look | the trade event is exempt from `TRIM`: a paraphrase reaching a man in a position is how a sentence becomes an order |
+| R-37 — handing the portrait to the trade look | the trade event is exempt from `TRIM`: a paraphrase reaching a man in a position is how a sentence becomes an order |
 
 The rest are refused by something no other document holds, so they carry their
 reasoning here.
@@ -378,6 +378,80 @@ door behind one already open, at the price of a signing key to keep and a
 public key built into every board.
 **Revisit if:** anyone but him ever holds a credential here, or the bucket is
 ever written by anything but the workflow.
+
+### R-38 — `-Werror` on the charm's own component
+**Why refused:** the C version of `types.test.mjs`'s two questions is asked
+already. A name used and declared nowhere fails the ESP-IDF build — its
+`-Werror=all` makes an implicit declaration an error, and an undeclared
+variable is one under any flags — which was seen red on the workflow, planted.
+A name declared and used nowhere is `charm.test.mjs`'s census, which runs on
+every push in `npm test`, needs no toolchain, and reaches what no warning
+does: a header export no other file calls, a function missing from its
+header. Wholesale `-Werror` would add a red build for every warning the pinned
+toolchain or a component's header raises — facts about the invocation, which
+is why `types.test.mjs` asks two questions and not a whole typecheck.
+**Revisit if:** a defect the compiler warned about reaches `main` past the
+census.
+
+### R-39 — moving `FRAME_VOICE` and `FRAME_VOLUME` into `frames.c`
+**Why refused:** they are the one header export only its own file reads, so
+the strict reading of "a header exports only what another file calls" moves
+them. But they are the wire format `frames.h` documents beside the function
+that decodes it, the Facts row names them there, and `agree.test.mjs` reads
+them there against `FRAME`. The census holds a header's functions to another
+caller and its other names to a use, which these have.
+**Revisit if:** a header grows constants that are not part of what it
+documents.
+
+### R-40 — naming the charm's screen centre and size
+**Why refused:** 233 and 466 recur in every file that draws, but they are two
+of some hundred coordinates measured in the same pixels — the render is bytes
+for this panel, and every position is the playgrounds' number on it. Naming
+two leaves the rest literal in the same space and makes no decision movable.
+**Revisit if:** a second panel size is ever driven.
+
+### R-41 — the charm's single-use colours into `palette.h`
+**Why refused:** `palette.h` holds a colour the app or a second file shares.
+The render's ink, highlight and mouth in `face.c`, the journal's resting
+halves and the setup screen's cross are each drawn by one function, beside
+which they are read — the reason §3 gives for leaving each CSS rule beside its
+component.
+**Revisit if:** a second file draws one of them.
+
+### R-42 — one tick for the setup screen and the journal's done
+**Why refused:** the two ticks share three points, but one is an `lv_line`
+object shown whole and the other is drawn in stroke by stroke by its own
+event; sharing the points needs a header for six numbers, and they may part
+the day either is redesigned.
+**Revisit if:** the tick is redesigned and both are meant to stay one shape.
+
+### R-43 — one Wi-Fi bring-up for `net.c` and `setup.c`
+**Why refused:** one starts a station that joins in the background with a
+fast path through the last access point; the other an access point and a
+station side by side, every event routed to the setup screen. What they must
+agree on — her own leaving is no refusal — is already held, found rather than
+listed, by `agree.test.mjs`. A shared start would be an options object over
+two modes. The same holds for the `yyyymmdd` day `briefing.c` and `ota.c`
+each keep: each is compared only with itself, so the two cannot disagree in a
+way that matters.
+**Revisit if:** a third file joins a network.
+
+### R-44 — one bare full-screen object for `face.c`, `journal.c` and `setup.c`
+**Why refused:** `plain()`, `box()` and `group()` each make a 466 × 466 object,
+but on different parents, with different flags, one with a background and one
+hidden at birth. One helper would take those as arguments for three callers
+that read plainer as they are.
+**Revisit if:** a fourth file draws a screen of its own.
+
+### R-45 — checking every `esp_err_t` in the firmware
+**Why refused:** a check is for a failure that changes what she does next.
+`esp_http_client_fetch_headers` failing leaves the status at 0, which `talk()`
+already treats as nothing said, and a −1 with the network up shows the same
+nothing; an NVS write that fails costs a setting the next save repeats; the
+codecs and the radio's start-up fail into the same refusals the doors report.
+Each check would be padding where nothing untrusted enters.
+**Revisit if:** `talk()` comes to tell a refused door from silence, or a
+setting is ever written once and never again.
 
 ---
 

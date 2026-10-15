@@ -7,6 +7,9 @@
 // volume after.
 void sound_start(void);
 
+// The rate the microphones record at, and the notes play at.
+#define SOUND_RATE 16000
+
 // 0 to 100.
 void sound_volume(int percent);
 
@@ -24,7 +27,8 @@ void sound_listen(void);
 void sound_sent(void);
 
 /* Both hand `more` how loud each moment is, 0 to 1, and stop when it answers
-   false. Recording is mono 16 kHz, handed to `more` a run of samples at a
-   time. Playing is mono at `rate` and returns false when `more` stopped it. */
+   false. Recording is mono at SOUND_RATE, handed to `more` a run of samples
+   at a time. Playing is mono at `rate` and returns false when `more` stopped
+   it. */
 void sound_record(bool (*more)(const int16_t *in, size_t n, float loud));
 bool sound_play(const int16_t *in, size_t samples, uint32_t rate, bool (*more)(float));

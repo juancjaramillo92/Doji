@@ -289,7 +289,7 @@ static esp_err_t reply(httpd_req_t *req, const char *json) {
 
 // What she has, her network's name, and how many networks she keeps.
 static esp_err_t api_state(httpd_req_t *req) {
-    char out[400];
+    char out[1024];  // MAX_NETS names at their longest escaped, and the rest
     int o = snprintf(out, sizeof out, "{\"ready\":%s,\"name\":\"%s\",\"max\":%d,\"nets\":[",
                      config_ready() ? "true" : "false", ap_name, MAX_NETS);
     for (int i = 0; i < cfg.n_nets; i++) {
@@ -308,7 +308,9 @@ static esp_err_t api_scan(httpd_req_t *req) {
     if (esp_wifi_scan_start(NULL, true) != ESP_OK || esp_wifi_scan_get_ap_records(&n, seen) != ESP_OK) n = 0;
     static char out[1400];
     int o = snprintf(out, sizeof out, "[");
-    for (int i = 0; i < n && o < (int)sizeof out - 120; i++) {
+    // An entry is written only with room for the longest one: a name of 32
+    // control characters, each escaped to six, and the rest of its object.
+    for (int i = 0; i < n && o < (int)sizeof out - 240; i++) {
         const char *ssid = (const char *)seen[i].ssid;
         bool again = !ssid[0];
         for (int j = 0; j < i && !again; j++) again = !strcmp(ssid, (const char *)seen[j].ssid);

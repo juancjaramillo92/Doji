@@ -265,6 +265,50 @@ test('Eugenia\'s charm sends the headers her door reads, and knows the frames it
   assert.deepEqual(kinds, { ...FRAME }, 'the charm and her door number the frames differently');
 });
 
+/* Three more things the charm holds of her door, each a number or a word in
+   C beside the one in TypeScript it must agree with. The charm hangs up on a
+   silence longer than READ_MS, so it must outlast two of her BEAT_MS beats;
+   it records into FILE_ROOM, which her door refuses past FILE_MAX; and it
+   asks ?briefing= for the words charmBriefing answers, and no other. */
+test('the charm waits out her silence, records what her door takes, and asks the briefing it answers', () => {
+  const talk = source('charm/main/talk.c');
+  const number = (text, pattern, what) => {
+    const m = text.match(pattern);
+    assert.ok(m && /^[\d\s*+()_]+$/.test(m[1]), `${what} is no longer defined as this test reads it`);
+    return Function(`return ${m[1].replace(/_/g, '')}`)();
+  };
+  const readMs = number(talk, /^#define READ_MS\s+(.+)$/m, "talk.c's READ_MS");
+  const beatMs = number(EUGENIA_TS, /^const BEAT_MS = (.+);$/m, "doji-eugenia's BEAT_MS");
+  assert.ok(readMs >= 2 * beatMs,
+    `the charm gives up after ${readMs} ms of nothing, inside two of her ${beatMs} ms beats — it hangs up while she thinks`);
+  const room = number(talk, /^#define FILE_ROOM\s+(.+)$/m, "talk.c's FILE_ROOM");
+  const max = number(EUGENIA_TS, /^const FILE_MAX = (.+);$/m, "doji-eugenia's FILE_MAX");
+  assert.ok(room <= max, `the charm records up to ${room} bytes and her door refuses past ${max}`);
+
+  const asked = [...talk.matchAll(/EUGENIA_DOOR "\?briefing=(\w+)"/g)].map(m => m[1]).sort();
+  const door = EUGENIA_TS.match(/if \(which !== '(\w+)' && which !== '(\w+)'\) \{/);
+  assert.ok(asked.length && door, 'talk.c or charmBriefing no longer names the briefing as this test reads it');
+  assert.deepEqual(asked, door.slice(1).sort(), 'the charm asks ?briefing= for a word her door does not answer, or misses one');
+});
+
+/* The charm updates herself from the object the charm workflow publishes, and
+   the workflow checks the image it builds holds the app where the bootloader
+   looks: two names and an offset, each written in two files. */
+test('the charm updates from what the workflow publishes, and the image holds the app where it boots', () => {
+  const net = source('charm/main/net.h'), workflow = source('.github/workflows/charm.yml');
+  const reads = net.match(/#define FIRMWARE_URL "https:\/\/\w+\.supabase\.co\/storage\/v1\/object\/public\/(\w+)\/([\w.]+)"/);
+  const writes = workflow.match(/\/storage\/v1\/object\/(\w+)\/([\w.]+)"/);
+  const made = workflow.match(/"id":"(\w+)","name":"\w+","public":true/);
+  assert.ok(reads && writes && made, 'net.h or charm.yml no longer names the update as this test reads it');
+  assert.deepEqual(reads.slice(1), writes.slice(1), 'the charm looks for her update where the workflow does not put it');
+  assert.equal(made[1], reads[1], 'the workflow makes a bucket the charm does not read from');
+
+  const slot = source('charm/partitions.csv').match(/^ota_0,\s*app,\s*ota_0,\s*(0x[0-9a-f]+),/im);
+  const checked = workflow.match(/test "\$full" -ge \$\(\( (0x[0-9a-f]+) \+ app \)\)/i);
+  assert.ok(slot && checked, 'partitions.csv or charm.yml no longer places the app as this test reads it');
+  assert.equal(Number(checked[1]), Number(slot[1]), 'the workflow checks for the app at an offset the partition table does not boot from');
+});
+
 /* The conversation comes first, and a trade waits for it to end. Its
    questions come up only once the conversation is over with him looking —
    never after a single answer, never before a waiting briefing, which is read
@@ -297,6 +341,12 @@ test('a trade\'s questions wait for the conversation to end, and PWR on them goe
 /* The charm's words are drawn in fonts holding only the letters
    tools/fonts.sh gave them; a word with any other letter draws a gap. */
 test('every word on the charm\'s screens is in the font that draws it', () => {
+  // The files that draw words, found rather than listed: a fifth would draw
+  // letters nothing below checks.
+  const drawers = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n')
+    .filter(f => f.endsWith('.c') && /LV_FONT_DECLARE\(hanken_/.test(source(f))).map(f => f.slice('charm/main/'.length));
+  assert.deepEqual(drawers.sort(), ['dial.c', 'face.c', 'journal.c', 'setup.c'],
+    'a file draws words in the charm\'s fonts that this test does not read');
   const journal = source('charm/main/journal.c');
   const list = (name) => {
     const m = journal.match(new RegExp(`${name}\\[\\d\\] = \\{([^}]+)\\}`));
@@ -1428,6 +1478,20 @@ test('the charm asks for the briefing in the hours it is written', () => {
   }
 });
 
+
+/* A new app is good once she has reached her Wi-Fi, whichever waking it is:
+   confirmed where every join succeeds, and nowhere else. Confirmed on one
+   path only, a press in the second after an update took the other, and the
+   bootloader rolled a good app back at the next wake. */
+test('the charm keeps a new app wherever she reaches her Wi-Fi', () => {
+  const callers = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n')
+    .filter(f => f.endsWith('.c') && /\bota_confirm\(\);/.test(source(f)));
+  assert.deepEqual(callers, ['charm/main/net.c'], 'a new app is confirmed somewhere other than where she joins, or nowhere');
+  const join = bodyOf(source('charm/main/net.c'), 'static void join(void *arg) {', 'net.c has no join()');
+  const gaveUp = join.indexOf('xEventGroupSetBits(events, GAVE_UP);');
+  assert.ok(gaveUp > -1 && join.indexOf('ota_confirm();') > gaveUp,
+    'join() confirms the app before it knows she joined');
+});
 
 /* The charm joins a network by waiting for an address or a refusal, and gives
    up on a failed attempt by leaving it. That leaving arrives as a disconnect,
@@ -5465,8 +5529,12 @@ test('the Sunday briefing reads the week and tells it rather than lists it, in b
   const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
   const critic = EUGENIA_PROMPT.match(/export const CRITIC = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
   assert.match(system, /ON SUNDAY THE BRIEFING OPENS THE WEEK/, 'SYSTEM no longer says what a Sunday briefing is for');
-  assert.match(system, /Today's releases and nothing else/,
+  assert.match(system, /Today's releases rated high and nothing else/,
     'the weekday calendar lists more than its own day again, so tomorrow arrives twice');
+  /* HIGH-RATED ONLY, IN BOTH COPIES, on his instruction of 13 October: seven
+     lines for one release that mattered. The critic runs last. */
+  assert.match(critic, /is a line on the Today: list rated anything but high\? It comes out/,
+    'CRITIC no longer takes a release rated below high off the weekday list, and it runs last');
   assert.match(system, /not a look back at his week/,
     'SYSTEM no longer rules out a weekly review, which he decided against');
   /* THE WEEK IS TOLD, IN BOTH COPIES. The critic runs last, so a writer told
@@ -5627,7 +5695,7 @@ test('every market read she goes without writes a row', () => {
     .map((m, i) => [m[1], EUGENIA_TS.slice(m.index, starts[i + 1]?.index)])
     .filter(([, body]) => /tvRead\("|fetch\((MARKET_URL|COT_URL)/.test(uncomment(body)));
   assert.deepEqual(readers.map(([name]) => name).sort(),
-    ['aroundBlock', 'headlinesBlock', 'marketQuote', 'positioningBlock', 'ratesBlock', 'readTvCalendar', 'volumeBlock'],
+    ['headlinesBlock', 'marketQuote', 'positioningBlock', 'readTvCalendar', 'storeMarket', 'storeRates', 'volumeBlock'],
     'the market reads have changed — declare the new one, and give it the meter');
   for (const [name, body] of readers) {
     if (name === 'readTvCalendar') continue;
@@ -5635,10 +5703,31 @@ test('every market read she goes without writes a row', () => {
       `${name}'s failure reaches the console and no row`);
   }
   // In part, too, where the door names what it did not read.
-  for (const name of ['aroundBlock', 'ratesBlock']) {
+  for (const name of ['storeMarket', 'storeRates']) {
     assert.match(bodyOf(EUGENIA_TS, `export async function ${name}(`),
       /if \(answer\.missing\.length\) await unread\(/, `${name} keeps a partial read to itself`);
   }
+});
+
+/* THE MARKET IS READ AHEAD BY ONE WRITER, AND READ BACK BY EVERYONE ELSE. A
+   briefing that reads TradingView itself pays for it out of its own clock, as
+   on 13 and 14 October; a second writer to the store races the market's
+   read-then-write. The census above catches a block reading the door again;
+   this holds the job's half and the store's one way in. */
+test('the quarter-hourly job reads the market ahead, and nothing else writes the copy', () => {
+  const run = bodyOf(EUGENIA_TS, 'async function postScheduled(');
+  const door = run.slice(run.indexOf('get("calendar") === "1"'));
+  assert.match(door.slice(0, door.indexOf('return json')),
+    /await filed\(\);\s*await Promise\.all\(\[storeMarket\(\), storeRates\(\)\]\);/,
+    'the quarter-hourly job no longer reads the market ahead, so every copy goes stale');
+  for (const name of ['aroundBlock', 'ratesBlock']) {
+    assert.match(bodyOf(EUGENIA_TS, `export async function ${name}(`), /readStored\("/,
+      `${name} no longer reads the copy the job keeps`);
+  }
+  assert.equal([...uncomment(EUGENIA_TS).matchAll(/eugenia_market\?/g)].length, 2,
+    'eugenia_market is addressed somewhere other than readStored and store');
+  const writers = [...uncomment(EUGENIA_TS).matchAll(/await store\("(\w+)"/g)].map(m => m[1]).sort();
+  assert.deepEqual(writers, ['market', 'rates'], 'the copy has a writer other than the job\'s two');
 });
 
 test('the calendar is filed before the briefing reads it, and every filing is a row', () => {

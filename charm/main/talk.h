@@ -7,7 +7,7 @@
    door answered — 200 when she did — 0 when he said nothing, and -1 when the
    network could not reach her, which is left to the lock screen to show;
    any other answer shows her confused, as does an encoder that will not
-   start, which is 0. */
+   start or no room to record in, which is 0. */
 int talk(void);
 
 /* Asks whether today's briefing has landed. When it has, `lit` lights the

@@ -106,7 +106,7 @@ static void draw_done(lv_event_t *e) {
         lv_draw_line(layer, &l);
         drawn -= len;
     }
-    face_ring(layer, 231, 8, fminf(1, t / (float)SWEEP_MS), t / 1800.0f, all_yes ? 1 : 0.55f);
+    face_ring(layer, 231, 8, fminf(1, t / (float)SWEEP_MS), t / (float)FACE_RING_TURN_MS, all_yes ? 1 : 0.55f);
 }
 
 static void redraw(lv_timer_t *t) {
@@ -144,7 +144,7 @@ static void build(void) {
     lv_obj_set_style_bg_opa(done, LV_OPA_TRANSP, 0);
     lv_obj_add_event_cb(done, draw_done, LV_EVENT_DRAW_MAIN, NULL);
     lv_obj_add_flag(done, LV_OBJ_FLAG_HIDDEN);
-    drawing = lv_timer_create(redraw, 33, NULL);
+    drawing = lv_timer_create(redraw, FACE_FRAME_MS, NULL);
     lv_timer_pause(drawing);
 }
 

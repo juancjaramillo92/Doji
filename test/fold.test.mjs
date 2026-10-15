@@ -46,7 +46,7 @@ import {
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock,
   sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
-  volumeList, volumeBlock,
+  volumeList, volumeBlock, keptMarket, storeMarket, storeRates,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -718,6 +718,35 @@ test('a TradingView that stops answering costs the symbols not reached, not the 
   }
 });
 
+/* THREE AT A TIME, AND IN ORDER. A server whose calls finish out of order —
+   each later symbol answered sooner — with its concurrency counted: one lane
+   is the fourteen-call queue that outran the deadline, and an unbounded burst
+   is what TradingView refuses. */
+test('the market is read three charts at a time and answered in its own order', async () => {
+  let open = 0, most = 0, calls = 0;
+  const symbols = [];
+  const fetch = async (url, init = {}) => {
+    if (url.includes('/rest/v1/tradingview_auth')) {
+      return Response.json([{ id: 'current', access_token: 'A', expires_at: new Date(Date.now() + 3600_000).toISOString() }]);
+    }
+    const body = JSON.parse(init.body);
+    if (body.method === 'initialize') return new Response('{}', { headers: { 'mcp-session-id': 's' } });
+    if (body.method !== 'tools/call') return new Response('', { status: 202 });
+    symbols.push(body.params.arguments.symbol);
+    most = Math.max(most, ++open);
+    await new Promise(r => setTimeout(r, 30 - 2 * calls++));
+    open--;
+    return new Response(`data: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { structuredContent: DXY_BARS } })}\n\n`);
+  };
+  const answer = await stubbed(async () => { globalThis.fetch = fetch; return readMarket(); });
+  assert.equal(most, 3, `${most} charts were asked for at once`);
+  // Asked in the list's order and finished out of it.
+  assert.deepEqual(answer.market.map(m => m.symbol), symbols, 'the answer is in the order the charts finished');
+  assert.equal(answer.market[0].symbol, 'TVC:DXY');
+  assert.equal(answer.market.length, 14);
+  assert.deepEqual(answer.missing, []);
+});
+
 const DFII10_BARS = { bars: [
   { c: 2.83, h: 2.83, l: 2.83, o: 2.83, t: 1790294400, v: null },
   { c: 2.9, h: 2.9, l: 2.9, o: 2.9, t: 1790553600, v: null },
@@ -735,11 +764,11 @@ test('bars fold to a span — where the first opened and where the last stands, 
 const AROUND = {
   ok: true,
   market: [
-    { name: 'Dollar index', unit: '', daily: false, from: 101.95, since: '2026-09-30T18:00:00.000Z',
+    { symbol: 'TVC:DXY', name: 'Dollar index', unit: '', daily: false, from: 101.95, since: '2026-09-30T18:00:00.000Z',
       last: 102.16, at: '2026-10-01T17:45:00.000Z' },
-    { name: 'Ten-year Treasury yield', unit: '%', daily: false, from: 5.18, since: '2026-09-30T18:00:00.000Z',
+    { symbol: 'TVC:US10Y', name: 'Ten-year Treasury yield', unit: '%', daily: false, from: 5.18, since: '2026-09-30T18:00:00.000Z',
       last: 5.243, at: '2026-10-01T17:45:00.000Z' },
-    { name: 'Ten-year real yield (TIPS)', unit: '%', daily: true, from: 2.83, since: '2026-09-25T00:00:00.000Z',
+    { symbol: 'FRED:DFII10', name: 'Ten-year real yield (TIPS)', unit: '%', daily: true, from: 2.83, since: '2026-09-25T00:00:00.000Z',
       last: 2.91, at: '2026-09-29T00:00:00.000Z' },
   ],
   missing: [{ symbol: 'TVC:VIX', name: 'VIX', error: 'TradingView mcp-tv-get-ohlcv: no answer' }],
@@ -759,54 +788,94 @@ test('every line of the market says what its number is measured from, and comput
   assert.match(out, /hourly bars rather than live ticks/);
 });
 
-test('a market that will not read is a sentence telling her not to reach for a search', async () => {
-  await stubbed(async () => {
-    globalThis.fetch = async () => new Response(JSON.stringify({ ok: false, error: 'not connected' }), { status: 500 });
-    assert.match(await aroundBlock(), /could not be read just now\. Do not quote the dollar or yields from a search/);
-    // An answer with nothing in it is the same: zero lines is not a market.
-    globalThis.fetch = async () => new Response(JSON.stringify({ ok: true, market: [], missing: [] }), { status: 200 });
-    assert.match(await aroundBlock(), /could not be read just now/);
-    globalThis.fetch = async () => new Response(JSON.stringify(AROUND), { status: 200 });
-    assert.match(await aroundBlock(), /Dollar index 102\.16/);
-  });
-});
-
-/* A READ SHE WENT WITHOUT IS A ROW. The briefing's own row reads ok either
-   way, so on 12 October the Edge log was the only place a briefing written
-   without the dollar and the Fed showed. Whole or in part; none when whole. */
-test('a market read she goes without is a row, whole or in part, and a full one is none', async () => {
-  const rows = [];
-  const door = (answer, status = 200) => async (url, init = {}) => {
+/* THE TABLE AND THE DOORS IN ONE STUB: eugenia_market answers what was last
+   stored under each door, eugenia_runs collects the meter, and each
+   doji-tradingview door answers what the test has set for it. */
+function marketWorld() {
+  const stored = new Map(), rows = [], doors = {};
+  const fetch = async (url, init = {}) => {
     if (url.includes('/rest/v1/eugenia_runs')) {
       rows.push(...JSON.parse(init.body));
       return new Response('', { status: 201 });
     }
+    if (url.includes('/rest/v1/eugenia_market')) {
+      if (init.method === 'POST') {
+        const row = JSON.parse(init.body);
+        stored.set(row.door, row);
+        return new Response('', { status: 201 });
+      }
+      const door = url.match(/door=eq\.(\w+)/)[1];
+      return Response.json(stored.has(door) ? [stored.get(door)] : []);
+    }
+    const [answer, status] = doors[url.match(/doji-tradingview\?(\w+)=1/)[1]];
     return Response.json(answer, { status });
   };
-  await stubbed(async () => {
-    globalThis.fetch = door({ ...AROUND, missing: [] });
-    await aroundBlock();
-    globalThis.fetch = door({ ok: true, ...RATES, missing: [] });
-    await ratesBlock();
-    assert.deepEqual(rows, [], 'a read that answered whole wrote a row');
+  return { fetch, stored, rows, doors };
+}
 
-    globalThis.fetch = door({ ...AROUND, missing: [
-      { symbol: 'TVC:VIX', name: 'VIX', error: 'not reached in 35s' },
-      { symbol: 'SP:SPX', name: 'S&P 500', error: 'TradingView mcp-tv-get-ohlcv: no answer' },
-      { symbol: 'TVC:DE10Y', name: 'German ten-year yield', error: 'not reached in 35s' }] });
-    assert.match(await aroundBlock(), /Not read just now: VIX, S&P 500, German ten-year yield\./);
-    globalThis.fetch = door({ ok: true, ...RATES,
-      missing: [{ symbol: 'CBOT:ZQG2027', error: 'not reached in 35s' }] });
-    await ratesBlock();
-    globalThis.fetch = door({ ok: false, error: 'not connected' }, 500);
-    await ratesBlock();
+/* READ AHEAD, READ BACK. On 13 and 14 October a chart took five or six seconds
+   and the briefing, reading them itself, kept six lines of fourteen. Now the
+   job reads and stores, and the briefing reads the copy, which a failed pass
+   leaves standing. */
+test('the market is read ahead by the job, and a briefing reads the copy a failed pass leaves', async () => {
+  const world = marketWorld();
+  await stubbed(async () => {
+    globalThis.fetch = world.fetch;
+    // Before the job has run there is nothing to read, and she is told so.
+    assert.match(await aroundBlock(), /could not be read just now\. Do not quote the dollar or yields from a search/);
+    assert.match(await ratesBlock(), /could not be read just now\. Do not quote rate\s+odds from a search/);
+
+    world.doors.market = [AROUND, 200];
+    world.doors.rates = [{ ok: true, ...RATES, missing: [] }, 200];
+    await Promise.all([storeMarket(), storeRates()]);
+    assert.match(await aroundBlock(), /Dollar index 102\.16/);
+    assert.match(await ratesBlock(), /read at \d\d:\d\d ET:\n· 28 Oct: 73% no change/);
+
+    // A pass that fails, or serves nothing, leaves the copy as it was.
+    world.doors.market = [{ ok: false, error: 'not connected' }, 500];
+    world.doors.rates = [{ ok: true, market: [], meetings: [], missing: [] }, 200];
+    await Promise.all([storeMarket(), storeRates()]);
+    assert.match(await aroundBlock(), /Dollar index 102\.16/);
+    assert.match(await ratesBlock(), /28 Oct: 73% no change/);
   });
-  assert.deepEqual(rows, [
-    { caller: 'market read', ok: false,
-      detail: 'market: TVC:VIX, TVC:DE10Y: not reached in 35s; SP:SPX: TradingView mcp-tv-get-ohlcv: no answer' },
-    { caller: 'market read', ok: false, detail: 'rates: CBOT:ZQG2027: not reached in 35s' },
-    { caller: 'market read', ok: false, detail: 'rates: TradingView rates: not connected' },
+  assert.deepEqual(world.rows.map(r => r.detail), [
+    'market: not read yet', 'rates: not read yet',
+    // The partial pass's VIX, written by the job that saw it, not the reader.
+    'market: TVC:VIX: TradingView mcp-tv-get-ohlcv: no answer',
+    'market: TradingView market: not connected', 'rates: no meeting served',
   ]);
+  assert.ok(world.rows.every(r => r.caller === 'market read' && r.ok === false));
+});
+
+/* ONE SLOW CALL LEAVES NO GAP: a symbol this pass missed keeps the last pass's
+   line, with that pass's bar times, and one never read is still named. */
+test('a symbol the pass did not reach keeps the line the last pass read', () => {
+  const line = (symbol, last) => ({ symbol, name: symbol, unit: '', daily: false,
+    from: 1, since: '2026-10-14T12:00:00Z', last, at: '2026-10-14T13:00:00Z' });
+  const kept = { market: [line('TVC:DXY', 100), line('TVC:VIX', 17)], missing: [] };
+  const fresh = { market: [line('TVC:DXY', 101)], missing: [
+    { symbol: 'TVC:VIX', name: 'VIX', error: 'not reached in 35s' },
+    { symbol: 'FX:EURUSD', name: 'Euro in dollars', error: 'not reached in 35s' }] };
+  const out = keptMarket(fresh, kept);
+  assert.deepEqual(out.market.map(m => [m.symbol, m.last]), [['TVC:DXY', 101], ['TVC:VIX', 17]],
+    'the fresh line lost to the old, or the old one was dropped');
+  assert.deepEqual(out.missing.map(m => m.symbol), ['FX:EURUSD']);
+  assert.deepEqual(keptMarket(fresh, null).missing.length, 2, 'a first pass invented lines');
+});
+
+/* THE ODDS AGE OUT; THE LINES DO NOT NEED TO. Each market line carries its bar
+   times, but the odds carry only when they were read, and a door that keeps
+   refusing would otherwise leave its last answer standing for good. */
+test('odds read more than two hours ago are not handed to her', async () => {
+  const world = marketWorld();
+  const read_at = '2026-10-15T12:00:00.000Z';
+  world.stored.set('rates', { door: 'rates', answer: { ok: true, ...RATES, missing: [] }, read_at });
+  await stubbed(async () => {
+    globalThis.fetch = world.fetch;
+    assert.match(await ratesBlock(Date.parse(read_at) + 2 * 3600_000), /08:00 ET:\n· 28 Oct/);
+    assert.match(await ratesBlock(Date.parse(read_at) + 2 * 3600_000 + 1), /could not be read just now/);
+  });
+  assert.equal(world.rows.length, 1, 'odds too old to hand her left no row');
 });
 
 /* ─── What the wires said ────────────────────────────────────────────────────
@@ -957,6 +1026,7 @@ const RATES = {
     { date: '2027-01-27', move_bp: 9.2, total_bp: 35.1, odds: [{ bp: 0, chance: 63 }, { bp: 25, chance: 37 }] },
   ],
   unread: [],
+  read_at: '2026-10-01T22:00:00.000Z',
 };
 
 test('the first meeting is said as odds and the later ones as what is priced by then', () => {
@@ -966,9 +1036,11 @@ test('the first meeting is said as odds and the later ones as what is priced by 
   assert.match(out, /· 27 Jan: 35 basis points of hikes priced in all by then, 9 of them at this meeting/);
   assert.doesNotMatch(out, /76%|37%/, 'a later meeting is said as its own odds, which FedWatch does not show');
   assert.match(out, /at least\s+fifteen minutes behind/, 'the block does not say the bars are delayed');
+  // Read ahead, so the block says when; the odds carry no other time.
+  assert.match(out, /read at 18:00 ET:/);
 
   const cut = ratesList({ meetings: [{ ...RATES.meetings[0], odds: [{ bp: -25, chance: 60 }, { bp: -50, chance: 40 }] },
-    { ...RATES.meetings[1], total_bp: -30.4 }], unread: ['2027-01-27'] });
+    { ...RATES.meetings[1], total_bp: -30.4 }], unread: ['2027-01-27'], read_at: RATES.read_at });
   assert.match(cut, /60% a quarter-point cut, 40% a 50bp cut/);
   assert.match(cut, /30 basis points of cuts priced in all by then/);
   assert.match(cut, /Not read just now: 27 Jan\./, 'a meeting the fold could not solve is dropped rather than named');
@@ -2724,7 +2796,7 @@ test('a list holding anything from abroad says once that his rules do not count 
     consensus: null, prior: null, actual: null });
   const out = calendarList([row('EU ECB Interest Rate Decision', 'EU'), row('GDP Growth Rate QoQ Adv', 'US')],
     Date.parse('2026-10-29T11:00:00Z'));
-  assert.match(out, /08:15 ET EU ECB Interest Rate Decision — due/);
+  assert.match(out, /08:15 ET EU ECB Interest Rate Decision, rated high — due/);
   assert.equal(out.match(/R-14 and R-19 count US releases alone/g)?.length, 1);
   assert.doesNotMatch(calendarList([row('GDP Growth Rate QoQ Adv', 'US')], Date.parse('2026-10-29T11:00:00Z')),
     /abroad/);
@@ -4020,11 +4092,12 @@ test('a landed release is never described as one still to come', () => {
   const out = calendarList([
     { id: 1, at: '2026-01-09T13:30:00Z', name: 'core CPI', country: 'US', importance: 'high',
       consensus: '0.3%', prior: '0.2%', actual: '0.4%' },
-    { id: 2, at: '2026-01-09T20:00:00Z', name: 'FOMC minutes', country: 'US', importance: 'high',
+    // The rating rides every line: the weekday slot lists only what is high.
+    { id: 2, at: '2026-01-09T20:00:00Z', name: 'FOMC minutes', country: 'US', importance: 'medium',
       consensus: null, prior: null, actual: null },
   ], Date.parse('2026-01-09T13:05:00Z'));
-  assert.match(out, /08:30 ET core CPI — LANDED at 0\.4%/);
-  assert.match(out, /15:00 ET FOMC minutes — due/);
+  assert.match(out, /08:30 ET core CPI, rated high — LANDED at 0\.4%/);
+  assert.match(out, /15:00 ET FOMC minutes, rated medium — due/);
   assert.doesNotMatch(out, /abroad/, 'a list of US releases is told some of it is from abroad');
   assert.equal(calendarList([]), '');
 });
@@ -4041,12 +4114,12 @@ test('a calendar line from another day names the day, and today stays bare', () 
     row('2026-09-25T12:30:00Z', 'durable goods'),      // Fri 08:30
     row('2026-09-25T14:00:00Z', 'Michigan expectations'), // Fri 10:00
   ], Date.parse('2026-09-24T12:02:00Z'));
-  assert.match(out, /· 08:30 ET jobless claims — due/,
+  assert.match(out, /· 08:30 ET jobless claims, rated high — due/,
     'today\'s release carries a date it does not need');
   assert.match(out, /· 08:30 ET on Friday 25 Sept? durable goods/,
     'tomorrow\'s 08:30 reads exactly like today\'s — she can brief it as due this morning');
   assert.match(out, /· 10:00 ET on Friday 25 Sept? Michigan expectations/);
-  assert.match(out, /· 20:00 ET on Wednesday 23 Sept? FOMC minutes — PAST, no figure on file/,
+  assert.match(out, /· 20:00 ET on Wednesday 23 Sept? FOMC minutes, rated high — PAST, no figure on file/,
     'last night\'s release reads as tonight\'s, due, when it has already happened');
 });
 

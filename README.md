@@ -83,9 +83,9 @@ charm/                                  firmware for the charm — see The charm
   main/motion.c                         the motion sensor, armed to wake her
   main/lift.c                           whether a lift was him looking
   main/ota.c                            her updates over Wi-Fi, from main
-  main/hanken_64.c                      Doji's typeface for the journal's words
+  main/hanken_64.c                      Doji's typeface for the journal's words; _16, _18, _36 the rest
   art/HankenGrotesk.ttf                 that typeface, with its licence beside it
-  art/eugenia.png                       a render; art/*.rgb565 are the bytes drawn
+  art/eugenia.png                       a render; art/*.rgb565 and art/blush.argb the bytes drawn
   tools/art.py                          turns a render into those bytes
   tools/fonts.sh                        turns the typeface into the charm's fonts and the page's
 scripts/backup.mjs                      the paged read behind the daily copy
@@ -96,7 +96,7 @@ test/                                   node:test suites — see Tests
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
 .github/workflows/backup.yml            the daily copy of the tables nothing else holds
 .github/workflows/health.yml            the hourly outside check; a failed run is the alarm
-.github/workflows/charm.yml             builds the charm firmware, kept as a download
+.github/workflows/charm.yml             builds the charm firmware, kept as a download; main's is her update
 .github/dependabot.yml                  monthly update PRs, both ecosystems
 package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
@@ -144,9 +144,9 @@ it.
 
 **The other half has no write path into any of it.** Eugenia reads the journal
 through `eugenia_trades`, a view granted `select` alone, and writes only tables
-of her own. She is woken by a schedule in pg_cron, a message he sent, or a
-trigger on `trades` firing when a position opens or closes — never by a clock
-she keeps herself.
+of her own. She is woken by a schedule in pg_cron, a message he sent, typed
+or spoken to his charm, or a trigger on `trades` firing when a position opens
+or closes — never by a clock she keeps herself.
 
 ```
    WHAT WAKES HER                        WHAT SHE IS HANDED OR READS
@@ -155,8 +155,8 @@ she keeps herself.
  │           calendar ×4/h │        │ her own tables   8, 7 backed up    │
  │                         │        │ strategy.ts      no write path     │
  │ Telegram  he writes     │        │ the web          search and fetch  │
- │ trades    opened/closed │        │ the broker's price, via the poller │
- │                         │        │ calendar, market   via TradingView │
+ │ charm     he talks      │        │ the broker's price, via the poller │
+ │ trades    opened/closed │        │ calendar, market   via TradingView │
  └────────────┬────────────┘        └─────────────────┬──────────────────┘
               └───────────────┬───────────────────────┘
                               ▼
@@ -390,7 +390,7 @@ single-sourced at run time:
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns, and twice in `trades_telegram_on_answer` — the `is distinct from` list and the `before` object — and her charm's `ANSWERS`, keys and columns in `COLUMNS`' order |
 | the **app's colours on the charm** | `index.html`'s tokens, and their copies in `charm/main/palette.h`, each beside the token it copies, and in `charm/main/setup.html`'s `:root` under the app's own names |
 | the **disconnect that is the charm's own** | each charm file that joins a network — `charm/main/net.c` and `charm/main/setup.c` — skipping `WIFI_REASON_ASSOC_LEAVE` where it marks a refusal, so leaving a failed attempt cannot end the next |
-| the **letters the charm's fonts hold** | the `--symbols` in `charm/tools/fonts.sh`, as each generated font records them, and the words drawn in `charm/main/journal.c`, `charm/main/dial.c`, `charm/main/face.c` and `charm/main/setup.c` |
+| the **letters the charm's fonts hold** | the `--symbols` in `charm/tools/fonts.sh`, as each generated font records them, and the words drawn in `charm/main/journal.c`, `charm/main/dial.c`, `charm/main/face.c` and `charm/main/setup.c` — found as the files that declare a font, so a fifth is held too |
 | the **five columns the app may WRITE** | the `grant update (…)` in `schema.sql` and both lists in `verify.sql`. Four are `Data.OWNED`; the fifth is `deleted`, which no tap or save names but `remove()` and `undo()` write — a grant built from `Data.OWNED` alone takes soft delete out |
 | the **two sides a trade may have** | `trades_direction_check`, the poller's `tradeSide` and its P&L inversion, `emailRow`'s check, the Apps Script's `BUY`/`SELL` mapping, the app's Long/Short label |
 | the **two roles a turn may have** | `eugenia_turns_role_check` and every `role:` she writes |
@@ -407,6 +407,11 @@ single-sourced at run time:
 | the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys`, two in `doji-eugenia` — each stating `hourCycle: 'h23'`, since a locale resolving to h24 renders midnight as 24 and breaks `nyParts` and `nyWall` |
 | the **charm's answer frames** | `FRAME` and `charmFrame` in `doji-eugenia`, and `FRAME_VOICE` and `FRAME_VOLUME` in `charm/main/frames.h`, whose parser `charm.test.mjs` feeds `charmFrame`'s own bytes |
 | the **charm's headers** | each `x-charm-` header `charm/main/talk.c` sets and `doji-eugenia` reads, in both directions |
+| how long the **charm waits out her silence** | `READ_MS` in `charm/main/talk.c`, at least two of `BEAT_MS` in `doji-eugenia`, or the charm hangs up while she thinks |
+| the **largest recording** | `FILE_ROOM` in `charm/main/talk.c`, at most `FILE_MAX` in `doji-eugenia` |
+| what the charm asks **`?briefing=`** for | the two in `charm/main/talk.c` and the two `charmBriefing` answers |
+| where the **charm's update** lives | `FIRMWARE_URL` in `charm/main/net.h`, and the bucket and object `.github/workflows/charm.yml` makes and writes |
+| where the **charm's app** boots from | the first app slot's offset in `charm/partitions.csv` and the offset `.github/workflows/charm.yml` checks the image against |
 | the **briefing's hours** | `briefDue` and `retryDue` in `doji-eugenia`, and the charm's `BRIEF_WEEKDAY`, `BRIEF_SUNDAY` and `BRIEF_RETRIES` with the line that gives each day its hour — the charm sleeps, so it wakes to ask in those hours |
 | the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts` and `ROLL_HOUR` in `index.ts` |
 | the **importance a release may carry** | `IMPORTANCE` in `doji-tradingview`, the check constraint, and the rated reads' `importance=eq.high` |
@@ -488,7 +493,8 @@ the delete back.
 
 **Supabase snapshots the whole database daily**, and the Pro plan keeps the last
 seven, under Database → Backups in the dashboard. A snapshot is every table,
-Vault included, and Doji keeps nothing in Storage, so it is everything there is.
+Vault included, and Doji keeps nothing in Storage but the charm's update, which
+the charm workflow rebuilds from `main`, so it is everything there is.
 It is the repair for a database that is gone or broken: a restore returns the
 whole project to that day, and everything written since — trades, answers, her
 memory — goes with it. Point-in-time recovery between snapshots is a paid
@@ -965,7 +971,9 @@ time. The real yield is FRED's daily series and is marked `daily`. Symbols, name
 and units live in one list, `MARKET`, most-needed first; a symbol that fails is
 named in `missing`.
 `aroundList` states every line as a level beside the level at a stated time and
-computes no change, so a move cannot lose its window. A failed read is a sentence
+computes no change, so a move cannot lose its window. The door is read ahead
+by the quarter-hourly job and she reads the copy (see *The market and the Fed's
+odds are read ahead*). A failed read is a sentence
 telling her not to quote the dollar or yields from a search.
 
 **`?news=1` is gold's and the dollar's headlines.** `foldHeadlines` merges the
@@ -1294,8 +1302,13 @@ are none.
 
 **The calendar is the one place the prose rule is relaxed** — a plain `Today:`
 label and one line per item, times in ET, one fact each, on weekdays only. It is
-that day's releases, and a line from abroad only where the story runs through it. The list
-holds times and names, `NAMED AND NOTHING MORE`: no mechanism goes in it,
+that day's releases **rated high**, and a line from abroad only where the story
+runs through it; a day with none says so in a line. The rest are hers to watch,
+and one that surprises goes into the next morning's story rather than onto the
+list — his instruction of 13 October, after seven lines for the one release that
+mattered. `calendarList` puts the rating on every line, since the slot lists by
+it, and `CRITIC` takes a lower-rated line off the list, since it runs last. The
+list holds times and names, `NAMED AND NOTHING MORE`: no mechanism goes in it,
 because that slot is where a second chain hides.
 
 **On Sunday the briefing is about the week it opens** (`weekBlock`). It files the
@@ -1308,7 +1321,7 @@ and the teaching block walks the release most likely to move it. **The week is
 told, not listed**: there is no calendar slot on Sunday. The release that carries
 the week is named with its day, and the rest is a sentence or two on which force
 the week tests and what it could change; the calendar is on his own screen, and
-each weekday morning lists that day's releases with their times. `CRITIC` holds
+each weekday morning lists that day's high-rated releases with their times. `CRITIC` holds
 the same rule, since it runs last.
 
 **Length is a rule, and what makes it safe is what sits beside it.** A ceiling
@@ -1448,7 +1461,9 @@ fifteen minutes of printing for the dashboard card and the trade event's warning
 between briefings. It is a second job rather than a faster one, because the
 hourly predicates all test `hour ===` and a `*/15` job would run four briefings.
 Every filing is an `eugenia_runs` row under `calendar`, failed or not, since a
-calendar that stopped moving looks like a quiet week.
+calendar that stopped moving looks like a quiet week. After it files, the same
+job reads the market around gold and the Fed's odds ahead into `eugenia_market`
+(see *The market and the Fed's odds are read ahead*).
 
 **One release is one row, whatever it is called**, because the key is
 TradingView's id and nothing she can call creates a row. Keyed on a name the
@@ -1934,7 +1949,7 @@ stated and never by price. A call is the one thing of hers price judges.
 
 ### What she remembers
 
-Eleven tables, separated by how long a thing is true for. A turn rolls over inside
+Twelve tables, separated by how long a thing is true for. A turn rolls over inside
 a morning; a note about him outlives twenty of those; what he UNDERSTANDS
 outlives both; a thesis and a portrait are only ever current, so each is one row
 rewritten, and what each said before is kept beside it; a loop stays until it
@@ -1950,6 +1965,7 @@ closes; and the calendar and her record are the datasets here that compound.
 | `eugenia_reads` | every read she gave, with a verdict on the test she stated | the last 30 days | her `record_read` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
 | `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar` |
+| `eugenia_market` | the market around gold and the Fed's odds, read ahead | 1 row per door, rewritten | the quarter-hourly job, `storeMarket` and `storeRates` |
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
 | `eugenia_rewrites` | what the thesis and the portrait said before each rewrite | never handed to her | a trigger on both, `eugenia_keep_rewrite` |
 | `eugenia_calls` | every call she made, and how price scored it | the last 30 days | her `make_call` tool; scored by the nightly pass |
@@ -2360,16 +2376,35 @@ means, so a dead feed now costs 45 seconds and that sentence. **A timeout names
 its door** — *TradingView calendar: no answer in 45s* — since the abort's own
 message names nothing, and the meter rows are where an outage is read afterwards.
 
-**The two doors that read one chart at a time answer by `DOOR_MS`, 35 seconds.**
-`?market=1` makes fourteen calls and `?rates=1` six, one after another, and on
-12 October, with the news door's two taking 25 seconds, both outran her 45 and
-a briefing and a reply lost each block whole, the symbols that had answered
-with it. Now one deadline covers each door's calls: the call in flight is
-aborted, every one after it is named in `missing` as *not reached in 35s*, and
-the door answers with what it has. `MARKET` and the contract months run
-most-needed first, so a slow morning keeps the dollar, the yields and the
-nearest meeting. They stay one at a time, since TradingView refuses a burst and
-a deadline already bounds the wait.
+**The market and the Fed's odds are read ahead, and she reads the copy.**
+`?market=1` makes fourteen chart calls and `?rates=1` six. Read while a briefing
+waited, they were paid for out of its clock: on 12 October, with the news
+door's two calls taking 25 seconds, both outran her 45 and the briefing lost
+each block whole, and on 13 and 14 October, at five or six seconds a chart,
+it kept six lines of fourteen. Now the quarter-hourly job reads both after it
+files the calendar (`storeMarket`, `storeRates`) and keeps the answers in
+`eugenia_market`, one row per door; `aroundBlock` and `ratesBlock` read that
+row, so a briefing or a reply never waits on TradingView for them. A copy is a
+quarter hour old at most, of hourly and daily bars. **A symbol a pass misses
+keeps the line the last pass read** (`keptMarket`), with that pass's bar times
+on it, so one slow call leaves no gap; one never read is still named. The odds
+are replaced whole once a pass prices a meeting, since a fold does not merge,
+and **odds read more than two hours ago are not handed to her** (`ODDS_HOURS`):
+each market line carries its own times, but the odds carry only when they were
+read, and a door that kept refusing would leave its last answer standing. A
+pass that fails leaves the copy as it was. Only the job writes the table, a
+quarter hour apart, so the market's read-then-write has no second writer.
+
+**Each door reads three charts at a time, inside `DOOR_MS`, 35 seconds.** One by
+one, fourteen did not fit at a slow morning's pace; all at once is the burst
+TradingView refuses. `inLanes` keeps three in flight, each call catching its
+own failure, so one refusal never takes the rest (under a bare `Promise.all`,
+one 504 once took all six of the poller's `?bars=raw` reads), and writes into
+the item's own slot, so the answer keeps `MARKET`'s order, most-needed first.
+Each request carries its own JSON-RPC id, since three share a session. At the
+deadline the calls in flight are aborted, every one not reached is named in
+`missing` as *not reached in 35s*, and the door answers with what it has —
+inside the 45 seconds the job gives it.
 
 **A failed briefing tries again** at 09:00, 10:00 and 11:00 ET — and on a Sunday
 at 18:00, 19:00 and 20:00, the three hours after its own open, two clear of the
@@ -2431,13 +2466,14 @@ it: a quiet day is a branch, and an early return is how both meters once skipped
 every night nobody spoke. The census stays after the pass, the only thing that
 can move a rung.
 
-**A market read she went without is a row**, `caller: 'market read'`, `ok:
-false`, the read and the reason in `detail`: the broker's price, the market
-around gold, the rate odds, the headlines, the speculators' count and COMEX
-volume, whole or — for the two doors that name a `missing` list — in part. The
-briefing or the reply still goes out and its own row reads ok, so on 12 October
-the Edge log was the only place a briefing written without the dollar and the
-Fed showed. Failures only: a row for every read that answered would be several
+**A market read that came back short is a row**, `caller: 'market read'`, `ok:
+false`, the read and the reason in `detail`: the broker's price, the headlines,
+the speculators' count and COMEX volume as a briefing or a reply reads them;
+the market around gold and the rate odds as the job reads them ahead, whole or
+— those two doors name a `missing` list — in part; and a copy a block could not
+hand her, not yet read or odds too old. The briefing or the reply still goes
+out and its own row reads ok, so on 12 October the Edge log was the only place
+a briefing written without the dollar and the Fed showed. Failures only: a row for every read that answered would be several
 a briefing saying nothing. The calendar's reads are left to `filed()` and
 `filedWeek()`, which already write both outcomes.
 
@@ -2795,7 +2831,8 @@ spare; the same firmware goes on any.
 `.github/workflows/charm.yml` in Espressif's ESP-IDF v5.5.4 image (pinned by
 digest) whenever `charm/` changes. The board's support package
 (`waveshare/esp32_s3_touch_amoled_1_75c`) and LVGL 9.5 come from Espressif's
-component registry, at the versions Waveshare's own examples for this board use.
+component registry, at the versions Waveshare's own examples for this board use,
+with Espressif's audio codecs for the Opus a recording is encoded in.
 The download is **`charm-full.bin`**, one image written at `0x0`: plug the
 board in by USB-C and flash it from Chrome with Espressif's web flasher, or with
 `esptool.py write_flash 0x0 charm-full.bin`. Not `charm.bin`, which is
@@ -2823,8 +2860,9 @@ from the render: blinks, glances, the mouth following the loudness of what
 plays; thinking, she looks up and away from one side to the other under three
 thought dots; when something goes wrong, her eyes go uneven and her smile turns
 down; going to sleep, her eyes close slowly. Only the face's own patch is
-redrawn on a frame; the ring — Doji's purples turning slowly round the rim — is
-the only thing that redraws the full screen, and only while it shows. **Nothing
+redrawn on a frame; the rings round the rim — Doji's purples turning slowly while
+she listens, and the one emptying while PWR is held — are the only things that
+redraw the full screen, and only while they show. **Nothing
 flashes between screens**: whatever comes up first is the only thing seen, so
 no face shows for a moment before the journal's questions or after them. Her
 state — a low battery, no internet — is never an expression on her face; it is
@@ -2837,7 +2875,7 @@ panel while the chip sleeps. Low on the screen, **one mark for what waits**:
 a purple dot with a glow while a briefing does, a white ring while a trade
 does, and the dot inside the ring when both do — one place and one size each,
 so nothing moves or shrinks when the other arrives, and shape tells them apart
-at a glance. At the top, a small battery when she is below 15% and off the
+at a glance. At the top, a small battery when she is at 15% or below and off the
 cable, and the **no-internet mark** when her last look for a network found
 none, side by side when both. On the cable, the charge as a ring round the rim
 with its percent. The marks wander a few pixels each time she sleeps, so a mark
@@ -3199,7 +3237,7 @@ job name, so a re-run makes the jobs match the file. Six jobs —
 |---|---|---|
 | `doji-mcp-sync` | `*/2 * * * *` | the poller |
 | `doji-eugenia` | `0 * * * *` | the briefing and the nightly pass — the function decides which, or neither |
-| `doji-eugenia-calendar` | `5,20,35,50 * * * *` | the calendar's filing |
+| `doji-eugenia-calendar` | `5,20,35,50 * * * *` | the calendar's filing, then the market and the Fed's odds read ahead |
 | `doji-dispatch-watch` | `*/10 * * * *` | `dispatch_watch`'s sweep |
 | `doji-pace-watch` | `37 * * * *` | `pace_watch`'s one-a-day warning |
 | `purge-cron-history` | `0 3 * * *` | trims `cron.job_run_details` |
@@ -3325,7 +3363,7 @@ home-screen shortcut and every bookmark open `/`.
 | `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load, save and soft delete, the scratch rule and aggregates, the money split and averages, the week boundary, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the snapshot, the offline boot, and the watch card |
 | `test/golden.test.mjs` | the snapshot: the real page on fixed fixtures and a frozen clock, every derived value and every panel's markup compared against `test/golden.json`, plus `Dates.session` swept across the four DST changeovers; and `test/golden-fold.json`, everything the folds return off the real captures — the rows the poller writes through its two windows, the email parsed and bounded, the calendar folded, and Eugenia's rule verdicts, day standings and stats over that week, with what she is told about each. Regenerate with `GOLDEN=write npm test`, deliberately, in the commit that changes behaviour — never to make a red run go away |
 | `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the charm driven end to end through the real turn — the reply read as the charm reads its frames, silence first, the recording transcribed as the Ogg it is, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, its headers in her turn and the volume she set sent ahead of her voice and nowhere else, the battery line spoken after her answer and neither copied nor stored, a wordless recording answered on the charm alone, and the door refusing a missing vendor, an empty recording and a wrong key; and the briefing on the charm, her ready line then today's briefing read as `pcm` in frames, the right day's briefing asked for, a `204` while none is stored; and Gladys's charm told what waits oldest first and a week back, its answer writing exactly one of the four columns, an edit, a stray column and a malformed body refused, and the door shut without its secret |
-| `test/charm.test.mjs` | the charm's pure C — `charm/main/briefing.c`, `charm/main/lift.c`, `charm/main/dns.c`, `charm/main/ogg.c` and `charm/main/frames.c` — compiled on the machine running the suite and driven in the zone the charm reads its clock in, out of `charm/main/net.c`: the briefing watch against `briefDue` and `retryDue` every five minutes of both weeks the clocks change in, an announced briefing not asked for again until the next day, never before the clock is set, a lift judged on readings, held and put down told apart, the setup's answer to a name, with and without the EDNS record a phone may add, a recording's Ogg file page by page against the specification's CRC, and her answer read out of `charmFrame`'s own bytes however the reads fall |
+| `test/charm.test.mjs` | the charm's pure C — `charm/main/briefing.c`, `charm/main/lift.c`, `charm/main/dns.c`, `charm/main/ogg.c` and `charm/main/frames.c` — compiled on the machine running the suite and driven in the zone the charm reads its clock in, out of `charm/main/net.c`: the briefing watch against `briefDue` and `retryDue` every five minutes of both weeks the clocks change in, an announced briefing not asked for again until the next day, never before the clock is set, a lift judged on readings, held and put down told apart, the setup's answer to a name, with and without the EDNS record a phone may add, a recording's Ogg file page by page against the specification's CRC, and her answer read out of `charmFrame`'s own bytes however the reads fall; and the firmware's names, the other of the two scope questions in C — every static, macro and enum constant a file declares used in it, every function a header declares called from another file, every non-static function in a header — since the ESP-IDF build refuses a name declared nowhere and only warns of one used nowhere |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions and the app as two programs — with one planted defect per question proving the check can fail |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, and `syncPepperstone`'s three outcomes |
@@ -3341,7 +3379,10 @@ the upserts, the Telegram sends, the model call — is tested for what it decide
 and through the doors `serve.test.mjs` drives, for what it sends; where a
 decision lives deeper than a test can reach, `agree.test.mjs` reads its source.
 Gmail itself, behind the Apps Script stubs. What Supabase's own `pg_net`,
-`pg_cron` and Vault do, behind `test/db`'s stand-ins.
+`pg_cron` and Vault do, behind `test/db`'s stand-ins. The charm's firmware beyond its
+pure C: the charm workflow's build compiles the rest, and only the board shows
+what it does — **To check on the real board first** in **The charms** is that
+list.
 
 **Both broker paths are anchored to what the broker sent, and the anchors
 overlap.** `fixtures/ctrader-get-deals.txt` is a real `?raw=1` capture and

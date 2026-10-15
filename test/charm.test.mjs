@@ -250,3 +250,85 @@ test('the charm plays what the server frames, however its reads fall', () => {
       `read ${sizes[i]} bytes at a time, the charm played something other than her voice at her volume`);
   }
 });
+
+/* ─── The firmware's names, the two scope questions in C ──────────────────
+   The ESP-IDF build already refuses the first, a name used and declared
+   nowhere: an undeclared function is an error under its -Werror=all, an
+   undeclared variable under any flags. It does not refuse the second. An
+   unused static is only a warning there, and nothing at all is said of a
+   header export no other file calls, a macro left from a design that went,
+   or a function left out of its header. So the firmware's own files are
+   read here, comments and strings stripped, and every name each declares
+   is asked for a use:
+
+     · in a .c, every static function and variable, macro and enum constant
+       is used again in that file;
+     · in a .h, every function is called from a .c other than its own — or
+       it belongs in its file as a static — and every other name is used by
+       some .c;
+     · every function a .c defines without `static` is one a header declares.
+
+   The fonts are lv_font_conv's output and are left out, found by the
+   options line it writes. app_main is ESP-IDF's to call. */
+const FIRMWARE = execFileSync('git', ['ls-files', MAIN], { encoding: 'utf8' }).split('\n')
+  .filter(f => /\.[ch]$/.test(f) && !/\* Opts: --font /.test(readFileSync(f, 'utf8')));
+
+// Comments to blank lines, strings and characters to empty ones, in one pass,
+// so a "/*" inside a string opens nothing.
+const bare = (text) => text.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'/g,
+  (m) => m[0] === '"' ? '""' : m[0] === "'" ? "''" : m.replace(/[^\n]/g, ' '));
+
+const uses = (text, name) => (text.match(new RegExp(`\\b${name}\\b`, 'g')) ?? []).length;
+
+// What a file declares at its top level, by kind.
+function declares(text) {
+  const enums = [...text.matchAll(/\benum\s*\{([^}]*)\}/g)].flatMap(m => m[1].match(/\b[A-Z]\w*\b/g) ?? []);
+  const types = [...text.matchAll(/^typedef\s+(?:struct|enum)\s*\{[^}]*\}\s*(\w+)\s*;/gm)].map(m => m[1]);
+  const flat = text.replace(/\b(?:struct|enum)\s*\{[^}]*\}/g, 'T').replace(/\basm\(""\)/g, '');
+  const functions = [...flat.matchAll(/^(static\s+)?(?:\w+\s+)*?\w+[\s*]+(\w+)\([^;{]*\)\s*([;{])/gm)]
+    .map(m => ({ name: m[2], static: Boolean(m[1]), defined: m[3] === '{' }));
+  const variables = [...flat.matchAll(/^(?:(static|extern)\s+[^;{=(]*|\w+\s+\w+)(?=\s*[;=])/gm)]
+    .flatMap(m => m[0].split(',').map(part => part.replace(/\[[^\]]*\]/g, '').match(/(\w+)\s*$/)?.[1]))
+    .filter(Boolean);
+  const macros = [...text.matchAll(/^#define\s+(\w+)/gm)].map(m => m[1]);
+  return { functions, variables, macros, enums, types };
+}
+
+// Each name the firmware declares and never uses as asked above, as a sentence.
+function unused(files) {
+  const found = [];
+  const c = Object.keys(files).filter(f => f.endsWith('.c'));
+  for (const [file, text] of Object.entries(files)) {
+    const d = declares(text);
+    if (file.endsWith('.c')) {
+      const local = [...d.functions.filter(f => f.static).map(f => f.name), ...d.variables,
+                     ...d.macros, ...d.enums];
+      for (const name of local) if (uses(text, name) < 2) found.push(`${file}: ${name} is declared and never used`);
+      for (const { name, static: s, defined } of d.functions) {
+        if (s || !defined || name === 'app_main') continue;
+        if (!Object.keys(files).some(h => h.endsWith('.h') && uses(files[h], name)))
+          found.push(`${file}: ${name} is not static and no header declares it`);
+      }
+    } else {
+      const own = file.replace(/\.h$/, '.c');
+      for (const { name } of d.functions) {
+        if (!c.some(f => f !== own && uses(files[f], name)))
+          found.push(`${file}: ${name} is called by no file but its own — it belongs there, static`);
+      }
+      for (const name of [...d.macros, ...d.enums, ...d.types, ...d.variables]) {
+        if (!c.some(f => uses(files[f], name))) found.push(`${file}: ${name} is used by no file`);
+      }
+    }
+  }
+  return found;
+}
+
+test('every name the firmware declares is one it uses, and a header exports only what another file calls', () => {
+  const files = Object.fromEntries(FIRMWARE.map(f => [f.slice(MAIN.length + 1), bare(readFileSync(f, 'utf8'))]));
+  assert.ok(Object.keys(files).length >= 30, `only ${Object.keys(files).length} firmware files read — the reader has gone blind`);
+  const counted = Object.values(files).map(declares);
+  for (const kind of ['functions', 'variables', 'macros', 'enums', 'types']) {
+    assert.ok(counted.reduce((n, d) => n + d[kind].length, 0) >= 10, `fewer than ten ${kind} found — the reader has gone blind`);
+  }
+  assert.deepEqual(unused(files), []);
+});

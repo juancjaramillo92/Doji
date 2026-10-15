@@ -126,7 +126,7 @@ static void close_eyes(void) {
 static void sleep_now(void) {
     int charge = power_charge();
     bool low = power_low();
-    int marks = briefing_waits | trade_waits << 1 | low << 2 | offline << 3 | (charge + 1) << 4;
+    int marks = face_marks(briefing_waits, trade_waits, low, offline, charge);
     close_eyes();
     if (lit || marks != drawn) {
         light(FACE_DARK);
@@ -153,7 +153,6 @@ static void errand(void) {
     net_start();
     offline = !net_wait(NET_ALL_MS);
     if (!offline) {
-        ota_confirm();
         bool tick = trade_came(), ask = briefing_due(time(NULL));
         if (tick || ask) {
             sound_start();

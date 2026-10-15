@@ -37,7 +37,6 @@ static const face_geometry_t F = {
 #define BLINK_EVERY_MS  4000
 #define LOOK_RANGE      6.0f
 #define BLUSH           0.55f
-#define FRAME_MS        33
 #define SHIFT_X         8     // how far the sleep screen's marks wander, so none burns in
 #define SHIFT_Y         4
 
@@ -77,6 +76,10 @@ void face_set_level(float l) { level = l < 0 ? 0 : l > 1 ? 1 : l; }
 void face_set_hold(float h) { hold = h < 0 ? 0 : h > 1 ? 1 : h; }
 void face_set_marks(bool b, bool t, bool l, bool o, int c) {
     briefing_waits = b; trade_waits = t; low = l; offline = o; charge = c;
+}
+
+int face_marks(bool b, bool t, bool l, bool o, int c) {
+    return b | t << 1 | l << 2 | o << 3 | (c + 1) << 4;
 }
 
 static float rnd(void) { return (float)esp_random() / 4294967295.0f; }
@@ -257,7 +260,7 @@ static void draw_face(lv_event_t *e) {
     }
 
     // The ring on the rim, while listening, follows his voice.
-    if (V.ring > 0.02f) face_ring(layer, 231, 4 + (int32_t)(7 * V.ring), 1, lv_tick_get() / 1800.0f, 0.35f + 0.65f * V.ring);
+    if (V.ring > 0.02f) face_ring(layer, 231, 4 + (int32_t)(7 * V.ring), 1, lv_tick_get() / (float)FACE_RING_TURN_MS, 0.35f + 0.65f * V.ring);
     if (hold > 0) draw_hold(layer);
 }
 
@@ -352,7 +355,7 @@ static void tick(lv_timer_t *t) {
     if (dark) {
         // Redrawn only when a mark changes: the panel holds the rest.
         static int drawn = -1;
-        int marks = briefing_waits | trade_waits << 1 | low << 2 | offline << 3 | (charge + 1) << 4;
+        int marks = face_marks(briefing_waits, trade_waits, low, offline, charge);
         if (marks != drawn) lv_obj_invalidate(night);
         drawn = marks;
         return;
@@ -445,5 +448,5 @@ void face_start(void) {
     uint32_t now = lv_tick_get();
     next_blink = now + 400;
     next_glance = now + 1500;
-    lv_timer_create(tick, FRAME_MS, NULL);
+    lv_timer_create(tick, FACE_FRAME_MS, NULL);
 }

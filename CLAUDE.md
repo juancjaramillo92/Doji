@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 735 tests, eight suites
+npm test      # 742 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -354,6 +354,11 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   `tradingview-abroad.json`, and `CALENDAR_COUNTRIES` asks for nothing else.
   Every rated read filters on `HOME` but the Sunday week — `agree.test.mjs`
   finds them rather than listing them.
+- **The market and the Fed's odds are read ahead** by the quarter-hourly job
+  into `eugenia_market`, and the blocks read the copy: nothing that runs on a
+  writer's clock reads those two doors. One writer, so the market's
+  read-then-write cannot race; `agree.test.mjs` holds it and the census of
+  market reads.
 - **`CAL_BACK`/`CAL_AHEAD` carry the 08:00 briefing past tomorrow's 10:00**, read
   and write alike; `fold.test.mjs` derives the reach from the source.
 - **The trade event** decides from data before any model call, returns first for
@@ -385,8 +390,8 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   idle timeout behind the 400s paid wall clock. `?embed=1` is the derived
   exception. The body names the job.
 - **`eugenia_runs` is where the meters survive.** Every `recordRun` key is a column
-  and every column is written; both outcomes, always — but `unread`, whose
-  success is the row of the briefing or reply it fed. `postConsolidation` has
+  and every column is written; both outcomes, always — but `unread`, failures
+  only, whose success is the row of the run it fed. `postConsolidation` has
   exactly one `return`, and the census stays after the pass. `postScheduled`'s
   catch writes its row before the apology. `caller` is free text.
 - **`gate` is one function.** Every outcome records a verdict row before it
@@ -444,6 +449,58 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   quietly as an attachment.
 
 ---
+
+## The charm
+
+The firmware in `charm/` is C on ESP-IDF, built by the charm workflow in a
+pinned image; the README's *The charms* says what it does. Three levels of
+proof, and a change says which it rests on:
+
+- **Pure, and driven in `npm test`.** `briefing.c`, `lift.c`, `dns.c`,
+  `ogg.c` and `frames.c` include no ESP-IDF, so `charm.test.mjs` compiles
+  them with the host's `cc -Wall -Werror`, `RTC_DATA_ATTR` stubbed to
+  nothing, and drives them against the server's own functions and bytes. A decision that can be pure goes in one of these, or a
+  new one added to that compile, so a test can drive it; one that cannot is
+  read by `agree.test.mjs`, as `awake()` and `journal_ask()` are.
+- **Compiled only by the workflow.** Everything else. The build refuses a
+  name declared nowhere; `charm.test.mjs`'s census refuses one used nowhere,
+  in a file or across a header. A refactor here is only an edit equivalent by
+  reading, and the workflow's green build is its proof. Nothing runs ESP-IDF
+  locally; push and read the build.
+- **Only the board.** Pixels, sound, touch, sleep current, the power chip's and
+  the motion sensor's registers, the lift readings, a rollback, the battery.
+  The README's *To check on the real board first* is that list, and only he
+  takes a line off it.
+
+What a change most often breaks:
+
+- **A sample, a frame or a byte changed is a behaviour change**, its own
+  commit — R-33 is the tick that looks foldable and is not.
+- **Only `RTC_DATA_ATTR` survives sleep**; every waking runs `app_main` again.
+  State that must outlive a sleep is declared so, and nothing else is assumed
+  to.
+- **Nothing flashes.** What shows first is decided before `light()`, and the
+  journal leaves on the dark: `FACE_DARK` goes up before the questions come
+  down.
+- **PWR is a notification to her task**; a question only looks at it
+  (`ulTaskNotifyValueClear`) and leaves it to be taken. `agree.test.mjs` reads
+  both.
+- **LVGL is touched from her task under `bsp_display_lock`**, or from inside
+  LVGL's own callbacks — the touch, the dial, the face's timer. The power task
+  reaches the screen only through the `face_set_*` setters, which write plain
+  volatiles the face's timer reads on its next frame.
+- **Every copy of a server fact is in the Facts list** — the frames, the
+  headers, the briefing's hours and words, the wait, the recording room, the
+  update's path, the doors in `net.h`. A new one goes in the list and in
+  `agree.test.mjs` in the same commit.
+- **A word drawn is a word the font holds.** A new word means `tools/fonts.sh`
+  run again; a new file that draws must be added to the font test, which
+  finds it.
+- **A wall-clock decision waits for `CLOCK_SET`**: before the internet sets it
+  the clock reads 1970.
+- **Flash `charm-full.bin`, never `charm.bin`** — the workflow checks the image
+  holds the app at the first slot's offset, and `agree.test.mjs` holds that
+  offset to `partitions.csv`.
 
 ## The journal and her memory are backed up from outside the browser
 
