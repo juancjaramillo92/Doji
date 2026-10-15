@@ -93,7 +93,7 @@ scripts/health.mjs                      whether anything is running, asked from 
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
-.github/workflows/backup.yml            the daily copy of the nine tables nothing else holds
+.github/workflows/backup.yml            the daily copy of the tables nothing else holds
 .github/workflows/health.yml            the hourly outside check; a failed run is the alarm
 .github/workflows/charm.yml             builds the charm firmware, kept as a download
 .github/dependabot.yml                  monthly update PRs, both ecosystems
@@ -495,10 +495,11 @@ add-on.
 
 **A copy of what exists nowhere else is taken daily, outside Supabase.**
 `scripts/backup.mjs`, run every night by `.github/workflows/backup.yml`, reads
-eleven tables into one JSON artifact: `trades`, whose journal columns only
-you can supply, and the ten of hers with no other source — the channel map,
-notes, turns, thesis, portrait, her record, open loops, calendar, feedback, and
-every stop and target a position carried. `trades` goes whole, the soft-deleted
+thirteen tables into one JSON artifact: `trades`, whose journal columns only
+you can supply, and the twelve of hers with no other source — the channel map,
+notes, turns, thesis, portrait, her record, open loops, calendar, feedback,
+every stop and target a position carried, her calls, and what the thesis and
+the portrait said before each rewrite. `trades` goes whole, the soft-deleted
 rows included: a restore without them lets the poller rebuild every trade you
 removed. `eugenia_runs` is left out: the largest table, and facts about model
 calls rather than about you.
