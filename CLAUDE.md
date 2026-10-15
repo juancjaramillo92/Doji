@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 743 tests, eight suites
+npm test      # 742 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -361,9 +361,10 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   market reads.
 - **`CAL_BACK`/`CAL_AHEAD` carry the 08:00 briefing past tomorrow's 10:00**, read
   and write alike; `fold.test.mjs` derives the reach from the source.
-- **The trade event** decides from data before any model call, returns first for
-  a trade not filed today, and says nothing on an "opened" event for a closed
-  row. The close trigger uses `is distinct from` and a transition guard.
+- **The trade event is a close alone** — an open does not call her, and an
+  "opened" event returns before any read. It decides from data before any model
+  call and returns first for a trade not filed today. The close trigger uses
+  `is distinct from` and a transition guard.
 
 ### Checking his rules
 
@@ -403,7 +404,7 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   sibling arriving beside its subject.** The declarations live in
   `agree.test.mjs`, the one file the symbol check cannot read.
 - **The trade event is exempt from `TRIM`**: it rewrites, and a paraphrased rule
-  citation reaching a man in a position is how a sentence becomes an order.
+  citation reaching him at the day's limit is how a sentence becomes an order.
 - **`APOLOGY` is a word per job**, and a failure reaches him, not the console.
 
 ### The model call

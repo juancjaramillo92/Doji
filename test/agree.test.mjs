@@ -700,7 +700,7 @@ test('verify.sql expects exactly the triggers schema.sql creates on trades', () 
   const sql = source('supabase/verify.sql');
 
   const expected = sql.match(
-    /\('exactly the five triggers on trades'[\s\S]*?\),\s*\n((?:\s*'[^']*'(?:\s*\|\|)?\s*\n?)+)\),/);
+    /\('exactly the four triggers on trades'[\s\S]*?\),\s*\n((?:\s*'[^']*'(?:\s*\|\|)?\s*\n?)+)\),/);
   assert.ok(expected, 'verify.sql no longer states the trigger list — the reader has gone blind');
   const named = expected[1].match(/'([^']*)'/g).join('').replace(/'/g, '')
     .split(',').map(t => t.trim()).filter(Boolean).sort();
@@ -2679,7 +2679,7 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
 
   /* AND THE CONVERSATION WINDOW, ON EVERYTHING THAT SPEAKS: without it she says
      again what she said, and a repetition reads as emphasis. Hardest on the
-     trade look, whose R-14/R-19 line fires on the print the briefing most likely
+     trade look, whose R-19/R-20 line fires on the print the briefing most likely
      named. postConsolidation reads its own fixed twenty-four hours. */
   for (const fn of SENDS) {
     assert.ok(reaches(reads(fn), 'recent'),
@@ -3160,8 +3160,6 @@ test('the importance a release may carry is the one the table accepts', () => {
   const declared = checkValues(SENSES_SQL, 'eugenia_calendar_importance_check');
   assert.ok(declared, 'schema.sql no longer constrains eugenia_calendar.importance');
 
-  const src = source('supabase/functions/doji-eugenia/index.ts');
-
   /* TRADINGVIEW'S THREE LEVELS MAP ONTO THE SAME THREE; one the table refuses is
      a 400 on every filing it touches. */
   const tv = source('supabase/functions/doji-tradingview/index.ts');
@@ -3170,16 +3168,9 @@ test('the importance a release may carry is the one the table accepts', () => {
   assert.deepEqual([...mapped[1].matchAll(/"([a-z]+)"/g)].map(m => m[1]).sort(), declared,
     "TradingView's importance maps to one the table refuses, or one is unreachable");
 
-  /* AND THE ONE HIS RULES COUNT IS ONE OF THEM: a rename leaves the trade
-     event's warning matching nothing, with no error anywhere. */
-  assert.ok(declared.includes('high'), 'nothing is filed as high, so no print ever warns him');
-
-  /* READ OUT OF aheadToday ITSELF: other reads filter on the same value, so a
-     whole-file match stays green with the warning's own filter deleted. */
-  const ahead = bodyOf(src, 'async function aheadToday(', 'doji-eugenia no longer has aheadToday()');
-  assert.match(ahead, /importance=eq\.high/,
-    'the trade event no longer filters what is ahead on importance, so every ' +
-    'medium entry of the day would warn him');
+  /* AND THE ONE HIS RULES COUNT IS ONE OF THEM: a rename leaves R-19's read
+     matching nothing, with no error anywhere. */
+  assert.ok(declared.includes('high'), 'nothing is filed as high, so R-19 never sees a print');
 });
 
 /* ─── The calendar reaches abroad; his rules do not ──────────────────────────
@@ -3187,7 +3178,7 @@ test('the importance a release may carry is the one the table accepts', () => {
    which of theirs are filed, so the two lists are one fact in two files: an
    economy asked for and never kept is paid for on every filing, and one kept
    and never asked for is a selection that can never fire. And everything that
-   acts on a release — R-14 and R-19, the trade warning — counts the US alone,
+   acts on a release — R-19 — counts the US alone,
    while only the Sunday week and the rolling list carry what is filed from
    abroad.
    ─────────────────────────────────────────────────────────────────────────── */
@@ -3218,7 +3209,7 @@ test('only US releases are counted or warned of', () => {
       .map(d => EUGENIA_TS.lastIndexOf(d, m.index))) + 1;
     return EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('(', at) + 1);
   });
-  assert.ok(reads.length >= 3, `only ${reads.length} rated reads found — the reader has gone blind`);
+  assert.ok(reads.length >= 2, `only ${reads.length} rated reads found — the reader has gone blind`);
   for (const decl of reads) {
     const body = bodyOf(EUGENIA_TS, decl);
     if (LISTS.includes(decl)) {
@@ -3226,7 +3217,7 @@ test('only US releases are counted or warned of', () => {
       continue;
     }
     assert.ok(body.includes('country=eq.${HOME}'),
-      `${decl} reads releases from abroad as his, so a print in Tokyo stands him aside`);
+      `${decl} reads releases from abroad as his, so a print in Tokyo is one of his`);
   }
   for (const decl of LISTS) assert.ok(reads.includes(decl), `${decl} is declared a list and reads no rating`);
 
@@ -4044,7 +4035,7 @@ const BY_HAND = {
                'this runs the nightly pass out of that schedule, which is how a ' +
                'missed night is made up without waiting for the next one',
   history:     'the weeks he has already traded, walked once from the date ' +
-               'given so R-14 and R-19 can judge them — the nightly pass only ' +
+               'given so R-19 can judge them — the nightly pass only ' +
                'ever files the week it runs in',
   review:      'the Saturday review out of its hour — it has no retry, so a ' +
                'failed one is made up by hand rather than a week late',
@@ -4764,15 +4755,14 @@ test('the trades trigger fires on the transition, not on every poll', () => {
     'the close trigger compares fill_time with <>, which is NULL against an open ' +
     'position and therefore never fires');
 
-  /* AND THE POLLER MUST NOT RE-FIRE IT: the two-minute re-upsert without a
-     transition guard is a model call every two minutes. */
-  const opened = SENSES_SQL.match(/create or replace trigger trades_eugenia_opened[\s\S]*?execute function/);
-  assert.ok(opened, 'schema.sql no longer creates trades_eugenia_opened');
-  assert.match(opened[0], /after insert/);
-  for (const t of [opened[0], closed[0]]) {
-    assert.match(t, /new\.id like 'PID%'/, 'the trigger fires on pre-sync rows too');
-    assert.match(t, /new\.deleted = false/, 'the trigger fires on soft-deleted rows');
-  }
+  assert.match(closed[0], /new\.id like 'PID%'/, 'the trigger fires on pre-sync rows too');
+  assert.match(closed[0], /new\.deleted = false/, 'the trigger fires on soft-deleted rows');
+
+  /* AND A TRADE OPENING DOES NOT CALL HER: a print pending beside an open is
+     R-20's, his to weigh, and a message on every open was the noise he asked
+     to be rid of. */
+  assert.ok(!/after insert on public\.trades[\s\S]{0,200}?trades_eugenia_on_event/.test(SENSES_SQL),
+    'a trade opening calls her again — every open becomes a message about a print');
 });
 
 test('the trigger reads the cron secret under the spelling Vault holds', () => {
@@ -5276,25 +5266,23 @@ test('every column the poller writes once is filtered inside the UPDATE', () => 
 });
 
 test('the trade look speaks only about the day it is happening on', () => {
-  /* BOTH THINGS THIS PATH MAY SAY ARE ABOUT TODAY. The trigger fires on a
-     transition, not a clock, so anything stamping an old close fires it for an
-     old day — a backfill would report August's losses in the present tense.
-     Guarded BEFORE either branch, being a property of the event; after them it
-     would be two guards, with the second to be forgotten. */
+  /* WHAT THIS PATH SAYS IS ABOUT TODAY. The trigger fires on a transition, not
+     a clock, so anything stamping an old close fires it for an old day — a
+     backfill would report August's losses in the present tense. Guarded BEFORE
+     the day is read, so an old close costs nothing. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
 
   const body = bodyOf(src, 'async function postTradeEvent(', 'doji-eugenia no longer has postTradeEvent()');
 
-  assert.match(body, /row\.open_day !== nyDate\(new Date\(\)\)/,
+  assert.match(body, /\bday !== nyDate\(new Date\(\)\)/,
     'the trade look no longer checks the trade is today, so any late stamp — a ' +
     'forced repair, an email arriving days later — reports a finished day in ' +
     'the present tense as though he could still act on it');
 
-  const guard = body.indexOf('row.open_day !== nyDate');
-  assert.ok(guard > -1 && guard < body.indexOf("event === 'opened'"),
-    'the day guard sits inside or after the branches rather than before them — ' +
-    'one of the two paths is then unguarded, and it is whichever one nobody ' +
-    'thought about second');
+  const guard = body.indexOf('day !== nyDate');
+  assert.ok(guard > -1 && guard < body.indexOf('dayStanding('),
+    'the day guard sits after the day is read — an old close pays for a read ' +
+    'of a day that is already over');
 });
 
 test('the close instant is written only where the deals say it closed', () => {
@@ -5415,13 +5403,13 @@ test('the poller fills best_price once, newest first, and counts what it wrote',
 });
 
 test("the nightly pass files the week, meters both outcomes, and check_rules reads it", () => {
-  /* fileWeek and r14 are driven in fold.test.mjs; a pass that stopped filing
-     leaves R-14 unknown on every trade with nothing erroring. The call sites,
+  /* fileWeek and r19 are driven in fold.test.mjs; a pass that stopped filing
+     leaves R-19 unknown on every trade with nothing erroring. The call sites,
      both meters and the calendar handed to the rules are read. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const pass = bodyOf(src, 'async function postConsolidation(');
   assert.match(pass, /await filedWeek\(weekOf\(new Date\(\)\)\)/,
-    'the nightly pass no longer files the week R-14 is judged against');
+    'the nightly pass no longer files the week R-19 is judged against');
   const week = bodyOf(src, 'async function filedWeek(');
   assert.match(week, /caller: 'calendar week', ok: true/, 'the week filing records no success');
   assert.match(week, /caller: 'calendar week', ok: false/, 'the week filing records no failure');
@@ -5431,7 +5419,7 @@ test("the nightly pass files the week, meters both outcomes, and check_rules rea
   assert.match(body, /releasesQuery\(days\)/, 'check_rules no longer reads the releases');
   assert.match(body, /weeksQuery\(days\)/, 'check_rules no longer reads which weeks were fetched');
   assert.match(body, /checkRules\(kept, Date\.now\(\), \{/,
-    'check_rules hands the rules no calendar, so R-14 is unknown on every trade');
+    'check_rules hands the rules no calendar, so R-19 is unknown on every trade');
   assert.match(body, /stopsQuery\(days\)/, 'check_rules no longer reads the stop history');
   assert.match(body, /\}, stops\)/,
     'check_rules hands the rules no stop history, so R-19 is unknown on every trade');
@@ -6290,6 +6278,6 @@ test('the trade look does not tell her he is in a position on a close', () => {
   assert.ok(body, 'prompt.ts no longer exports TRADE_EVENT');
   assert.doesNotMatch(body, /He is in a position while reading this/,
     'TRADE_EVENT tells her he is in a position, and it is also sent after a close');
-  assert.match(body, /just opened a position or just closed one/,
-    'TRADE_EVENT no longer says which two things it is sent about');
+  assert.match(body, /He has just closed a position/,
+    'TRADE_EVENT no longer says what it is sent about');
 });

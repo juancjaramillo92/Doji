@@ -34,3 +34,8 @@ update public.dispatch set job = 'eugenia-calendar' where job = 'eugenia-spine';
 
 alter table public.dispatch add constraint dispatch_job_check check (job in (
   'poller', 'eugenia', 'eugenia-calendar', 'trade-event', 'gladys'));
+
+-- The open-trade warning: a print pending beside a position he opened is R-20's,
+-- his to weigh, so a trade opening no longer calls her. trades_eugenia_on_event
+-- stays, called on a close alone.
+drop trigger if exists trades_eugenia_opened on public.trades;

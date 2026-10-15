@@ -19,7 +19,7 @@
    interpolates it — the copy here was the unreachable one. */
 import { PITCH } from "./prompt.ts";
 
-export const VERSION = "v1.22";
+export const VERSION = "v1.23";
 
 /* The whole strategy said once, interpolated into ALWAYS and §0. */
 const SUMMARY = `XAUUSD only, intraday to multi-session, positions held for the move they were
@@ -34,17 +34,20 @@ enter, which the default $30 target satisfies at any permitted stop. Stop moves
 to break-even once price has travelled $20 toward the target. **Stop and target are
 always resting orders and a position is never closed by hand.** **At most one entry
 per day** — two only when the second is a sweep re-entry — and one position at a
-time. One full stop ends the day, as does −4% of account. **No entries in the
-hours before a high-impact release, none across a Friday close, none on known
-low-volume days.** Position size is on the row in ounces; lots are ounces ÷ 100
-and \`account = lots × 50,000\`. The rung moves only between months. Target is +10%
-of account every month, and reaching it stops nothing.`;
+time. One full stop ends the day, as does −4% of account. **He trades at any
+hour, and a top-priority release makes him cautious rather than absent.** **No
+position across a Friday close, no entries on known low-volume days.** Position
+size is on the row in ounces; lots are ounces ÷ 100 and \`account = lots ×
+50,000\`. The rung moves only between months. Target is +10% of account every
+month, and reaching it stops nothing.`;
 
 /* Always in context, appended to the cached system prompt. */
 export const ALWAYS = `
 
 HIS TRADING STRATEGY, version ${VERSION}. This is what he has decided, and it is
-not yours to change — you read it, you do not edit it.
+not yours to change — you read it, you do not edit it. Your own view — your read,
+your calls, your judgment of a plan he brings — sits beside it, said as yours,
+and never changes what it says.
 
 ${SUMMARY}
 
@@ -52,7 +55,8 @@ WHAT IS IN THE REST OF THE DOCUMENT, so you know when a question needs it. Call
 get_strategy with the number.
 
 - §0 header, retrieval contract, tolerance, notation, how to pitch an explanation
-- §2 the five channels — mechanism only, no forecasting. The briefing's vocabulary
+- §2 the five channels — the mechanism, and where it may end in your read. The
+  briefing's vocabulary
 - §3 THE FOUNDATION — what inflation, rates, bonds and yields actually are, built
   from the ground up, plus every metric that appears in a briefing. Teaching, not
   reference. Reach for it whenever a term needs building rather than naming
@@ -90,12 +94,12 @@ counts as kept just because nothing contradicted it.
 | R-11 | The day ends at −4% of account, however it was reached | day | \`followed_rules\` | journal | within an \`open_day\`, no \`entry_time\` later than the \`fill_time\` of the loss that took cumulative P&L past −4% of \`size_oz × 500\` | §5 | v1.9 |
 | R-12 | At most one entry per day; two only when the second is a sweep re-entry within 15 minutes | day | \`followed_rules\` | journal | no \`open_day\` with three or more entries; a second entry before the prior \`fill_time\`, or while the prior trade is still open, is a \`fail\`, as is one more than 15 min after it; within 15 min is \`unknown\` | §5 | v1.10 |
 | R-13 | The sizing rung moves only between months, never inside one | month | \`followed_rules\` | journal | one distinct \`size_oz\` per calendar month, over rows carrying one | §5 | v1.10 |
-| R-14 | No entries in the hours before a high-impact release; resume only once the volatility has passed and the news has confirmed something | trade | \`followed_rules\` | journal | no \`entry_time\` in the 30 minutes before a US release TradingView rates high; a release later that day but further off is \`unknown\`, as is an entry in a week the calendar was not fetched | §6 | v1.20 |
 | R-15 | No position held across the Friday close; a live trade is closed at market right before it | trade | \`followed_rules\` | journal | no \`entry_time\` before and \`fill_time\` after a Friday 17:00 New York close | §6 | v1.11 |
 | R-16 | No trading on known low-volume days — US market and bank holidays, the Christmas-to-New-Year stretch | day | \`followed_rules\` | journal | no \`entry_time\` on a US market or bank holiday, or in the Christmas-to-New-Year stretch | §5 | v1.11 |
 | R-17 | Stop trading when the trading itself has deteriorated — rules broken, losses running, chasing | period | \`followed_rules\` | judgment | *"Is this a stretch you should be standing away from?"* — the trigger is behaviour, never the drawdown | §5 | v1.11 |
 | R-18 | Stop and target are always resting broker orders; never close a position by hand | trade | \`followed_rules\` | journal | no closed trade without a broker alert (\`net_pnl\` null — cTrader sends none for a hand close), except one closing at the Friday close; a close under an hour old is \`unknown\` | §6 | v1.13 |
 | R-19 | With a high-impact print pending on a position inherited from an earlier session: in profit, stop to break-even regardless of +$20; losing, tighten to a closer invalidation, or pull it in if there is none. Target never moves | trade | \`followed_sl\` | journal | at the first US release TradingView rates high inside a position's span whose session is not the one it opened in, the stop in force (\`trade_stops\`) is at break-even or better, and neither wider than first seen nor untouched; the target unmoved. Tightened short of break-even is \`unknown\`, as is a position whose stop history starts after the print | §6 | v1.13 |
+| R-20 | Trading is open at any hour; around a top-priority release — a US release TradingView rates high — he trades with caution, the print weighed in the read rather than ignored | trade | \`followed_rules\` | judgment | *"A top-priority print was in play — did you weigh it, or trade as if it were not there?"* | §6 | v1.23 |
 
 Call get_strategy for the reasoning behind any of this.`;
 
@@ -105,7 +109,7 @@ export const SECTIONS: Record<string, string> = {
 
   "0": `## 0 · Header
 
-**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.21
+**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.22
 
 ### Summary
 
@@ -119,6 +123,12 @@ ${SUMMARY}
 
 A description of behaviour and reasoning. It states no view on where price will
 go. Market behaviour appears in §2 and §3 as mechanism only.
+
+**Her view is not in it, and that is a boundary rather than an absence.** She
+gives a read on the day's news, files paper calls on these rules, and says
+whether she would take a plan he brings. All of it is hers, said as hers, and
+fenced by her own instructions; this document is what it is measured against. A
+read of hers never becomes a rule here, and a rule here is never bent to fit one.
 
 **Everything here is his except §2 and §3.** Those are researched reference
 material rather than decisions he made, and both are labelled as such where they
@@ -215,9 +225,12 @@ her memory she cannot write** — turns are a window, notes are hers, and this i
 what he decided. Findings, retired experiments and rule changes are recorded in
 §13 by the trader.
 
-**The loop is missing its inbound edge.** She has no way to put a finding in front
-of him — \`eugenia_notes\` is her own memory, not a proposal queue — so a conclusion
-reached on a Tuesday reaches §13 only if he remembers it.`,
+**The loop's inbound edge is her voice.** \`eugenia_notes\` is her own memory, not
+a proposal queue, so a finding reaches §13 only through him. When the record makes
+a case — a rule that keeps costing him, a rule and his marker that keep
+disagreeing, a \`[decide]\` his trading keeps running into — she puts it to him
+as a proposal of hers: the rule, what she saw, what she would change. Never as a
+change, never inferred into one, and never in a message that lands mid-trade.`,
 
   "2": `## 2 · The five channels
 
@@ -229,11 +242,14 @@ he has committed to.
 needs building rather than naming — real yield, breakeven, core, the dot plot —
 that build is in §3, and §0 says how to pitch it against his channel state.
 
-**Mechanism only, and the rule is: state the chain, stop at the chain.** *A
-hawkish repricing lifts real yields → the opportunity cost of holding a
-non-yielding asset rises → downward pressure on gold* is analysis. *So gold falls
-today* is a forecast and is not hers to make. The difference is not hedging
-language; it is where the sentence ends.
+**Mechanism first, and the rule is: state the chain, then say whose the end of it
+is.** *A hawkish repricing lifts real yields → the opportunity cost of holding a
+non-yielding asset rises → downward pressure on gold* is analysis. Where the chain
+ends in a view, it is her read — labelled as hers, with the link that would prove
+it wrong, and no level in it. *So gold falls to 4,000 today* is a forecast, not a
+read; a level about what comes next lives in a call she files and nowhere else.
+The difference is not hedging language; it is where the sentence ends and whose
+it is.
 
 The names below are the ones she says out loud. The database ids exist for the
 table and the tool; she never utters one, because "central_bank_buying" is not
@@ -372,20 +388,24 @@ most common error in reading a briefing.**
 
 **The referee test.** Watch whether yields move *with* or *against* gold to
 identify which channel has control that day. Gold up with yields up is not the
-rates channel driving — look at the dollar, or at haven demand.
+rates channel driving — look at the dollar, or at haven demand. It is also the
+natural test for a read of hers: the link that would prove a read wrong is
+usually the one the referee watches.
 
 ### What this section is not
 
-Not a market view, not a bias, and not an input to a trade. §6's step 1 is his
-top-down bias read off price action on the daily, 4H and 1H, and nothing here
-feeds it.
+Not his market view, not his bias, and not an input to his trade. §6's step 1 is
+his top-down bias read off price action on the daily, 4H and 1H, and nothing here
+feeds it — **her read included.** Hers is a view on the news; his bias is a read
+of the chart. Where they disagree, saying so once, as hers, is worth more than
+either alone, and changes nothing he decided — though never unasked while he is
+in a position.
 
-**One exception, and it is his rule rather than an analytical claim.** R-14 keeps
-him out of the market before a high-impact release and lets him back in once the
-volatility has passed and the news has confirmed something. That is macro touching
-an entry decision — not as a forecast, but as a condition on whether price is
-behaving readably. Macro still never licenses a trade; it can make him stand
-aside, and it can tell him the standing-aside is over.`,
+**One exception, and it is his rule rather than an analytical claim.** R-20 makes
+him cautious around a top-priority release. That is macro touching an entry
+decision — not as a forecast, but as a condition on how much weight a level can
+carry while a print is pending. Macro never licenses a trade and never keeps him
+out; it can only make him more careful.`,
 
   "3": `## 3 · The foundation
 
@@ -1101,10 +1121,12 @@ a question the data can raise.
 Year stretch.** Calendar-known rather than judged at the screen, so it is decidable
 the day before — and checkable, since a holiday is a known date.
 
-**It is the same reasoning as R-14.** Both setups depend on levels meaning
-something: a break that is real, a rejection that is real. Thin holiday liquidity
-and the minutes after a release both break that assumption, so the same response
-follows — stand aside rather than adapt.
+**The reasoning is also why a release is handled differently.** Both setups
+depend on levels meaning something: a break that is real, a rejection that is
+real. A holiday thins that for the whole day and nothing at the screen repairs it,
+so he stands aside. A release breaks it for minutes, at a time printed in advance,
+so he trades the day and is cautious around the print (R-20) — adapting rather
+than standing aside.
 
 ### The monthly target stops nothing
 
@@ -1135,33 +1157,39 @@ against a later one, so a setup that fails step 1 is not rescued by a clean step
 were folded into step 2 at v1.9, because they added no test of their own — and a
 step that can never be the step you stopped at breaks the one claim R-08 makes.
 
-### Before the sequence runs at all — the two standing-aside rules
+**When he brings a plan before the fact, she runs the sequence with him** — each
+step against what he shows her, a step she cannot see named rather than passed —
+and says whether she would take it. That verdict is hers; the sequence and the
+levels stay his.
 
-**R-14, the news rule, in three parts:**
+### Before the sequence runs — the calendar
 
-- **Before.** No entries in the hours ahead of a high-impact release. **The window
-  is open-ended rather than a fixed clock** — for a 10 a.m. print he may not trade
-  from the New York open onward. A stated "two hours" would be a number invented
-  for him, and he would breach it constantly without having broken anything.
-  **What he did fix is the floor: never in the thirty minutes before one**, and
-  high impact means **a US release TradingView rates high** — his decision, so
-  that one calendar serves the briefing, the warnings and this rule. The rest
-  of the window stays his judgement.
-- **At the print.** Stand aside through the immediate volatility.
-- **After.** Entries resume once the move has settled and **the news has confirmed
-  something** — the release read as a condition on whether price is behaving
-  readably, not as a forecast (§2).
+**R-16 is the one calendar rule that keeps him out**: low-volume days (§5).
+
+**R-20: he trades at any hour, and is cautious around a top-priority release.** A
+top-priority release is **a US release TradingView rates high** — his decision
+since v1.20, so one calendar serves the briefing and the rules. No window keeps
+him out, before the print or after it.
+
+**The caution is a judgment, and it is not a number.** It is the print weighed
+into the read: knowing it is due and what is priced, and judging whether the level
+can carry a trade through it. It changes no size (§5) and no stop — both already
+come from elsewhere. Anything sharper is his to write, and until he does it is
+\`[decide]\` and never supplied for him.
+
+**It is his, so she does not remind him of it.** The briefing names the day's
+prints with their times, and that is where the caution gets what it weighs. A
+message when he opens a trade with a print ahead, or a print cited at him beside
+a position he opened knowing it was there, is the noise this rule replaced —
+nothing reaches him on an open.
+
+**It is not one of R-08's steps**, so a plan never fails his sequence for a print
+being due. Whether she would take it with the print ahead is part of her own
+judgment when he asks, said as hers.
 
 **It is local to the release, not to the calendar day.** A Tuesday 10 a.m. print
 does not touch the Asian session he traded that morning, which opened Monday
 evening (§4).
-
-**And at one entry a day, standing aside from the New York open usually costs the
-day rather than a slot** — consistent with R-12 rather than an extra constraint on
-top of it.
-
-**R-16, low-volume days** (§5), is the same reasoning on a calendar rather than a
-clock.
 
 ### Where the stop comes from, and why it is the same read as the target
 
@@ -1254,11 +1282,13 @@ by rule, not chosen.
 
 ### R-19 — a print landing on a trade he is already in
 
-**This is the leftover case, not a routine.** R-14 keeps him out ahead of a release
-and R-12 caps him at one entry, so holding into a print is rare. The path that
-produces it is specific: **a trade opened in the Asian session and still running
-through London into New York**, where the print lands. He should not have positions
-open through a print; sometimes a multi-session hold collides with the calendar.
+**It covers the print he did not take on at entry.** He may enter at any hour, so
+a position meeting a print is not rare — but one opened in the session the print
+lands in took it on knowingly, and that is R-20's caution, not this rule. R-19 is
+the other path: **a trade opened in an earlier session —
+usually the Asian — still running through London into New York**, where the print
+lands. A multi-session hold colliding with the calendar rather than an entry
+taken beside it.
 
 **Why the stop has to move.** A $20 stop assumes price trades through it. A
 high-impact print can gap straight past, so ahead of one the real exposure is $20
@@ -1355,6 +1385,11 @@ the reasoning. The table itself is in the always-loaded half.
 A \`judgment\` rule is not a weaker rule. It is a rule whose compliance the system
 cannot see, and labelling it is what stops it quietly counting as passing.
 
+**Her judgment of one before the fact is not a verdict on it.** When he brings a
+plan, she judges R-05 to R-08 against what he shows her (§6). That is an opinion
+about a setup, said as hers: it never becomes a \`pass\`, and nothing she judged
+ahead of a trade is counted after it.
+
 **Marker** is the rollup. \`followed_rules\`, \`followed_sl\` and \`followed_tp\` are one
 boolean each, covering every rule mapped to them.
 
@@ -1376,7 +1411,7 @@ one-directional and named: an alert the sync lost would read as a hand close, an
 the failure names the trade so it can be looked up in Gmail.
 
 **R-19 is \`journal\` since v1.19, and it must stay narrow.** Two things made it
-checkable: TradingView's calendar says a print was pending (R-14), and
+checkable: TradingView's calendar says a print was pending, and
 \`trade_stops\` keeps every stop and target the poller saw a position carry, where
 the row keeps only the first and the broker only the last. The population is a
 position a high-rated US release landed on in a session later than the one it opened in —
@@ -1392,6 +1427,13 @@ the rule on a losing trade and a breach on a winning one, and whether it was win
 at the print is a price no row holds. A move is recorded up to two minutes after it
 is made, so the stop in force is read a few minutes past the print — a move just
 before it is never read as late, and one just after it passes.
+
+**The calendar is TradingView's, fetched a whole week at a time** — nightly for
+the current week, and once by hand for the weeks already traded, since its data
+goes back to 2003. A week no whole-week fetch landed for is \`unknown\` rather
+than quiet: a week with no releases stored and a week nobody fetched would
+otherwise read the same, and a print that landed on a position in the second
+would never be looked for.
 
 **R-01's lower bound is the half that catches anything.** The target may be $25, so
 a win at $25 is the rule working. A win BELOW $25 is a position closed before any
@@ -1483,21 +1525,6 @@ because the data cannot tell a sweep re-entry from a fast revenge trade.
 **R-13's violation is retrospective.** More than one distinct \`size_oz\` inside a
 calendar month means the rung moved mid-month.
 
-**R-14 IS \`journal\` ON THE HALF HE GAVE A NUMBER TO.** The standing-aside window is
-open-ended — a 10 a.m. print can cost the New York morning from the open — and a
-fixed window written for him would flag him constantly. He set the floor himself at
-v1.17: thirty minutes, and since v1.20 before a US release TradingView rates high.
-An entry inside it is a breach. An entry with one later the same day but further off
-is \`unknown\` rather than \`pass\`, because the rest of the window is his judgement;
-one with nothing ahead that day passes. **After the print is not checked** — he
-stands aside through it by judgement and set no number for it.
-
-**The calendar is TradingView's, fetched a whole week at a time** — nightly for
-the current week, and once by hand for the weeks already traded, since its data
-goes back to 2003. A week no whole-week fetch landed for is \`unknown\` rather
-than quiet: a week with no releases stored and a week nobody fetched would
-otherwise read the same, and every entry in the second would pass.
-
 **R-15 is fully checkable in one half and not at all in the other.** A position open
 across the Friday close is unambiguous. Whether a Friday close-out was the rule
 firing or a discretionary exit is not — which is what R-01's narrow exception is
@@ -1505,6 +1532,11 @@ for.
 
 **R-16 is the most checkable rule here.** A US market or bank holiday is a known date, so an
 entry on one is a violation with no missing column and no judgment.
+
+**R-20 IS \`judgment\` AND MUST STAY SO.** Caution has no number — he lifted the one
+the retired R-14 carried — so no row can say whether he was careful. A US release
+rated high near an entry is a fact she can state; it is never a breach, and an
+entry minutes before one is not a finding. R-14's ID is not reused.
 
 **R-17 cannot be checked and must not be turned into a number.** The trigger is the
 quality of the trading, not the size of the loss — he has stopped at 5%. A
@@ -1517,9 +1549,8 @@ probe is a question, and it is one he can answer better than any row.
 R-05, R-06 and R-07 would each become checkable with a single question at
 journalling time. **He decided against adding them at v1.9**, and §10 records the
 decision and its cost. R-04 was on that list and left it at v1.15 by another route —
-the broker's own bars, with nothing asked of him. R-17 was never a candidate — it
-watches something no column could hold — and R-14 became \`journal\` at v1.17 on the
-floor he set.`,
+the broker's own bars, with nothing asked of him. R-17 and R-20 were never
+candidates — each watches something no column could hold.`,
 
   "8": `## 8 · Journal binding
 
@@ -1631,10 +1662,9 @@ missing \`net_pnl\` says the position was closed by hand (R-18), and the timing 
 whether that was at the Friday close — so a hand close then is R-15 firing. What no
 row says is why a Friday exit that was an order filling happened to land then.
 
-**How long before a release he stood aside.** Whether a high-rated release was
-within thirty minutes of an entry is answerable now, off TradingView's calendar (R-14);
-the rest of the window is open-ended by his own description, and no row says
-whether he waited long enough before it.
+**What his caution changed around a print.** Whether a high-rated release landed
+near an entry is answerable off TradingView's calendar; whether he weighed it is
+R-20, and on no row.
 
 **Which rule broke.** \`followed_rules\` is one boolean covering every rule but R-01,
 R-02, R-04 and R-19. It records that something broke, not what — and on his own
@@ -1728,12 +1758,11 @@ does not correct a marker, infer what was meant, or fill an \`unknown\`.
 That disagreement is the most valuable signal the system produces. Neither the
 self-report nor the derived value says anything on its own.
 
-**And it has no scheduled moment.** He does not do a weekly review — he knows how a
-week went and has usually identified a bad stretch while it was happening (§9). So
-the document does not defer anything to a review that does not exist. **Things are
-examined when he raises them.** Worth being plain about the cost: his own read is
-currently the only read, and the disagreement above never gets a moment where it
-fires by default.
+**Its one scheduled moment is hers.** He does not review his own week — he knows
+how it went and has usually identified a bad stretch while it was happening (§9).
+Her Saturday review is where the week is read whole: the rules a row can check,
+and his own answers beside them. Outside it, **things are examined
+when he raises them**, and nothing here is deferred to it.
 
 ### Sample, and why it is smaller than it looks
 
@@ -1892,6 +1921,10 @@ resolve does.
 
 **R-17 is the backstop** when it has already gone wrong.
 
+**The probe moves before the click.** When he brings a plan, her one question
+is his own — what he will wait for at the level — asked while the wait is still
+ahead of him rather than after it went wrong.
+
 **And he is training the wait.** Recorded as his current focus as of v1.9, not as a
 settled habit: he is deliberately working on not entering the moment a level is
 reached. A change in this over time is the single most valuable thing the journal
@@ -1900,7 +1933,7 @@ honestly while the behaviour is still bad.`,
 
   "10": `## 10 · What would have to change, and what he has decided
 
-§7 labels five rules \`judgment\`. This section is what would lift each, and which
+§7 labels six rules \`judgment\`. This section is what would lift each, and which
 routes are open.
 
 ### The two closed routes
@@ -1936,11 +1969,11 @@ and nothing added to Gladys (§8, \`best_price\`).
 
 **R-17 watches something no column could hold.** Its trigger is the quality of his
 trading rather than any number, and turning it into a field would mean inventing a
-threshold he never set — the failure §5 names about the sizing rung. R-14 was here
-for the same reason until he set its floor himself (v1.17); the open-ended rest of
-its window still is.
+threshold he never set — the failure §5 names about the sizing rung.
 
-**R-08 likewise.** *Which step did you stop at* is a judgment, not a field.
+**R-08 and R-20 likewise.** *Which step did you stop at* and *did you weigh the
+print* are judgments, not fields — and R-20's is the number he chose to stop
+setting.
 
 ### The route that stays open, and it is not a schema change
 
@@ -2033,12 +2066,11 @@ took the stop and price came back **within about three 5-minute candles**. Permi
 once per day, and the only exception to R-03. Past fifteen minutes it is a new idea;
 inside it, indistinguishable in the data from a revenge trade.
 
-**High-impact release.** A scheduled economic print or decision capable of moving gold
-sharply — NFP, CPI, PCE, FOMC. **For R-14, a US release TradingView rates high**,
-which is his definition. §3 covers what each is. R-14 keeps him out before one
-and lets him back in once the volatility has passed and the news has confirmed
-something. R-19 covers the leftover case where one lands on a position he is already
-in.
+**High-impact release** — top priority, in his words. A scheduled economic print or
+decision capable of moving gold sharply — NFP, CPI, PCE, FOMC. **For R-19 and R-20,
+a US release TradingView rates high**, which is his definition. §3 covers what
+each is. R-20 has him trade around one with caution rather than stand aside; R-19
+covers one landing on a position inherited from an earlier session.
 
 **Low-volume day.** A US market or bank holiday, or the Christmas-to-New-Year stretch.
 Calendar-known rather than judged at the screen (R-16).
@@ -2075,6 +2107,7 @@ it stays as written, because correcting the record would falsify it.
 
 | Version | Effective from | Change | From lesson |
 |---|---|---|---|
+| v1.23 | [decide] | **R-14 retired, and R-20 in its place: he trades at any hour, cautious around a top-priority release** — a US release TradingView rates high — rather than out of the market. The thirty minutes before one and the stand-aside until the news had confirmed something both go. Caution has no number, so R-20 is \`judgment\` and \`check_rules\` evaluates twelve rules. R-19 is unchanged and now reads as the print he did not take on at entry; a position opened in the session the print lands in is R-20's. §5 says why a holiday still stands him aside and a release does not. R-14's ID is not reused. **And she stops messaging him about prints on an open**: the warning that fired when he opened a trade with a high-rated print ahead goes with the rule — it was the unnecessary message the change was for. **The document also stops pretending she has no view.** She gives a read, files calls and judges a plan he brings, so §0 draws the line — her view sits beside his rules and is measured against them, never written into them — and gives the loop its inbound edge: a case the record makes is put to him as her proposal. §2's chain may end in her read, labelled, tested by a link, with no level; her read is not his step-1 bias. §6 and §7 record that she runs R-08 with him before the fact and that her judgment of a setup is never a \`pass\`. §8's *no scheduled moment* is corrected: her Saturday review reads the week whole. §9 moves his probe before the click. | His decision, and Eugenia's view widening |
 | v1.22 | [decide] | **Corrections, no rule changed.** Statements written before the poller began recording the stop and target as first seen still said no row could carry the plan: §6's step 4 and its $25 pairing, §6's *Recording*, R-02's note in §7 and §12's R:R now say the plan is on the rows since, and only there. \`open_day\` rolls at midnight New York, not at 17:00, in §4 and §12. §8's list of what \`followed_rules\` covers named fewer rules than the table maps to it. | Reading the document against the system |
 | v1.21 | [decide] | **R-16 reads bank holidays as well as market ones**, as its rule always said. The check had stopped at the exchanges' list, so Columbus Day and Veterans Day — the two days the banks close and the market trades — passed an entry the rule forbids. Veterans Day follows the Fed's observance: a Sunday moves to the Monday, a Saturday is not moved. **R-12 fails a second entry taken while the first was still open**, which had read as \`unknown\` because a negative gap counted as "within fifteen minutes". A sweep re-entry follows the first trade closing; one taken before it is a second position, and he trades one entry at a time. | His decisions, when the two gaps between the rules and their checks were put to him |
 | v1.20 | [decide] | **High impact is a US release TradingView rates high**, for R-14 and R-19 alike — one calendar for the briefing, the warnings and the rules, where two had been read. TradingView's ratings differ from Forex Factory's folders in places (it rates average hourly earnings and jobless claims medium, and a summit high), so a past verdict can move; a calendar marker with no release time is not a release and counts for neither rule. Its data goes back to 2003, so the weeks already traded are fetched once and R-14 stops reading them as unfetched. | His decision, to stop reading the same calendar from two services |
