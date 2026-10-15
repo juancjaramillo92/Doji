@@ -1995,9 +1995,10 @@ test('every answer dueNow can give is dispatched by postScheduled', () => {
 });
 
 /* ─── The critic is given no tool, and not for the obvious reason ────────────
-   An empty array is the cheaper write as well as the stricter one: the critic
-   differs from the briefing in effort too, so sharing its array still writes a
-   prefix of its own. REFACTOR.md R-15 carries the figures.
+   An empty array is the stricter choice and was the cheaper write while the
+   critic's effort differed at the top of the request. With effort a message,
+   the array is all that keeps it off the briefing's prefix; moving it is the
+   next measurement, one caller at a time. REFACTOR.md R-15 carries the figures.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the critic is offered no tool at all', () => {
@@ -3064,7 +3065,11 @@ test('the roles a turn may have are the roles she actually writes', () => {
   const declared = checkValues(EUGENIA_SQL, 'eugenia_turns_role_check');
   assert.ok(declared, 'schema.sql no longer constrains eugenia_turns.role');
 
-  const named = [...new Set([...EUGENIA_TS.matchAll(/role:\s*["'](\w+)["']/g)].map(m => m[1]))];
+  // The effort message is sent at the head of a request and never stored, so
+  // its role is not one a turn may have.
+  const sent = EUGENIA_TS.replace(/export const effortMessages[\s\S]*?: messages;/, '');
+  assert.notEqual(sent, EUGENIA_TS, 'effortMessages is gone, so this no longer knows which role is only sent');
+  const named = [...new Set([...sent.matchAll(/role:\s*["'](\w+)["']/g)].map(m => m[1]))];
   assert.ok(named.length >= 2,
     `only ${named.length} roles written in doji-eugenia — the reader has gone blind`);
   for (const role of named) {
@@ -5907,6 +5912,20 @@ test('the refusal fallback rides only with the model it is proven on', () => {
   assert.match(body, /\.\.\.\(model === OPUS \? \{ fallbacks: "default" \} : \{\}\)/,
     'the fallbacks field is sent on every model, or is no longer sent at all — ' +
     'the header and the field are a pair and either alone is a 400');
+});
+
+test('the effort a caller asks for is the one it runs at, and the top of every Opus request is one value', () => {
+  /* THE PREFIX IS SHARED ONLY IF THE TOP IS ONE VALUE, and the caller still
+     runs at its own effort only if the message carries it — with the beta
+     header beside it, or the message is a 400 on every call. */
+  const at = EUGENIA_TS.indexOf('async function call(');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n  if (!res.ok)', at));
+  assert.match(body, /messages: effortMessages\(messages, effort, model\)/,
+    'the conversation is sent without the caller\'s effort, so every Opus caller runs at the top one');
+  assert.match(body, /output_config: \{ effort: model === OPUS \? BASE_EFFORT : effort \}/,
+    'the top-level effort varies by caller again, so each writes its own copy of the prefix');
+  assert.match(body, /model === OPUS\s*\n?\s*\?\s*\{ "anthropic-beta": "[^"]*mid-conversation-output-config-2026-07-01/,
+    'the effort message is sent without its beta header, a 400 on every Opus call');
 });
 
 /* ─── The gate reaches every message she composes ────────────────────────────

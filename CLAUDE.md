@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 733 tests, eight suites
+npm test      # 735 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -410,7 +410,10 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
 - **A beta flag is a header on a raw fetch**, never a `betas` field.
 - **The container is mandatory once web search is in play**; neither tool sets
   `strict: true`.
-- **Effort is per caller**; nothing runs `low`.
+- **Effort is per caller**; nothing runs `low`. On Opus it rides as an
+  effort-only system message (`effortMessages`) under one top-level
+  `BASE_EFFORT`, so callers on one array share one cached prefix; the message is
+  sent, never stored.
 - **`MAX_ROUNDS` is a backstop** at ten, and `TURN_MS` its twin for time — one
   signal per turn, at `pace_line`'s share. `rounds` and `model` are columns; a
   successful turn's `detail` is its client-tool tally. Read `rounds` before

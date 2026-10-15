@@ -2682,9 +2682,21 @@ quarter-hourly job clustered several looks into one morning. One reply could not
 say how replies arrive. The week to 2026-10-08 had eighteen: fourteen within an
 hour of the turn before them, six within five minutes — so eight a week wrote
 again a prefix the hour would still have held, and `CHAT_TOOLS` takes the hour.
-The weekday briefing shares that array but not its effort, so it reads nothing
-the replies wrote and pays 2× for its own write; the replies more than cover it.
-So it is `1h` for `CHAT_TOOLS` and `5m` for the rest. `cached` counts
+So it is `1h` for `CHAT_TOOLS` and `5m` for the rest.
+
+**Effort is a message, so one array is one prefix.** The effort at the top of a
+request renders ahead of the tools and the system prompt, and the briefing at
+`high` once read nothing the replies at `medium` wrote, paying 2× for a copy of
+the same prefix. On Opus every request now sends one top-level effort,
+`BASE_EFFORT`, and the caller's own as an effort-only system message at the
+head of the conversation (`effortMessages`, beta
+`mid-conversation-output-config-2026-07-01`, a header beside the fallback one),
+which changes effort without touching what is cached before it. Each caller
+still runs at its own effort and `eugenia_runs.effort` records that one. Sonnet's
+one caller, `trim`, has its own array and keeps its effort at the top. **Whether
+it worked is one morning's rows**: the first reply after a briefing should read
+the hour's prefix (`cached`) rather than write it (`wrote_1h`). The message is
+sent and never stored, so it is not a role a turn may have. `cached` counts
 reads; `wrote_1h` and `wrote_5m` count writes, kept apart because their rates
 differ.
 

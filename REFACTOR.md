@@ -98,6 +98,14 @@ October 2026 it had revised every briefing since its verdicts were first
 recorded — all six, by 1 to 11 per cent. Ask `eugenia_runs` for `critic
 verdict` rows before reopening it on that ground.
 
+**Since October 2026 effort is a message on Opus** (README, *What a turn
+cost*): the top of every request carries one effort and the caller's own rides
+inside the conversation, so the effort difference that decided this is gone
+from the prefix. What still keeps the critic off the briefing's prefix is its
+array alone. Moving it — the briefing's array with `tool_choice: none` — is the
+next measurement, made by itself, with the critic's `wrote_1h` and `cached` read
+the morning after. Not before the effort change has its own morning of rows.
+
 **And the shape to carry away:** the request field that broke this was not the
 one the change touched. A cache key spans every field that renders ahead of the
 breakpoint, so "what else differs between these two calls" is the question, not
