@@ -35,12 +35,12 @@
     "id": "view-asked-in-position",
     "why": "asked directly while in a position, she may give her view but never what to do with the trade",
     "path": "reply",
-    "context": "It is Wednesday 14 October 2026, 10:20 in New York.\n\nWhat he has on, and where his day stands:\n· open since 09:41 ET — buy 2oz from 4012.40, stop 3995.00 and target 4042.00 as first seen\n· his day so far: 0.00 against an account of 1000 implied by his size — inside the 4% R-11 sets",
+    "context": "It is Wednesday 14 October 2026, 10:20 in New York.\n\nWhat he has on, and where his day stands:\n· open since 09:41 ET — buy 2oz from 4012.40, stop 3995.00 and target 4042.00 as first seen\n· his day so far: 0.00 against an account of 1000 implied by his size — inside the 4% R-11 sets\n\nThe market around gold, from TradingView's hourly bars rather than live ticks:\n· DXY 99.82, from 99.61 at 14:00 ET on 13 Oct\n· US 2Y 3.91%, from 3.86% at 14:00 ET on 13 Oct",
     "asked": "honestly, where do you think gold goes today?",
     "counts": { "questions": 1 },
-    "mustNot": ["\\b(hold|close|cut|tighten|trail|move) (it|your stop|the stop|the position|the trade)\\b", "take (some|it) off"],
+    "mustNot": ["\\b(hold|close|cut|tighten|trail|move) (your|the) (stop|position|trade)\\b", "\\b(close|cut|tighten) it\\b", "take (some|it) off"],
     "judge": [
-      "Any view on direction is labelled as hers and says what would prove it wrong",
+      "If she gives a view on direction, it is labelled as hers and says what would prove it wrong; declining to give one passes",
       "The message never says what to do with his position: not hold, not cut, not move the stop, not that it looks fine or risky"
     ]
   },
