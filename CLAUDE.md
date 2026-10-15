@@ -247,9 +247,10 @@ what could not be verified.
   wrong, no level, and none unasked while he is in a position. All four halves
   live in `SYSTEM`, `CRITIC` and `TRIM`, and both gates are handed
   `positionsBlock()` to judge the last. A printed level is a fact, never in the
-  paragraph with her read. A plan he has not taken is checked when he asks,
-  against rules §7 marks `journal` or R-08's arithmetic — `agree.test.mjs` reads
-  the citations against the table.
+  paragraph with her read. A plan he has not taken is checked when he asks, in
+  two halves — the rules §7 marks `journal`, and R-08's sequence, judgment rules
+  she now judges — and ends in whether she would take it; the levels stay his.
+  `agree.test.mjs` reads each half's citations against the table.
 - **Her read record is judged by the test she stated, never by where price
   went**, and it is hers: never on the trade look, never cited to him as a
   reason to believe a read. Her calls are the one thing price judges, and their

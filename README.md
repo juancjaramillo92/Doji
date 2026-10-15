@@ -1641,11 +1641,11 @@ to repeat himself for a fault that is not his. The audio goes to the vendor with
 **both** its extension and its `audio/ogg` type, since providers differ in which
 they read.
 
-**A chart** she can see, and the prohibitions do not move because she can. She
-may describe it and take it as context; on a trade not yet taken she may not say
-whether a setup is valid or a level will hold — a picture is the most tempting
-place in this system to give a signal. A chart of a closed trade she judges the
-way she judges the journal.
+**A chart** she can see. She describes it, and on a trade not yet taken she
+judges the setup against your pre-trade sequence and says whether she would
+take it, as she does a plan you give her (*What she will not do, and what she
+may*). On a position you hold, the prohibitions hold: never what to do with it.
+A chart of a closed trade she judges the way she judges the journal.
 
 Neither is stored as sent: the transcript is kept, the image is not — a megabyte
 of base64 would be resent as history for six exchanges. `stamped` appends the
@@ -2722,17 +2722,23 @@ your chart. A level attached to what comes next stays out unless it is a call sh
 filed, and so does any printed level in the paragraph holding her read: outside a
 call, a level beside a direction is a call nobody scores.
 
-**She checks a plan you have not taken, when you ask, against your rules**: the
-stop and target distances (R-01, R-02), reward against risk at entry against R-08's
-1:1.5, a high-rated US release inside R-14's thirty minutes, whether the day already
-rules out an entry (R-03, R-11, R-12, R-16), something already open (R-10), the
-Friday close (R-15). Whether the setup is the right kind of level is judgment and
-stays yours, and her one question is your own probe for the touch, asked before
-the fact: what you will wait for at the level before you click. **The levels
-stay yours**: she never suggests a different entry, stop
-or target, never says whether to take it, and never turns "the ratio is 1:1.1"
-into the target that would fix it; `TRIM` removes a level she offers in place of
-yours. Her own calls are hers and filed; your plan's levels are yours.
+**She checks a plan you have not taken, when you ask, two ways.** Against the
+rules a row can answer: the stop and target distances (R-01, R-02), reward
+against risk at entry against R-08's 1:1.5, a high-rated US release inside
+R-14's thirty minutes, whether the day already rules out an entry (R-03, R-11,
+R-12, R-16), something already open (R-10), the Friday close (R-15). And against
+your pre-trade sequence, which no row can see and which you decided in October
+2026 she should judge: R-08's four steps in order — the bias, the level (R-05's
+interior for Break & Retest, R-06's outer extreme for Support & Resistance), the
+confirmation rather than the touch (R-07), the ratio — reading §4 and §6 first
+so she holds you to what you wrote, and naming any step she cannot see. **Then
+she says whether she would take it**, as hers, and you decide. Her one question
+is your own probe for the touch, asked before the fact: what you will wait for
+at the level before you click. **The levels stay yours**: she never suggests a
+different entry, stop or target and never turns "the ratio is 1:1.1" into the
+target that would fix it; `TRIM` removes a level she offers in place of yours.
+Her own trades are calls she files, never edits of yours. A test holds the two
+halves to the kinds of rule §7 says they are.
 
 **She judges trades — the decision, never the result** — against your rules and the
 plan you entered with. A loss inside your rules was a good trade; a win that broke

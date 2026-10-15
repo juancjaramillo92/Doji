@@ -3608,7 +3608,7 @@ test('a printed level may be named, never beside her read, in the writer and bot
   }
 });
 
-test('a plan he gives her is checked against his rules, and the levels stay his', () => {
+test('a plan he gives her is checked against his rules and his sequence, and the levels stay his', () => {
   const body = (name) => EUGENIA_PROMPT.match(new RegExp(`export const ${name} = \`([\\s\\S]*?)\`;`))[1]
     .replace(/\s+/g, ' ');
   const system = body('SYSTEM');
@@ -3616,26 +3616,39 @@ test('a plan he gives her is checked against his rules, and the levels stay his'
   assert.ok(at > -1, 'SYSTEM no longer tells her how to check a plan he has not taken');
   const section = system.slice(at, system.indexOf('WHEN HE SENDS A CHART', at));
   assert.match(section, /THE LEVELS STAY HIS\. Never suggest a different entry, stop or target/,
-    'the plan check no longer forbids her offering levels of her own — that is the signal, by another door');
+    'the plan check no longer forbids her offering levels of her own in place of his');
+  assert.match(section, /THEN SAY WHETHER YOU WOULD TAKE IT/,
+    'the plan check no longer ends in whether she would take it, which is what he asked');
+  assert.match(section, /Read §4 and §6 with get_strategy before you judge a step/,
+    'she judges his setup against her idea of one rather than the sequence he wrote');
 
   const trim = body('TRIM');
   assert.match(trim, /check of a plan he gave you against his own rules stays/,
     'TRIM no longer keeps a plan check, so the gate on every reply can cut the one she was asked for');
+  assert.match(trim, /your judgment of his setup and whether you would take it/,
+    'TRIM no longer keeps her judgment of his setup');
   assert.match(trim, /A level YOU offer in place of his/,
     'TRIM no longer removes a level she offers in place of his');
 
-  // Every rule cited is one a journal row can answer, or R-08, whose step 4 is
-  // arithmetic on the numbers he gave.
+  /* TWO HALVES, TWO KINDS OF RULE. What a row can answer cites §7's journal rules
+     or R-08's arithmetic; the sequence is R-08's steps, whose levels and
+     confirmation are judgment rules. Every citation must exist in the table. */
   const rows = [...ALWAYS.matchAll(/^\| (R-\d+) \|.*\| (journal|judgment) \|/gm)];
   const journal = new Set(rows.filter(m => m[2] === 'journal').map(m => m[1]));
-  assert.ok(journal.size >= 10, `read ${journal.size} journal rules out of §7 — the reader has gone blind`);
-  const cited = [...new Set(section.match(/R-\d+/g))];
-  assert.ok(cited.length >= 8, `the plan check cites ${cited.length} rules — the reader has gone blind`);
-  for (const r of cited) {
+  const judgment = new Set(rows.filter(m => m[2] === 'judgment').map(m => m[1]));
+  assert.ok(journal.size >= 10 && judgment.size >= 4,
+    `read ${journal.size} journal and ${judgment.size} judgment rules out of §7 — the reader has gone blind`);
+  const half = (from, to) => section.slice(section.indexOf(from), section.indexOf(to));
+  const byRow = [...new Set(half('AGAINST THE RULES A ROW CAN ANSWER', 'AGAINST HIS PRE-TRADE SEQUENCE').match(/R-\d+/g))];
+  assert.ok(byRow.length >= 8, `the row half cites ${byRow.length} rules — the reader has gone blind`);
+  for (const r of byRow) {
     assert.ok(journal.has(r) || r === 'R-08',
-      `the plan check cites ${r}, which §7 does not mark journal — she would be ` +
-      `pronouncing on a judgment rule no row can see`);
+      `the row half cites ${r}, which §7 does not mark journal — a row cannot answer it`);
   }
+  const bySequence = [...new Set(half('AGAINST HIS PRE-TRADE SEQUENCE', 'THEN SAY WHETHER').match(/R-\d+/g))];
+  assert.deepEqual(bySequence.sort(), ['R-05', 'R-06', 'R-07', 'R-08'],
+    'the sequence half no longer names the steps R-08 runs through');
+  for (const r of bySequence) assert.ok(judgment.has(r), `${r} is not a judgment rule in §7`);
 });
 
 test('her read on price is fenced in the writer and in both gates', () => {
