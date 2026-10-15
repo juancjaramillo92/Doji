@@ -1071,20 +1071,22 @@ Background, in one sentence at most, never a reason to trade.
 strategy §2 names. The gold reserves of China, Poland, India, Turkey and the
 Czech Republic, in tonnes, from TradingView's economic series
 (`ECONOMICS:<country>GRES`, `RESERVES`), folded by `foldReserves` to the newest
-five points, about a year of quarters, each on its date: the series runs months
-behind the official release, which is why the date is the point. And the two
-largest US gold funds (`FUNDS`, GLD and IAU) off the screener: assets under
-management and money in or out over a month, three months and the year
-(`FUND_COLUMNS`), folded by `foldFunds`, a column the screener does not serve
-null and never zero; the second probe read them in dollars (GLD $141.3B). Each
-economy and the funds' batch is its own call and its own failure, named in
-`missing`. The batch goes first and the economies three at a time, inside
-`DOOR_MS`: one economic read took eleven seconds on that probe, and five in a
-row at that pace outran it. `flowsList` gives levels on dates and computes
-no change, and `flowsBlock` reads the door directly, as the speculators' count
-is read, for the Sunday briefing and `get_around` alone: a quarter of
-central-bank buying is the story, and five weekday briefings repeating it are
-not. `test/fixtures/tradingview-reserves.json` is the 15 October capture.
+five points, about a year of quarters (`RESERVE_DAYS`), each on its date: the
+series runs months behind the official release, which is why the date is the
+point. A series in any unit but tonnes is refused rather than labelled tonnes.
+And the two largest US gold funds (`FUNDS`, GLD and IAU) off the screener:
+assets under management and money in or out over a month, three months and the
+year (`FUND_COLUMNS`), folded by `foldFunds`, a column the screener does not
+serve null and never zero, and a fund it does not hold named; the second probe
+read them in dollars (GLD $141.3B). Each economy and the funds' batch is its own
+call and its own failure, named in `missing`. The batch goes first and the
+economies three at a time, inside `DOOR_MS`: one economic read took eleven
+seconds on that probe, and five in a row at that pace outran it. `flowsList`
+gives levels on dates and computes no change, and `flowsBlock` reads the door
+directly, as the speculators' count is read, for the Sunday briefing and
+`get_around` alone: a quarter of central-bank buying is the story, and five
+weekday briefings repeating it are not.
+`test/fixtures/tradingview-reserves.json` is the 15 October capture.
 
 **`?volume=1` is what COMEX gold futures traded** — the exchange's own volume in
 the front-month contract (`COMEX:GC1!`), twenty-two daily bars folded by

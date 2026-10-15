@@ -1126,8 +1126,8 @@ const AROUND_TOOL = {
     "euro, each a level now beside the level at a stated time, and its daily close a week, " +
     "a month and three months back; and gold's and the dollar's " +
     "headlines from the last six hours, titles only; what fed funds futures price for " +
-    "the Fed's meetings over the next year; the gold reserves of the central banks that buy " +
-    "most, and the two largest US gold funds' assets and money in or out; the CFTC's weekly count of " +
+    "the Fed's meetings over the next year; central banks' gold reserves and the two " +
+    "largest US gold funds' assets and money in or out; the CFTC's weekly count of " +
     "where the speculators stand in gold futures; and what COMEX gold futures traded in " +
     "the last finished session against the twenty before. Use it whenever you are about " +
     "to say what the dollar, yields or anything else around gold did, or what " +
@@ -3120,7 +3120,7 @@ type Trend = { symbol: string; name: string; unit: string; points: { close: numb
 export function trendList(answer: { market: Trend[]; missing: { name: string }[] }): string {
   const lines = answer.market.map(m =>
     `· ${m.name} ${m.points.map(p => `${figure(p.close, m.unit)} on ${civilDay(p.at.slice(0, 10))}`).join(", ")}`);
-  if (answer.missing.length) lines.push(`· Not read: ${answer.missing.map(m => m.name).join(", ")}.`);
+  if (answer.missing.length) lines.push(`· Not read just now: ${answer.missing.map(m => m.name).join(", ")}.`);
   return `\n\nThe weeks behind it, from TradingView's daily closes a week, a month and three months ` +
     `back:\n${lines.join("\n")}`;
 }
@@ -3396,7 +3396,7 @@ export async function positioningBlock(): Promise<string> {
    the Sunday briefing and get_around. A figure the screener does not serve is
    said, never shown as zero.
    ───────────────────────────────────────────────────────────────────────── */
-type Reserve = { country: string; name: string; unit: string; points: { date: string; tonnes: number }[] };
+type Reserve = { country: string; name: string; points: { date: string; tonnes: number }[] };
 type Fund = { symbol: string; name: string; aum: number | null;
               flow_1m: number | null; flow_3m: number | null; flow_ytd: number | null };
 

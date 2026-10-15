@@ -757,14 +757,21 @@ export const RESERVES = [
 export const FUNDS = ["AMEX:GLD", "AMEX:IAU"];
 export const FUND_COLUMNS = ["description", "aum", "fund_flows.1M", "fund_flows.3M", "fund_flows.YTD"];
 
-// The newest five points, about a year of quarters, as levels on their dates.
+// Four hundred days reach five quarterly points, about a year.
+const RESERVE_DAYS = 400;
+
+/* The newest five points as levels on their dates. The series is read in the
+   tonnes it says it is in, and a series in any other unit is refused rather
+   than labelled tonnes. */
 export function foldReserves(answer: any) {
   const series = answer.series;
   if (!Array.isArray(series) || !series.length) throw new Error("no series");
-  return { unit: answer.unit, points: series.slice(-5).map((p: any) => ({ date: p.date, tonnes: p.value })) };
+  if (answer.unit !== "TNE") throw new Error(`a series in ${answer.unit}, not tonnes`);
+  return series.slice(-5).map((p: any) => ({ date: p.date, tonnes: p.value }));
 }
 
-// A fund the screener does not hold comes back in `missing`, never as zeros.
+// A column the screener does not serve is null, never zero; readFlows names a
+// fund it does not hold.
 export function foldFunds(answer: any) {
   return FUNDS.filter(s => answer.data?.[s]).map(s => {
     const d = answer.data[s];
@@ -776,19 +783,22 @@ export function foldFunds(answer: any) {
 export async function readFlows() {
   const signal = AbortSignal.timeout(DOOR_MS);
   const session = await tvSession();
-  const from = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
-  const reserves: Record<string, unknown>[] = [], missing: Record<string, string>[] = [];
-  let funds: Record<string, unknown>[] = [];
+  const from = day(-RESERVE_DAYS);
+  const reserves: Record<string, unknown>[] = [], missing: Record<string, string>[] = [],
+        unread: Record<string, string>[] = [];
+  let funds: { symbol: string }[] = [];
   try {
     funds = foldFunds(await tvCall(session, "mcp-tv-get-symbol-data-batch",
       { symbols: FUNDS, columns: FUND_COLUMNS }, signal));
+    for (const s of FUNDS.filter(s => !funds.some(f => f.symbol === s))) {
+      missing.push({ symbol: s, name: s, error: "not served" });
+    }
   } catch (err) {
     missing.push({ symbol: FUNDS.join(", "), name: "the gold funds", error: unreached(signal, err) });
   }
-  const unread: Record<string, string>[] = [];
   await inLanes(RESERVES, async (r, i) => {
     try {
-      reserves[i] = { ...r, ...foldReserves(await tvCall(session, "mcp-tv-get-economic-data",
+      reserves[i] = { ...r, points: foldReserves(await tvCall(session, "mcp-tv-get-economic-data",
         { symbol: `ECONOMICS:${r.country}GRES`, date_from: from }, signal)) };
     } catch (err) {
       unread[i] = { symbol: `ECONOMICS:${r.country}GRES`, name: r.name, error: unreached(signal, err) };
@@ -880,7 +890,7 @@ const PROBES: Record<string, () => Call[]> = {
     ["mcp-tv-get-ohlcv", { symbol: "COMEX:GC1!", interval: "1D", count: 3 }],
   ],
   flows: () => [
-    ["mcp-tv-get-economic-data", { symbol: "ECONOMICS:CNGRES", date_from: day(-400) }],
+    ["mcp-tv-get-economic-data", { symbol: "ECONOMICS:CNGRES", date_from: day(-RESERVE_DAYS) }],
     ["mcp-tv-get-symbol-data-batch", { symbols: FUNDS, columns: FUND_COLUMNS }],
   ],
 };
