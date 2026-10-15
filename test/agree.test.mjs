@@ -24,7 +24,7 @@ import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/st
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
          READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_MAX, RR_MIN, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
-import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
+import { CONSOLIDATE, SYSTEM, PITCH, REVIEW } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled,
          discipline }
   from '../supabase/functions/doji-eugenia/journal.ts';
@@ -5815,10 +5815,11 @@ test('the briefing opens on the weeks, in the writer and in the critic', () => {
     'the critic no longer names the opening it replaces, so it can keep one');
 });
 
-test('the word count never outranks the teaching block, in either copy', () => {
+test('a word count never stands without what to cut instead: the briefing\'s two copies and the review', () => {
   /* A CEILING ON ITS OWN CUTS THE TEACHING, the longest thing on the page. The
      count is safe only beside what to cut INSTEAD, so a copy holding the count
-     alone reproduces that. */
+     alone reproduces that. The review's teaching is its verdict and its one
+     thing to keep and one to change. */
   const writer = EUGENIA_PROMPT.slice(0, EUGENIA_PROMPT.indexOf('export const CRITIC'));
   const critic = EUGENIA_PROMPT.slice(EUGENIA_PROMPT.indexOf('export const CRITIC'));
   for (const [who, half] of [['writer', writer], ['critic', critic]]) {
@@ -5827,6 +5828,10 @@ test('the word count never outranks the teaching block, in either copy', () => {
       `the ${who} holds a word count with nothing saying what to cut instead — ` +
       `which is the arrangement that stopped her teaching the first time`);
   }
+  const review = REVIEW.replace(/\s+/g, ' ');
+  assert.match(review, /Under two hundred and fifty words/, 'the review has lost its word count');
+  assert.match(review, /THE VERDICT ON THE WEEK AND THE ONE THING TO KEEP AND ONE TO CHANGE ARE NOT PLACES YOU CUT/,
+    'the review holds a word count with nothing saying what to cut instead');
 });
 
 test('the gold-against-real-yields chain is exempt from the rung, in both copies', () => {
