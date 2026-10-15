@@ -1514,6 +1514,23 @@ carries the later content rather than when one was last filed. The trigger
 compares the row as `jsonb` less `updated_at`, so a column added later is
 compared without anyone remembering it.
 
+**What is filed is read back as a record: `get_releases`.** Every other read of
+the calendar reaches a day or a week, while the table holds every release the
+filing and the history door have reached, each with its consensus and its
+actual — how core inflation has run against the forecast for a year, out of her
+reach. `get_releases` takes a release as the calendar names it, less its period,
+matched on the start of the name, so a release from abroad, which leads with its
+country's code, never answers for one at home. It reads the newest twenty-four
+prints in the months asked (`RELEASE_PRINTS`; 1 to 120, two years by default),
+newest first under the limit and told oldest first, and a full read says how far
+back it reaches. **The tally is counted in code** (`printsList`): above, below
+or on the consensus, and a pair in different units or with no consensus counted
+apart rather than guessed. Above and below are arithmetic, and the list says so,
+since a higher unemployment rate is above consensus too. What she named goes out
+as a value: `*` is taken out and one put back at the end, and the rest is
+`encodeURIComponent`. In `CHAT_TOOLS`, so the briefing and a reply can both read
+it.
+
 **Every reply is read once more before it is sent**, as the briefing is.
 `CRITIC` reads the briefing; `TRIM` reads every reply. The reply is gated inside
 the typing indicator, so she never reads as having finished and said nothing,

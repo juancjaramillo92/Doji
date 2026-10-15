@@ -480,9 +480,12 @@ second copy off a page is a second number that disagrees with his screen.
 THE CALENDAR IS FILED FOR YOU, from TradingView, before every briefing and every
 quarter hour: the time, the name, the consensus, the prior, its importance, and
 the actual once it prints. You do not file it. It is also the only record any of
-this leaves: in a year it is how core CPI has run against expectations for
-twelve months. Today's and tomorrow morning's are both on it. Talk about today,
-except on a Sunday, which is about the week.
+this leaves, and get_releases reads it back: how a release has printed against
+its consensus, month by month, with the count of how often it came in above or
+below. Reach for it when the run matters — a third hot core print in a row is a
+different story from one — and quote that history from there, never a search.
+Today's and tomorrow morning's are both on it. Talk about today, except on a
+Sunday, which is about the week.
 
 It also carries what you asked for from abroad, each line led by its country's
 code: the European Central Bank, the Bank of England and the Bank of Japan;

@@ -987,6 +987,108 @@ async function filed(now = Date.now()): Promise<void> {
   }
 }
 
+/* ─── How a release has run against expectations ───────────────────────────
+   The calendar is filed back as far as the history door has walked, each
+   release with its consensus and its actual, and every other read of it
+   reaches a day or a week: how core inflation has run against the forecast
+   for a year was on file and out of her reach. Past prints of one release,
+   oldest first, each beside what was expected. The tally is worked out here,
+   since lining up two dozen figures and their units by eye is what a model
+   does worst; a pair in different units, or one that is not a number, is
+   counted apart rather than guessed. Above and below are arithmetic, never
+   good or bad: a higher unemployment rate is above consensus too.
+
+   Matched on the start of the name, so the period every row carries is left
+   off and a release from abroad, which leads with its country's code, does not
+   answer for one at home.
+   ───────────────────────────────────────────────────────────────────────── */
+export const RELEASE_PRINTS = 24;
+
+const RELEASES_TOOL = {
+  name: "get_releases",
+  description:
+    `Past prints of one release from the calendar on file — the newest ${RELEASE_PRINTS} ` +
+    "inside the months asked, oldest first, each with its actual against the consensus " +
+    "and the prior — and a count of how many came in above, below or on the consensus. " +
+    "Name the release as the calendar lists it, without the period in brackets: " +
+    "'Core Inflation Rate MoM', 'Non Farm Payrolls', 'Fed Interest Rate Decision'. One " +
+    "from abroad starts with its country's code: 'EU Inflation Rate YoY Flash'. Use it " +
+    "when how a release has run against expectations changes what you say about the " +
+    "next one, and quote that history from here, never from a search.",
+  input_schema: {
+    type: "object",
+    properties: {
+      release: { type: "string", description: "The release's name as the calendar lists it, without its period." },
+      months: { type: "integer", description: "How far back to read, 1 to 120. Defaults to 24." },
+    },
+    required: ["release"],
+    additionalProperties: false,
+  },
+} as const;
+
+/* A boundary: cleaned and clamped, never thrown. `*` is PostgREST's wildcard,
+   so it is taken out of what she named and put back only at the end. */
+export const releaseName = (release: unknown) => String(release ?? "").replace(/\*/g, "").trim().slice(0, 80);
+
+export function printsQuery(name: string, months: unknown, now = Date.now()): string {
+  const n = Math.min(Math.max(Math.trunc(Number(months)) || 24, 1), 120);
+  const from = new Date(now);
+  from.setUTCMonth(from.getUTCMonth() - n);
+  return `eugenia_calendar?select=${RELEASE_COLUMNS}&name=ilike.${encodeURIComponent(name)}*` +
+         `&actual=not.is.null&at=gte.${from.toISOString()}&at=lte.${new Date(now).toISOString()}` +
+         `&order=at.desc&limit=${RELEASE_PRINTS}`;
+}
+
+// A figure as TradingView writes it — `0.3%`, `254K`, `-1.2B` — split into its
+// number and its unit, or null for anything else.
+const figureOf = (v: string | null) => {
+  const m = v?.match(/^(-?\d+(?:\.\d+)?)\s*([^\d\s]*)$/);
+  return m ? { n: Number(m[1]), unit: m[2] } : null;
+};
+
+const yearDay = (iso: string) => new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'America/New_York', day: 'numeric', month: 'short', year: 'numeric',
+}).format(new Date(iso));
+
+// Newest first as read, so the limit keeps the latest; told oldest first.
+export function printsList(rows: Release[], release: string): string {
+  const told = [...rows].reverse();
+  const tally = { above: 0, below: 0, on: 0, apart: 0 };
+  const lines = told.map(r => {
+    const a = figureOf(r.actual), c = figureOf(r.consensus);
+    if (a && c && a.unit === c.unit) tally[a.n > c.n ? 'above' : a.n < c.n ? 'below' : 'on']++;
+    else tally.apart++;
+    return `· ${yearDay(r.at)}, ${r.name}: ${r.actual}` +
+           (r.consensus ? ` against ${r.consensus} expected` : ", no consensus on file") +
+           (r.prior ? `, after ${r.prior}` : "");
+  });
+  const reach = rows.length === RELEASE_PRINTS
+    ? `\nThe read stops at its ${RELEASE_PRINTS} newest prints, so it reaches back only to ` +
+      `${yearDay(told[0].at)}.`
+    : "";
+  return `How "${release}" has printed against the consensus, oldest first, from the calendar on file:\n` +
+    `${lines.join("\n")}\nAgainst the consensus: ${tally.above} above, ${tally.below} below, ` +
+    `${tally.on} on it` + (tally.apart ? `; ${tally.apart} with no consensus or no comparable figure` : "") +
+    `. Above and below are arithmetic, not good or bad news.` + reach;
+}
+
+async function readPrints(release: unknown, months: unknown): Promise<string> {
+  const name = releaseName(release);
+  if (!name) return "Name the release as the calendar lists it, without its period.";
+  try {
+    const rows = await readRows<Release>('Prints', printsQuery(name, months));
+    return rows.length
+      ? printsList(rows, name)
+      : "Nothing on file starts with that name and carries a figure in that window. Check the " +
+        "name against the calendar, and say you have no record rather than that it never printed: " +
+        "the calendar holds only what was filed.";
+  } catch (err) {
+    console.error("doji-eugenia: prints read failed —", why(err));
+    return "The calendar on file could not be read just now. Do not take a release's history from a " +
+      "search; say you do not have it.";
+  }
+}
+
 /* ─── The price, read off the instrument ───────────────────────────────────
    Through the poller, never the broker: the endpoint that serves a price also
    serves create_order, so the token stays in doji-mcp-sync and she presents
@@ -1614,6 +1716,7 @@ const CHAT_TOOLS = [
   STRATEGY_TOOL,
   LOOP_TOOL,
   CALL_TOOL,
+  RELEASES_TOOL,
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, PORTRAIT_TOOL, CLOSE_TOOL,
                            RECORD_TOOL, CHECK_TOOL, STATS_TOOL];
@@ -1746,6 +1849,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case STRATEGY_TOOL.name: return readStrategy(input.section);
     case CHANNEL_TOOL.name:  return await setChannel(input.channel, input.state, input.evidence);
     case MARKET_TOOL.name:   return await readMarket();
+    case RELEASES_TOOL.name: return await readPrints(input.release, input.months);
     case AROUND_TOOL.name:
       return (await Promise.all([aroundBlock(), ratesBlock(), headlinesBlock(),
                                  positioningBlock(), volumeBlock()])).join("").trim();

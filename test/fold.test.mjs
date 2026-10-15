@@ -45,6 +45,7 @@ import {
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock,
+  releaseName, printsQuery, printsList, RELEASE_PRINTS,
   sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
   volumeList, volumeBlock, keptMarket, storeMarket, storeRates, storeTrend, trendList, trendBlock,
 } from '../supabase/functions/doji-eugenia/index.ts';
@@ -4144,6 +4145,55 @@ test('a landed release is never described as one still to come', () => {
   assert.equal(calendarList([]), '');
 });
 
+/* ─── How a release has run against expectations ─────────────────────────────
+   Five of core inflation's prints, the newest first as the read returns them,
+   one with no consensus and one in a unit the consensus is not in. */
+const print = (at, name, actual, consensus, prior = null) =>
+  ({ id: 1, at, name, country: 'US', importance: 'high', consensus, prior, actual });
+const PRINTS = [
+  print('2026-10-14T12:30:00Z', 'Core Inflation Rate MoM (Sep)', '0.4%', '0.3%', '0.3%'),
+  print('2026-09-11T12:30:00Z', 'Core Inflation Rate MoM (Aug)', '0.3%', '0.3%', '0.2%'),
+  print('2026-08-12T12:30:00Z', 'Core Inflation Rate MoM (Jul)', '0.2%', '0.3%'),
+  print('2026-07-15T12:30:00Z', 'Core Inflation Rate MoM (Jun)', '0.3%', null),
+  print('2026-06-10T12:30:00Z', 'Core Inflation Rate MoM (May)', '0.3%', '300K'),
+];
+
+test('a release\'s prints are told oldest first, and the tally against the consensus is counted', () => {
+  const out = printsList(PRINTS, 'Core Inflation Rate MoM');
+  const lines = out.split('\n').filter(l => l.startsWith('· '));
+  assert.deepEqual(lines.map(l => l.match(/\((\w+)\)/)[1]), ['May', 'Jun', 'Jul', 'Aug', 'Sep'],
+    'the prints are not told in the order they happened');
+  assert.match(out, /· 14 Oct 2026, Core Inflation Rate MoM \(Sep\): 0\.4% against 0\.3% expected, after 0\.3%/);
+  assert.match(out, /Core Inflation Rate MoM \(Jun\): 0\.3%, no consensus on file/);
+  // A figure against a consensus in another unit is counted apart, never compared.
+  assert.match(out, /1 above, 1 below, 1 on it; 2 with no consensus or no comparable figure\./);
+  assert.match(out, /arithmetic, not good or bad news/);
+  assert.doesNotMatch(out, /stops at its/, 'a short read says it was cut');
+
+  // A full read says how far back it reaches.
+  const full = Array.from({ length: RELEASE_PRINTS }, (_, i) =>
+    print(new Date(Date.UTC(2026, 9, 1) - i * 30 * 86_400_000).toISOString(), `NFP (${i})`, '200K', '180K'));
+  assert.match(printsList(full, 'NFP'), new RegExp(`${RELEASE_PRINTS} above, 0 below, 0 on it\\.[\\s\\S]*` +
+    `stops at its ${RELEASE_PRINTS} newest prints, so it reaches back only to \\d+ \\w+ 2024\\.`));
+});
+
+test('the prints read is bounded, newest first, and takes what she named as a value, never a pattern', () => {
+  const now = Date.parse('2026-10-15T12:00:00Z');
+  const q = printsQuery(releaseName('  Core *Inflation Rate MoM '), 6, now);
+  // Her wildcard is taken out; the one at the end is the code's.
+  assert.match(q, /&name=ilike\.Core%20Inflation%20Rate%20MoM\*&/);
+  assert.match(q, /&actual=not\.is\.null&at=gte\.2026-04-15T12:00:00\.000Z&at=lte\.2026-10-15T12:00:00\.000Z/);
+  assert.match(q, new RegExp(`&order=at\\.desc&limit=${RELEASE_PRINTS}$`));
+  // Clamped: nothing past ten years, nothing under a month, a default for nonsense.
+  assert.match(printsQuery('NFP', 999, now), /at=gte\.2016-10-15/);
+  assert.match(printsQuery('NFP', 0, now), /at=gte\.2024-10-15/);
+  assert.match(printsQuery('NFP', 'soon', now), /at=gte\.2024-10-15/);
+  assert.equal(releaseName('**'), '');
+  assert.equal(releaseName('x'.repeat(200)).length, 80);
+  // An ampersand she typed cannot open a second filter.
+  assert.match(printsQuery('A&order=id.asc', 12, now), /name=ilike\.A%26order%3Did\.asc\*/);
+});
+
 test('a calendar line from another day names the day, and today stays bare', () => {
   /* A day forward holds two 08:30s and twelve hours back holds last night's
      20:00, so the day must be named. Driven across yesterday evening, this
@@ -5386,6 +5436,7 @@ const TOOL_CALLS = [
   ['record_read',   { reading: 'a read', test: 'the two-year falls', verdict: 'untested', evidence: 'no close',
                       firmness: 'light' }],
   ['make_call',     { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market' }],
+  ['get_releases',  { release: 'Core Inflation Rate MoM', months: 12 }],
 ];
 
 /* AND THE LIST IS HELD AGAINST THE SWITCH: a tool added to `serve` and not
