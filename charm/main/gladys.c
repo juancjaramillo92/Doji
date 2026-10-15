@@ -37,7 +37,6 @@ static const struct { const char *key, *column; } ANSWERS[4] = {
 static const char *const SETUPS[2] = { "Break & Retest", "Support & Resistance" };
 
 #define READ_MS    15000
-#define FRAME_MS   50     // the dark reaching the screen before the journal leaves it
 
 static bool read_answer(const char *body, trade_t *t) {
     cJSON *root = cJSON_Parse(body);
@@ -112,10 +111,11 @@ int gladys_journal(void) {
     }
     if (reached && answered && t.waiting == 0) journal_done(all_yes);
     // The journal gives way to the dark, never to a face: the sleep screen is
-    // put under it first, so taking it away shows nothing in between.
+    // put under it first, so taking it away shows nothing in between. The
+    // face's next frame puts the dark up, and a frame more sees it drawn.
     if (shown) {
         face_set_mode(FACE_DARK);
-        vTaskDelay(pdMS_TO_TICKS(FRAME_MS));
+        vTaskDelay(pdMS_TO_TICKS(2 * FACE_FRAME_MS));
     }
     journal_hide();
     return reached ? t.waiting : -1;
