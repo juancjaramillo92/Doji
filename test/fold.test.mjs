@@ -3253,41 +3253,43 @@ test('R-02 checks the cap and nothing else', () => {
     'unknown', 'R-02 has no losses to look at, which is unknown rather than clean');
 });
 
-test('R-03 allows one entry after a $20 stop, and a tighter loss is not one', () => {
+test('R-03 allows no entry after a $20 stop, and a tighter loss is not one', () => {
   const day = '2026-01-06';
   const at = (hm) => `${day}T${hm}:00Z`;
   const t = (id, open, close, o) => trade({ id, open_day: day, entry_price: 4000,
     entry_time: at(open), fill_time: close && at(close), ...o });
   const stop = (o) => t('PIDs', '10:00', '10:30', { pnl: -80, exit_price: 3980, ...o });
-  const win = (id, open) => t(id, open, '15:00', { pnl: 120, exit_price: 4030 });
+  const win = (id, open, close = '15:00') => t(id, open, close, { pnl: 120, exit_price: 4030 });
   const r = (rows) => verdictOf(rows, 'R-03');
 
-  // One re-entry after the full stop is the sweep exception, and a pass.
-  const kept = r([stop(), win('PIDa', '10:40')]);
+  // The full stop ends the day: alone it is a pass, and one entry before it is
+  // not after it.
+  const kept = r([win('PIDa', '08:00', '09:00'), stop()]);
   assert.deepEqual([kept.verdict, kept.passed, kept.failed], ['pass', 1, 0]);
 
-  // A second is the breach, and the DAY is what is named — in either row order.
-  const broke = r([win('PIDb', '12:00'), win('PIDa', '10:40'), stop()]);
+  /* ONE ENTRY AFTER IT IS THE BREACH — a sweep re-entry follows only a stop
+     tighter than $20 — and the DAY is what is named, in either row order. */
+  const broke = r([win('PIDa', '10:40'), stop()]);
   assert.deepEqual([broke.verdict, broke.failed, broke.ids], ['fail', 1, [day]]);
 
   // Past the cap is R-02's breach and still a full stop.
-  assert.equal(r([stop({ exit_price: 3975 }), win('PIDa', '10:40'), win('PIDb', '12:00')]).verdict, 'fail');
+  assert.equal(r([stop({ exit_price: 3975 }), win('PIDa', '10:40')]).verdict, 'fail');
 
   /* HIS DEFINITION. A $12 stop taken in full is a loss and not a full stop, so
-     the entries after it leave the population — counted nowhere. */
-  const tight = r([stop({ exit_price: 3988, pnl: -48 }), win('PIDa', '10:40'), win('PIDb', '12:00')]);
+     the re-entry after it — the one a sweep permits — leaves the population. */
+  const tight = r([stop({ exit_price: 3988, pnl: -48 }), win('PIDa', '10:40')]);
   assert.deepEqual([tight.passed, tight.failed, tight.unresolved], [0, 0, 0]);
-  assert.equal(r([stop({ exit_price: 3980.01 }), win('PIDa', '10:40'), win('PIDb', '12:00')]).failed, 0,
+  assert.equal(r([stop({ exit_price: 3980.01 }), win('PIDa', '10:40')]).failed, 0,
     'a loss a cent inside $20 was read as a full stop');
 
   // Unmeasurable where it could matter, and only there.
-  assert.equal(r([stop({ fill_time: null }), win('PIDa', '10:40'), win('PIDb', '12:00')]).verdict, 'unknown',
+  assert.equal(r([stop({ fill_time: null }), win('PIDa', '10:40')]).verdict, 'unknown',
     'a full stop with no instant cannot count the entries after it');
-  assert.equal(r([stop({ exit_price: null }), win('PIDa', '10:40'), win('PIDb', '12:00')]).verdict, 'unknown',
+  assert.equal(r([stop({ exit_price: null }), win('PIDa', '10:40')]).verdict, 'unknown',
     'a loss with no exit price might be a full stop');
-  const cannot = r([stop({ fill_time: null }), win('PIDa', '10:40')]);
+  const cannot = r([stop({ fill_time: null })]);
   assert.deepEqual([cannot.verdict, cannot.unresolved], ['pass', 0],
-    'two entries cannot breach this, so there was nothing the data failed to decide');
+    'one entry cannot breach this, so there was nothing the data failed to decide');
 });
 
 test('R-18 reads a close with no broker alert as a hand close, and spares the Friday one', () => {

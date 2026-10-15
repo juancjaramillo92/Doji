@@ -19,7 +19,7 @@
    interpolates it — the copy here was the unreachable one. */
 import { PITCH } from "./prompt.ts";
 
-export const VERSION = "v1.23";
+export const VERSION = "v1.24";
 
 /* The whole strategy said once, interpolated into ALWAYS and §0. */
 const SUMMARY = `XAUUSD only, intraday to multi-session, positions held for the move they were
@@ -29,12 +29,13 @@ Resistance trades the reversal** off an outer extreme that is holding. Take
 profit is **$30 from entry by default**, $25 by exception where the level looks
 hard to reach. The stop is a **ceiling of $20** and is set at entry from where
 the chart shows the idea to be wrong, so it is usually tighter — it is never
-moved tighter once the trade is on. Reward-to-risk must be at least 1:1.5 to
+widened, and tightened only under R-19. Reward-to-risk must be at least 1:1.5 to
 enter, which the default $30 target satisfies at any permitted stop. Stop moves
 to break-even once price has travelled $20 toward the target. **Stop and target are
 always resting orders and a position is never closed by hand.** **At most one entry
-per day** — two only when the second is a sweep re-entry — and one position at a
-time. One full stop ends the day, as does −4% of account. **He trades at any
+per day** — two only when the second is a sweep re-entry after a stop tighter
+than $20 — and one position at a time. One full stop ends the day, as does −4% of
+account; at every rung those are the same loss. **He trades at any
 hour, and a top-priority release makes him cautious rather than absent.** **No
 position across a Friday close, no entries on known low-volume days.** Position
 size is on the row in ounces; lots are ounces ÷ 100 and \`account = lots ×
@@ -84,7 +85,7 @@ counts as kept just because nothing contradicted it.
 |---|---|---|---|---|---|---|---|
 | R-01 | Take profit $30 from entry price, or $25 where the level looks hard to reach | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) < 25\`, except a Friday close-out, which is \`unknown\` | §5 | v1.0 |
 | R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` — the CAP only, see §7 | §5 | v1.0 |
-| R-03 | No entry after a full-stop loss on the same day, except one sweep re-entry | day | \`followed_rules\` | journal | within an \`open_day\`, at most one \`entry_time\` later than the \`fill_time\` of a loss with \`abs(exit − entry) ≥ 20\` | §5 | v1.0 |
+| R-03 | No entry after a full-stop loss on the same day — a sweep re-entry follows only a stop tighter than $20 | day | \`followed_rules\` | journal | within an \`open_day\`, no \`entry_time\` later than the \`fill_time\` of a loss with \`abs(exit − entry) ≥ 20\` | §5 | v1.0 |
 | R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | journal | no loss beyond the ±$3 scratch band on a trade whose \`best_price\` was $20 or more in his favour; \`unknown\` where \`best_price\` is null | §6 | v1.0 |
 | R-05 | Break & Retest at interior levels only — marked by the grid or by a previous price reaction — never at an extreme | trade | \`followed_rules\` | judgment | *"Was this at an extreme or in the interior?"* | §4.1 | v1.0 |
 | R-06 | Support & Resistance at the outer extremes of the range only | trade | \`followed_rules\` | judgment | *"Was this the outer boundary, or a level inside the range?"* | §4.2 | v1.0 |
@@ -92,11 +93,11 @@ counts as kept just because nothing contradicted it.
 | R-08 | Pre-trade sequence run in order; a failed step ends it rather than being weighed | trade | \`followed_rules\` | judgment | *"Which step did you stop at, if any?"* | §6 | v1.0 |
 | R-10 | One position at a time — no scaling in, no adding, no second trade open | trade | \`followed_rules\` | journal | no two rows whose \`entry_time\`→\`fill_time\` spans overlap | §5 | v1.9 |
 | R-11 | The day ends at −4% of account, however it was reached | day | \`followed_rules\` | journal | within an \`open_day\`, no \`entry_time\` later than the \`fill_time\` of the loss that took cumulative P&L past −4% of \`size_oz × 500\` | §5 | v1.9 |
-| R-12 | At most one entry per day; two only when the second is a sweep re-entry within 15 minutes | day | \`followed_rules\` | journal | no \`open_day\` with three or more entries; a second entry before the prior \`fill_time\`, or while the prior trade is still open, is a \`fail\`, as is one more than 15 min after it; within 15 min is \`unknown\` | §5 | v1.10 |
+| R-12 | At most one entry per day; two only when the second is a sweep re-entry within 15 minutes, after a stop tighter than $20 | day | \`followed_rules\` | journal | no \`open_day\` with three or more entries; a second entry before the prior \`fill_time\`, or while the prior trade is still open, is a \`fail\`, as is one more than 15 min after it; within 15 min is \`unknown\` | §5 | v1.10 |
 | R-13 | The sizing rung moves only between months, never inside one | month | \`followed_rules\` | journal | one distinct \`size_oz\` per calendar month, over rows carrying one | §5 | v1.10 |
 | R-15 | No position held across the Friday close; a live trade is closed at market right before it | trade | \`followed_rules\` | journal | no \`entry_time\` before and \`fill_time\` after a Friday 17:00 New York close | §6 | v1.11 |
 | R-16 | No trading on known low-volume days — US market and bank holidays, the Christmas-to-New-Year stretch | day | \`followed_rules\` | journal | no \`entry_time\` on a US market or bank holiday, or in the Christmas-to-New-Year stretch | §5 | v1.11 |
-| R-17 | Stop trading when the trading itself has deteriorated — rules broken, losses running, chasing | period | \`followed_rules\` | judgment | *"Is this a stretch you should be standing away from?"* — the trigger is behaviour, never the drawdown | §5 | v1.11 |
+| R-17 | Stop trading when the trading itself has deteriorated — rules broken, chasing, crazy trading; never for losses taken with proper entries | period | \`followed_rules\` | judgment | *"Is this a stretch you should be standing away from?"* — the trigger is behaviour, never the drawdown | §5 | v1.11 |
 | R-18 | Stop and target are always resting broker orders; never close a position by hand | trade | \`followed_rules\` | journal | no closed trade without a broker alert (\`net_pnl\` null — cTrader sends none for a hand close), except one closing at the Friday close; a close under an hour old is \`unknown\` | §6 | v1.13 |
 | R-19 | With a high-impact print pending on a position inherited from an earlier session: in profit, stop to break-even regardless of +$20; losing, tighten to a closer invalidation, or pull it in if there is none. Target never moves | trade | \`followed_sl\` | journal | at the first US release TradingView rates high inside a position's span whose session is not the one it opened in, the stop in force (\`trade_stops\`) is at break-even or better, and neither wider than first seen nor untouched; the target unmoved. Tightened short of break-even is \`unknown\`, as is a position whose stop history starts after the print | §6 | v1.13 |
 | R-20 | Trading is open at any hour; around a top-priority release — a US release TradingView rates high — he trades with caution, the print weighed in the read rather than ignored | trade | \`followed_rules\` | judgment | *"A top-priority print was in play — did you weigh it, or trade as if it were not there?"* | §6 | v1.23 |
@@ -109,7 +110,7 @@ export const SECTIONS: Record<string, string> = {
 
   "0": `## 0 · Header
 
-**Version** ${VERSION} · **Effective from** [decide] · **Supersedes** v1.22
+**Version** ${VERSION} · **Supersedes** v1.23
 
 ### Summary
 
@@ -237,6 +238,10 @@ change, never inferred into one, and never in a message that lands mid-trade.`,
 **NOT HIS DECISIONS.** Researched reference material, written for him because he
 is learning macro deliberately. Treat it as shared vocabulary, never as something
 he has committed to.
+
+**Every figure here is dated.** Correlations move with the window and the regime,
+and the tonnage is the World Gold Council's through 2025. Quote one as of its
+year, never as today's.
 
 **This section assumes the foundation. §3 is the foundation.** If a term here
 needs building rather than naming — real yield, breakeven, core, the dot plot —
@@ -943,7 +948,7 @@ back inside is a liquidity sweep: the stops resting beyond the level were taken 
 price refused anyway, which is the level holding rather than failing.
 
 That is why §6 allows re-entry after a sweep takes the stop and price comes rapidly
-back. It is not an exception to the rules and not a revenge trade — the idea was
+back — a stop tighter than $20, since a full one has already spent the day. It is not an exception to the rules and not a revenge trade — the idea was
 never invalidated, the stop was simply inside the sweep. The trade being stopped
 out and the idea being wrong are two different events at an extreme, and only the
 second one ends it.
@@ -996,7 +1001,7 @@ It is aimed directly at what §9 says goes wrong. The failure is impatience at a
 level, and a hard cap of one is the structural answer: a trade taken impatiently at
 nine in the morning costs the whole day rather than being followed by another.
 
-**What he is working toward is fewer — two or three trades a week.** An aim, NOT a
+**What he is working toward is fewer — about four trades a week.** An aim, NOT a
 rule, recorded the way this section records the sizing pattern. Report the weekly
 count as a plain number when asked, never as a verdict.
 
@@ -1006,14 +1011,14 @@ not the statistics.**
 
 ### The day also ends at 4%, and a full stop is the usual way of reaching it
 
-**Two rules, not one seen twice.** A full stop is the stop taken at its $20
-ceiling (§12), so R-03 and R-11 can disagree in both directions: a full stop at a
-small rung ends the day under R-03 having spent well under the limit, and several
-smaller losses — a tighter stop taken, or a hand-cut exit — can spend the limit
-without R-03 firing.
+**A full stop is the day's 4%, at every rung.** The ladder is linear, so a $20 stop
+on \`size_oz\` ounces loses \`20 × size_oz\` against an account of \`500 × size_oz\`
+— 4% exactly, before commission. R-03 and R-11 agree on every full stop.
 
-**R-11 is the limit. R-03 is the usual shape of hitting it.** In practice R-12's
-one-entry cap reaches first on most days.
+**Two rules all the same.** Several smaller losses — a tighter stop taken, or a
+hand-cut exit — can spend the 4% without R-03 firing, which is R-11's half. And R-03
+reads prices alone, so it decides a day whose rows carry no size, where R-11 is
+\`unknown\`. In practice R-12's one-entry cap reaches first on most days.
 
 ### Nothing else caps a loss, and that is deliberate
 
@@ -1023,9 +1028,13 @@ number attached. What stops a bad run is R-17, and it is not a number.
 ### When he stops trading altogether
 
 **R-17, and the trigger is behavioural rather than financial.** When the trading
-itself has gone wrong — rules being broken, losses running, chasing the move to
-get back to flat — he stops for a stretch, and he has done this. **Even at a 5%
-loss.** The size of the drawdown is not what tells him; the way he is trading is.
+itself has gone wrong — rules being broken, chasing the move to get back to flat —
+he stops for a stretch, and he has done this. **Even at a 5% loss.** The size of
+the drawdown is not what tells him; the way he is trading is.
+
+**A bad stretch is crazy trading, in his words — not losing with proper entries.**
+A run of losses on trades taken by the sequence is the strategy's variance, and no
+reason to stop.
 
 **This is the only rule in the document that watches how he is trading rather than
 a price, a distance or a percentage.** Everything else is arithmetic. This one
@@ -1090,30 +1099,27 @@ the new rung is 4% of the new account, not a larger share of the old one.
 
 ### Coming down a rung
 
-**When the implied account has halved, he drops to the previous rung** — at the
-next month boundary, like every other move.
+**His judgment, with no number, at a month boundary** like every other move (R-13).
+What he is keeping is *the maximum stop at about 4% of what is actually there*: when
+the capital behind the size has shrunk far enough that a full stop is a much larger
+share of it, he steps down.
 
-Not arbitrary and not really a drawdown threshold. The rungs are 0.02 lots per
-$1,000, so **the rung below sits at half the account**: halving is where the current
-size stops fitting the capital behind it. Better read as *keep the maximum stop at
-4% of what is actually there*.
-
-**Measured against the implied account, not the broker balance.** \`size_oz × 500\`
-is the base the ladder was applied to and includes what is held off-broker. Using
-the balance would delay the step while reserve capital sat unused.
+**Not measurable here, and deliberately so.** \`size_oz × 500\` is the account the
+size implies, so it cannot fall while the size stays put, and the capital he holds
+off-broker is on no row. A threshold written for him would be a number he never
+set.
 
 His reason is the psychological half of the same arithmetic: he does not want each
-trade's risk large relative to the account. Holding a rung through a halved account
-turns a 4% stop into an 8% one, and those are the same trade at different sizes —
-the second much harder to take properly.
+trade's risk large relative to the account. A 4% stop held through a shrunken
+account is an 8% one at the same size, and the second is much harder to take
+properly.
 
 **The downward step is not funded.** The account shrank by what was lost, not to the
 lower rung's level, so trading the lower rung risks *less* than 4%. That is the
 brake working.
 
-Unlike the upward move it leaves a trace: a size the implied account no longer
-supports is visible. Not a violation — the move is by hand and there is a lag — but
-a question the data can raise.
+**She does not raise it.** When to step down is his call; asked, she can say what a
+full stop now costs against what he tells her he holds.
 
 ### Known low-volume days
 
@@ -1303,23 +1309,24 @@ plus whatever the gap adds. Tightening reduces the exposure that is actually the
 - **Never wider**, ever
 
 **Read narrowly or it becomes a door.** Written as a general tool it makes "there is
-news later" a reason to touch any position — the same shape as the sweep exception
-in R-03, which §7 already flags as pushable. It applies to a position inherited from
+news later" a reason to touch any position — the same shape as the sweep re-entry,
+which §7 already flags as pushable. It applies to a position inherited from
 an earlier session and to nothing else.
 
-### Re-entry after a sweep, and it is bounded twice
+### Re-entry after a sweep, and it is bounded three times
 
-Where a liquidity sweep takes the stop and price comes rapidly back, he may enter
-again. **Same level, same direction, and it has to be a true sweep** — the same
+Where a liquidity sweep takes a stop tighter than $20 and price comes rapidly back,
+he may enter again. **Never after a full stop**: $20 is the day's 4% (§5), so R-03
+and R-11 have both ended the day. **Same level, same direction, and it has to be a true sweep** — the same
 trade re-entered because the idea was never invalidated, not another go at a loss.
 
 **Rapidly back means a couple of 5-minute candles, three at most** — about fifteen
 minutes from the sweep to the return. Past that it is not a sweep re-entry; it is a
 new idea.
 
-**Once.** One re-entry and the day is over regardless, which is R-12's second entry
-and the whole of the exception to R-03. Without the cap the reasoning is reusable,
-and a violent session would swallow the day one "sweep" at a time.
+**Once.** One re-entry and the day is over regardless, which is R-12's second entry.
+Without the cap the reasoning is reusable, and a violent session would swallow the
+day one "sweep" at a time.
 
 **The fifteen minutes is checkable and the rest is not.** \`entry_time\` on the second
 trade against \`fill_time\` on the first gives the gap directly, so a late re-entry is
@@ -1417,7 +1424,7 @@ the row keeps only the first and the broker only the last. The population is a
 position a high-rated US release landed on in a session later than the one it opened in —
 the one path the rule is written for. Read generally it turns "there is news later"
 into a reason to touch any position, which is the same door §7 already flags on
-R-03's sweep exception.
+the sweep re-entry.
 
 **What it can and cannot part.** A stop at break-even or better passes, whichever
 way the trade stood — a losing trade cannot hold a stop past its entry. An
@@ -1476,13 +1483,14 @@ $20. A loss $20 or more from entry is one, anything smaller is not, and the rule
 runs over every row that carries both prices. A loss past $20 is also R-02's
 breach, and it is still a full stop — the stop is what ended the day. A day whose
 losses cannot be measured, or whose full stop carries no \`fill_time\` to count
-later entries from, is \`unknown\` wherever it holds enough entries to breach.
+later entries from, is \`unknown\` wherever it holds a second entry.
 
-**Its exception is real and it opens a door.** One re-entry is permitted after a
-sweep, so the predicate allows a second entry and fails on a third. But nothing
-separates a genuine sweep re-entry from a rationalised one — *"that was just a
-sweep"* is available every time. R-11, R-12 and R-17 are the backstops; the honesty
-is his.
+**It has no exception.** A sweep re-entry follows only a stop tighter than $20,
+which is not a full stop, so it never reaches this population; one entry after a
+full stop is a \`fail\`. That closes the door the exception used to open on a full
+stop. On a tighter one it stays open — nothing separates a genuine sweep re-entry
+from a rationalised one, and *"that was just a sweep"* is available every time.
+R-11, R-12 and R-17 are the backstops there; the honesty is his.
 
 **R-04 is \`journal\` because the broker keeps the path.** This section called it
 unrecoverable — the prices on a row are endpoints — and the broker's minute bars go
@@ -1768,7 +1776,7 @@ when he raises them**, and nothing here is deferred to it.
 
 No claim from a single trade. Per-trade conversations are for processing.
 
-**He is working toward two or three trades a week** (§5), so this is not the
+**He is working toward about four trades a week** (§5), so this is not the
 arithmetic of a day-trading journal. A month is a handful of trades. A rate over
 anything less than a long stretch is noise, and saying so is more useful than
 qualifying a number nobody should be reading.
@@ -1780,11 +1788,10 @@ sleeps rather than because of anything he decided (§4). Report a bucket if he a
 when all five are identical.
 
 **Direction is one of the few splits the data can actually make**, since
-\`direction\` is on every row. **He trades both ways.** He has noticed he prefers
-shorting so far — recorded as a preference and **explicitly not a rule**, the same
-shape as the sizing pattern in §5. Never read a long/short skew as confirming
-something he decided, and at two or three trades a week the split means very little
-for a long time yet.
+\`direction\` is on every row. **He trades both ways, with no preference between
+them.** A long/short skew in the data is a fact about a small sample, never a
+preference or a decision, and at about four trades a week the split means very
+little for a long time yet.
 
 **The break-even win rate is 40%** — the line any win rate is read against. It falls
 out of the geometry: a $30 target against a $20 stop needs 20/(20+30), and 44.4% on
@@ -1925,11 +1932,11 @@ resolve does.
 is his own — what he will wait for at the level — asked while the wait is still
 ahead of him rather than after it went wrong.
 
-**And he is training the wait.** Recorded as his current focus as of v1.9, not as a
-settled habit: he is deliberately working on not entering the moment a level is
-reached. A change in this over time is the single most valuable thing the journal
-could show, and the only way it will show is if the marker keeps being answered
-honestly while the behaviour is still bad.`,
+**His current focus is finding his rhythm**, in his words, as of v1.24 — recorded
+as a focus, not a rule, and not defined here beyond what he says of it. The wait
+at the level is still R-07 and still the failure above. A change in how often he
+takes the touch is the single most valuable thing the journal could show, and the
+only way it will show is if the marker keeps being answered honestly.`,
 
   "10": `## 10 · What would have to change, and what he has decided
 
@@ -2062,9 +2069,9 @@ taken and price refused anyway. The level held. Distinguished from a close beyon
 level, which is the level failing.
 
 **Sweep re-entry.** Re-entering the same level in the same direction after a sweep
-took the stop and price came back **within about three 5-minute candles**. Permitted
-once per day, and the only exception to R-03. Past fifteen minutes it is a new idea;
-inside it, indistinguishable in the data from a revenge trade.
+took a stop tighter than $20 and price came back **within about three 5-minute
+candles**. Permitted once per day, never after a full stop. Past fifteen minutes it
+is a new idea; inside it, indistinguishable in the data from a revenge trade.
 
 **High-impact release** — top priority, in his words. A scheduled economic print or
 decision capable of moving gold sharply — NFP, CPI, PCE, FOMC. **For R-19 and R-20,
@@ -2077,7 +2084,7 @@ Calendar-known rather than judged at the screen (R-16).
 
 **Rung.** A step on the sizing ladder. \`account = lots × 50,000\`, continuous — 0.02
 lots per $1,000 at every size. Moves only between months (R-13): up by deposit, down
-when the implied account has halved.
+by his judgment when the capital behind it has shrunk.
 
 **Implied account.** \`size_oz × 500\` — the capital the ladder was applied to,
 including what is held off-broker. Distinct from \`balance\`, the deployed portion. The
@@ -2105,31 +2112,32 @@ Rows below v1.11 are history and describe the document as it stood. Where one st
 something later corrected — v1.7's "five steps", v1.3's account of the $25 target —
 it stays as written, because correcting the record would falsify it.
 
-| Version | Effective from | Change | From lesson |
-|---|---|---|---|
-| v1.23 | [decide] | **R-14 retired, and R-20 in its place: he trades at any hour, cautious around a top-priority release** — a US release TradingView rates high — rather than out of the market. The thirty minutes before one and the stand-aside until the news had confirmed something both go. Caution has no number, so R-20 is \`judgment\` and \`check_rules\` evaluates twelve rules. R-19 is unchanged and now reads as the print he did not take on at entry; a position opened in the session the print lands in is R-20's. §5 says why a holiday still stands him aside and a release does not. R-14's ID is not reused. **And she stops messaging him about prints on an open**: the warning that fired when he opened a trade with a high-rated print ahead goes with the rule — it was the unnecessary message the change was for. **The document also stops pretending she has no view.** She gives a read, files calls and judges a plan he brings, so §0 draws the line — her view sits beside his rules and is measured against them, never written into them — and gives the loop its inbound edge: a case the record makes is put to him as her proposal. §2's chain may end in her read, labelled, tested by a link, with no level; her read is not his step-1 bias. §6 and §7 record that she runs R-08 with him before the fact and that her judgment of a setup is never a \`pass\`. §8's *no scheduled moment* is corrected: her Saturday review reads the week whole. §9 moves his probe before the click. | His decision, and Eugenia's view widening |
-| v1.22 | [decide] | **Corrections, no rule changed.** Statements written before the poller began recording the stop and target as first seen still said no row could carry the plan: §6's step 4 and its $25 pairing, §6's *Recording*, R-02's note in §7 and §12's R:R now say the plan is on the rows since, and only there. \`open_day\` rolls at midnight New York, not at 17:00, in §4 and §12. §8's list of what \`followed_rules\` covers named fewer rules than the table maps to it. | Reading the document against the system |
-| v1.21 | [decide] | **R-16 reads bank holidays as well as market ones**, as its rule always said. The check had stopped at the exchanges' list, so Columbus Day and Veterans Day — the two days the banks close and the market trades — passed an entry the rule forbids. Veterans Day follows the Fed's observance: a Sunday moves to the Monday, a Saturday is not moved. **R-12 fails a second entry taken while the first was still open**, which had read as \`unknown\` because a negative gap counted as "within fifteen minutes". A sweep re-entry follows the first trade closing; one taken before it is a second position, and he trades one entry at a time. | His decisions, when the two gaps between the rules and their checks were put to him |
-| v1.20 | [decide] | **High impact is a US release TradingView rates high**, for R-14 and R-19 alike — one calendar for the briefing, the warnings and the rules, where two had been read. TradingView's ratings differ from Forex Factory's folders in places (it rates average hourly earnings and jobless claims medium, and a summit high), so a past verdict can move; a calendar marker with no release time is not a release and counts for neither rule. Its data goes back to 2003, so the weeks already traded are fetched once and R-14 stops reading them as unfetched. | His decision, to stop reading the same calendar from two services |
-| v1.19 | [decide] | **R-19 made checkable.** \`trade_stops\` records every stop and target the poller sees a position carry, one row per change, where the row keeps the first and the broker only the last; with Forex Factory's calendar saying a print was pending, R-19 moves to \`journal\`. Judged at the first USD red folder landing on a position opened in an earlier session: break-even or better passes, an untouched or wider stop fails, a moved target fails, a stop tightened short of break-even is \`unknown\` — right if the trade was losing, wrong if winning, and no row holds which. | His go-ahead, after asking which rules still had holes |
-| v1.18 | [decide] | **R-09 retired** — *only operate in obvious trends and cycles*. A line from a book he read while learning, never one he traded by, so it goes rather than being made checkable; its ID is not reused. §4's bias chart and §4.2's failure mode no longer lean on it. | His decision |
-| v1.17 | [decide] | **R-14 made checkable on the floor he set.** High impact is **the red folder on Forex Factory, USD only**, and **no entry in the thirty minutes before one**; the rest of the stand-aside stays open-ended and his. R-14 moves to \`journal\`: an entry inside the thirty minutes fails, one with a red folder later that day but further off is \`unknown\`, one with none ahead passes. The calendar is Forex Factory's own export, fetched nightly and kept, so the rule sees nothing before the first fetch and reads a missed week as \`unknown\` rather than quiet. Nothing after the print is checked — he set no number for it. | His definitions, asked for while making R-14 checkable |
-| v1.16 | [decide] | **R-18 made checkable, from a fact about the broker he confirmed.** cTrader sends an alert when a stop or target fills and none for a position closed by hand, so a closed trade with no alert — \`net_pnl\` null — was closed by hand. R-18 moves to \`journal\`: that is a fail, except at the Friday close, which is R-15 and permitted; a close under an hour old is \`unknown\` while its alert may still arrive. §8 records what a missing \`net_pnl\` means, and that a Friday hand close is now R-15 firing rather than a guess. | Eight closes with no alert, looked up in Gmail with him |
-| v1.15 | [decide] | **R-04 made checkable from the broker, not from him.** §7, §8 and §10 called it uncheckable for good because how far a trade ran was "stored nowhere, including at the broker"; the broker's minute bars go back a year, so \`best_price\` now records the furthest each trade ran in his favour, and R-04 moves to \`journal\` — a loss beyond the scratch band on a trade that had been $20 in his favour is a stop that was not moved. Nothing asked of him, nothing added to Gladys; the v1.9 decision against widening the journal stands for R-05 to R-07. | Eugenia's own review of which rules she could not see |
-| v1.14 | [decide] | **A full stop is the stop hit at $20 from entry**, in his words. §12 had also counted a stop set tighter and taken in full, which no row can tell from a hand-cut exit — so R-03's population was missing and the rule was \`field\`. With the definition his, R-03 moves to \`journal\` and its predicate reads a loss of $20 or more; §5's example of a full stop on a $12 stop is gone with it. | His definition, asked while making R-03 checkable |
-| v1.13 | [decide] | **Three gaps closed, found by asking what the document never asked.** R-18: **stop and target are always resting broker orders and a position is never closed by hand** — which makes R-01 and R-02 exact rather than suggestive, since a loss beyond $20 is now an edited order rather than a decision at the screen, and R-15's Friday close-out is named as the one permitted manual close. R-19: **a high-impact print landing on a position inherited from an earlier session** — in profit the stop goes to break-even regardless of R-04's threshold, losing it is tightened to a closer invalidation or pulled in if there is none, and the target never moves. Written narrowly on his instruction: he should not be holding through a print, and the path that produces this is an Asian-session trade still running into New York. §5's "never moved tighter" now carries that exception, and §8 records that R-19 muddies "break-even means R-04 fired" — a sub-$20 break-even on a trade opened in the same session is not R-19 and is a question. **Direction recorded: he trades both ways**, with a noticed preference for shorting held as a preference and explicitly not a rule, since \`direction\` is on every row and a skew would otherwise read as confirmation of a decision. | Asking what the document had never asked |
-| v1.12 | [decide] | **Verification pass rather than new rules.** Eighteen inherited claims — carried since before the audit and never confirmed by him — read back and confirmed, one corrected: **an interior level is any level inside the range, marked by the quarter grid OR by a previous price reaction**, so R-05, §4.1 and §12 no longer reduce interior levels to quarters and a previous high mid-range is tradeable for Break & Retest. §13's history confirmed as record rather than reconstruction. **§9's "identical rows" corrected** — the *price data* is identical, but \`followed_rules\` is not, and since he marks it honestly the marker is the signature and the only one. **§3 proofread**: the opening definition no longer contradicts cost-push, the room-to-cut argument now follows from nominal = real + expected inflation rather than asserting the Fed would have none, the 2.5% breakeven line is reconciled against the CPI/PCE gap, and the dot plot distinguishes participants from voters. **§3 given a term index** so a single lookup is not a scan of thirty thousand characters, plus retail sales, Michigan inflation expectations, the ISM/S&P PMI split, and the FRED codes for every rates series. | Verification of what was already written |
-| v1.11 | [decide] | **Four rules added, all from gaps an audit surfaced rather than from new behaviour.** R-14: no entries in the hours before a high-impact release, resuming once the volatility has passed and the news has confirmed something — the first rule connecting the briefing to the trading, and judgment because the window is open-ended by his description. R-15: nothing held across the Friday close, closed at market right before it, because a weekend gap can open past the stop — which forces a narrow R-01 exception for wins under $25 filling at that close. R-16: no trading on known low-volume days. R-17: **he stops trading when the trading has deteriorated — rules broken, losses running, chasing — and the trigger is behaviour, never drawdown.** He has stopped at a 5% loss; a threshold would fire on the wrong variable. **§3 written — the foundation**, built bottom-up from what inflation is through the funds rate, the transmission chain, bonds and yields, TIPS and breakevens, to why gold sits at the end of it, plus every metric a briefing uses. Written because he said the technical content lands as terms he nods past and he wants it from the inside out. **§0 records that the document teaches at more than one level**, against \`eugenia_channels\` states, with demotions from him never argued with. **§2 deepened** and pointed down to §3. **Sweep re-entry bounded at three 5-minute candles**, which makes half of R-12 checkable. **Session characters recorded** — New York violent, Asia calmer — as an input to the read, with London thin because of when he sleeps rather than by preference, and the Asian session's straddle of the calendar date written into §4, §8 and §12. **Slippage \`[decide]\` closed**: the stop is $20 from the chart fill with no spread allowance, so slippage is his. **The weekly review dropped** — he has never done one, and §8 no longer defers to it. **§9 corrected twice**: the NY-open caution now has its reason, and revenge trading is recorded as the same failure accelerating rather than a second failure. | A provenance and coverage audit, worked through question by question |
-| v1.10 | [decide] | R-12 caps entries at one a day (two when the second is a sweep re-entry); R-13 pins rung changes to month boundaries. **The sweep re-entry bounded at once** and stated as the one exception to R-03 — the two had contradicted each other since v1.5. Timeframes recorded: bias on daily/4H/1H, levels on 1H/30m, entry on 15m/5m. How a level is marked: the grid plus reaction points, with confluence. **B&R trades continuation, S&R trades the reversal** — counter-trend is the point, closing the fade-against-bias question. Coming down a rung written. §2 rewritten from research and marked as not his decisions. §9 corrected: greed is not a separate failure. Session floor removed; 40% kept in §12. | A full read of the document with him |
-| v1.9 | [decide] | **The stop is a ceiling, not a value** — under $20, set at entry from the chart's invalidation, never tightened. R-02 restated as a cap check with a stated blind spot. **The $25 target is two things**: an entry choice needing a stop under $16.67, and a management shortening. **R-08 folded from five steps to four.** Quarters defined. No session rule, stated. R-10 and R-11 given IDs. §5's "the day ends at 4%, which is one full stop" corrected: two rules. Sections 2, 9 and 10 written. §0 de-duplicated and given a section index. | His answers |
-| v1.8 | [decide] | \`planned_stop\` and \`planned_target\` retired: columns dropped, fields removed from the app. **He journals a trade, not a plan.** R-03 returns to \`field\` and the narrowed full-stop population; §8 and §12 restated — no row carries intent. | His decision |
-| v1.7 | [decide] | R-08's five steps written: top-down bias, liquidity pools and S&R, psychological levels, candle or chart pattern with signal then confirmation, and reward-to-risk of at least 1:1.5. Step 5 is arithmetic and checkable from the planned columns. Settles a contradiction the document was carrying — 1:1.5 at ENTRY, 1:1.25 the realised floor after a permitted shortening. | His rules |
-| v1.6 | [decide] | §4 written. The two setups differ by METHOD, not location. Invalidation stated per setup, and §6's re-entry rule shown to follow from S&R's. | Method research, anchored to his stated rules |
-| v1.5 | [decide] | §5 and §6 written. 4% per trade; the rung moves by hand; 4% is also the daily limit and there is no weekly or monthly one. One position at a time. Entry at market, exits price-based only, journalled at entry. Re-entry allowed after a liquidity sweep. R-08's sequence recorded as existing but not written down. | His answers |
-| v1.4 | [decide] | \`planned_stop\` and \`planned_target\` recorded at journalling time. R-03 moves from \`field\` to \`journal\`. §8 and §12 restated: intent is on the row. | Schema change |
-| v1.3 | [decide] | The target may be shortened from $30 to $25 where the level looks hard to reach. R-01 gains its lower bound. The R:R floor restated as 1:1.25. | His decision |
-| v1.2 | [decide] | Tolerance settled at none. \`TOL\` retired from §0 and §12. Recorded that R-01 is not R-02's mirror. | His decision |
-| v1.1 | [decide] | \`TOL\` named and R-01/R-02 given executable predicates. R-03 relabelled \`field\`. §8 records \`size_oz\` and the \`pnl\` fallback. | Review of v1.0 against the live schema |
-| v1.0 | [decide] | Initial document. R-01 through R-09. | — |`,
+| Version | Change | From lesson |
+|---|---|---|
+| v1.24 | **A sweep re-entry follows only a stop tighter than $20.** A full stop is $20 on a linear ladder, so it is the day's 4% at every rung, and R-11 had already ended the day R-03's one exception was meant to continue — a re-entry after a full stop could only ever breach R-11. R-03 now allows no entry after a full stop, and §5's claim that a full stop at a small rung spends well under the limit is corrected. **Coming down a rung is his judgment**: "the implied account has halved" could not be measured, since \`size_oz × 500\` moves only with the size, so the rule names no number and she does not raise it. The summary says the stop is never widened and tightened only under R-19, where it said never tightened. §2's figures are marked as dated. R-19 stays narrow, by his decision. **R-17's bad stretch is crazy trading, not losing with proper entries.** **What he says of himself, brought up to date**: about four trades a week where it was two or three; no preference between long and short; his current focus is finding his rhythm. The changelog's *Effective from* column goes — never filled, it was twenty-five \`[decide]\` markers for something nothing reads. | A point-by-point review with him |
+| v1.23 | **R-14 retired, and R-20 in its place: he trades at any hour, cautious around a top-priority release** — a US release TradingView rates high — rather than out of the market. The thirty minutes before one and the stand-aside until the news had confirmed something both go. Caution has no number, so R-20 is \`judgment\` and \`check_rules\` evaluates twelve rules. R-19 is unchanged and now reads as the print he did not take on at entry; a position opened in the session the print lands in is R-20's. §5 says why a holiday still stands him aside and a release does not. R-14's ID is not reused. **And she stops messaging him about prints on an open**: the warning that fired when he opened a trade with a high-rated print ahead goes with the rule — it was the unnecessary message the change was for. **The document also stops pretending she has no view.** She gives a read, files calls and judges a plan he brings, so §0 draws the line — her view sits beside his rules and is measured against them, never written into them — and gives the loop its inbound edge: a case the record makes is put to him as her proposal. §2's chain may end in her read, labelled, tested by a link, with no level; her read is not his step-1 bias. §6 and §7 record that she runs R-08 with him before the fact and that her judgment of a setup is never a \`pass\`. §8's *no scheduled moment* is corrected: her Saturday review reads the week whole. §9 moves his probe before the click. | His decision, and Eugenia's view widening |
+| v1.22 | **Corrections, no rule changed.** Statements written before the poller began recording the stop and target as first seen still said no row could carry the plan: §6's step 4 and its $25 pairing, §6's *Recording*, R-02's note in §7 and §12's R:R now say the plan is on the rows since, and only there. \`open_day\` rolls at midnight New York, not at 17:00, in §4 and §12. §8's list of what \`followed_rules\` covers named fewer rules than the table maps to it. | Reading the document against the system |
+| v1.21 | **R-16 reads bank holidays as well as market ones**, as its rule always said. The check had stopped at the exchanges' list, so Columbus Day and Veterans Day — the two days the banks close and the market trades — passed an entry the rule forbids. Veterans Day follows the Fed's observance: a Sunday moves to the Monday, a Saturday is not moved. **R-12 fails a second entry taken while the first was still open**, which had read as \`unknown\` because a negative gap counted as "within fifteen minutes". A sweep re-entry follows the first trade closing; one taken before it is a second position, and he trades one entry at a time. | His decisions, when the two gaps between the rules and their checks were put to him |
+| v1.20 | **High impact is a US release TradingView rates high**, for R-14 and R-19 alike — one calendar for the briefing, the warnings and the rules, where two had been read. TradingView's ratings differ from Forex Factory's folders in places (it rates average hourly earnings and jobless claims medium, and a summit high), so a past verdict can move; a calendar marker with no release time is not a release and counts for neither rule. Its data goes back to 2003, so the weeks already traded are fetched once and R-14 stops reading them as unfetched. | His decision, to stop reading the same calendar from two services |
+| v1.19 | **R-19 made checkable.** \`trade_stops\` records every stop and target the poller sees a position carry, one row per change, where the row keeps the first and the broker only the last; with Forex Factory's calendar saying a print was pending, R-19 moves to \`journal\`. Judged at the first USD red folder landing on a position opened in an earlier session: break-even or better passes, an untouched or wider stop fails, a moved target fails, a stop tightened short of break-even is \`unknown\` — right if the trade was losing, wrong if winning, and no row holds which. | His go-ahead, after asking which rules still had holes |
+| v1.18 | **R-09 retired** — *only operate in obvious trends and cycles*. A line from a book he read while learning, never one he traded by, so it goes rather than being made checkable; its ID is not reused. §4's bias chart and §4.2's failure mode no longer lean on it. | His decision |
+| v1.17 | **R-14 made checkable on the floor he set.** High impact is **the red folder on Forex Factory, USD only**, and **no entry in the thirty minutes before one**; the rest of the stand-aside stays open-ended and his. R-14 moves to \`journal\`: an entry inside the thirty minutes fails, one with a red folder later that day but further off is \`unknown\`, one with none ahead passes. The calendar is Forex Factory's own export, fetched nightly and kept, so the rule sees nothing before the first fetch and reads a missed week as \`unknown\` rather than quiet. Nothing after the print is checked — he set no number for it. | His definitions, asked for while making R-14 checkable |
+| v1.16 | **R-18 made checkable, from a fact about the broker he confirmed.** cTrader sends an alert when a stop or target fills and none for a position closed by hand, so a closed trade with no alert — \`net_pnl\` null — was closed by hand. R-18 moves to \`journal\`: that is a fail, except at the Friday close, which is R-15 and permitted; a close under an hour old is \`unknown\` while its alert may still arrive. §8 records what a missing \`net_pnl\` means, and that a Friday hand close is now R-15 firing rather than a guess. | Eight closes with no alert, looked up in Gmail with him |
+| v1.15 | **R-04 made checkable from the broker, not from him.** §7, §8 and §10 called it uncheckable for good because how far a trade ran was "stored nowhere, including at the broker"; the broker's minute bars go back a year, so \`best_price\` now records the furthest each trade ran in his favour, and R-04 moves to \`journal\` — a loss beyond the scratch band on a trade that had been $20 in his favour is a stop that was not moved. Nothing asked of him, nothing added to Gladys; the v1.9 decision against widening the journal stands for R-05 to R-07. | Eugenia's own review of which rules she could not see |
+| v1.14 | **A full stop is the stop hit at $20 from entry**, in his words. §12 had also counted a stop set tighter and taken in full, which no row can tell from a hand-cut exit — so R-03's population was missing and the rule was \`field\`. With the definition his, R-03 moves to \`journal\` and its predicate reads a loss of $20 or more; §5's example of a full stop on a $12 stop is gone with it. | His definition, asked while making R-03 checkable |
+| v1.13 | **Three gaps closed, found by asking what the document never asked.** R-18: **stop and target are always resting broker orders and a position is never closed by hand** — which makes R-01 and R-02 exact rather than suggestive, since a loss beyond $20 is now an edited order rather than a decision at the screen, and R-15's Friday close-out is named as the one permitted manual close. R-19: **a high-impact print landing on a position inherited from an earlier session** — in profit the stop goes to break-even regardless of R-04's threshold, losing it is tightened to a closer invalidation or pulled in if there is none, and the target never moves. Written narrowly on his instruction: he should not be holding through a print, and the path that produces this is an Asian-session trade still running into New York. §5's "never moved tighter" now carries that exception, and §8 records that R-19 muddies "break-even means R-04 fired" — a sub-$20 break-even on a trade opened in the same session is not R-19 and is a question. **Direction recorded: he trades both ways**, with a noticed preference for shorting held as a preference and explicitly not a rule, since \`direction\` is on every row and a skew would otherwise read as confirmation of a decision. | Asking what the document had never asked |
+| v1.12 | **Verification pass rather than new rules.** Eighteen inherited claims — carried since before the audit and never confirmed by him — read back and confirmed, one corrected: **an interior level is any level inside the range, marked by the quarter grid OR by a previous price reaction**, so R-05, §4.1 and §12 no longer reduce interior levels to quarters and a previous high mid-range is tradeable for Break & Retest. §13's history confirmed as record rather than reconstruction. **§9's "identical rows" corrected** — the *price data* is identical, but \`followed_rules\` is not, and since he marks it honestly the marker is the signature and the only one. **§3 proofread**: the opening definition no longer contradicts cost-push, the room-to-cut argument now follows from nominal = real + expected inflation rather than asserting the Fed would have none, the 2.5% breakeven line is reconciled against the CPI/PCE gap, and the dot plot distinguishes participants from voters. **§3 given a term index** so a single lookup is not a scan of thirty thousand characters, plus retail sales, Michigan inflation expectations, the ISM/S&P PMI split, and the FRED codes for every rates series. | Verification of what was already written |
+| v1.11 | **Four rules added, all from gaps an audit surfaced rather than from new behaviour.** R-14: no entries in the hours before a high-impact release, resuming once the volatility has passed and the news has confirmed something — the first rule connecting the briefing to the trading, and judgment because the window is open-ended by his description. R-15: nothing held across the Friday close, closed at market right before it, because a weekend gap can open past the stop — which forces a narrow R-01 exception for wins under $25 filling at that close. R-16: no trading on known low-volume days. R-17: **he stops trading when the trading has deteriorated — rules broken, losses running, chasing — and the trigger is behaviour, never drawdown.** He has stopped at a 5% loss; a threshold would fire on the wrong variable. **§3 written — the foundation**, built bottom-up from what inflation is through the funds rate, the transmission chain, bonds and yields, TIPS and breakevens, to why gold sits at the end of it, plus every metric a briefing uses. Written because he said the technical content lands as terms he nods past and he wants it from the inside out. **§0 records that the document teaches at more than one level**, against \`eugenia_channels\` states, with demotions from him never argued with. **§2 deepened** and pointed down to §3. **Sweep re-entry bounded at three 5-minute candles**, which makes half of R-12 checkable. **Session characters recorded** — New York violent, Asia calmer — as an input to the read, with London thin because of when he sleeps rather than by preference, and the Asian session's straddle of the calendar date written into §4, §8 and §12. **Slippage \`[decide]\` closed**: the stop is $20 from the chart fill with no spread allowance, so slippage is his. **The weekly review dropped** — he has never done one, and §8 no longer defers to it. **§9 corrected twice**: the NY-open caution now has its reason, and revenge trading is recorded as the same failure accelerating rather than a second failure. | A provenance and coverage audit, worked through question by question |
+| v1.10 | R-12 caps entries at one a day (two when the second is a sweep re-entry); R-13 pins rung changes to month boundaries. **The sweep re-entry bounded at once** and stated as the one exception to R-03 — the two had contradicted each other since v1.5. Timeframes recorded: bias on daily/4H/1H, levels on 1H/30m, entry on 15m/5m. How a level is marked: the grid plus reaction points, with confluence. **B&R trades continuation, S&R trades the reversal** — counter-trend is the point, closing the fade-against-bias question. Coming down a rung written. §2 rewritten from research and marked as not his decisions. §9 corrected: greed is not a separate failure. Session floor removed; 40% kept in §12. | A full read of the document with him |
+| v1.9 | **The stop is a ceiling, not a value** — under $20, set at entry from the chart's invalidation, never tightened. R-02 restated as a cap check with a stated blind spot. **The $25 target is two things**: an entry choice needing a stop under $16.67, and a management shortening. **R-08 folded from five steps to four.** Quarters defined. No session rule, stated. R-10 and R-11 given IDs. §5's "the day ends at 4%, which is one full stop" corrected: two rules. Sections 2, 9 and 10 written. §0 de-duplicated and given a section index. | His answers |
+| v1.8 | \`planned_stop\` and \`planned_target\` retired: columns dropped, fields removed from the app. **He journals a trade, not a plan.** R-03 returns to \`field\` and the narrowed full-stop population; §8 and §12 restated — no row carries intent. | His decision |
+| v1.7 | R-08's five steps written: top-down bias, liquidity pools and S&R, psychological levels, candle or chart pattern with signal then confirmation, and reward-to-risk of at least 1:1.5. Step 5 is arithmetic and checkable from the planned columns. Settles a contradiction the document was carrying — 1:1.5 at ENTRY, 1:1.25 the realised floor after a permitted shortening. | His rules |
+| v1.6 | §4 written. The two setups differ by METHOD, not location. Invalidation stated per setup, and §6's re-entry rule shown to follow from S&R's. | Method research, anchored to his stated rules |
+| v1.5 | §5 and §6 written. 4% per trade; the rung moves by hand; 4% is also the daily limit and there is no weekly or monthly one. One position at a time. Entry at market, exits price-based only, journalled at entry. Re-entry allowed after a liquidity sweep. R-08's sequence recorded as existing but not written down. | His answers |
+| v1.4 | \`planned_stop\` and \`planned_target\` recorded at journalling time. R-03 moves from \`field\` to \`journal\`. §8 and §12 restated: intent is on the row. | Schema change |
+| v1.3 | The target may be shortened from $30 to $25 where the level looks hard to reach. R-01 gains its lower bound. The R:R floor restated as 1:1.25. | His decision |
+| v1.2 | Tolerance settled at none. \`TOL\` retired from §0 and §12. Recorded that R-01 is not R-02's mirror. | His decision |
+| v1.1 | \`TOL\` named and R-01/R-02 given executable predicates. R-03 relabelled \`field\`. §8 records \`size_oz\` and the \`pnl\` fallback. | Review of v1.0 against the live schema |
+| v1.0 | Initial document. R-01 through R-09. | — |`,
 
 };
