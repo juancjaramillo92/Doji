@@ -92,6 +92,7 @@ charm/                                  firmware for the charm — see The charm
 scripts/backup.mjs                      the paged read behind the daily copy
 scripts/health.mjs                      whether anything is running, asked from outside
 scripts/eval.mjs                        whether Eugenia still behaves, asked of the model, by hand
+scripts/calibrate.mjs                   whether her map finds the levels he traded, by hand
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
@@ -765,6 +766,10 @@ when a suspicious row gets looked at.
   is read, one copy for the poller and her; no window asks for more than 240
   bars, the most one answer has been seen to carry. One chart at a time, and a
   chart that will not read is named in `missing` rather than served short.
+- **`?entries=1`** returns the 1H and 30m as they stood at each of his twenty
+  newest entries, read from the table rather than the request, and only bars
+  closed by the minute he clicked: one closed after holds prices he could not
+  have seen. It is `scripts/calibrate.mjs`'s input (*Her map of his charts*).
 
 ```sh
 curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?raw=1&hours=72" \
@@ -1948,7 +1953,23 @@ broker token stays in the poller, as for `get_market` — and `foldStructure` in
 
 `TURN`, `ON_GRID`, `EDGE`, `REACH` and `EQUAL` are readings rather than facts, kept in
 one object, `READINGS`, so each can be argued with and the calibration can fold
-under others. `structureList` says the map with every price timed,
+under others.
+
+**Whether they find his levels is measured, by hand.** `scripts/calibrate.mjs`
+folds her map at each of his twenty newest entries (`?entries=1`) under 36 sets
+of readings and prints, for each, how often his entry sat within `NEAR` ($3) of
+a level on it, against how often a level would sit that close to any price by
+chance given how many the readings draw — the **lift**, since readings that
+draw a level every five dollars find every entry and mean nothing — the median
+distance, and how often a level he journalled a setup at sits where his rules
+put that setup: at the range's edge for Support & Resistance, inside for Break
+& Retest. Today's readings are marked. It changes nothing; a reading worth
+changing is a behaviour change to `structure.ts` with the table in its commit.
+
+```sh
+SUPABASE_URL=… SB_SECRET_KEY=… DOJI_CRON_SECRET=… \
+  node --experimental-strip-types scripts/calibrate.mjs
+``` `structureList` says the map with every price timed,
 and says it is **hers**: his structure is drawn in TradingView and deliberately
 kept nowhere here, so where he sends a chart his chart decides. A chart the
 door did not read is named, in the map and in a `market read` row.
@@ -3540,7 +3561,7 @@ one `net.http_post` each.
 
 | Function | What a holder of the secret can do |
 |---|---|
-| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`), minute bars (`?bars=raw`), the day's bars for her calls (`?bars=1`), or his six charts (`?structure=1`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
+| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`), minute bars (`?bars=raw`), the day's bars for her calls (`?bars=1`), his six charts (`?structure=1`), or his level charts at his newest entries (`?entries=1`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
 | `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code. `?consolidate=1` is the one that does more than spend: it runs the nightly pass, which WRITES memory — notes written and superseded, channel rungs moved, loops closed. `?embed=1` spends at the embedding vendor. `?calendar=1` files the calendar and spends nothing, and a `{trade}` body reaches the trade look |
 | `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
 

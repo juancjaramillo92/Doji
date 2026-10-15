@@ -64,6 +64,7 @@ import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/pro
 import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { backup, readAll, TABLES } from '../scripts/backup.mjs';
 import { lastRun, stale } from '../scripts/health.mjs';
+import { score, table, readingsGrid, NEAR } from '../scripts/calibrate.mjs';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -1034,6 +1035,36 @@ test('the map is said as hers, with every price timed and nothing about what com
   assert.doesNotMatch(out, /\b(will|next|likely|expect|should)\b/i);
   // A map with no bar at all is said as no map.
   assert.match(structureList(foldStructure({}, MAP_NOW), MAP_NOW), /could not be read just now, so you have no map/);
+});
+
+/* THE CALIBRATION SCORES A READING BY WHAT IT FOUND OF HIS, NOT BY HOW MUCH IT
+   DREW. On the map's fixture the level charts draw 4049 (the week's top),
+   4023 (inside) and 3980 (the bottom); three entries are scored against them. */
+test('the calibration scores her map by the levels he traded, against chance', () => {
+  const charts = { H_1: MAP_CHARTS.H_1, M_30: MAP_CHARTS.M_30 };
+  const entry = (id, price) => ({ id, entry_price: price, at: MAP_NOW, charts, missing: [] });
+  const entries = [entry('PID1', 4024), entry('PID2', 4047), entry('PID3', 4000)];
+  const setups = { PID1: 'Break & Retest', PID2: 'Break & Retest' };
+  const today = readingsGrid().find(r => r.TURN === READINGS.TURN && r.ON_GRID === READINGS.ON_GRID &&
+                                         r.EDGE === READINGS.EDGE);
+  assert.ok(today, "today's readings are not in the grid, so the run cannot say whether they are beaten");
+  assert.equal(readingsGrid().length, 36);
+  assert.equal(NEAR, 3);
+  const got = score(entries, setups, today);
+  // 4024 is $1 from 4023 and 4047 $2 from 4049; 4000 is $20 from 3980.
+  assert.deepEqual([got.hits, got.median], [2, 2]);
+  // Three levels within $60 cover three $6 windows of $120: 15% by chance.
+  assert.equal(got.chance, 0.15);
+  assert.equal(Math.round(got.lift * 100) / 100, 4.44);
+  // A Break & Retest belongs inside the range: 4023 agrees, 4049 at its top does not.
+  assert.deepEqual([got.agreed, got.judged], [1, 2]);
+  assert.equal(score(entries, { PID2: 'Support & Resistance' }, today).agreed, 1);
+  // An entry the map draws nothing for is a miss, and chance is not paid for it.
+  const blind = score([{ ...entry('PID4', 4024), charts: {} }], {}, today);
+  assert.deepEqual([blind.hits, blind.chance, blind.lift, blind.median], [0, 0, 0, null]);
+  const out = table([got]);
+  assert.match(out, /^3 entries, within \$3 of a level/);
+  assert.match(out, /\* TURN 3  ON_GRID 3  EDGE 5  at a level 67% \(chance 15%, lift 4\.44\)  median \$2  setup agrees 1\/2/);
 });
 
 /* THE WINDOWS STAY INSIDE WHAT ONE ANSWER HAS BEEN SEEN TO CARRY: a four-hour

@@ -5113,6 +5113,22 @@ test('every reason a voice note fails is one the handler can actually reach', ()
     'the extension has nothing to go on');
 });
 
+/* THE CALIBRATION'S DOOR CANNOT LOOK AHEAD, and nothing can drive it: it is a
+   network read. A bar that closed after he clicked holds prices he could not
+   have seen, and a map drawn from it finds his level by knowing where price
+   went. And it reads his trades from the table, never from the request. */
+test('the entries door serves only bars closed by the minute he clicked, for trades it reads itself', () => {
+  const src = source('supabase/functions/doji-mcp-sync/index.ts');
+  const body = bodyOf(src, 'async function readEntries(', 'doji-mcp-sync no longer has readEntries()');
+  assert.match(body, /const at = Math\.floor\(Date\.parse\(t\.entry_time\) \/ MINUTE\) \* MINUTE;/,
+    'the door no longer reads each chart to the minute of the entry');
+  assert.match(body, /readCharts\(session, at, LEVEL_CHARTS\)/, 'the door no longer reads the charts to the entry');
+  assert.match(body, /\?\.filter\(b => b\.t \+ c\.ms <= at\)/,
+    'the door serves bars that closed after he clicked, so the calibration looks ahead');
+  assert.match(body, /&order=entry_time\.desc&limit=\$\{ENTRIES\}/, 'the door no longer reads the newest entries, bounded');
+  assert.doesNotMatch(body, /\burl\b|searchParams/, 'the door puts something from the request into its read');
+});
+
 test('every query flag the poller reads is one the market gate considers', () => {
   /* A READ-ONLY FLAG LEFT OUT OF THE GATE ANSWERS "market closed" AT THE WEEKEND,
      exactly when a suspicious row gets looked at. Every flag the entry point
