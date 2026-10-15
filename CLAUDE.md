@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 722 tests, eight suites
+npm test      # 725 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -343,6 +343,11 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   `tradingview-abroad.json`, and `CALENDAR_COUNTRIES` asks for nothing else.
   Every rated read filters on `HOME` but the Sunday week — `agree.test.mjs`
   finds them rather than listing them.
+- **The market and the Fed's odds are read ahead** by the quarter-hourly job
+  into `eugenia_market`, and the blocks read the copy: nothing that runs on a
+  writer's clock reads those two doors. One writer, so the market's
+  read-then-write cannot race; `agree.test.mjs` holds it and the census of
+  market reads.
 - **`CAL_BACK`/`CAL_AHEAD` carry the 08:00 briefing past tomorrow's 10:00**, read
   and write alike; `fold.test.mjs` derives the reach from the source.
 - **The trade event** decides from data before any model call, returns first for
@@ -374,8 +379,8 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   idle timeout behind the 400s paid wall clock. `?embed=1` is the derived
   exception. The body names the job.
 - **`eugenia_runs` is where the meters survive.** Every `recordRun` key is a column
-  and every column is written; both outcomes, always — but `unread`, whose
-  success is the row of the briefing or reply it fed. `postConsolidation` has
+  and every column is written; both outcomes, always — but `unread`, failures
+  only, whose success is the row of the run it fed. `postConsolidation` has
   exactly one `return`, and the census stays after the pass. `postScheduled`'s
   catch writes its row before the apology. `caller` is free text.
 - **`gate` is one function.** Every outcome records a verdict row before it

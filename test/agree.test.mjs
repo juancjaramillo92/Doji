@@ -5572,7 +5572,7 @@ test('every market read she goes without writes a row', () => {
     .map((m, i) => [m[1], EUGENIA_TS.slice(m.index, starts[i + 1]?.index)])
     .filter(([, body]) => /tvRead\("|fetch\((MARKET_URL|COT_URL)/.test(uncomment(body)));
   assert.deepEqual(readers.map(([name]) => name).sort(),
-    ['aroundBlock', 'headlinesBlock', 'marketQuote', 'positioningBlock', 'ratesBlock', 'readTvCalendar', 'volumeBlock'],
+    ['headlinesBlock', 'marketQuote', 'positioningBlock', 'readTvCalendar', 'storeMarket', 'storeRates', 'volumeBlock'],
     'the market reads have changed — declare the new one, and give it the meter');
   for (const [name, body] of readers) {
     if (name === 'readTvCalendar') continue;
@@ -5580,10 +5580,31 @@ test('every market read she goes without writes a row', () => {
       `${name}'s failure reaches the console and no row`);
   }
   // In part, too, where the door names what it did not read.
-  for (const name of ['aroundBlock', 'ratesBlock']) {
+  for (const name of ['storeMarket', 'storeRates']) {
     assert.match(bodyOf(EUGENIA_TS, `export async function ${name}(`),
       /if \(answer\.missing\.length\) await unread\(/, `${name} keeps a partial read to itself`);
   }
+});
+
+/* THE MARKET IS READ AHEAD BY ONE WRITER, AND READ BACK BY EVERYONE ELSE. A
+   briefing that reads TradingView itself pays for it out of its own clock, as
+   on 13 and 14 October; a second writer to the store races the market's
+   read-then-write. The census above catches a block reading the door again;
+   this holds the job's half and the store's one way in. */
+test('the quarter-hourly job reads the market ahead, and nothing else writes the copy', () => {
+  const run = bodyOf(EUGENIA_TS, 'async function postScheduled(');
+  const door = run.slice(run.indexOf('get("calendar") === "1"'));
+  assert.match(door.slice(0, door.indexOf('return json')),
+    /await filed\(\);\s*await Promise\.all\(\[storeMarket\(\), storeRates\(\)\]\);/,
+    'the quarter-hourly job no longer reads the market ahead, so every copy goes stale');
+  for (const name of ['aroundBlock', 'ratesBlock']) {
+    assert.match(bodyOf(EUGENIA_TS, `export async function ${name}(`), /readStored\("/,
+      `${name} no longer reads the copy the job keeps`);
+  }
+  assert.equal([...uncomment(EUGENIA_TS).matchAll(/eugenia_market\?/g)].length, 2,
+    'eugenia_market is addressed somewhere other than readStored and store');
+  const writers = [...uncomment(EUGENIA_TS).matchAll(/await store\("(\w+)"/g)].map(m => m[1]).sort();
+  assert.deepEqual(writers, ['market', 'rates'], 'the copy has a writer other than the job\'s two');
 });
 
 test('the calendar is filed before the briefing reads it, and every filing is a row', () => {

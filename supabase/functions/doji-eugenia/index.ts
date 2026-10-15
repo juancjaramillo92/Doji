@@ -1689,9 +1689,12 @@ async function unread(what: string, reason: string): Promise<void> {
   await recordRun({ caller: 'market read', ok: false, detail: `${what}: ${reason}`.slice(0, 500) });
 }
 
-// What a door answered without, grouped by why, so eleven symbols the deadline
-// cut short read as one clause and the row stays inside its 500 characters.
-const missed = (list: { symbol: string; error: string }[]) => {
+// What a door answered without: the market's carry a name, the rates' do not.
+type Missed = { symbol: string; name?: string; error: string };
+
+// Grouped by why, so eleven symbols the deadline cut short read as one clause
+// and the row stays inside its 500 characters.
+const missed = (list: Missed[]) => {
   const by = new Map<string, string[]>();
   for (const m of list) (by.get(m.error) ?? by.set(m.error, []).get(m.error)!).push(m.symbol);
   return [...by].map(([error, symbols]) => `${symbols.join(", ")}: ${error}`).join("; ");
@@ -2521,6 +2524,70 @@ export async function weekBlock(now = Date.now()): Promise<string> {
   }
 }
 
+/* ─── The market, read ahead ───────────────────────────────────────────────
+   The market around gold and the Fed's odds are read by the quarter-hourly
+   job and kept here, and a briefing or a reply reads the copy. Read when
+   wanted, they were paid for out of the briefing's clock: on 13 and 14
+   October a chart took five or six seconds, and fourteen did not fit in what
+   a briefing can wait. The job can wait. A copy is a quarter hour old at
+   most, of hourly and daily bars.
+
+   One row per door, rewritten, so the table never grows. Only the job writes
+   it, a quarter hour apart, so the market's read-then-write has no second
+   writer to race. Both writers are exported so the job's sequence is driven.
+   ───────────────────────────────────────────────────────────────────────── */
+type Stored = { answer: any; read_at: string };
+
+async function readStored(door: string): Promise<Stored | null> {
+  const [row] = await readRows<Stored>('Market',
+    `eugenia_market?select=answer,read_at&door=eq.${door}&limit=1`);
+  return row ?? null;
+}
+
+async function store(door: string, answer: unknown): Promise<void> {
+  const res = await fetch(`${SB_URL}/rest/v1/eugenia_market?on_conflict=door`, {
+    method: "POST", headers: sbHeaders("resolution=merge-duplicates,return=minimal"),
+    body: JSON.stringify({ door, answer, read_at: new Date().toISOString() }),
+  });
+  if (!res.ok) throw new Error(`Market store failed (HTTP ${res.status})`);
+}
+
+/* A symbol this pass did not reach keeps the line the last pass read, its own
+   bar times on it, so one slow call leaves no gap; one never read stays named.
+   Pure, so the carrying is driven. */
+export function keptMarket(fresh: { market: Around[]; missing: Missed[] },
+                           kept: { market: Around[] } | null) {
+  const old = new Map((kept?.market ?? []).map(m => [m.symbol, m]));
+  return {
+    market: [...fresh.market, ...fresh.missing.flatMap(m => old.get(m.symbol) ?? [])],
+    missing: fresh.missing.filter(m => !old.has(m.symbol)),
+  };
+}
+
+export async function storeMarket(): Promise<void> {
+  try {
+    const answer = await tvRead("market");
+    if (!answer.market?.length) throw new Error("no symbol served");
+    if (answer.missing.length) await unread("market", missed(answer.missing));
+    await store("market", keptMarket(answer, (await readStored("market"))?.answer ?? null));
+  } catch (err) {
+    await unread("market", why(err));
+  }
+}
+
+// Replaced whole once it prices a meeting, since a fold is not merged: a
+// contract missed leaves its meeting named as unread.
+export async function storeRates(): Promise<void> {
+  try {
+    const answer = await tvRead("rates");
+    if (!answer.meetings?.length) throw new Error("no meeting served");
+    if (answer.missing.length) await unread("rates", missed(answer.missing));
+    await store("rates", answer);
+  } catch (err) {
+    await unread("rates", why(err));
+  }
+}
+
 /* ─── The market around gold ───────────────────────────────────────────────
    The dollar, yields, real yield, silver, oil, the S&P and the VIX, and abroad
    four European ten-year yields, Japan's and the euro, for the briefing and
@@ -2534,7 +2601,7 @@ export async function weekBlock(now = Date.now()): Promise<string> {
    page. A symbol not served is named: an absent line reads as never asked.
    ───────────────────────────────────────────────────────────────────────── */
 type Around = {
-  name: string; unit: string; daily: boolean;
+  symbol: string; name: string; unit: string; daily: boolean;
   from: number; since: string; last: number; at: string;
 };
 
@@ -2560,10 +2627,9 @@ export function aroundList(answer: { market: Around[]; missing: { name: string }
 
 export async function aroundBlock(): Promise<string> {
   try {
-    const answer = await tvRead("market");
-    if (!answer.market?.length) throw new Error("no symbol served");
-    if (answer.missing.length) await unread("market", missed(answer.missing));
-    return aroundList(answer);
+    const kept = await readStored("market");
+    if (!kept) throw new Error("not read yet");
+    return aroundList(kept.answer);
   } catch (err) {
     await unread("market", why(err));
     return NO_AROUND;
@@ -2580,7 +2646,7 @@ export async function aroundBlock(): Promise<string> {
    ───────────────────────────────────────────────────────────────────────── */
 type Priced = { date: string; move_bp: number; total_bp: number | null; odds: { bp: number; chance: number }[] };
 
-export function ratesList(answer: { meetings: Priced[]; unread: string[] }): string {
+export function ratesList(answer: { meetings: Priced[]; unread: string[]; read_at: string }): string {
   const move = (bp: number) => bp === 0 ? "no change"
     : `a ${Math.abs(bp) === 25 ? "quarter-point" : `${Math.abs(bp)}bp`} ${bp > 0 ? "hike" : "cut"}`;
   const bps = (bp: number) => `${Math.abs(Math.round(bp))} basis points of ${bp < 0 ? "cuts" : "hikes"}`;
@@ -2591,15 +2657,22 @@ export function ratesList(answer: { meetings: Priced[]; unread: string[] }): str
       : `${bps(m.total_bp)} priced in all by then, ${Math.abs(Math.round(m.move_bp))} of them at this meeting`));
   if (answer.unread.length) lines.push(`· Not read just now: ${answer.unread.map(civilDay).join(", ")}.`);
   return `\n\nWhat fed funds futures price for the next Fed meetings, worked out as CME's FedWatch ` +
-    `works them, from daily bars at least fifteen minutes behind:\n${lines.join("\n")}`;
+    `works them, from daily bars at least fifteen minutes behind, read at ${nyTime(answer.read_at)} ET:` +
+    `\n${lines.join("\n")}`;
 }
 
-export async function ratesBlock(): Promise<string> {
+/* Odds two hours old are not the morning's once anything has printed, and a
+   door that keeps refusing — a Fed date the table of meetings does not hold —
+   must not leave its last answer standing. The market's lines need no such
+   bound: each carries its own bar times. */
+const ODDS_HOURS = 2;
+
+export async function ratesBlock(now = Date.now()): Promise<string> {
   try {
-    const answer = await tvRead("rates");
-    if (!answer.meetings?.length) throw new Error("no meeting served");
-    if (answer.missing.length) await unread("rates", missed(answer.missing));
-    return ratesList(answer);
+    const kept = await readStored("rates");
+    if (!kept) throw new Error("not read yet");
+    if (now - Date.parse(kept.read_at) > ODDS_HOURS * 3600_000) throw new Error(`last read ${kept.read_at}`);
+    return ratesList({ ...kept.answer, read_at: kept.read_at });
   } catch (err) {
     await unread("rates", why(err));
     return "\n\nWhat the futures price for the Fed could not be read just now. Do not quote rate " +
@@ -2872,8 +2945,12 @@ async function postScheduled(url: URL): Promise<Response> {
   try {
     if (url.searchParams.get("consolidate") === "1") { job = 'consolidate'; return await postConsolidation(); }
     // The calendar, on its own quarter-hourly job, so an actual lands within
-    // one; filed() never throws.
-    if (url.searchParams.get("calendar") === "1")    { await filed(); return json({ ok: true, filed: true }); }
+    // one, and the market read ahead after it; none of the three throws.
+    if (url.searchParams.get("calendar") === "1") {
+      await filed();
+      await Promise.all([storeMarket(), storeRates()]);
+      return json({ ok: true, filed: true });
+    }
 
     // The backfill, called by hand until `left: 0`; the nightly pass sweeps
     // the trickle a failed vendor call leaves.
