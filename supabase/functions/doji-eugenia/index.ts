@@ -33,11 +33,13 @@ import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // Pure and imported, so the parts that decide are testable.
 import {
   checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker, HIGH, HOME, weekOf, FULL_STOP, TO_BREAK_EVEN,
+  TARGET_MIN, TARGET_MAX,
   type TradeRow, type Standing, type Stop, type RuleResult,
 } from "./adherence.ts";
 import { journalStats, statsList } from "./journal.ts";
 import {
-  env, secretMatches, json, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY, why, marketOpen
+  env, secretMatches, json, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY, why, marketOpen,
+  type Candle,
 } from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("EUGENIA_BOT_TOKEN");
@@ -1391,14 +1393,9 @@ async function recordRead(reading: unknown, test: unknown, verdict: unknown,
    rule.
    ───────────────────────────────────────────────────────────────────────── */
 export const CALL_SIDES = ['buy', 'sell'] as const;
-// R-01's two targets, the exception and the default.
-export const TARGET_MIN = 25, TARGET_MAX = 30;
 // R-08's fourth step, at entry.
 export const RR_MIN = 1.5;
 export const CALL_MAX = 300;
-
-const MINUTE = 60_000;
-const HOUR = 3_600_000;
 
 const CALL_TOOL = {
   name: "make_call",
@@ -1447,11 +1444,11 @@ export function callProblem(direction: unknown, entry: number, stop: number, tar
    gold session it belongs to. Walked by the hour, since New York moves by
    whole hours. */
 export function expiryOf(made: Date): Date {
-  let t = Math.floor(made.getTime() / HOUR) * HOUR + HOUR;
+  let t = Math.floor(made.getTime() / 3_600_000) * 3_600_000 + 3_600_000;
   for (;;) {
     const { wd, hour } = nyClock(new Date(t));
     if (hour === ROLL_HOUR && wd >= 1 && wd <= 5) return new Date(t);
-    t += HOUR;
+    t += 3_600_000;
   }
 }
 
@@ -1495,7 +1492,6 @@ async function makeCall(direction: unknown, entry: unknown, stop: unknown, targe
    ───────────────────────────────────────────────────────────────────────── */
 export const CALL_OUTCOMES = ['won', 'lost', 'scratch', 'open', 'untriggered', 'unread'] as const;
 
-export type Candle = { t: number; open: number; high: number; low: number; close: number };
 export type Call = { id: number; made_at: string; expires_at: string; direction: string;
                      entry: number; stop: number; target: number; condition: string;
                      outcome: string | null; result: number | null };
@@ -1506,10 +1502,10 @@ export function scoreCall(c: Call, candles: Candle[], from: number): Score {
   const made = Date.parse(c.made_at), ends = Date.parse(c.expires_at);
   const none = { triggered_at: null, closed_at: null, closed_price: null, result: null };
   // The market was open somewhere between the call and the first bar served.
-  for (let h = made; h < from; h += HOUR) if (marketOpen(new Date(h))) return { outcome: 'unread', ...none };
+  for (let h = made; h < from; h += 3_600_000) if (marketOpen(new Date(h))) return { outcome: 'unread', ...none };
 
-  const start = Math.ceil(made / MINUTE) * MINUTE;
-  const bars = candles.filter(b => b.t >= start && b.t + MINUTE <= ends);
+  const start = Math.ceil(made / 60_000) * 60_000;
+  const bars = candles.filter(b => b.t >= start && b.t + 60_000 <= ends);
   const buy = c.direction === 'buy';
   const at = bars.findIndex(b => b.low <= c.entry && c.entry <= b.high);
   if (at < 0) return { outcome: 'untriggered', ...none };
@@ -1517,7 +1513,7 @@ export function scoreCall(c: Call, candles: Candle[], from: number): Score {
   const gain = (p: number) => Math.round((buy ? p - c.entry : c.entry - p) * 100) / 100;
   const close = (b: Candle, price: number, outcome: Score['outcome']): Score => ({
     outcome, triggered_at: new Date(bars[at].t).toISOString(),
-    closed_at: new Date(b.t + MINUTE).toISOString(), closed_price: price, result: gain(price),
+    closed_at: new Date(b.t + 60_000).toISOString(), closed_price: price, result: gain(price),
   });
   let stop = c.stop;
   for (let i = at; i < bars.length; i++) {

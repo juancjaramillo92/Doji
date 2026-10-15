@@ -75,17 +75,16 @@ export function request(c, prompts = PROMPTS) {
 
 /* ─── What is counted rather than judged ─────────────────────────────────────
    The countable rules, the ones the gates are told to count: no em-dash, a
-   paragraph of four sentences at most, a word budget, one question. A list
-   line — a dash or the calendar's label — is not prose and is not counted. */
-const prose = (text) => text.split(/\n\s*\n/)
-  .map(p => p.split('\n').filter(l => !/^\s*(-|·|Today:)/.test(l)).join(' ').trim())
-  .filter(Boolean);
+   paragraph of four sentences at most, a word budget, one question. */
 const sentences = (para) => (para.match(/[^.!?]+[.!?]+(?=\s|$)/g) ?? [para]).length;
 
 export const COUNTERS = {
   emDash:    (text) => !text.includes('—') || 'an em-dash',
   sentences: (text, n) => {
-    const over = prose(text).find(p => sentences(p) > n);
+    // A list line — a dash or the calendar's label — is not prose and is not counted.
+    const over = text.split(/\n\s*\n/)
+      .map(p => p.split('\n').filter(l => !/^\s*(-|·|Today:)/.test(l)).join(' ').trim())
+      .find(p => p && sentences(p) > n);
     return !over || `a paragraph of ${sentences(over)} sentences: "${over.slice(0, 60)}…"`;
   },
   words:     (text, n) => {
@@ -210,11 +209,10 @@ export async function grade(c, prompts = PROMPTS, ask = claude) {
   return { id: c.id, text: sent.text, failed, usage };
 }
 
-// Per million tokens, the rates the README's cost table uses for 5.5.
+// Per million tokens, Opus 5.5's: a read a twentieth of input, a five-minute
+// write 1.25×. The trim cases run on Sonnet and are counted at these, so the
+// figure printed leans high.
 const RATE = { in: 4, out: 20, read: 0.2, write: 5 };
-const dollars = (usage) => usage.reduce((sum, u) => sum +
-  ((u.input_tokens ?? 0) * RATE.in + (u.output_tokens ?? 0) * RATE.out +
-   (u.cache_read_input_tokens ?? 0) * RATE.read + (u.cache_creation_input_tokens ?? 0) * RATE.write) / 1e6, 0);
 
 async function main(argv) {
   if (!KEY) throw new Error('ANTHROPIC_API_KEY is not set; this eval calls the model and costs money');
@@ -245,7 +243,10 @@ async function main(argv) {
     for (const f of result.failed) console.log(`      · ${f}`);
     if (result.failed.length) console.log(`      she wrote: ${result.text.replace(/\s+/g, ' ').slice(0, 400)}`);
   }
-  console.log(`\n${red} of ${CASES.length} failed; this run cost about $${dollars(usage).toFixed(2)}`);
+  const cost = usage.reduce((sum, u) => sum +
+    ((u.input_tokens ?? 0) * RATE.in + (u.output_tokens ?? 0) * RATE.out +
+     (u.cache_read_input_tokens ?? 0) * RATE.read + (u.cache_creation_input_tokens ?? 0) * RATE.write) / 1e6, 0);
+  console.log(`\n${red} of ${CASES.length} failed; this run cost about $${cost.toFixed(2)}`);
   process.exitCode = red ? 1 : 0;
 }
 
