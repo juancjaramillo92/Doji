@@ -5406,8 +5406,12 @@ test('the Sunday briefing reads the week and tells it rather than lists it, in b
   const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
   const critic = EUGENIA_PROMPT.match(/export const CRITIC = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
   assert.match(system, /ON SUNDAY THE BRIEFING OPENS THE WEEK/, 'SYSTEM no longer says what a Sunday briefing is for');
-  assert.match(system, /Today's releases and nothing else/,
+  assert.match(system, /Today's releases rated high and nothing else/,
     'the weekday calendar lists more than its own day again, so tomorrow arrives twice');
+  /* HIGH-RATED ONLY, IN BOTH COPIES, on his instruction of 13 October: seven
+     lines for one release that mattered. The critic runs last. */
+  assert.match(critic, /is a line on the Today: list rated anything but high\? It comes out/,
+    'CRITIC no longer takes a release rated below high off the weekday list, and it runs last');
   assert.match(system, /not a look back at his week/,
     'SYSTEM no longer rules out a weekly review, which he decided against');
   /* THE WEEK IS TOLD, IN BOTH COPIES. The critic runs last, so a writer told

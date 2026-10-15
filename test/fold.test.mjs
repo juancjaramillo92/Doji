@@ -2723,7 +2723,7 @@ test('a list holding anything from abroad says once that his rules do not count 
     consensus: null, prior: null, actual: null });
   const out = calendarList([row('EU ECB Interest Rate Decision', 'EU'), row('GDP Growth Rate QoQ Adv', 'US')],
     Date.parse('2026-10-29T11:00:00Z'));
-  assert.match(out, /08:15 ET EU ECB Interest Rate Decision — due/);
+  assert.match(out, /08:15 ET EU ECB Interest Rate Decision, rated high — due/);
   assert.equal(out.match(/R-14 and R-19 count US releases alone/g)?.length, 1);
   assert.doesNotMatch(calendarList([row('GDP Growth Rate QoQ Adv', 'US')], Date.parse('2026-10-29T11:00:00Z')),
     /abroad/);
@@ -3918,11 +3918,12 @@ test('a landed release is never described as one still to come', () => {
   const out = calendarList([
     { id: 1, at: '2026-01-09T13:30:00Z', name: 'core CPI', country: 'US', importance: 'high',
       consensus: '0.3%', prior: '0.2%', actual: '0.4%' },
-    { id: 2, at: '2026-01-09T20:00:00Z', name: 'FOMC minutes', country: 'US', importance: 'high',
+    // The rating rides every line: the weekday slot lists only what is high.
+    { id: 2, at: '2026-01-09T20:00:00Z', name: 'FOMC minutes', country: 'US', importance: 'medium',
       consensus: null, prior: null, actual: null },
   ], Date.parse('2026-01-09T13:05:00Z'));
-  assert.match(out, /08:30 ET core CPI — LANDED at 0\.4%/);
-  assert.match(out, /15:00 ET FOMC minutes — due/);
+  assert.match(out, /08:30 ET core CPI, rated high — LANDED at 0\.4%/);
+  assert.match(out, /15:00 ET FOMC minutes, rated medium — due/);
   assert.doesNotMatch(out, /abroad/, 'a list of US releases is told some of it is from abroad');
   assert.equal(calendarList([]), '');
 });
@@ -3939,12 +3940,12 @@ test('a calendar line from another day names the day, and today stays bare', () 
     row('2026-09-25T12:30:00Z', 'durable goods'),      // Fri 08:30
     row('2026-09-25T14:00:00Z', 'Michigan expectations'), // Fri 10:00
   ], Date.parse('2026-09-24T12:02:00Z'));
-  assert.match(out, /· 08:30 ET jobless claims — due/,
+  assert.match(out, /· 08:30 ET jobless claims, rated high — due/,
     'today\'s release carries a date it does not need');
   assert.match(out, /· 08:30 ET on Friday 25 Sept? durable goods/,
     'tomorrow\'s 08:30 reads exactly like today\'s — she can brief it as due this morning');
   assert.match(out, /· 10:00 ET on Friday 25 Sept? Michigan expectations/);
-  assert.match(out, /· 20:00 ET on Wednesday 23 Sept? FOMC minutes — PAST, no figure on file/,
+  assert.match(out, /· 20:00 ET on Wednesday 23 Sept? FOMC minutes, rated high — PAST, no figure on file/,
     'last night\'s release reads as tonight\'s, due, when it has already happened');
 });
 

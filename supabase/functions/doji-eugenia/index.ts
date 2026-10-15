@@ -2466,8 +2466,9 @@ export function calendarList(rows: Release[], now = Date.now(),
   const today = nyDate(new Date(now));
   const lines = rows.map(r => {
     const day = nyDate(new Date(r.at));
+    // The rating is what the weekday slot lists by, so it is on every line.
     const head = `· ${nyTime(r.at)} ET` + (day === today ? "" : ` on ${weekday(day)} ${civilDay(day)}`) +
-                 ` ${r.name}`;
+                 ` ${r.name}, rated ${r.importance}`;
     if (r.actual) {
       return `${head} — LANDED at ${r.actual}` +
              (r.consensus ? ` against ${r.consensus} expected` : "");

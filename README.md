@@ -1290,8 +1290,13 @@ are none.
 
 **The calendar is the one place the prose rule is relaxed** — a plain `Today:`
 label and one line per item, times in ET, one fact each, on weekdays only. It is
-that day's releases, and a line from abroad only where the story runs through it. The list
-holds times and names, `NAMED AND NOTHING MORE`: no mechanism goes in it,
+that day's releases **rated high**, and a line from abroad only where the story
+runs through it; a day with none says so in a line. The rest are hers to watch,
+and one that surprises goes into the next morning's story rather than onto the
+list — his instruction of 13 October, after seven lines for the one release that
+mattered. `calendarList` puts the rating on every line, since the slot lists by
+it, and `CRITIC` takes a lower-rated line off the list, since it runs last. The
+list holds times and names, `NAMED AND NOTHING MORE`: no mechanism goes in it,
 because that slot is where a second chain hides.
 
 **On Sunday the briefing is about the week it opens** (`weekBlock`). It files the
@@ -1304,7 +1309,7 @@ and the teaching block walks the release most likely to move it. **The week is
 told, not listed**: there is no calendar slot on Sunday. The release that carries
 the week is named with its day, and the rest is a sentence or two on which force
 the week tests and what it could change; the calendar is on his own screen, and
-each weekday morning lists that day's releases with their times. `CRITIC` holds
+each weekday morning lists that day's high-rated releases with their times. `CRITIC` holds
 the same rule, since it runs last.
 
 **Length is a rule, and what makes it safe is what sits beside it.** A ceiling
