@@ -1105,7 +1105,7 @@ failure is its own answer:
 | `search` | the names gold's feeds and a real yield go by, for whatever `quotes` could not resolve |
 | `fedfunds` | whether thirty-day fed funds futures answer, under the continuous names (`ZQ1!` to `ZQ3!`) and under named contract months, and what a bar of them carries — the price `?rates=1` works the meeting odds out from |
 | `futures` | what a daily bar of gold's front month (`COMEX:GC1!`) carries — the bars `?volume=1` folds |
-| `flows` | which `ECONOMICS:` series carry gold reserves, at home and in China, and what GLD, the largest gold fund, answers — the central banks' and the investors' flows §2 names, which no reader serves until this shows what is there |
+| `flows` | the two flows §2 names, which no reader serves until this shows what is there: two years of gold reserves for China, Poland, India, Turkey, the Czech Republic and the US as TradingView's `ECONOMICS:<country>GRES` series (China's resolved on 15 October), and which screener columns an ETF carries for its assets, shares and flows |
 
 **How the sign-in is found.** OAuth 2.1 as MCP specifies it, discovered rather
 than configured: the only TradingView address in the file is the endpoint, whose

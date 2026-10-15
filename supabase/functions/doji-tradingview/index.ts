@@ -304,7 +304,8 @@ async function callback(url: URL): Promise<Response> {
    active. Left out on purpose: the technical rating, forecasts and screener,
    which are signals by another name, and everything about companies. */
 const ALLOWED_TOOLS = [
-  "mcp-tv-get-economic-calendar", "mcp-tv-get-economic-symbols", "mcp-tv-get-symbol-data-batch",
+  "mcp-tv-get-economic-calendar", "mcp-tv-get-economic-symbols", "mcp-tv-get-economic-data",
+  "mcp-tv-get-symbol-data-batch", "mcp-tv-get-screener-columns",
   "mcp-tv-get-ohlcv", "mcp-tv-get-news", "mcp-tv-search-symbols",
 ] as const;
 type AllowedTool = typeof ALLOWED_TOOLS[number];
@@ -775,9 +776,11 @@ async function readVolume() {
      fedfunds   fed funds futures under continuous and named months, and what
                 a bar carries
      futures    what a daily bar of gold's front month carries
-     flows      which ECONOMICS: series carry gold reserves, at home and in
-                China, and what GLD, the largest gold fund, answers — the two
-                flows §2 names and no reader yet serves
+     flows      the two flows §2 names and no reader yet serves: two years
+                of the gold reserves of the central banks that buy most, as
+                TradingView's economic series (China's resolved, GRES, on
+                15 October), and which screener columns an ETF carries for its
+                assets and its flows, read for GLD and IAU
 
    Every argument is written here; none is read from the request. */
 const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
@@ -822,10 +825,11 @@ const PROBES: Record<string, () => Call[]> = {
     ["mcp-tv-get-ohlcv", { symbol: "COMEX:GC1!", interval: "1D", count: 3 }],
   ],
   flows: () => [
-    ["mcp-tv-get-economic-symbols", { search: "gold" }],
-    ["mcp-tv-get-economic-symbols", { country: "CN", search: "gold" }],
-    ["mcp-tv-search-symbols", { query: "GLD", type_filter: "etf" }],
-    ["mcp-tv-get-ohlcv", { symbol: "AMEX:GLD", interval: "1D", count: 3 }],
+    ...["CN", "PL", "IN", "TR", "CZ", "US"].map((c): Call =>
+      ["mcp-tv-get-economic-data", { symbol: `ECONOMICS:${c}GRES`, date_from: day(-730), date_to: day(0) }]),
+    ["mcp-tv-get-screener-columns", { market: "etf", search: "flow" }],
+    ["mcp-tv-get-screener-columns", { market: "etf", search: "asset" }],
+    ["mcp-tv-get-screener-columns", { market: "etf", search: "shares" }],
   ],
 };
 
