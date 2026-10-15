@@ -1040,19 +1040,18 @@ export function printsQuery(name: string, months: unknown, now = Date.now()): st
          `&order=at.desc&limit=${RELEASE_PRINTS}`;
 }
 
-// A figure as TradingView writes it — `0.3%`, `254K`, `-1.2B` — split into its
-// number and its unit, or null for anything else.
-const figureOf = (v: string | null) => {
-  const m = v?.match(/^(-?\d+(?:\.\d+)?)\s*([^\d\s]*)$/);
-  return m ? { n: Number(m[1]), unit: m[2] } : null;
-};
-
 const yearDay = (iso: string) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'America/New_York', day: 'numeric', month: 'short', year: 'numeric',
 }).format(new Date(iso));
 
 // Newest first as read, so the limit keeps the latest; told oldest first.
 export function printsList(rows: Release[], release: string): string {
+  // A figure as TradingView writes it — `0.3%`, `254K`, `-1.2B` — split into
+  // its number and its unit, or null for anything else.
+  const figureOf = (v: string | null) => {
+    const m = v?.match(/^(-?\d+(?:\.\d+)?)\s*([^\d\s]*)$/);
+    return m ? { n: Number(m[1]), unit: m[2] } : null;
+  };
   const told = [...rows].reverse();
   const tally = { above: 0, below: 0, on: 0, apart: 0 };
   const lines = told.map(r => {
@@ -3007,10 +3006,10 @@ export async function storeMarket(): Promise<void> {
 /* Daily closes move once a day, so a copy read today is kept and the door is
    asked again only on a new New York day; what a pass misses carries, as the
    hourly lines do. */
-export async function storeTrend(now = Date.now()): Promise<void> {
+export async function storeTrend(): Promise<void> {
   try {
     const kept = await readStored("trend");
-    if (kept && nyDate(new Date(kept.read_at)) === nyDate(new Date(now))) return;
+    if (kept && nyDate(new Date(kept.read_at)) === nyDate(new Date())) return;
     const answer = await tvRead("trend");
     if (!answer.market?.length) throw new Error("no symbol served");
     if (answer.missing.length) await unread("trend", missed(answer.missing));
@@ -3392,20 +3391,19 @@ export async function positioningBlock(): Promise<string> {
    buy most and the one that has been selling, and the two largest US gold
    funds' assets and the money in or out of them. Levels on their dates, as the
    market's lines are; the reserves run months behind the official release, so
-   the date is the point. Where the trend's weeks would be noise, a quarter of
-   buying is the story, so it goes where the speculators' count goes: the Sunday
-   briefing and get_around. A figure the screener does not serve is said, never
-   shown as zero.
+   the date is the point. A quarter of buying is the story, and five weekday
+   briefings repeating it are not, so it goes where the speculators' count goes:
+   the Sunday briefing and get_around. A figure the screener does not serve is
+   said, never shown as zero.
    ───────────────────────────────────────────────────────────────────────── */
 type Reserve = { country: string; name: string; unit: string; points: { date: string; tonnes: number }[] };
 type Fund = { symbol: string; name: string; aum: number | null;
               flow_1m: number | null; flow_3m: number | null; flow_ytd: number | null };
 
-const monthYear = (date: string) => new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'UTC', month: 'short', year: 'numeric',
-}).format(new Date(`${date}T12:00:00Z`));
-
 export function flowsList(answer: { reserves: Reserve[]; funds: Fund[]; missing: { name: string }[] }): string {
+  const monthYear = (date: string) => new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC', month: 'short', year: 'numeric',
+  }).format(new Date(`${date}T12:00:00Z`));
   const dollars = (v: number | null, signed = false) => v === null ? "not served"
     : `${signed ? (v < 0 ? "−" : "+") : ""}$${(Math.abs(v) / 1e9).toFixed(1)}B`;
   const lines = [

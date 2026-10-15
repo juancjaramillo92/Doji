@@ -353,7 +353,7 @@ const tvCall = async (session: Record<string, string>, tool: AllowedTool, args: 
                       signal?: AbortSignal) =>
   unwrap(parseSse(await tvPost(session, tool, args, signal)), tool);
 
-/* What each of the three long doors may spend, so that it answers inside the
+/* What each long door may spend, so that it answers inside the
    READ_MS, 45 seconds, its caller waits, with what it has rather than with
    nothing: on 12 October the market's fourteen calls and the rates' six
    outran it, and a briefing and a reply lost both blocks whole. Ten seconds
@@ -451,11 +451,11 @@ export function foldCalendar(answer: any) {
    inflation the bond market expects, each a day or more behind, and neither
    may read as live: `daily` says so to whoever renders it. The two side by
    side are strategy §2's table, which neither answers alone. GVZ is what gold
-   options price its swing at over the next month. Abroad, the
-   ten-year yields she reads the calendar's auctions and central banks against
-   — France and Italy each against Germany is what lenders charge for the doubt
-   — and the euro, more than half the dollar index. The names live here, once,
-   beside the symbols — this list is the whole of what is read. */
+   options price its swing at over the next month. Abroad, the ten-year yields
+   she reads the calendar's auctions and central banks against — France and
+   Italy each against Germany is what lenders charge for the doubt — and the
+   euro, more than half the dollar index. The names live here, once, beside the
+   symbols — this list is the whole of what is read. */
 const MARKET = [
   { symbol: "TVC:DXY",     name: "Dollar index",              unit: "" },
   { symbol: "TVC:US02Y",   name: "Two-year Treasury yield",   unit: "%" },
@@ -595,11 +595,11 @@ async function readHeadlines() {
 
    The meeting dates are the Fed's published schedule — the calendar reaches a
    month and the odds need a year of meetings. Where the table runs short of a
-   year the strip is as long as the table, each meeting named by its date, and
-   a test fails half a year before the
-   table runs out, and every read checks the calendar: a decision it lists that
-   the table lacks refuses the answer, since odds against the wrong meeting are
-   a confident wrong number. The decision day is the second of the two. */
+   year the strip is as long as the table, each meeting named by its date. A
+   test fails half a year before the table runs out, and every read checks the
+   calendar: a decision it lists that the table lacks refuses the answer, since
+   odds against the wrong meeting are a confident wrong number. The decision
+   day is the second of the two. */
 export const FOMC = [
   "2026-10-28", "2026-12-09",
   "2027-01-27", "2027-03-17", "2027-04-28", "2027-06-09",

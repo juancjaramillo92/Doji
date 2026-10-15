@@ -985,24 +985,24 @@ filed at midnight under `Calendar` must not be counted as a print. The event
 descriptions are dropped, since she would pay for each on every request.
 
 **`?market=1` is the market around gold, as bars**: the dollar index, the two-
-and ten-year yields, the ten-year real yield and breakeven, silver, US crude, the
-S&P 500, the VIX and gold's volatility index (GVZ) — and abroad the German, French, Italian, UK and Japanese ten-year
-yields and EUR/USD, what the calendar's auctions and central banks are read
-against: France and Italy each against Germany is what lenders charge for the
-doubt, and the euro is more than half the dollar index. The quote batch refused on every probe with the scanners' 429, while the
-OHLCV read answered for every symbol, so each is twenty-five hourly bars folded by
-`foldBars` to where the first opened and where the last stands, each with its
-time. The real yield and the breakeven are FRED's daily series and are marked
-`daily`: the inflation the bond market expects and what is left of the ten-year
-once it is taken out, the two halves strategy §2's table reads apart, which the
-ten-year alone cannot tell. Symbols, names
-and units live in one list, `MARKET`, most-needed first; a symbol that fails is
-named in `missing`.
-`aroundList` states every line as a level beside the level at a stated time and
-computes no change, so a move cannot lose its window. The door is read ahead
-by the quarter-hourly job and she reads the copy (see *The market and the Fed's
-odds are read ahead*). A failed read is a sentence
-telling her not to quote the dollar or yields from a search.
+and ten-year yields, the ten-year real yield and breakeven, silver, US crude,
+the S&P 500, the VIX and gold's volatility index (GVZ) — and abroad the German,
+French, Italian, UK and Japanese ten-year yields and EUR/USD, what the
+calendar's auctions and central banks are read against: France and Italy each
+against Germany is what lenders charge for the doubt, and the euro is more than
+half the dollar index. The quote batch refused on every probe with the scanners'
+429, while the OHLCV read answered for every symbol, so each is twenty-five
+hourly bars folded by `foldBars` to where the first opened and where the last
+stands, each with its time. The real yield and the breakeven are FRED's daily
+series and are marked `daily`: what is left of the ten-year once expected
+inflation is taken out, and that inflation, the two halves strategy §2's table
+reads apart, which the ten-year alone cannot tell. Symbols, names and units live
+in one list, `MARKET`, most-needed first; a symbol that fails is named in
+`missing`. `aroundList` states every line as a level beside the level at a
+stated time and computes no change, so a move cannot lose its window. The door
+is read ahead by the quarter-hourly job and she reads the copy (see *The market
+and the Fed's odds are read ahead*). A failed read is a sentence telling her not
+to quote the dollar or yields from a search.
 
 **`?trend=1` is the weeks behind it** — the same `MARKET` list as daily closes
 a week, a month and three months of sessions back (`BACK`, 5, 21 and 63), each

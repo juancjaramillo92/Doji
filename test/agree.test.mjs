@@ -5842,9 +5842,9 @@ test('every market read gives up at READ_MS rather than at the platform', () => 
 /* A LONG DOOR ANSWERS INSIDE ITS CALLER'S BOUND, or the deadline that keeps
    what was read lands after the caller has stopped listening and keeps
    nothing. Two files, one relation: ten seconds for the boot, the sign-in and
-   the wire. And every call the three doors make carries the deadline, the
+   the wire. And every call the doors make carries the deadline, the
    calendar check included. */
-test('the three long doors answer inside READ_MS', () => {
+test('the long doors answer inside READ_MS', () => {
   const tv = source('supabase/functions/doji-tradingview/index.ts');
   const ms = (src, name) => {
     const m = src.match(new RegExp(`const ${name} = ([\\d_]+);`));
