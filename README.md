@@ -420,10 +420,11 @@ single-sourced at run time:
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, the check constraint |
 | how **firmly a read was said** | `READ_FIRMNESS` in `doji-eugenia` and the check constraint on `eugenia_reads.firmness` |
 | her **calls' sides, outcomes and condition length** | `CALL_SIDES`, `CALL_OUTCOMES` and `CALL_MAX` in `doji-eugenia`, and the check constraints on `eugenia_calls` |
+| the **rules her calls are held to** | `FULL_STOP`, `TARGET_MIN`, `TARGET_MAX` and `TO_BREAK_EVEN` in `adherence.ts` and `RR_MIN` in `doji-eugenia`, which `callProblem` and `scoreCall` apply, and the words `SYSTEM` tells her them in |
 | the **thesis length** | `THESIS_MAX` and the check constraint |
 | the **portrait length** | `PORTRAIT_MAX` and the check constraint |
 | the **verdicts a read may carry** | `READ_VERDICTS` in `index.ts` and the check constraint |
-| the **length of a filed read** | `READ_MAX` and the three check constraints on `eugenia_reads` |
+| the **length of a filed read** | `READ_MAX` and the three check constraints on `eugenia_reads`; a lesson's, `NOTE_MAX` and its own |
 | the **two writers' names** | `sync_health_id_check`, the seed beside it, and each function's `heartbeat("…")` call |
 | the **columns of `eugenia_runs`** | the table, the object literals `recordRun` is called with, and the `verify.sql` row on the cache-write columns |
 | **which rules a row can answer** | §7's `Evaluable` column and the thirteen predicates in `adherence.ts` |
@@ -1419,6 +1420,10 @@ broken and how many he left blank, the one record of entering on the touch —
 what he committed to and whether he kept it, one thing to keep and one to
 change, and her own calls in a sentence. Process, never P&L as the measure,
 and nothing about where price goes next week, which is Sunday's briefing.
+Under 250 words, with what to cut first named beside the count — figures from
+his journal, then her calls, then a commitment kept — and the verdict and the
+one thing to keep and one to change never cut, since a ceiling alone cuts what
+the message is for.
 
 She is handed the week computed — `get_stats`' summary with his answers,
 `check_rules`' verdicts, her calls and her record — with his notes, the
@@ -1690,9 +1695,9 @@ gives `[object Object]` on exactly the turns carrying most context.
 
 **Everything she writes is spoken.** The old rule — answer in the channel he
 used — only ever decided a reply, so the briefing, the one message he wanted read
-to him, was never spoken. He decided it the other way. Four call sites speak:
-the briefing twice (its speaking worker, and its own fallback), the trade event
-and the reply. `say()` keeps the
+to him, was never spoken. He decided it the other way. Five call sites speak:
+the briefing twice (its speaking worker, and its own fallback), the trade event,
+the reply and the Saturday review. `say()` keeps the
 `/notes` audit (a table, unlistenable), the apologies (failure notices, not her
 words), the short operational lines and the charm's copy, whose voice is on the
 charm.
@@ -1933,14 +1938,16 @@ decided this in October 2026, after the evidence on both sides was put to you
   whether price reached the entry, then whether the target or the stop came
   first, the stop moved to break-even at +$20 as your R-04 moves yours. On the
   bar that filled her only the stop counts; a bar touching both is a loss; the
-  break-even move starts on the next bar, since a bar's high and low cannot say
-  which came first. Outcomes are `won`, `lost`, `scratch`, `open` (still on at
+  +$20 that moves the stop must come on a bar after the fill, and the move
+  starts on the bar after that, since a bar's high and low cannot say which
+  came first. Outcomes are `won`, `lost`, `scratch`, `open` (still on at
   the roll, marked at the last close), `untriggered`, and `unread` when the bars
   do not reach back to the call. The PATCH is filtered on `outcome is null`, so
   a retry never rescores one, and the run is a `caller: 'calls'` row either way.
 - **Her calls' record** — a month of outcomes, what the triggered ones made an
   ounce, the newest losses, and any call still standing — goes where her read
-  record goes: the briefing, a reply and the pass, never the trade look.
+  record goes: the briefing, a reply, the pass and the review, never the trade
+  look.
   `/notes` shows it to you. She gives it straight when you ask, losses first, and
   never uses it to talk you into a trade.
 
@@ -2050,7 +2057,7 @@ sharing one instant — otherwise no quote rather than a wrong one.
 **Who gets what.** `notesBlock()` reaches **every path** — the briefing, a
 reply, the nightly pass, the Saturday review and the trade look — and its absence would be silent:
 she carries on ignoring an instruction he believes she took. `portraitBlock()`,
-`recordBlock()` and `callsBlock()` go to the briefing, a reply and the pass, and a
+`recordBlock()` and `callsBlock()` go to the briefing, a reply, the pass and the review, and a
 test asserts none reaches the trade look: it lands while he is in a position, where *"he
 cuts winners early"* reads as an order about the trade he is in. The portrait is
 its own block so a failed read costs the paragraph and never his instructions. `channelsBlock()`
@@ -3319,7 +3326,8 @@ its own CI job, and `agree.test.mjs` holds that both still name it.
 matters most about her is a sentence, and no suite can say whether the model
 still obeys it. The eval sends the cases in `test/fixtures/eval-cases.json` —
 the failures this README records and the rules his decisions added — through her
-real prompts, built as the reply, both gates and the trade look build them, and
+real prompts, built as the reply, both gates, the trade look and the Saturday
+review's draft build them, and
 grades the answer: what is countable in code (em-dashes, sentences a paragraph,
 words, questions, patterns that must or must not appear), the rest by an Opus
 judge against a criterion written per case, answered as JSON a schema fixes.

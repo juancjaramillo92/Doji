@@ -4014,6 +4014,8 @@ test('a call is scored on price, every doubt against her', () => {
     'scratch', 'R-04 did not move the stop to break-even after +$20');
   assert.equal(score([minute(1, { low: 3999 }), minute(2, { high: 4021, low: 3999 })]).outcome, 'open',
     'the stop moved on the same bar that reached +$20, which cannot say which came first');
+  assert.equal(score([minute(1, { low: 3999, high: 4021 }), minute(2, { low: 3984 })]).outcome, 'lost',
+    'the fill bar\'s high moved the stop to break-even, though it may have come before the fill');
   const open = score([minute(1, { low: 3999 }), minute(2, { close: 4010.5 })]);
   assert.deepEqual([open.outcome, open.result], ['open', 10.5], 'a call still on at the roll is marked at the last close');
   assert.equal(score([minute(1, { low: 3999 }), { ...minute(0, { high: 4031 }), t: Date.parse(CALL.expires_at) }]).outcome,
@@ -5669,7 +5671,7 @@ test('every eval case names a path, carries what that path needs, and checks som
   const ids = EVAL.CASES.map(c => c.id);
   assert.equal(new Set(ids).size, ids.length, 'two eval cases share an id');
   assert.ok(EVAL.CASES.length >= 12, `only ${EVAL.CASES.length} eval cases`);
-  const needs = { reply: 'asked', critic: 'draft', trim: 'draft', trade: 'situation' };
+  const needs = { reply: 'asked', critic: 'draft', trim: 'draft', trade: 'situation', review: 'context' };
   for (const c of EVAL.CASES) {
     assert.ok(EVAL.PATHS[c.path], `${c.id} names a path the eval does not build: ${c.path}`);
     assert.ok(c[needs[c.path]], `${c.id} is a ${c.path} case with no ${needs[c.path]}`);
@@ -5708,12 +5710,15 @@ test('each eval path asks what its call site asks, of the model it runs on', () 
   const [opus, sonnet] = ['OPUS', 'SONNET'].map(k => fn.match(new RegExp(`const ${k} = "([^"]+)"`))[1]);
   const at = (path, extra = {}) => EVAL.request({ path, context: '', asked: 'q', draft: 'D', situation: 'S', ...extra });
   assert.equal(at('trim').model, sonnet, 'TRIM runs on Sonnet in the function and on something else here');
-  for (const path of ['reply', 'critic', 'trade']) {
+  for (const path of ['reply', 'critic', 'trade', 'review']) {
     assert.equal(at(path).model, opus, `the ${path} runs on Opus in the function and on something else here`);
   }
   assert.match(at('critic').messages[0].content, /THE BRIEFING:\n\nD$/);
   assert.match(at('trim').messages[0].content, /THE MESSAGE:\n\nD$/);
   assert.ok(at('trade').messages[0].content.startsWith(EVAL.PROMPTS.TRADE_EVENT));
+  assert.ok(at('review').messages[0].content.startsWith(EVAL.PROMPTS.REVIEW));
+  assert.match(fn, /`\$\{REVIEW\}\\n\\nHis week, computed from the rows:/,
+    'postReview no longer opens on REVIEW, so the eval\'s review asks something else');
   assert.ok(at('reply').system[0].text.startsWith(EVAL.PROMPTS.SYSTEM), 'the eval asks under a different system prompt');
   // The gates' markers are the function's own.
   assert.match(fn, /\\n\\nTHE BRIEFING:\\n\\n\$\{draft\}/);

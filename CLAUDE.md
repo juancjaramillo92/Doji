@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 742 tests, eight suites
+npm test      # 743 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -440,7 +440,7 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   boot guard, each guarded where used — `agree.test.mjs` makes that cost
   something.
 - **Everything she writes is spoken, with the text as the fallback**, through
-  `sayAloud`; `agree.test.mjs` reads it and counts the four call sites, and
+  `sayAloud`; `agree.test.mjs` reads it and counts the five call sites, and
   `fold.test.mjs` drives the fallback. There is no length cap and the prompt
   states none; `TTS_LIMIT` is a chunk size. The briefing speaks in a second worker
   (`postSpeak`), stored before the hand-off, falling back to speaking itself.

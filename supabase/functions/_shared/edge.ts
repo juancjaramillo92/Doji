@@ -160,3 +160,10 @@ export function marketOpen(now = new Date()): boolean {
   if (wd === 0 && hour < 17) return false;    // before the Sunday open
   return true;
 }
+
+/* ─── A minute of price ────────────────────────────────────────────────────
+   What `doji-mcp-sync?bars=1` serves and `doji-eugenia` scores her calls on:
+   one shape, declared once, since the two functions meet only over HTTP.
+   Display prices, the bar's opening minute in epoch milliseconds.
+   ───────────────────────────────────────────────────────────────────────── */
+export interface Candle { t: number; open: number; high: number; low: number; close: number }

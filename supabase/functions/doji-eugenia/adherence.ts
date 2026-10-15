@@ -204,6 +204,9 @@ const CENT = 0.005;
    ───────────────────────────────────────────────────────────────────────── */
 export const CLOSEOUT_MIN = 30;
 
+// The two targets, the exception and the default; her calls are held to both.
+export const TARGET_MIN = 25, TARGET_MAX = 30;
+
 export function nearFridayClose(fill: Date): boolean {
   const w = nyWall(fill);
   if (w.wd !== 5) return false;
@@ -217,7 +220,7 @@ function r01(rows: TradeRow[]): RuleResult {
   for (const t of rows) {
     if (!isBroker(t) || !closed(t) || (t.pnl as number) <= 0) continue;
     if (!priced(t)) { unknown.push(t.id); continue; }
-    if (gap(t) >= 25 - CENT) { pass.push(t.id); continue; }
+    if (gap(t) >= TARGET_MIN - CENT) { pass.push(t.id); continue; }
 
     /* A scratch is not a missed target. §6 names a break-even stop-out as a
        legitimate exit, while §7's predicate flags any win under $25 — and a
@@ -230,7 +233,7 @@ function r01(rows: TradeRow[]): RuleResult {
     if (t.fill_time && nearFridayClose(new Date(t.fill_time))) unknown.push(t.id);
     else fail.push(t.id);
   }
-  return result('R-01', 'wins closing under $25 from entry, break-even exits and Friday close-outs excepted',
+  return result('R-01', `wins closing under $${TARGET_MIN} from entry, break-even exits and Friday close-outs excepted`,
                 pass, fail, unknown);
 }
 
@@ -239,14 +242,16 @@ function r01(rows: TradeRow[]): RuleResult {
    cap only. Whether the stop was respected needs planned_sl, which almost no
    row carries yet, so §7 keeps it out.
    ───────────────────────────────────────────────────────────────────────── */
+export const FULL_STOP = 20;
+
 function r02(rows: TradeRow[]): RuleResult {
   const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
   for (const t of rows) {
     if (!isBroker(t) || !closed(t) || (t.pnl as number) >= 0) continue;
     if (!priced(t)) { unknown.push(t.id); continue; }
-    if (gap(t) > 20 + CENT) fail.push(t.id); else pass.push(t.id);
+    if (gap(t) > FULL_STOP + CENT) fail.push(t.id); else pass.push(t.id);
   }
-  return result('R-02', 'losses further than $20 from entry — the cap only, never whether it was respected',
+  return result('R-02', `losses further than $${FULL_STOP} from entry — the cap only, never whether it was respected`,
                 pass, fail, unknown);
 }
 
@@ -261,8 +266,6 @@ function r02(rows: TradeRow[]): RuleResult {
    than three entries cannot breach whatever they are. A known breach stands
    regardless.
    ───────────────────────────────────────────────────────────────────────── */
-export const FULL_STOP = 20;
-
 function r03(rows: TradeRow[]): RuleResult {
   const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
 
