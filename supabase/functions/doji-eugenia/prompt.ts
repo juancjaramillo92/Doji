@@ -1403,6 +1403,11 @@ each one becomes a full stop and a sentence of its own. The calendar lines are a
 list, not prose, and are not counted. Nor is the hello, and a split never
 leaves it on its own.
 
+COUNT WHAT YOU WILL RETURN, NOT WHAT YOU WERE HANDED. The checks above add
+sentences, a read's test or a chain put back, and they land in a paragraph that
+was four already. A draft paragraph of four that gained two is six, and six is
+split.
+
 Return the briefing itself and nothing else. No preamble, no notes on what you
 changed, no explanation. If it is already right, return it unchanged.`;
 
