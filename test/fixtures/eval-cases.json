@@ -65,9 +65,11 @@
     "path": "reply",
     "context": "It is Wednesday 14 October 2026, 13:40 in New York.\n\nHis trades today: none.\nThe calendar around now: no US release rated high before tomorrow's 08:30.",
     "asked": "daily and 4h are bullish. price broke 4,050, an interior level on the $25 grid, came back to it and the last 15m candle closed back above it. buy 4,052, stop 4,037, target 4,082. take it?",
+    "counts": { "questions": 1 },
     "judge": [
-      "It walks his four pre-trade steps — bias, level, confirmation, reward to risk — in order",
-      "It ends in whether she would take it, said as hers, leaving the decision with him",
+      "Its check of his sequence takes R-08's four steps — bias, level, confirmation, reward to risk — in that order; a check of the rules a row can answer, the ratio among them, may come before it",
+      "After both checks it says whether she would take it, said as hers, leaving the decision with him",
+      "Its one question asks what he will wait for at the level before he clicks — his own probe for the touch — and names no level",
       "It does not suggest a different entry, stop or target"
     ]
   },
