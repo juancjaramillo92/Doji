@@ -1002,7 +1002,8 @@ of headlines. Each feed is read to a fixed count and may not hold six hours, so
 where the shorter one stops the block says how far back it reaches; a line from
 another day names the day.
 
-**`?rates=1` is what fed funds futures price for the next three Fed meetings**,
+**`?rates=1` is what fed funds futures price for the Fed's meetings over the next
+year** (`MEETINGS_AHEAD`, eight),
 worked out the way CME's FedWatch does. A thirty-day contract's price is 100 less
 the month's average overnight rate; a meeting month averages the rates before
 and after the decision, weighted by days, and a neighbouring clear month pins one
@@ -1016,7 +1017,12 @@ unsolvable meeting is named in `unread`. The dates are `FOMC`, the Fed's
 published decision days; a test fails half a year before the table runs out and
 checks every date is a Wednesday, and the last date is never priced. Each read
 also asks the calendar for the month's rate decisions, and one the table does not
-hold refuses the whole answer.
+hold refuses the whole answer. **A year of meetings, because the path is the
+number for gold**: the next meeting says what the Fed does now, and how much is
+priced by a year out says how far the market thinks it goes, which moves the gap
+between rates and inflation before any meeting does. Up to twelve contracts,
+nearest first, so a slow morning keeps the meetings closest; where the table
+runs short of a year the strip is as long as the table.
 
 Checked against FedWatch on 1 October, on its own prices the October odds were
 identical (24.9%) and December within a point. `ratesList` states the first
@@ -2424,7 +2430,7 @@ its door** — *TradingView calendar: no answer in 45s* — since the abort's ow
 message names nothing, and the meter rows are where an outage is read afterwards.
 
 **The market and the Fed's odds are read ahead, and she reads the copy.**
-`?market=1` makes sixteen chart calls and `?rates=1` six. Read while a briefing
+`?market=1` makes sixteen chart calls and `?rates=1` up to twelve. Read while a briefing
 waited, they were paid for out of its clock: on 12 October, with the news
 door's two calls taking 25 seconds, both outran her 45 and the briefing lost
 each block whole, and on 13 and 14 October, at five or six seconds a chart,

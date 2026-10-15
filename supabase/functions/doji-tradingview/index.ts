@@ -587,8 +587,15 @@ async function readHeadlines() {
    Named months, never the continuous ones: `ZQ1!` rolls early and `ZQ3!` was
    refused.
 
+   A year of meetings, eight, because the path is the number for gold: the next
+   meeting says what the Fed does now, and how much is priced by a year out says
+   how far the market thinks it goes. Near months first, so a slow morning
+   keeps the meetings closest.
+
    The meeting dates are the Fed's published schedule — the calendar reaches a
-   month and the odds need three meetings. A test fails half a year before the
+   month and the odds need a year of meetings. Where the table runs short of a
+   year the strip is as long as the table, each meeting named by its date, and
+   a test fails half a year before the
    table runs out, and every read checks the calendar: a decision it lists that
    the table lacks refuses the answer, since odds against the wrong meeting are
    a confident wrong number. The decision day is the second of the two. */
@@ -597,7 +604,7 @@ export const FOMC = [
   "2027-01-27", "2027-03-17", "2027-04-28", "2027-06-09",
   "2027-07-28", "2027-09-15", "2027-10-27", "2027-12-08",
 ];
-const MEETINGS_AHEAD = 3;
+const MEETINGS_AHEAD = 8;
 const MONTH_CODES = "FGHJKMNQUVXZ";
 
 const shift = (ym: string, by: number) => {

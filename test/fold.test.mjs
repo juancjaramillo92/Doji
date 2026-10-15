@@ -1032,7 +1032,9 @@ test('fed funds futures are read as FedWatch reads them, meeting by meeting', ()
   assert.equal(dec.after, 4.1423);
   assert.equal(dec.move_bp, 19.7);
   assert.equal(dec.total_bp, 26.6, 'the move since now is not measured from the rate before October');
-  assert.deepEqual(unread, ['2027-01-27'], 'a meeting whose months were not read is dropped rather than named');
+  // A year of meetings is asked for, and every one whose months were not read is named.
+  assert.deepEqual(unread, ['2027-01-27', '2027-03-17', '2027-04-28', '2027-06-09', '2027-07-28', '2027-09-15'],
+    'a meeting whose months were not read is dropped rather than named');
 });
 
 /* A CONTRACT EXPIRES ON THE LAST DAY OF ITS MONTH, so on 1 December the clear
@@ -1043,7 +1045,8 @@ test('fed funds futures are read as FedWatch reads them, meeting by meeting', ()
 test('a meeting with no clear month read beside it is solved off the meeting after it', () => {
   const prices = { '2026-12': 95.95, '2027-01': 95.80, '2027-02': 95.79, '2027-03': 95.75 };
   const { meetings, unread } = foldRates(prices, '2026-12-01');
-  assert.deepEqual(unread, []);
+  // Every meeting the prices reach resolves; the rest of the year is named.
+  assert.deepEqual(unread, ['2027-04-28', '2027-06-09', '2027-07-28', '2027-09-15', '2027-10-27']);
   const [dec, jan] = meetings;
   assert.equal(dec.after, jan.before, 'December is not solved off January');
   // (31 × 4.05 − 22 × after) / 9, with after = (31 × 4.20 − 4 × 4.21) / 27
@@ -1052,7 +1055,11 @@ test('a meeting with no clear month read beside it is solved off the meeting aft
 });
 
 test('the contracts are named months, each meeting with the clear one beside it', () => {
-  assert.deepEqual(contractMonths('2026-10-01'), ['2026-10', '2026-11', '2026-12', '2027-01', '2027-02']);
+  // A year of meetings, October to September, and every month between them clear or meeting.
+  assert.deepEqual(contractMonths('2026-10-01'), ['2026-10', '2026-11', '2026-12', '2027-01', '2027-02',
+    '2027-03', '2027-04', '2027-05', '2027-06', '2027-07', '2027-08', '2027-09']);
+  // Near the table's end the strip is as long as the table, never past it.
+  assert.deepEqual(contractMonths('2027-09-01'), ['2027-08', '2027-09', '2027-10', '2027-11']);
   assert.deepEqual(['2026-10', '2026-11', '2027-01'].map(zq), ['CBOT:ZQV2026', 'CBOT:ZQX2026', 'CBOT:ZQF2027']);
   // The table's last date is a boundary, never a meeting to price.
   assert.ok(!contractMonths(FOMC.at(-2)).includes(FOMC.at(-1).slice(0, 7)),

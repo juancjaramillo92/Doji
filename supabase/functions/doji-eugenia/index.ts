@@ -1126,7 +1126,7 @@ const AROUND_TOOL = {
     "euro, each a level now beside the level at a stated time, and its daily close a week, " +
     "a month and three months back; and gold's and the dollar's " +
     "headlines from the last six hours, titles only; what fed funds futures price for " +
-    "the next three Fed meetings; the CFTC's weekly count of " +
+    "the Fed's meetings over the next year; the CFTC's weekly count of " +
     "where the speculators stand in gold futures; and what COMEX gold futures traded in " +
     "the last finished session against the twenty before. Use it whenever you are about " +
     "to say what the dollar, yields or anything else around gold did, or what " +
