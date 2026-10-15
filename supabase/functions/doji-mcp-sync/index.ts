@@ -24,7 +24,7 @@
 
 import {
   env, secretMatches, json, marketOpen, nyDate, sbHeaders, heartbeat, mcpInit, parseSse,
-  SB_URL, SB_KEY, why, type Candle
+  SB_URL, SB_KEY, why, CHARTS, type Candle
 } from "../_shared/edge.ts";
 
 const MCP_URL   = env("CTRADER_MCP_URL") || "https://mcp.ctrader.com/trading/mcp";
@@ -479,18 +479,39 @@ export function bestPrice(bars: Bar[], direction: string, entryMs: number, close
   return fromPipettes(direction === "BUY" ? Math.max(...side) : Math.min(...side));
 }
 
-/* Four hours a request: nothing has established how many bars one answer
-   carries, and a page cut short reports a best price low, silently. */
-const BAR_CHUNK_MS = 4 * 3600_000;
+/* ─── What one bar read can carry ──────────────────────────────────────────
+   get_trendbars counts its answer back from toTimestamp: 100 bars unless
+   `count` asks for more, never more than 1000, over a window of 30 days at
+   most — its own description, kept in test/fixtures/ctrader-get-trendbars.json.
+   Asked without `count`, a window over 100 bars came back as its newest 100
+   and said nothing: every chart of her map on 15 October, and every four-hour
+   chunk of minutes behind best_price and her calls' scores before it. So
+   every read asks for the most, a window is split well inside both limits,
+   and an answer holding the most is a cut page, thrown rather than trusted. */
+export const BAR_MAX = 1000;
+export const RANGE_MAX_MS = 30 * 86_400_000;
+const WINDOW_BARS = 900;
 
-async function readBars(session: Record<string, string>, from: number, to: number): Promise<Bar[]> {
+// Pure, so the splitting is driven. Windows meet at their edges, and a bar
+// there comes back twice; both readers below are indifferent to that.
+export function barWindows(from: number, to: number, ms: number): { from: number; to: number }[] {
+  const span = Math.min(RANGE_MAX_MS, WINDOW_BARS * ms);
+  const out: { from: number; to: number }[] = [];
+  for (let at = from; at < to; at += span) out.push({ from: at, to: Math.min(at + span, to) });
+  return out;
+}
+
+async function readTrendbars(session: Record<string, string>, period: string, ms: number,
+                             from: number, to: number): Promise<Bar[]> {
   const bars: Bar[] = [];
-  for (let at = from; at < to; at += BAR_CHUNK_MS) {
+  for (const w of barWindows(from, to, ms)) {
     const got = await mcpCall(session, "get_trendbars", {
-      symbolId: SYMBOL_IDS[0], period: "M_1",
-      fromTimestamp: String(at), toTimestamp: String(Math.min(at + BAR_CHUNK_MS, to) - MINUTE),
+      symbolId: SYMBOL_IDS[0], period, count: BAR_MAX,
+      fromTimestamp: String(w.from), toTimestamp: String(w.to),
     });
-    bars.push(...(got.trendbars ?? []));
+    const page: Bar[] = got.trendbars ?? [];
+    if (page.length >= BAR_MAX) throw new Error(`get_trendbars ${period} answered ${page.length} bars, its most: the window was cut`);
+    bars.push(...page);
   }
   return bars;
 }
@@ -522,6 +543,52 @@ export function foldCandles(bars: Bar[]): Candle[] | null {
   }));
 }
 
+/* His charts up to `to`, at CHARTS' windows. One chart at a time, each failure
+   its own, for ?bars=raw's reason; a chart that will not read is named rather
+   than served short, and the rest are still worth having. */
+async function readCharts(session: Record<string, string>, to: number, charts: readonly typeof CHARTS[number][] = CHARTS) {
+  const out: Record<string, Candle[]> = {};
+  const missing: { period: string; error: string }[] = [];
+  for (const c of charts) {
+    try {
+      const candles = foldCandles(await readTrendbars(session, c.period, c.ms, to - c.hours * 3600_000, to));
+      if (!candles) throw new Error("a bar that will not read");
+      if (!candles.length) throw new Error("no bars");
+      out[c.period] = candles;
+    } catch (err) {
+      missing.push({ period: c.period, error: why(err) });
+    }
+  }
+  return { charts: out, missing };
+}
+
+/* ─── His charts at his own entries ────────────────────────────────────────
+   For scripts/calibrate.mjs, which folds her map at the minute of each of his
+   newest entries and asks whether it had the level he traded. The trades come
+   from the table, never the request, so the door still puts nothing a caller
+   sends into a broker call. The two level charts only, and only bars closed by
+   the minute he clicked: one that closed after it holds prices he could not
+   have seen, and a map drawn from it would find his level by looking ahead. */
+const ENTRIES = 20;
+const LEVEL_CHARTS = CHARTS.filter(c => c.period === "H_1" || c.period === "M_30");
+
+async function readEntries(session: Record<string, string>) {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/trades?select=id,direction,entry_time,entry_price` +
+    `&entry_time=not.is.null&entry_price=not.is.null&deleted=is.false&id=like.PID*` +
+    `&order=entry_time.desc&limit=${ENTRIES}`,
+    { headers: sbHeaders() });
+  if (!res.ok) throw new Error(`Entry read failed (HTTP ${res.status}): ${await res.text()}`);
+  const out = [];
+  for (const t of await res.json() as { id: string; direction: string; entry_time: string; entry_price: number }[]) {
+    const at = Math.floor(Date.parse(t.entry_time) / MINUTE) * MINUTE;
+    const { charts, missing } = await readCharts(session, at, LEVEL_CHARTS);
+    for (const c of LEVEL_CHARTS) charts[c.period] = charts[c.period]?.filter(b => b.t + c.ms <= at);
+    out.push({ ...t, at, charts, missing });
+  }
+  return out;
+}
+
 /* The newest closed trades still missing a figure, a few a poll — one path for
    a fresh close and for the year behind it, newest first so a new close never
    queues behind the backlog. Too short to measure is skipped at no broker
@@ -546,7 +613,7 @@ async function fillExcursions(session: Record<string, string>): Promise<number> 
   let wrote = 0;
   for (const t of due) {
     const span = barSpan(t.entry, t.close) as { from: number; to: number };
-    const best = bestPrice(await readBars(session, span.from, span.to), t.direction, t.entry, t.close);
+    const best = bestPrice(await readTrendbars(session, "M_1", MINUTE, span.from, span.to), t.direction, t.entry, t.close);
     if (best === null) continue;
     if (await writeOnce(t.id, "best_price", best)) wrote++;
   }
@@ -582,8 +649,11 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     const marketRaw = url.searchParams.get("market") === "raw";
     const bars      = url.searchParams.get("bars") === "raw";
     const day       = url.searchParams.get("bars") === "1";
+    const structure = url.searchParams.get("structure") === "1";
+    const entries   = url.searchParams.get("entries") === "1";
     // The read-only probes answer over the weekend, when rows get looked at.
-    if (!force && !raw && !tools && !posns && !market && !marketRaw && !bars && !day && !marketOpen()) {
+    if (!force && !raw && !tools && !posns && !market && !marketRaw && !bars && !day && !structure &&
+        !entries && !marketOpen()) {
       // A skip is a completed run: unmarked, the heartbeat freezes over the
       // weekend close and reads as a dead sync every Sunday evening.
       await heartbeat("poller");
@@ -650,9 +720,20 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
        calls. Thrown rather than served short when one will not read. */
     if (day) {
       const from = Math.floor((to - CALL_HOURS * 3600_000) / MINUTE) * MINUTE;
-      const candles = foldCandles(await readBars(session, from, to));
+      const candles = foldCandles(await readTrendbars(session, "M_1", MINUTE, from, to));
       if (!candles) throw new Error("get_trendbars returned a bar that will not read");
       return json({ ok: true, symbol: SYMBOL_IDS[0], from, bars: candles });
+    }
+
+    /* ?structure=1 — his six charts, folded, for Eugenia's map. */
+    if (structure) {
+      return json({ ok: true, symbol: SYMBOL_IDS[0], at: to, ...await readCharts(session, to) });
+    }
+
+    /* ?entries=1 — his level charts at each of his newest entries, for
+       scripts/calibrate.mjs. */
+    if (entries) {
+      return json({ ok: true, symbol: SYMBOL_IDS[0], entries: await readEntries(session) });
     }
 
     /* ?bars=raw — minute bars at six ages, raw: their shape, their scale, and

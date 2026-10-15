@@ -558,10 +558,11 @@ create index if not exists eugenia_calendar_ticker on public.eugenia_calendar (t
 alter table public.eugenia_calendar enable row level security;
 
 -- ─── The market, read ahead ────────────────────────────────────────────────
--- What doji-tradingview's two long doors last answered, one row per door,
--- rewritten by the quarter-hourly job, so a briefing or a reply reads the
--- market here rather than waiting on TradingView. A cache that never grows,
--- so it is not backed up; the next quarter hour refills it.
+-- What doji-tradingview's two long doors last answered, and her map of his
+-- charts off the poller's, one row per door, rewritten by the quarter-hourly
+-- job, so a briefing or a reply reads the market here rather than waiting on a
+-- feed. A cache that never grows, so it is not backed up; the next quarter
+-- hour refills it.
 create table if not exists public.eugenia_market (
   door    text primary key,
   answer  jsonb not null,

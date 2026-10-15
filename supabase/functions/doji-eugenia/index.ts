@@ -37,9 +37,10 @@ import {
   type TradeRow, type Standing, type Stop, type RuleResult,
 } from "./adherence.ts";
 import { journalStats, statsList } from "./journal.ts";
+import { foldStructure, READINGS, GRID, ADR_SESSIONS, type Structure, type Turn } from "./structure.ts";
 import {
-  env, secretMatches, json, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY, why, marketOpen,
-  type Candle,
+  env, secretMatches, json, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY, why, marketOpen, CHARTS,
+  type Candle, type Period,
 } from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("EUGENIA_BOT_TOKEN");
@@ -1136,6 +1137,23 @@ const AROUND_TOOL = {
   input_schema: { type: "object", properties: {}, additionalProperties: false },
 } as const;
 
+/* His charts, in a conversation: what the briefing is handed for its call,
+   for the call he asks for and the plan he brings without a chart. */
+const STRUCTURE_TOOL = {
+  name: "get_structure",
+  description:
+    "His six charts, read off his own broker's bars every quarter hour: the turns on the daily, " +
+    "4H and 1H and the sequence they make; where price has turned on the 1H and 30m, with the $25 " +
+    "grid beside them and where the two agree; which of those sit at the edge of the week's hourly " +
+    "range and which inside it; equal highs and lows still resting, the liquidity pools of his " +
+    "step 2; wicks through a turn that closed back; the sessions' ranges; the average daily range; " +
+    "and the last four closed 15m and 5m candles. Use it before judging his bias or " +
+    "his level when he has sent no chart, and before filing a call, whose levels come off it. It is " +
+    "your map, computed the same way every time, and not his. Every figure in it has already " +
+    "printed; like get_market, it says nothing about where price goes next.",
+  input_schema: { type: "object", properties: {}, additionalProperties: false },
+} as const;
+
 /* Display prices: the poller settles the scale before serving. */
 export interface Quote {
   bid: number; ask: number; high: number; low: number;
@@ -1716,6 +1734,7 @@ const CHAT_TOOLS = [
   WEB_FETCH,
   MARKET_TOOL,
   AROUND_TOOL,
+  STRUCTURE_TOOL,
   TRADES_TOOL,
   STATS_TOOL,
   CHECK_TOOL,
@@ -1861,6 +1880,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case AROUND_TOOL.name:
       return (await Promise.all([aroundBlock(), ratesBlock(), headlinesBlock(),
                                  positioningBlock(), volumeBlock()])).join("").trim();
+    case STRUCTURE_TOOL.name: return (await structureBlock()).trim();
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
     case PORTRAIT_TOOL.name: return await setPortrait(input.portrait);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
@@ -3012,6 +3032,31 @@ export async function storeRates(): Promise<void> {
   }
 }
 
+/* His charts come from his broker, through the poller for get_market's
+   reason, and are folded here rather than there: the poller serves bars, and
+   what a bar means to his rules is hers. Stored as folded, so every reader
+   gets the same map; a chart the door did not read is named in it. */
+const STRUCTURE_URL = `${SB_URL}/functions/v1/doji-mcp-sync?structure=1`;
+
+export async function storeStructure(): Promise<void> {
+  try {
+    const res = await fetch(STRUCTURE_URL, { headers: { "x-doji-key": CRON_SECRET },
+                                             signal: AbortSignal.timeout(READ_MS) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const served = await res.json();
+    if (!served?.ok || !served.charts) throw new Error("no readable answer");
+    if (served.missing.length) {
+      await unread("structure", missed(served.missing.map((m: { period: string; error: string }) =>
+        ({ symbol: m.period, error: m.error }))));
+    }
+    const map = foldStructure(served.charts, Date.now());
+    if (!map.last) throw new Error("no chart served");
+    await store("structure", map);
+  } catch (err) {
+    await unread("structure", why(err));
+  }
+}
+
 /* ─── The market around gold ───────────────────────────────────────────────
    The dollar, yields, real yield, breakeven, silver, oil, the S&P, the VIX and
    GVZ, and abroad four European ten-year yields, Japan's and the euro, for the
@@ -3089,6 +3134,96 @@ export async function trendBlock(): Promise<string> {
     await unread("trend", why(err));
     return "\n\nThe weeks behind the market could not be read just now. Do not quote a week's " +
       "or a month's move from a search; say you do not have it.";
+  }
+}
+
+/* ─── His charts, as a map ─────────────────────────────────────────────────
+   The fold in structure.ts, said. Every price on it has printed, and every
+   line says when, so a level can be checked against his own screen. It is
+   handed to the briefing for its call and served by get_structure, and it
+   says it is hers: his map is drawn in TradingView and kept nowhere here.
+
+   Never throws, and a failed read is a sentence, or a call is built off a
+   search page.
+   ───────────────────────────────────────────────────────────────────────── */
+const NO_STRUCTURE =
+  "\n\nHis charts could not be read just now, so you have no map of them. Say so " +
+  "rather than reading a level off a search, and file no call that needs one.";
+
+const SEQUENCE = {
+  up: "higher highs and higher lows",
+  down: "lower highs and lower lows",
+  mixed: "not the same way on both sides",
+} as const;
+
+export function structureList(s: Structure, now = Date.now()): string {
+  if (!s.last) return NO_STRUCTURE;
+  const today = nyDate(new Date(now));
+  const when = (ms: number) => {
+    const day = nyDate(new Date(ms));
+    return `${nyTime(new Date(ms).toISOString())} ET` + (day === today ? "" : ` ${weekday(day)} ${civilDay(day)}`);
+  };
+  const name = (p: Period) => CHARTS.find(c => c.period === p)!.name;
+  const turn = (t: Turn) => `${t.price} (${when(t.at)})`;
+  const pair = (ts: Turn[], kind: string) =>
+    ts.length ? `${kind} ${ts.map(turn).join(" then ")}` : `no ${kind} yet`;
+
+  const lines = [
+    `\n\nHis charts, off his own broker's bars. The newest bar read opened at ${when(s.last.t)} ` +
+    `and last traded ${s.last.close}. This is YOUR map, computed from the bars; his is drawn in ` +
+    `TradingView. Every figure on it has already printed.`,
+    `The turns on the bias charts, the newest two of each:`,
+    ...s.bias.map(b => `· ${name(b.period)}: ${pair(b.highs, "highs")}; ${pair(b.lows, "lows")} — ` +
+      (b.trend ? SEQUENCE[b.trend] : "too few turns for a sequence") + `. Last close ${b.close}.`),
+  ];
+  if (s.range) {
+    lines.push(`The week of hourly bars runs from ${turn(s.range.low)} to ${turn(s.range.high)}. A level ` +
+      `within $${READINGS.EDGE} of either end is at its edge; anything between is inside the range.`);
+  }
+  lines.push(`Where price has turned, on the 1H and 30m, within $${READINGS.REACH} of ${s.last.close}:`,
+    ...(s.levels.length ? s.levels.map(l => `· ${l.price} — ` +
+      (l.sides === 'both' ? "turned both ways, a level that has flipped" : `a ${l.sides}`) +
+      `, on the ${l.periods.map(name).join(" and ")}, newest ${when(l.at)}` +
+      (l.quarter === null ? "" : `; on the ${l.quarter} ${l.quarter % (2 * GRID) === 0 ? "round number" : "quarter"}`) +
+      (l.edge ? `; at the ${l.edge} of the week's range` : s.range ? "; inside the range" : "")) : ["· none"]),
+    ...(s.pools.length
+      ? ["Where highs or lows have printed level and still rest, the stops beyond them not yet taken:",
+         ...s.pools.map(p => `· ${p.price} — equal ${p.kind}s, on the ${p.periods.map(name).join(" and ")}, ` +
+           `touched ${p.touches.map(when).join(", ")}`)]
+      : [`No equal highs or lows still rest within $${READINGS.REACH}.`]),
+    `The grid within $${READINGS.REACH}: ` + s.grid.map(q =>
+      `${q.price} (${q.round ? "round" : "quarter"}${q.turned ? ", a turn sits on it" : ""})`).join(", ") + ".");
+  lines.push(...(s.sweeps.length
+    ? ["Wicks through a turn that closed back, in the last day:",
+       ...s.sweeps.map(w => `· ${name(w.period)} bar at ${when(w.at)}: ${w.kind === 'high' ? "above" : "below"} ` +
+         `the ${w.level} ${w.kind} to ${w.wick}, closed back at ${w.close}`)]
+    : ["No wick through a turn closed back in the last day."]));
+  if (s.sessions.length) {
+    lines.push("The sessions over the last day, on the 15m: " + s.sessions.map(x =>
+      `${x.name} ${when(x.from)} to ${nyTime(new Date(x.to).toISOString())}${x.to > now ? " so far" : ""}, ` +
+      `${x.low} to ${x.high}`).join("; ") + ".");
+  }
+  if (s.adr !== null) {
+    lines.push(`The daily range has averaged $${s.adr} over the last ${ADR_SESSIONS} sessions` +
+      (s.today === null ? "." : `; this session has covered $${s.today} so far.`));
+  }
+  lines.push(...s.candles.map(c => `The last closed ${name(c.period)} candles, oldest first: ` +
+    c.bars.map(b => `${when(b.t)} open ${b.open}, high ${b.high}, low ${b.low}, close ${b.close}`).join("; ") + "."));
+  if (s.missing.length) {
+    lines.push(`Not read just now: the ${s.missing.map(name).join(", ")}. Say so rather than judging a ` +
+      `step off a chart you do not have.`);
+  }
+  return lines.join("\n");
+}
+
+export async function structureBlock(): Promise<string> {
+  try {
+    const kept = await readStored("structure");
+    if (!kept) throw new Error("not read yet");
+    return structureList(kept.answer);
+  } catch (err) {
+    await unread("structure", why(err));
+    return NO_STRUCTURE;
   }
 }
 
@@ -3402,10 +3537,11 @@ async function postScheduled(url: URL): Promise<Response> {
   try {
     if (url.searchParams.get("consolidate") === "1") { job = 'consolidate'; return await postConsolidation(); }
     // The calendar, on its own quarter-hourly job, so an actual lands within
-    // one, and the market read ahead after it; none of the three throws.
+    // one, and the market, its weeks and his charts read ahead after it; none
+    // of the five throws.
     if (url.searchParams.get("calendar") === "1") {
       await filed();
-      await Promise.all([storeMarket(), storeRates(), storeTrend()]);
+      await Promise.all([storeMarket(), storeRates(), storeTrend(), storeStructure()]);
       return json({ ok: true, filed: true });
     }
 
@@ -3596,12 +3732,13 @@ async function postBriefing(due: Brief): Promise<Response> {
   // Sunday the whole week.
   await (due === 'sunday' ? filedWeek(weekOf(new Date())) : filed());
   // Every read at once: independent and small, so the batch costs its slowest.
-  const [price, around, rates, crowd, traded, notes, portrait, channels, trades, breaches, story, health, loops,
-         calendar, desk, record, calls] =
+  const [price, chart, around, rates, crowd, traded, notes, portrait, channels, trades, breaches, story, health,
+         loops, calendar, desk, record, calls] =
     await Promise.all([
-      marketBlock(), aroundBlock(), ratesBlock(), due === 'sunday' ? positioningBlock() : "", volumeBlock(),
-      notesBlock(), portraitBlock(), channelsBlock(), tradesBlock(), breachesBlock(), thesisBlock(), healthBlock(),
-      loopsBlock(), due === 'sunday' ? weekBlock() : calendarBlock(), positionsBlock(), recordBlock(), callsBlock(),
+      marketBlock(), structureBlock(), aroundBlock(), ratesBlock(), due === 'sunday' ? positioningBlock() : "",
+      volumeBlock(), notesBlock(), portraitBlock(), channelsBlock(), tradesBlock(), breachesBlock(), thesisBlock(),
+      healthBlock(), loopsBlock(), due === 'sunday' ? weekBlock() : calendarBlock(), positionsBlock(), recordBlock(),
+      callsBlock(),
     ]);
 
   const asked = (due === 'sunday'
@@ -3609,8 +3746,8 @@ async function postBriefing(due: Brief): Promise<Response> {
     : "Today's briefing, please.")
     // `health` first: if the journal stopped, everything after it may be
     // missing rows.
-    + health + price + around + rates + crowd + traded + notes + portrait + channels + trades + breaches + story
-    + loops + calendar + desk + record + calls;
+    + health + price + chart + around + rates + crowd + traded + notes + portrait + channels + trades + breaches
+    + story + loops + calendar + desk + record + calls;
 
   const left = () => Math.max(0, opened + WRITER_MS - Date.now());
   const draft = await ask([...await recent(), { role: 'user', content: asked }],

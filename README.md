@@ -59,6 +59,7 @@ supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
   doji-eugenia/strategy.ts              what he decided; she cannot write it
   doji-eugenia/journal.ts               the app's arithmetic, ported so she can reach it
   doji-eugenia/adherence.ts             the twelve rules a journal row can answer
+  doji-eugenia/structure.ts             his six charts, read in his words: her map
 supabase/functions/doji-tradingview/    Edge Function: the TradingView sign-in
 doji_gmail_sync.gs                      Apps Script: broker email parser
 charm/                                  firmware for the charm — see The charms
@@ -91,12 +92,15 @@ charm/                                  firmware for the charm — see The charm
 scripts/backup.mjs                      the paged read behind the daily copy
 scripts/health.mjs                      whether anything is running, asked from outside
 scripts/eval.mjs                        whether Eugenia still behaves, asked of the model, by hand
+scripts/calibrate.mjs                   whether her map finds the levels he traded, by hand
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
 .github/workflows/backup.yml            the daily copy of the tables nothing else holds
 .github/workflows/health.yml            the hourly outside check; a failed run is the alarm
 .github/workflows/charm.yml             builds the charm firmware, kept as a download; main's is her update
+.github/workflows/calibrate.yml         runs scripts/calibrate.mjs, by hand from the Actions tab
+.github/workflows/eval.yml              runs scripts/eval.mjs --plant, by hand from the Actions tab
 .github/dependabot.yml                  monthly update PRs, both ecosystems
 package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
@@ -758,6 +762,16 @@ when a suspicious row gets looked at.
   first, for Eugenia to score her own calls against at night (*Her own calls*).
   The window is fixed, so like every other door it puts nothing from the request
   into a broker call; a bar that will not read refuses them all.
+- **`?structure=1`** returns his six charts — daily, 4H, 1H, 30m, 15m and 5m —
+  in dollars, oldest first, for Eugenia's map of them (*Her map of his
+  charts*). `CHARTS` in `_shared/edge.ts` names each period and how far back it
+  is read, one copy for the poller and her, through the same split read as every
+  other bar (below). One chart at a time, and a chart that will not read is
+  named in `missing` rather than served short.
+- **`?entries=1`** returns the 1H and 30m as they stood at each of his twenty
+  newest entries, read from the table rather than the request, and only bars
+  closed by the minute he clicked: one closed after holds prices he could not
+  have seen. It is `scripts/calibrate.mjs`'s input (*Her map of his charts*).
 
 ```sh
 curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?raw=1&hours=72" \
@@ -801,6 +815,16 @@ in under half a second; a bar carries `timestamp` (the minute it opens), `open`,
 `high`, `low`, `close` and `volume`, a range is inclusive at both ends, and it is
 in pipettes. That is what `best_price` is built on, and
 `test/fixtures/ctrader-get-trendbars.txt` is one such window, unchanged.
+
+**One read carries at most 1000 bars and 30 days, and asks for the 1000.** The
+tool counts its answer back from `toTimestamp`, 100 bars unless `count` asks
+for more, and refuses a window over 30 days; its own description says so, kept
+as `test/fixtures/ctrader-get-trendbars.json`, and a test holds `BAR_MAX` and
+`RANGE_MAX_MS` to it. Asked without `count`, any window over 100 bars came back
+as its newest 100 and nothing said so. So every bar the poller folds is read by
+`readTrendbars`, which asks for `BAR_MAX`, splits the window (`barWindows`) to
+900 bars and 30 days at most, and throws on an answer holding `BAR_MAX`, a cut
+page rather than a full one; `agree.test.mjs` holds that it is the only read.
 
 **The plan is read off the open position.** A live position carries `stopLoss`
 and `takeProfit`, so the poller records both as first seen and every change in
@@ -1314,7 +1338,8 @@ hour of a week through the composition.
 off his own screen, so the overnight move, the session's range, an hour's swing
 in yields and a forty-dollar day stay out; a move earns a line only where it
 changed the bigger story. The live quote is still handed in, for knowing where
-gold stands rather than for opening on.
+gold stands rather than for opening on. Her map of his charts is handed in
+for her call and nothing else.
 
 Five slots: **where the big picture stands** — the Fed's path, the dollar's
 trend, inflation, central-bank buying, and which of them moved — in two or three
@@ -1951,6 +1976,80 @@ makes a retry's refiling a no-op.
   believe one, never gives a read to improve it, and never holds one back to
   protect it. `/notes` shows it to him, so he can see what her reads are worth.
 
+### Her map of his charts
+
+**She sees his charts as he marks them, off his own broker.** Every quarter
+hour the job reads his six charts through `doji-mcp-sync?structure=1` — the
+broker token stays in the poller, as for `get_market` — and `foldStructure` in
+`structure.ts` turns the bars into §4's words. It is pure, and driven in
+`fold.test.mjs` against bars drawn so every turn can be found by eye:
+
+- **Turns**: a bar whose high clears `TURN` (3) bars before it and is not beaten
+  by three after; a low, mirrored. The newest three bars are never one, and no
+  bar still forming counts — a turn read off an unfinished bar has not printed.
+- **Step 1, the bias charts** — daily, 4H, 1H: the two newest turns of each
+  kind, and the sequence they make: higher highs and higher lows, lower and
+  lower, or neither. Fewer than two of either is no sequence, never a guess.
+- **Step 2, the level charts** — 1H and 30m: every turn within `REACH` ($60, a
+  call's wait and its $30 target) of price, merged where two are within
+  `ON_GRID` ($3), a high and a low on one price being a level that has flipped;
+  the quarter it sits on, if one is within $3; and the `$25` grid beside them,
+  00 and 50 round, where a turn on a quarter is §4's stronger level.
+- **R-05 against R-06**: the week of hourly bars is the range, and a level
+  within `EDGE` ($5) of its high or low is at its edge, the rest inside it.
+- **Step 2's liquidity pools** (`poolsOf`): two highs within `EQUAL` ($1.50),
+  more than three bars apart, with price gone $3 away between them and nothing
+  trading through since — the stops above still resting. Read off the bars, not
+  the turns, since the second of two equal highs is never a turn; a third touch
+  joins the pool, and a low is mirrored.
+- **§4.2's sweep**: a wick through a standing turn on the 1H or 15m that closed
+  back, in the last day — not once a bar has closed through it.
+- **The sessions** over the last day on the 15m, by `sessionAt`, the bar still
+  forming included; **the average daily range** over fourteen sessions and what
+  this one has covered; **the last four closed 15m and 5m candles** (`CANDLES`),
+  oldest first, since three can make a pattern and one never does.
+
+`TURN`, `ON_GRID`, `EDGE`, `REACH` and `EQUAL` are readings rather than facts, kept in
+one object, `READINGS`, so each can be argued with and the calibration can fold
+under others.
+
+**Whether they find his levels is measured, by hand.** `scripts/calibrate.mjs`
+folds her map at each of his twenty newest entries (`?entries=1`) under 36 sets
+of readings and prints, for each, how often his entry sat within `NEAR` ($3) of
+a level on it, against how often a level would sit that close to any price by
+chance given how many the readings draw — the **lift**, since readings that
+draw a level every five dollars find every entry and mean nothing — the median
+distance, and how often a level he journalled a setup at sits where his rules
+put that setup: at the range's edge for Support & Resistance, inside for Break
+& Retest. Today's readings are marked. It changes nothing; a reading worth
+changing is a behaviour change to `structure.ts` with the table in its commit.
+
+```sh
+SUPABASE_URL=… SB_SECRET_KEY=… DOJI_CRON_SECRET=… \
+  node --experimental-strip-types scripts/calibrate.mjs
+```
+
+Or from GitHub: **Actions → calibrate → Run workflow**, the table in the run's
+log. It needs `DOJI_CRON_SECRET` as a repository secret beside the backup's
+two; the value is the one in Vault as `doji_cron_secret`. `structureList` says the map with every price timed,
+and says it is **hers**: his structure is drawn in TradingView and deliberately
+kept nowhere here, so where he sends a chart his chart decides. A chart the
+door did not read is named, in the map and in a `market read` row.
+
+**Where it goes.** The briefing is handed it (`structureBlock()`) for its call
+and nothing else — the briefing is still the weeks behind his chart, so none of
+the map is prose, and the critic takes any of it out of the prose that is not
+the filed call. A reply reads it through `get_structure`, offered in a
+conversation only: before a call, and before judging his bias or his level on a
+plan he brings without a chart, said as her map. Every figure on it has
+printed, so the rules for a printed level hold: never beside her read, and
+nothing setup-flavoured off it unasked while he holds a position.
+
+**What it cannot see is the candle he waits for.** It is read every quarter hour
+and says when its newest bar opened; the price now is still `get_market`'s.
+Step 3 prints after he asks, and she never watches the market move. Indicators
+are refused (`REFACTOR.md` R-69): his rules read none.
+
 ### Her own calls
 
 **A coach who cannot do the thing is not one**, so she trades beside you on
@@ -1968,6 +2067,10 @@ decided this in October 2026, after the evidence on both sides was put to you
 - **Filed before it is said.** A level about where price goes next is allowed
   in a filed call and nowhere else, since a call in words alone is a tip nobody
   scores. Both gates keep a filed call whole and never change a number in it.
+- **Built on her map of his charts.** Its level is a turn or a quarter on the
+  map, its setup the one his rules name for where the level sits, its stop
+  where the idea is wrong beyond it. A call whose level is not on the map is a
+  guess, and one that needs a chart the map says was not read is not made.
 - **A call can wait for its setup.** In the morning the setup is usually not
   there yet, so the call says what it waits for — *if price comes back to 4,000
   and a fifteen-minute candle closes above it, buy at 4,002*. The condition is
@@ -2016,7 +2119,7 @@ closes; and the calendar and her record are the datasets here that compound.
 | `eugenia_reads` | every read she gave, with a verdict on the test she stated | the last 30 days | her `record_read` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
 | `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar` |
-| `eugenia_market` | the market around gold and the Fed's odds, read ahead | 1 row per door, rewritten | the quarter-hourly job, `storeMarket`, `storeTrend` and `storeRates` |
+| `eugenia_market` | the market around gold, the weeks behind it, the Fed's odds and her map of his charts, read ahead | 1 row per door, rewritten | the quarter-hourly job, `storeMarket`, `storeTrend`, `storeRates` and `storeStructure` |
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
 | `eugenia_rewrites` | what the thesis and the portrait said before each rewrite | never handed to her | a trigger on both, `eugenia_keep_rewrite` |
 | `eugenia_calls` | every call she made, and how price scored it | the last 30 days | her `make_call` tool; scored by the nightly pass |
@@ -2465,7 +2568,9 @@ and **odds read more than two hours ago are not handed to her** (`ODDS_HOURS`):
 each market line carries its own times, but the odds carry only when they were
 read, and a door that kept refusing would leave its last answer standing. A
 pass that fails leaves the copy as it was. Only the job writes the table, a
-quarter hour apart, so the market's read-then-write has no second writer.
+quarter hour apart, so the market's read-then-write has no second writer. His
+charts ride the same pass (`storeStructure`) from the poller's `?structure=1`,
+stored as the folded map (*Her map of his charts*).
 
 **Each door reads three charts at a time, inside `DOOR_MS`, 35 seconds.** One by
 one, fourteen did not fit at a slow morning's pace; all at once is the burst
@@ -3306,7 +3411,7 @@ job name, so a re-run makes the jobs match the file. Six jobs —
 |---|---|---|
 | `doji-mcp-sync` | `*/2 * * * *` | the poller |
 | `doji-eugenia` | `0 * * * *` | the briefing and the nightly pass — the function decides which, or neither |
-| `doji-eugenia-calendar` | `5,20,35,50 * * * *` | the calendar's filing, then the market, the weeks behind it and the Fed's odds read ahead |
+| `doji-eugenia-calendar` | `5,20,35,50 * * * *` | the calendar's filing, then the market, the weeks behind it, the Fed's odds and his charts read ahead |
 | `doji-dispatch-watch` | `*/10 * * * *` | `dispatch_watch`'s sweep |
 | `doji-pace-watch` | `37 * * * *` | `pace_watch`'s one-a-day warning |
 | `purge-cron-history` | `0 3 * * *` | trims `cron.job_run_details` |
@@ -3408,6 +3513,10 @@ breaks. Run it before and after any prompt change, and read the cases first:
 ```sh
 ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs --plant
 ```
+
+Or from GitHub: **Actions → eval → Run workflow**, with `ANTHROPIC_API_KEY` as a
+repository secret; the verdicts and the cost are in the run's log, and a failed
+case fails the run.
 
 **`npm run test:db` needs a Postgres server with pgvector, of the major version
 Supabase runs** — named once, in `test.yml`'s `PGCLUSTER`, and asserted by the
@@ -3530,7 +3639,7 @@ one `net.http_post` each.
 
 | Function | What a holder of the secret can do |
 |---|---|
-| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`), minute bars (`?bars=raw`), or the day's bars for her calls (`?bars=1`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
+| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`), minute bars (`?bars=raw`), the day's bars for her calls (`?bars=1`), his six charts (`?structure=1`), or his level charts at his newest entries (`?entries=1`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
 | `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code. `?consolidate=1` is the one that does more than spend: it runs the nightly pass, which WRITES memory — notes written and superseded, channel rungs moved, loops closed. `?embed=1` spends at the embedding vendor. `?calendar=1` files the calendar and spends nothing, and a `{trade}` body reaches the trade look |
 | `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
 

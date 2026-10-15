@@ -161,9 +161,23 @@ export function marketOpen(now = new Date()): boolean {
   return true;
 }
 
-/* ─── A minute of price ────────────────────────────────────────────────────
-   What `doji-mcp-sync?bars=1` serves and `doji-eugenia` scores her calls on:
-   one shape, declared once, since the two functions meet only over HTTP.
-   Display prices, the bar's opening minute in epoch milliseconds.
+/* ─── A bar of price ───────────────────────────────────────────────────────
+   What `doji-mcp-sync?bars=1` and `?structure=1` serve and `doji-eugenia`
+   reads: one shape, declared once, since the two functions meet only over
+   HTTP. Display prices, the bar's opening minute in epoch milliseconds.
    ───────────────────────────────────────────────────────────────────────── */
 export interface Candle { t: number; open: number; high: number; low: number; close: number }
+
+/* His six charts, §4's three jobs: bias on the daily, 4H and 1H, levels on the
+   1H and 30m, the entry on the 15m and 5m. The poller reads each as far back
+   as `hours`, split where the broker's limits on one read fall, and Eugenia
+   folds them, so the list is one copy for both. */
+export const CHARTS = [
+  { period: "D_1",  name: "daily", ms: 86_400_000, hours: 2_880 },
+  { period: "H_4",  name: "4H",    ms: 14_400_000, hours: 720 },
+  { period: "H_1",  name: "1H",    ms: 3_600_000,  hours: 192 },
+  { period: "M_30", name: "30m",   ms: 1_800_000,  hours: 72 },
+  { period: "M_15", name: "15m",   ms: 900_000,    hours: 48 },
+  { period: "M_5",  name: "5m",    ms: 300_000,    hours: 12 },
+] as const;
+export type Period = typeof CHARTS[number]["period"];
