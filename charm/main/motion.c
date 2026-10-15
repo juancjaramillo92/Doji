@@ -10,9 +10,9 @@
    and are among what to check on the real board first. */
 #include "motion.h"
 
+#include <string.h>
 #include "bsp/esp-bsp.h"
 #include "driver/i2c_master.h"
-#include <string.h>
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -43,6 +43,7 @@ static const char *TAG = "motion";
 #define BLANK        8
 #define APART_MS     150
 #define SAMPLES      8     // averaged into one reading, so the sensor's noise is not a hand's tremor
+#define SAMPLE_MS    8     // a new sample at RATE_READ's 125 Hz
 
 static i2c_master_dev_handle_t chip;
 static bool reading;
@@ -118,7 +119,7 @@ lift_hold_t motion_hold(void) {
     for (int s = 0; s < SAMPLES; s++) {
         read_g(g);
         for (int i = 0; i < 3; i++) now[i] += g[i] / SAMPLES;
-        vTaskDelay(pdMS_TO_TICKS(8));
+        vTaskDelay(pdMS_TO_TICKS(SAMPLE_MS));
     }
     lift_hold_t hold = judged ? lift_hold(before, now) : LIFT_ELSE;
     memcpy(before, now, sizeof now);

@@ -263,6 +263,12 @@ test('Eugenia\'s charm sends the headers her door reads, and knows the frames it
   const kinds = Object.fromEntries([...source('charm/main/frames.h').matchAll(/^#define FRAME_(\w+)\s+(\d+)$/gm)]
     .map(m => [m[1].toLowerCase(), Number(m[2])]));
   assert.deepEqual(kinds, { ...FRAME }, 'the charm and her door number the frames differently');
+
+  // Each Ogg page counts FRAME_MS of sound, and the encoder is set to its own
+  // frame by name: two spellings of one length, a granule apart if they part.
+  const ms = talk.match(/^#define FRAME_MS\s+(\d+)/m), set = [...talk.matchAll(/ESP_OPUS_ENC_FRAME_DURATION_(\d+)_MS/g)];
+  assert.ok(ms && set.length === 1, 'talk.c no longer sets the encoder\'s frame and counts it as this test reads them');
+  assert.equal(set[0][1], ms[1], 'the Ogg pages count a frame the encoder is not making');
 });
 
 /* Three more things the charm holds of her door, each a number or a word in

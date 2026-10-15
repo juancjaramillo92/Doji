@@ -275,6 +275,7 @@ static void draw_face(lv_event_t *e) {
 static void draw_night(lv_event_t *e) {
     lv_layer_t *layer = lv_event_get_layer(e);
     int x = 233 + shift[0], y = 404 + shift[1];
+    // The ring near white: grey on black reads as a smudge.
     if (trade_waits) {
         lv_draw_arc_dsc_t a;
         lv_draw_arc_dsc_init(&a);

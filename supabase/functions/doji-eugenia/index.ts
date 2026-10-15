@@ -3905,10 +3905,11 @@ async function handleFeedback(query: any): Promise<void> {
    What she is handed when he talks to her, the model and the gate — one turn
    however he reached her, so every door into the conversation reads the same
    memory, notes, map and desk. What comes back is his turn as it is stored
-   (marked when he was quoting her) and her answer as the gate left it.
+   (marked when he was quoting her), her answer as the gate left it, and a
+   volume she set for the charm. `device` is the charm telling her about
+   itself, for this turn only — never stored, like the rest of the context; ""
+   from Telegram.
    ───────────────────────────────────────────────────────────────────────── */
-/* `device` is the charm telling her about itself, for this turn only — never
-   stored, like the rest of the context. "" from Telegram. */
 async function converse(text: string, blocks: any[], quoting: Promise<string | null>,
                         device: string): Promise<{ asked: string; answer: string; volume: number | null }> {
   const [history, notes, portrait, channels, story, loops, calendar, desk, record, calls, quoted] = await Promise.all([

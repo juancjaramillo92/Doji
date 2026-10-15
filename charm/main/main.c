@@ -120,9 +120,9 @@ static void close_eyes(void) {
     }
 }
 
-/* Goodnight, her eyes closing, then the sleep screen, drawn only when its marks differ from what the
-   panel already holds, then deep sleep until the next errand, the motion
-   sensor armed. */
+/* Goodnight, her eyes closing, then the sleep screen, drawn only when its
+   marks differ from what the panel already holds, then deep sleep until the
+   next errand, the motion sensor armed. */
 static void sleep_now(void) {
     int charge = power_charge();
     bool low = power_low();
