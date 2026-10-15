@@ -453,6 +453,87 @@ Each check would be padding where nothing untrusted enters.
 **Revisit if:** `talk()` comes to tell a refused door from silence, or a
 setting is ever written once and never again.
 
+
+### R-46 — search by date, and a scroll around a hit
+**Deferred, not refused.** Hermes's session search takes date bounds, sorts
+newest or oldest, and returns the turns around a match. Hers returns twelve
+hits cut at 300 characters with no neighbours, so a hit on his "yes, that one"
+says nothing about what he agreed to. A date argument changes `eugenia_search`'s
+signature, which is a `drop` run by hand. A scroll could be a plain read of the
+turns either side of an id, but hits carry no turn id today. Unmeasured, as R-30
+is.
+**Revisit if:** a reply's tally shows `search_memory` called twice or more in
+one turn for the same question, or he says she quoted him out of context.
+
+### R-47 — his approval before a note is kept, and a mark on what changed overnight
+**Deferred, not refused.** Hermes can stage every memory write for the user's
+yes, and announce each change in chat. Her notes are his correction channel, and
+staging would put a step in front of the only lever he uses. `/notes` shows what
+she holds but not what moved last night.
+**Revisit if:** a wrong note is found that shaped her for more than a week
+before he saw it.
+
+### R-48 — the portrait's claims linked to the notes and counts they rest on
+**Deferred, not refused.** Honcho's deduction and induction passes refuse a
+conclusion without its source ids. The portrait asks for each claim to be
+counted, but nothing links a sentence to what it counted. Ids inside an
+800-character paragraph read back to her as noise.
+**Revisit if:** the portrait is found carrying a claim no count supports.
+
+### R-49 — a commitment's period as a column
+**Deferred, not refused.** Graphiti stores when a fact stopped being true apart
+from when it was learned. A commitment's period lives in its words, and the
+nightly pass reads it there. A column would make *ended* computable instead of
+read.
+**Revisit if:** a commitment is retired before its period ended, or left open
+long after.
+
+### R-50 — reasoning about him every few replies
+**Why refused:** Honcho re-derives its model of the user every N turns, in up to
+three passes. Hers is a judgement across days, made once at night with the week
+in front of it. Doing it per reply is a model call per reply to answer a
+question whose evidence arrives once a day. R-28 is the same refusal for notes.
+**Revisit if:** R-28's condition is met.
+
+### R-51 — memory that decays with age
+**Why refused:** FinMem and its kin rank memories by recency and let the old
+ones fade. Hers keeps what is still true however old (`CONSOLIDATE`: "a note
+that is merely old stays"), and the window, the merge rule and search already
+handle volume.
+**Revisit if:** never on age alone.
+
+### R-52 — several drafts, a debate, or a team of analysts behind a read
+**Why refused:** TradingAgents and the forecasting systems sample many times,
+argue a bull against a bear, or split the analysis across agents. Her read is
+one sentence fenced by its own falsifier, and the briefing's cost is its
+draft. Several drafts multiply that cost for the one paragraph the rules
+already constrain hardest. Agent Market Arena's finding that architecture moves
+outcomes more than the backbone is a finding about trading P&L, which she is not
+graded on.
+**Revisit if:** `scripts/eval.mjs` shows her reads failing their own fence in a
+way a second opinion would catch.
+
+### R-53 — sources printed under the briefing
+**Deferred, not refused.** Bloomberg links its summaries to the documents behind
+them. Hers are spoken and read on a phone, and every figure she quotes already
+comes from a handed block rather than a page.
+**Revisit if:** he asks where a figure came from more than once.
+
+### R-54 — context as a mid-conversation system message, and cache diagnostics
+**Deferred, not refused.** Both are documented for Opus 5.5. The first gives
+handed context operator authority over web text, but the README records that
+shape as never exercised here, and a 400 kills every reply. The second would
+say where a prefix broke, but effort as a message (R-15) tests the one place a
+break is known.
+**Revisit if:** that measurement leaves an unexplained write, or a page's
+text is seen steering a reply.
+
+### R-55 — compaction, context editing, the memory tool, the batch API
+**Why refused:** each solves a problem she does not have. Her windows are twelve
+turns and twenty notes, her memory is her own tables, and the nightly pass is a
+tool loop that a single batch request cannot run.
+**Revisit if:** a window is ever widened past what a request carries cheaply.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED
