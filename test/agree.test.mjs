@@ -2439,14 +2439,15 @@ test('no paragraph of the prompt shows where it was edited', () => {
    had. THE PROMPT CARRIES NO PREFERENCE OF HIS AT ALL: an instruction note is
    the channel for them, the one he can correct, and the prompt says notes
    outrank the shape. So tastes are searched for as tastes, and a rule propped
-   up with *and he has told you so* is the other half. Bare `he told you` and
+   up with *and he has told you so*, or *the nag he asked to be rid of*, is the
+   other half. Bare `he told you` and
    `he said` stay: that is how the tool descriptions name the notes mechanism.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the prompt states no preference of his', () => {
   const taste =
     /\bhe (?:gets |is |gets a bit |grows )?\w*(?:frustrat|annoy|irritat|impatien|bored)|\bhe (?:hates|dislikes|prefers|resents)\b|\b(?:frustrates|annoys|irritates|bores) him\b/i;
-  const cited = /\bhe has (?:told you|said) so\b|\bas he has (?:told you|said)\b/i;
+  const cited = /\bhe has (?:told you|said) so\b|\bas he has (?:told you|said)\b|\bhe (?:asked|wants) to be rid of\b/i;
 
   const bodies = [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)];
   assert.ok(bodies.length >= 5,
