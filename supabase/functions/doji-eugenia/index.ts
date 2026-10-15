@@ -1485,8 +1485,8 @@ async function makeCall(direction: unknown, entry: unknown, stop: unknown, targe
    target was hit before a stop is the arithmetic a model does worst. Every
    doubt goes against her: on the bar that filled her, only the stop counts;
    a bar touching both stop and target is a loss; the stop moves to break-even
-   at +$20 as R-04 moves his, from the bar after the one that reached it, since
-   a bar's high and low cannot say which came first. The condition is hers to
+   at +$20 as R-04 moves his, reached on a bar after the fill and effective from
+   the bar after that, since a bar's high and low cannot say which came first. The condition is hers to
    state and is not checked; the entry is what is scored. A call whose session
    the bars do not reach is `unread`, never a guess.
    ───────────────────────────────────────────────────────────────────────── */
@@ -1520,7 +1520,7 @@ export function scoreCall(c: Call, candles: Candle[], from: number): Score {
     const b = bars[i];
     if (buy ? b.low <= stop : b.high >= stop) return close(b, stop, stop === c.entry ? 'scratch' : 'lost');
     if (i > at && (buy ? b.high >= c.target : b.low <= c.target)) return close(b, c.target, 'won');
-    if (gain(buy ? b.high : b.low) >= TO_BREAK_EVEN) stop = c.entry;
+    if (i > at && gain(buy ? b.high : b.low) >= TO_BREAK_EVEN) stop = c.entry;
   }
   const last = bars[bars.length - 1];
   return close(last, last.close, 'open');

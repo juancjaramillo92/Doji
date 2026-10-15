@@ -4014,6 +4014,8 @@ test('a call is scored on price, every doubt against her', () => {
     'scratch', 'R-04 did not move the stop to break-even after +$20');
   assert.equal(score([minute(1, { low: 3999 }), minute(2, { high: 4021, low: 3999 })]).outcome, 'open',
     'the stop moved on the same bar that reached +$20, which cannot say which came first');
+  assert.equal(score([minute(1, { low: 3999, high: 4021 }), minute(2, { low: 3984 })]).outcome, 'lost',
+    'the fill bar\'s high moved the stop to break-even, though it may have come before the fill');
   const open = score([minute(1, { low: 3999 }), minute(2, { close: 4010.5 })]);
   assert.deepEqual([open.outcome, open.result], ['open', 10.5], 'a call still on at the roll is marked at the last close');
   assert.equal(score([minute(1, { low: 3999 }), { ...minute(0, { high: 4031 }), t: Date.parse(CALL.expires_at) }]).outcome,

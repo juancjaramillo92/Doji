@@ -1934,8 +1934,9 @@ decided this in October 2026, after the evidence on both sides was put to you
   whether price reached the entry, then whether the target or the stop came
   first, the stop moved to break-even at +$20 as your R-04 moves yours. On the
   bar that filled her only the stop counts; a bar touching both is a loss; the
-  break-even move starts on the next bar, since a bar's high and low cannot say
-  which came first. Outcomes are `won`, `lost`, `scratch`, `open` (still on at
+  +$20 that moves the stop must come on a bar after the fill, and the move
+  starts on the bar after that, since a bar's high and low cannot say which
+  came first. Outcomes are `won`, `lost`, `scratch`, `open` (still on at
   the roll, marked at the last close), `untriggered`, and `unread` when the bars
   do not reach back to the call. The PATCH is filtered on `outcome is null`, so
   a retry never rescores one, and the run is a `caller: 'calls'` row either way.
