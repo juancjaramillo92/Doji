@@ -570,6 +570,39 @@ dark that is already drawing. The first has no frame to count and keeps a
 margin the second does not need. **Revisit if:** the sleep screen is ever
 seen half drawn after she sleeps, or a flash is seen when the journal leaves.
 
+### R-60 — reading all fourteen charts at once
+**Why refused:** one at a time, fourteen outran `DOOR_MS` at the five or six
+seconds a chart took on 13 and 14 October; all at once is the burst TradingView
+refuses — its scanner answered 429 on every quote batch, and its calendar
+refuses past about thirty reads a minute — on one session. `inLanes` keeps
+three in flight. Three is a reading, not a fact.
+**Revisit if:** the `market read` rows name refusals from the job's reads (go
+to two), or still name *not reached* at three.
+
+### R-61 — a bound on how old a kept market line may be
+**Why refused:** the odds carry `ODDS_HOURS` because they carry only the time
+they were read. Each market line carries its own bar times, so a line kept
+from an earlier pass reads as old where it is old, and a bound would drop a
+true reading for its age. A job that has stopped is the dispatch watcher's to
+report.
+**Revisit if:** a briefing quotes a kept line as though it were current.
+
+### R-62 — a job of its own for the read-ahead
+**Why refused:** it rides the quarter-hourly calendar job, after the filing.
+Its own job is a new name in `dispatch_job_check` (an `upgrade.sql` step), a
+seventh schedule and the counts in `verify.sql`, for the same cadence. The
+cost is a job whose name says only *calendar*.
+**Revisit if:** the market and the calendar want different cadences, or the
+job's worst case — 45s filing, then 45s reading — nears its 120s timeout.
+
+### R-63 — a longer bound for the quarter-hourly calendar read
+**Deferred, not refused.** About thirteen of some 270 filings from 12 to 15
+October got no answer in 45 seconds, most of them overnight. Each window
+overlaps the next, so the filing a quarter hour later catches up, and no
+briefing lost its calendar.
+**Revisit if:** a print's actual reaches the calendar later than the next
+filing, or the failures cluster before 08:00.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

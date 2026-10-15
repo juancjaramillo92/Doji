@@ -1911,11 +1911,11 @@ async function recordRun(row: Record<string, unknown>): Promise<void> {
   }
 }
 
-/* A market read a briefing or a reply went without, whole or in part. The
-   answer still goes out and its own row reads ok, so on 12 October the only
-   trace of a briefing written blind to the dollar and the Fed was the console.
-   Failures only: a row for every read that answered would be several a
-   briefing saying nothing. Never throws. */
+/* A market read that came back short, whole or in part — one a briefing or a
+   reply made, or the job's read ahead. What it fed still goes out and its own
+   row reads ok, so on 12 October the only trace of a briefing written blind
+   to the dollar and the Fed was the console. Failures only: a row for every
+   read that answered would be several a run saying nothing. Never throws. */
 async function unread(what: string, reason: string): Promise<void> {
   console.error(`doji-eugenia: ${what} not read —`, reason);
   await recordRun({ caller: 'market read', ok: false, detail: `${what}: ${reason}`.slice(0, 500) });
