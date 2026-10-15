@@ -1067,9 +1067,9 @@ for the seven economies abroad from 7 September to 4 November, read on 5 October
 — 459 kinds, 862 events, each with its country, rating, category and title — so
 what is filed from abroad is judged against the whole catalogue.
 
-**`?probe=` is fixed: nothing in the request reaches a tool.** It picks one of
-eight, every argument is written in the function, and each call's failure is its
-own answer:
+**`?probe=` is fixed: nothing in the request reaches a tool.** It picks one from
+the table below, every argument is written in the function, and each call's
+failure is its own answer:
 
 | `?probe=` | what it asks |
 |---|---|
@@ -1081,6 +1081,7 @@ own answer:
 | `search` | the names gold's feeds and a real yield go by, for whatever `quotes` could not resolve |
 | `fedfunds` | whether thirty-day fed funds futures answer, under the continuous names (`ZQ1!` to `ZQ3!`) and under named contract months, and what a bar of them carries — the price `?rates=1` works the meeting odds out from |
 | `futures` | what a daily bar of gold's front month (`COMEX:GC1!`) carries — the bars `?volume=1` folds |
+| `flows` | which `ECONOMICS:` series carry gold reserves, at home and in China, and what GLD, the largest gold fund, answers — the central banks' and the investors' flows §2 names, which no reader serves until this shows what is there |
 
 **How the sign-in is found.** OAuth 2.1 as MCP specifies it, discovered rather
 than configured: the only TradingView address in the file is the endpoint, whose

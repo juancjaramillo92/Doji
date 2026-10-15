@@ -775,6 +775,9 @@ async function readVolume() {
      fedfunds   fed funds futures under continuous and named months, and what
                 a bar carries
      futures    what a daily bar of gold's front month carries
+     flows      which ECONOMICS: series carry gold reserves, at home and in
+                China, and what GLD, the largest gold fund, answers — the two
+                flows §2 names and no reader yet serves
 
    Every argument is written here; none is read from the request. */
 const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
@@ -817,6 +820,12 @@ const PROBES: Record<string, () => Call[]> = {
   ],
   futures: () => [
     ["mcp-tv-get-ohlcv", { symbol: "COMEX:GC1!", interval: "1D", count: 3 }],
+  ],
+  flows: () => [
+    ["mcp-tv-get-economic-symbols", { search: "gold" }],
+    ["mcp-tv-get-economic-symbols", { country: "CN", search: "gold" }],
+    ["mcp-tv-search-symbols", { query: "GLD", type_filter: "etf" }],
+    ["mcp-tv-get-ohlcv", { symbol: "AMEX:GLD", interval: "1D", count: 3 }],
   ],
 };
 
