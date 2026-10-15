@@ -59,6 +59,7 @@ supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
   doji-eugenia/strategy.ts              what he decided; she cannot write it
   doji-eugenia/journal.ts               the app's arithmetic, ported so she can reach it
   doji-eugenia/adherence.ts             the twelve rules a journal row can answer
+  doji-eugenia/structure.ts             his six charts, read in his words: her map
 supabase/functions/doji-tradingview/    Edge Function: the TradingView sign-in
 doji_gmail_sync.gs                      Apps Script: broker email parser
 charm/                                  firmware for the charm — see The charms
@@ -758,6 +759,12 @@ when a suspicious row gets looked at.
   first, for Eugenia to score her own calls against at night (*Her own calls*).
   The window is fixed, so like every other door it puts nothing from the request
   into a broker call; a bar that will not read refuses them all.
+- **`?structure=1`** returns his six charts — daily, 4H, 1H, 30m, 15m and 5m —
+  in dollars, oldest first, for Eugenia's map of them (*Her map of his
+  charts*). `CHARTS` in `_shared/edge.ts` names each period and how far back it
+  is read, one copy for the poller and her; no window asks for more than 240
+  bars, the most one answer has been seen to carry. One chart at a time, and a
+  chart that will not read is named in `missing` rather than served short.
 
 ```sh
 curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?raw=1&hours=72" \
@@ -1291,7 +1298,8 @@ hour of a week through the composition.
 off his own screen, so the overnight move, the session's range, an hour's swing
 in yields and a forty-dollar day stay out; a move earns a line only where it
 changed the bigger story. The live quote is still handed in, for knowing where
-gold stands rather than for opening on.
+gold stands rather than for opening on. Her map of his charts is handed in
+for her call and nothing else.
 
 Five slots: **where the big picture stands** — the Fed's path, the dollar's
 trend, inflation, central-bank buying, and which of them moved — in two or three
@@ -1906,6 +1914,53 @@ makes a retry's refiling a no-op.
   believe one, never gives a read to improve it, and never holds one back to
   protect it. `/notes` shows it to him, so he can see what her reads are worth.
 
+### Her map of his charts
+
+**She sees his charts as he marks them, off his own broker.** Every quarter
+hour the job reads his six charts through `doji-mcp-sync?structure=1` — the
+broker token stays in the poller, as for `get_market` — and `foldStructure` in
+`structure.ts` turns the bars into §4's words. It is pure, and driven in
+`fold.test.mjs` against bars drawn so every turn can be found by eye:
+
+- **Turns**: a bar whose high clears `TURN` (3) bars before it and is not beaten
+  by three after; a low, mirrored. The newest three bars are never one, and no
+  bar still forming counts — a turn read off an unfinished bar has not printed.
+- **Step 1, the bias charts** — daily, 4H, 1H: the two newest turns of each
+  kind, and the sequence they make: higher highs and higher lows, lower and
+  lower, or neither. Fewer than two of either is no sequence, never a guess.
+- **Step 2, the level charts** — 1H and 30m: every turn within `REACH` ($60, a
+  call's wait and its $30 target) of price, merged where two are within
+  `ON_GRID` ($3), a high and a low on one price being a level that has flipped;
+  the quarter it sits on, if one is within $3; and the `$25` grid beside them,
+  00 and 50 round, where a turn on a quarter is §4's stronger level.
+- **R-05 against R-06**: the week of hourly bars is the range, and a level
+  within `EDGE` ($5) of its high or low is at its edge, the rest inside it.
+- **§4.2's sweep**: a wick through a standing turn on the 1H or 15m that closed
+  back, in the last day — not once a bar has closed through it.
+- **The sessions** over the last day on the 15m, by `sessionAt`, the bar still
+  forming included; **the average daily range** over fourteen sessions and what
+  this one has covered; **the last closed 15m and 5m candles**.
+
+`TURN`, `ON_GRID`, `EDGE` and `REACH` are readings rather than facts, named so
+each can be argued with. `structureList` says the map with every price timed,
+and says it is **hers**: his structure is drawn in TradingView and deliberately
+kept nowhere here, so where he sends a chart his chart decides. A chart the
+door did not read is named, in the map and in a `market read` row.
+
+**Where it goes.** The briefing is handed it (`structureBlock()`) for its call
+and nothing else — the briefing is still the weeks behind his chart, so none of
+the map is prose, and the critic takes any of it out of the prose that is not
+the filed call. A reply reads it through `get_structure`, offered in a
+conversation only: before a call, and before judging his bias or his level on a
+plan he brings without a chart, said as her map. Every figure on it has
+printed, so the rules for a printed level hold: never beside her read, and
+nothing setup-flavoured off it unasked while he holds a position.
+
+**What it cannot see is the candle he waits for.** It is read every quarter hour
+and says when its newest bar opened; the price now is still `get_market`'s.
+Step 3 prints after he asks, and she never watches the market move. Indicators
+are refused (`REFACTOR.md` R-64): his rules read none.
+
 ### Her own calls
 
 **A coach who cannot do the thing is not one**, so she trades beside you on
@@ -1923,6 +1978,10 @@ decided this in October 2026, after the evidence on both sides was put to you
 - **Filed before it is said.** A level about where price goes next is allowed
   in a filed call and nowhere else, since a call in words alone is a tip nobody
   scores. Both gates keep a filed call whole and never change a number in it.
+- **Built on her map of his charts.** Its level is a turn or a quarter on the
+  map, its setup the one his rules name for where the level sits, its stop
+  where the idea is wrong beyond it. A call whose level is not on the map is a
+  guess, and one that needs a chart the map says was not read is not made.
 - **A call can wait for its setup.** In the morning the setup is usually not
   there yet, so the call says what it waits for — *if price comes back to 4,000
   and a fifteen-minute candle closes above it, buy at 4,002*. The condition is
@@ -1971,7 +2030,7 @@ closes; and the calendar and her record are the datasets here that compound.
 | `eugenia_reads` | every read she gave, with a verdict on the test she stated | the last 30 days | her `record_read` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
 | `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar` |
-| `eugenia_market` | the market around gold and the Fed's odds, read ahead | 1 row per door, rewritten | the quarter-hourly job, `storeMarket` and `storeRates` |
+| `eugenia_market` | the market around gold, the Fed's odds and her map of his charts, read ahead | 1 row per door, rewritten | the quarter-hourly job, `storeMarket`, `storeRates` and `storeStructure` |
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
 | `eugenia_rewrites` | what the thesis and the portrait said before each rewrite | never handed to her | a trigger on both, `eugenia_keep_rewrite` |
 | `eugenia_calls` | every call she made, and how price scored it | the last 30 days | her `make_call` tool; scored by the nightly pass |
@@ -2407,7 +2466,9 @@ and **odds read more than two hours ago are not handed to her** (`ODDS_HOURS`):
 each market line carries its own times, but the odds carry only when they were
 read, and a door that kept refusing would leave its last answer standing. A
 pass that fails leaves the copy as it was. Only the job writes the table, a
-quarter hour apart, so the market's read-then-write has no second writer.
+quarter hour apart, so the market's read-then-write has no second writer. His
+charts ride the same pass (`storeStructure`) from the poller's `?structure=1`,
+stored as the folded map (*Her map of his charts*).
 
 **Each door reads three charts at a time, inside `DOOR_MS`, 35 seconds.** One by
 one, fourteen did not fit at a slow morning's pace; all at once is the burst
@@ -3248,7 +3309,7 @@ job name, so a re-run makes the jobs match the file. Six jobs —
 |---|---|---|
 | `doji-mcp-sync` | `*/2 * * * *` | the poller |
 | `doji-eugenia` | `0 * * * *` | the briefing and the nightly pass — the function decides which, or neither |
-| `doji-eugenia-calendar` | `5,20,35,50 * * * *` | the calendar's filing, then the market and the Fed's odds read ahead |
+| `doji-eugenia-calendar` | `5,20,35,50 * * * *` | the calendar's filing, then the market, the Fed's odds and his charts read ahead |
 | `doji-dispatch-watch` | `*/10 * * * *` | `dispatch_watch`'s sweep |
 | `doji-pace-watch` | `37 * * * *` | `pace_watch`'s one-a-day warning |
 | `purge-cron-history` | `0 3 * * *` | trims `cron.job_run_details` |
@@ -3472,7 +3533,7 @@ one `net.http_post` each.
 
 | Function | What a holder of the secret can do |
 |---|---|
-| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`), minute bars (`?bars=raw`), or the day's bars for her calls (`?bars=1`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
+| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`), minute bars (`?bars=raw`), the day's bars for her calls (`?bars=1`), or his six charts (`?structure=1`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
 | `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code. `?consolidate=1` is the one that does more than spend: it runs the nightly pass, which WRITES memory — notes written and superseded, channel rungs moved, loops closed. `?embed=1` spends at the embedding vendor. `?calendar=1` files the calendar and spends nothing, and a `{trade}` body reaches the trade look |
 | `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
 
