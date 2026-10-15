@@ -427,7 +427,7 @@ single-sourced at run time:
 | the **length of a filed read** | `READ_MAX` and the three check constraints on `eugenia_reads`; a lesson's, `NOTE_MAX` and its own |
 | the **two writers' names** | `sync_health_id_check`, the seed beside it, and each function's `heartbeat("…")` call |
 | the **columns of `eugenia_runs`** | the table, the object literals `recordRun` is called with, and the `verify.sql` row on the cache-write columns |
-| **which rules a row can answer** | §7's `Evaluable` column and the twelve predicates in `adherence.ts` |
+| **which rules a row can answer** | §7's `Evaluable` column, the twelve predicates in `adherence.ts`, and the lists and counts in `check_rules`' description, the prompt and the paragraph below |
 | the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union, and `pace_line`'s `owed \|\| ' briefing delivered'` |
 | the **number of scheduled jobs** | the `cron.schedule` calls in `schema.sql` and the count `verify.sql` asserts |
 | a **long door's deadline** | `DOOR_MS` in `doji-tradingview` and `READ_MS` in `doji-eugenia`, ten seconds apart for the boot, the sign-in and the wire |
@@ -1557,10 +1557,9 @@ account his size implies, and R-11 says the day ends there. Naming the rule is
 citation; saying what he should do is not hers, and the prompt says so.
 
 **An open does not call her.** A high-impact print pending beside a position he
-opened is R-20's, his to weigh, and the briefing has already named it; a message
-on every open was noise he asked to be rid of. `postTradeEvent` returns on any
-event but `closed` before it reads anything, and `upgrade.sql` drops the open
-trigger from the live database.
+opened is R-20's, his to weigh, and the briefing has already named it, so no
+trigger fires on an insert. `postTradeEvent` returns on any event but `closed`
+before it reads anything — the `{trade}` door takes an event from a person too.
 
 **Silence is the common case and costs nothing**: the close decides from data
 *before* any model call. It is about **today**, so a trade filed under another
@@ -1593,8 +1592,8 @@ three-state logic over four hundred rows by eye is what a model does worst, and
 a rate over the wrong population looks exactly like one over the right.
 `adherence.ts` evaluates the twelve rules a row can answer — **R-01, R-02,
 R-03, R-04, R-10, R-11, R-12, R-13, R-15, R-16, R-18 and R-19** — and
-`check_rules` serves it. §7's `Evaluable` column decides the set, and `agree`
-holds the two lists together.
+`check_rules` serves it. §7's `Evaluable` column decides the set, and
+`agree.test.mjs` holds every list of it, and every count, to what is evaluated.
 
 **R-19 is judged against TradingView's calendar** — he defined high impact, at
 v1.20, as a US release TradingView rates high, so one calendar serves the
@@ -2317,9 +2316,8 @@ made R-03 `journal`, and since v1.24 nothing follows one: a sweep re-entry comes
 only after a stop tighter than $20. **R-12** caps him at one entry a day, two only
 for that re-entry; **R-13** pins a rung change to a month boundary; **R-15**
 closes anything live before the Friday close; **R-16** keeps him off low-volume
-days; **R-17** stops him
-when the trading itself deteriorates — behaviour rather than a number, so
-`judgment`. **R-18** — stop and target are resting broker orders and a position is
+days; **R-17** stops him when the trading itself deteriorates — behaviour rather
+than a number, so `judgment`. **R-18** — stop and target are resting broker orders and a position is
 never closed by hand — makes R-01 and R-02 exact. **R-19** is the one exception to
 *never tightened*: a high-impact print landing on a position inherited from an
 earlier session takes it to break-even if in profit, a closer invalidation if

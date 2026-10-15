@@ -28,7 +28,7 @@ import { CONSOLIDATE, SYSTEM, PITCH, REVIEW } from '../supabase/functions/doji-e
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled,
          discipline }
   from '../supabase/functions/doji-eugenia/journal.ts';
-import { HOME, FULL_STOP, TO_BREAK_EVEN, TARGET_MIN, TARGET_MAX } from '../supabase/functions/doji-eugenia/adherence.ts';
+import { HOME, FULL_STOP, TO_BREAK_EVEN, TARGET_MIN, TARGET_MAX, checkRules } from '../supabase/functions/doji-eugenia/adherence.ts';
 
 // A repository file, read once however many tests ask for it.
 const READ = new Map();
@@ -2433,6 +2433,48 @@ test('no paragraph of the prompt shows where it was edited', () => {
   }
 });
 
+/* ─── The rules she can check, wherever they are listed ──────────────────────
+   WRITTEN OUT THREE TIMES — the tool's description, the prompt's CHECKING HIS
+   RULES and the README — each with its count spelled, and the two prompts also
+   count the judgment rules. A rule retired from adherence.ts and left in a list
+   is one she says she checked; a stale count is the same claim.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('every list of the rules check_rules answers is the list it evaluates', () => {
+  const between = (text, from, to) => {
+    const a = text.indexOf(from), b = text.indexOf(to, a);
+    assert.ok(a > -1 && b > a, `"${from}" … "${to}" is gone — the reader has gone blind`);
+    // A description written as concatenated literals reads as one sentence.
+    return text.slice(a, b).replace(/"\s*\+\s*"/g, '').replace(/\s+/g, ' ');
+  };
+  const lists = {
+    'check_rules description': between(EUGENIA_TS, 'const CHECK_TOOL', 'input_schema'),
+    'the prompt': between(EUGENIA_PROMPT, 'CHECKING HIS RULES', 'USE IT INSTEAD'),
+    'the README': between(source('README.md'), '`adherence.ts` evaluates the', '`check_rules` serves it'),
+  };
+
+  const WORDS = { five: 5, six: 6, seven: 7, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, eighteen: 18 };
+  const checked = checkRules([]).map(r => r.rule).sort();
+  const table = [...ALWAYS.matchAll(/^\| (R-\d\d) \|.*?\| (journal|field|judgment) \|/gm)];
+  const judgment = table.filter(([, , kind]) => kind === 'judgment').length;
+
+  for (const [where, text] of Object.entries(lists)) {
+    assert.deepEqual([...new Set(text.match(/R-\d\d/g))].sort(), checked,
+      `${where} names a different set of rules from the ones adherence.ts evaluates`);
+    const count = text.match(/the (\w+) rules a row can actually answer|the (\w+) rules a row can answer/i);
+    assert.ok(count, `${where} no longer spells how many rules it checks`);
+    assert.equal(WORDS[(count[1] ?? count[2]).toLowerCase()], checked.length,
+      `${where} says ${count[1] ?? count[2]} rules and adherence.ts evaluates ${checked.length}`);
+  }
+
+  const other = lists['check_rules description'].match(/The other (\w+) rules are judgment rules/);
+  const ofHis = between(EUGENIA_PROMPT, 'ARE NOT THE STRATEGY', 'nothing stored').match(/(\w+) of his (\w+) rules are judgment/i);
+  assert.ok(other && ofHis, 'the judgment count is no longer spelled where it was');
+  assert.equal(WORDS[other[1]], judgment, `check_rules says ${other[1]} judgment rules and §7 marks ${judgment}`);
+  assert.equal(WORDS[ofHis[1].toLowerCase()], judgment, `the prompt says ${ofHis[1]} judgment rules and §7 marks ${judgment}`);
+  assert.equal(WORDS[ofHis[2]], table.length, `the prompt says ${ofHis[2]} rules and §7 holds ${table.length}`);
+});
+
 /* ─── A preference of his is not the prompt's to state ───────────────────────
    A claim about a conversation this repository cannot see, in the file that
    decides how she talks to him, reaches him as her quoting a taste he never
@@ -3200,7 +3242,7 @@ test('the economies the calendar is asked for are the ones calendarRows keeps', 
     'the calendar is asked for an economy nothing keeps, or keeps one it never asks for');
 });
 
-test('only US releases are counted or warned of', () => {
+test('only US releases are counted', () => {
   /* EVERY READ FILTERED ON A RATING, found rather than listed, so a new one
      arrives already asked the question. The Sunday week is the one declared
      exception: it is a list for her to read, not a release anything acts on. */
@@ -4760,10 +4802,9 @@ test('the trades trigger fires on the transition, not on every poll', () => {
   assert.match(closed[0], /new\.deleted = false/, 'the trigger fires on soft-deleted rows');
 
   /* AND A TRADE OPENING DOES NOT CALL HER: a print pending beside an open is
-     R-20's, his to weigh, and a message on every open was the noise he asked
-     to be rid of. */
+     R-20's, his to weigh, and the briefing has already named it. */
   assert.ok(!/after insert on public\.trades[\s\S]{0,200}?trades_eugenia_on_event/.test(SENSES_SQL),
-    'a trade opening calls her again — every open becomes a message about a print');
+    'a trade opening calls her — every open becomes a message about a print');
 });
 
 test('the trigger reads the cron secret under the spelling Vault holds', () => {
