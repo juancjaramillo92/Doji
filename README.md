@@ -99,6 +99,8 @@ test/                                   node:test suites — see Tests
 .github/workflows/backup.yml            the daily copy of the tables nothing else holds
 .github/workflows/health.yml            the hourly outside check; a failed run is the alarm
 .github/workflows/charm.yml             builds the charm firmware, kept as a download; main's is her update
+.github/workflows/calibrate.yml         runs scripts/calibrate.mjs, by hand from the Actions tab
+.github/workflows/eval.yml              runs scripts/eval.mjs --plant, by hand from the Actions tab
 .github/dependabot.yml                  monthly update PRs, both ecosystems
 package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
@@ -1969,7 +1971,11 @@ changing is a behaviour change to `structure.ts` with the table in its commit.
 ```sh
 SUPABASE_URL=… SB_SECRET_KEY=… DOJI_CRON_SECRET=… \
   node --experimental-strip-types scripts/calibrate.mjs
-``` `structureList` says the map with every price timed,
+```
+
+Or from GitHub: **Actions → calibrate → Run workflow**, the table in the run's
+log. It needs `DOJI_CRON_SECRET` as a repository secret beside the backup's
+two; the value is the one in Vault as `doji_cron_secret`. `structureList` says the map with every price timed,
 and says it is **hers**: his structure is drawn in TradingView and deliberately
 kept nowhere here, so where he sends a chart his chart decides. A chart the
 door did not read is named, in the map and in a `market read` row.
@@ -3439,6 +3445,10 @@ breaks. Run it before and after any prompt change, and read the cases first:
 ```sh
 ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs --plant
 ```
+
+Or from GitHub: **Actions → eval → Run workflow**, with `ANTHROPIC_API_KEY` as a
+repository secret; the verdicts and the cost are in the run's log, and a failed
+case fails the run.
 
 **`npm run test:db` needs a Postgres server with pgvector, of the major version
 Supabase runs** — named once, in `test.yml`'s `PGCLUSTER`, and asserted by the
