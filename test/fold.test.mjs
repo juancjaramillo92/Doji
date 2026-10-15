@@ -5727,6 +5727,10 @@ test('every planted defect breaks a prompt and names a case that exists', () => 
       `the plant "${plant.why}" no longer matches the prompt it breaks, so --plant proves nothing`);
     for (const id of plant.cases) assert.ok(EVAL.CASES.some(c => c.id === id), `the plant names no case ${id}`);
   }
+  // A plant that leaves a copy of its rule standing tests the copy, not the eval.
+  const ban = EVAL.PLANTS.find(p => p.cases.includes('view-unasked-in-position')).breaks(EVAL.PROMPTS).SYSTEM;
+  assert.doesNotMatch(ban, /No view on where price goes|a view while he is in a position/,
+    'the position-ban plant leaves the writer a statement of the ban');
 });
 
 test('a graded case fails on what she wrote and on what the judge found', async () => {

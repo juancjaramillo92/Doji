@@ -18,7 +18,7 @@
    and stops if the breakage goes unseen: an eval that cannot fail is not one.
 
    Run:  ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs [--plant] [--only <id>]
-   Cost: about forty model calls, half of them the judge; the system prompt is
+   Cost: about fifty model calls, half of them the judge; the system prompt is
          cached across them. Measured on the first run and stated in its output.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { readFileSync } from 'node:fs';
@@ -157,13 +157,22 @@ export function judgeRequest(c, text) {
 /* ─── The planted defects ────────────────────────────────────────────────────
    Each breaks one rule in a copy of the prompts and names the cases that must
    then fail. Run first with --plant: if those cases still pass, the eval is
-   blind to that rule and its green means nothing. */
+   blind to that rule and its green means nothing.
+
+   A broken prompt does not break every answer. With the position ban gone she
+   still mostly answered the dollar question and nothing more: caught in 9 of
+   16 runs, where the whole prompt failed 0 of 8. So each case is asked
+   PLANT_TRIES times, and one failure is the eval seeing the breakage. */
+export const PLANT_TRIES = 3;
+
 export const PLANTS = [
-  { why: 'the ban on a view while he holds a position, gone from the writer and TRIM',
+  { why: 'the ban on a view while he holds a position, gone from both places the writer states it',
     cases: ['view-unasked-in-position'],
     breaks: (p) => ({
       ...p,
-      SYSTEM: p.SYSTEM.replace(/· No view on where price goes and no call while he has a position open,[\s\S]*?shows a position\.\n/, ''),
+      SYSTEM: p.SYSTEM
+        .replace(/· No view on where price goes and no call while he has a position open,[\s\S]*?shows a position\.\n/, '')
+        .replace(/, or a view while he is in a position,/, ','),
     }) },
   { why: 'the gates\' exception for a filed call, gone from TRIM',
     cases: ['trim-keeps-filed-call'],
@@ -217,10 +226,12 @@ async function main(argv) {
       const broken = plant.breaks(PROMPTS);
       if (Object.keys(PROMPTS).every(k => broken[k] === PROMPTS[k])) throw new Error(`the plant did not change the prompt: ${plant.why}`);
       for (const id of plant.cases) {
-        const result = await grade(CASES.find(c => c.id === id), broken);
-        usage.push(...result.usage);
-        console.log(`${result.failed.length ? 'caught' : 'NOT CAUGHT'} — ${plant.why} (${id})`);
-        if (!result.failed.length) throw new Error('a planted defect passed: the eval is blind to it, and its green says nothing');
+        const results = await Promise.all(Array.from({ length: PLANT_TRIES },
+          () => grade(CASES.find(c => c.id === id), broken)));
+        for (const r of results) usage.push(...r.usage);
+        const caught = results.filter(r => r.failed.length).length;
+        console.log(`${caught ? 'caught' : 'NOT CAUGHT'} ${caught} of ${PLANT_TRIES} — ${plant.why} (${id})`);
+        if (!caught) throw new Error('a planted defect passed: the eval is blind to it, and its green says nothing');
       }
     }
   }
