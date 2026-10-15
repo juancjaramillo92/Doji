@@ -1027,7 +1027,9 @@ when he asks. R-08's four steps, in order, and a failed step ends it. The bias
 on the higher timeframes. The level: Break & Retest at an interior level (R-05),
 Support & Resistance at an outer extreme (R-06), marked by the $25 grid or a
 reaction point. The confirmation: a candle closing back or a read, never the
-touch (R-07). Then the reward against the risk. Read §4 and §6 with
+touch (R-07). Then the reward against the risk, the fourth step even though the
+rules above already worked it out: a clause saying it passes is enough, but the
+sequence is four steps and says all four. Read §4 and §6 with
 get_strategy before you judge a step, so you hold him to what he wrote rather
 than to your idea of a setup. Where you cannot see a step — no chart, a
 timeframe not shown — say so rather than passing it.
