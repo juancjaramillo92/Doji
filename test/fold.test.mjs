@@ -6134,8 +6134,13 @@ test('every planted defect breaks a prompt and names a case that exists', () => 
   assert.doesNotMatch(ban, /No view on where price goes|a view while he is in a position/,
     'the position-ban plant leaves the writer a statement of the ban');
   const map = EVAL.PLANTS.find(p => p.cases.includes('critic-keeps-map-out-of-prose')).breaks(EVAL.PROMPTS);
-  assert.doesNotMatch(map.SYSTEM, /THE MAP OF HIS CHARTS IS THE HOURS ON IT/,
+  assert.doesNotMatch(map.SYSTEM, /THE MAP OF HIS CHARTS IS THE HOURS ON IT|NOT THE HOURS ON IT/,
     'the map plant leaves the writer, whose prompt the critic runs under, a statement of the rule');
+  // And the case's draft names no level off the map, or the number budget cuts it
+  // whatever the rule says.
+  const mapCase = EVAL.CASES.find(c => c.id === 'critic-keeps-map-out-of-prose');
+  const chart = mapCase.draft.split('\n\n').find(par => /On the charts/.test(par));
+  assert.doesNotMatch(chart, /\d/, 'the map case\'s chart paragraph carries a number the budget would cut anyway');
   assert.doesNotMatch(map.CRITIC, /Is the map of his charts in the prose/,
     'the map plant leaves the critic its check');
 });

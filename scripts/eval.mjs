@@ -182,11 +182,17 @@ export const PLANTS = [
       ...p,
       TRIM: p.TRIM.replace(/YOUR CALL IS THE ONE\s+EXCEPTION:[\s\S]*?never changed\./, 'A call with levels in it comes out whole.'),
     }) },
+  /* The map rule restates the hours rule above it for the map, and the critic
+     runs under both, so both go. Its draft names no level off the map: on 15
+     October, with eight levels in it, the number budget cut them with the rule
+     gone, and the plant was caught 0 of 3. */
   { why: 'the map of his charts kept out of the briefing\'s prose, gone from the critic and the writer',
     cases: ['critic-keeps-map-out-of-prose'],
     breaks: (p) => ({
       ...p,
-      SYSTEM: p.SYSTEM.replace(/THE MAP OF HIS CHARTS IS THE HOURS ON IT,[\s\S]*?a call you file\.\n\n/, ''),
+      SYSTEM: p.SYSTEM
+        .replace(/THE BRIEFING IS THE WEEKS BEHIND HIS CHART, NOT THE HOURS ON IT\.[\s\S]*?the story that leads\.\n\n/, '')
+        .replace(/THE MAP OF HIS CHARTS IS THE HOURS ON IT,[\s\S]*?a call you file\.\n\n/, ''),
       CRITIC: p.CRITIC.replace(/Is the map of his charts in the prose\?[\s\S]*?it comes out\.\n\n/, ''),
     }) },
 ];
