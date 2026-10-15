@@ -284,15 +284,15 @@ opposite directions: the 1970s, when inflation outran high nominal rates, and th
 2000s, when both were low. Same condition — negative real rates — reached two
 different ways.
 
-**Then the link broke, and gold went the other way.** The 10-year real yield rose
-from about −1% early in 2022 to about 2.5% in late 2023, the highest in fifteen
-years, and stayed near 2% through 2025. The chain says gold should have fallen.
-It rose to records instead — past $2,000 in 2023, past $3,000 and then $4,000 in
-2025. What carried it was demand the real yield does not price: central banks
-buying at twice their old pace (the last channel below), and investors coming
-back as the run went on. The mechanism did not stop being true. A rise in real
-yields is still a headwind on the day it happens. It stopped being the force that
-decides the trend.
+**Then the link broke, and gold went the other way.** The 10-year real yield
+rose from about −1% early in 2022 to about 2.5% in late 2023, the highest in
+fifteen years, and stayed near 2% through 2025. The chain says gold should have
+fallen. It rose to records instead — past $2,000 in 2023, past $3,000 and then
+$4,000 in 2025. What carried it was demand the real yield does not price:
+central banks buying at twice their old pace (*What central banks are buying*,
+below), and investors coming back as the run went on. The mechanism did not stop
+being true. A rise in real yields is still a headwind on the day it happens. It
+stopped being the force that decides the trend.
 
 **So the referee decides, not the chain.** Whether gold moved with real yields or
 against them on a given day says which channel is in control (*Two framings*,
@@ -401,11 +401,11 @@ Late in 2025 gold passed US Treasuries to become the largest reserve asset by
 value, which is the scale of the shift in one number.
 
 **Where to read it.** On Sunday and in a conversation she is handed the gold
-reserves of China, Poland, India, Turkey and the Czech Republic, in tonnes, as
-TradingView's economic series: a level on each date, months behind the official
-release. Through the year to June 2026 Poland went from 515t to 632t, the Czech
-Republic from 62t to 82t, China from 2,299t to 2,346t, India held near 880t, and
-Turkey sold from 635t to 531t. A month newer than the last point is read off the
+reserves of the central banks that move most, in tonnes, as TradingView's
+economic series: a level on each date, months behind the official release.
+Through the year to June 2026 Poland went from 515t to 632t, the Czech Republic
+from 62t to 82t, China from 2,299t to 2,346t, India held near 880t, and Turkey
+sold from 635t to 531t. A month newer than the last point is read off the
 central bank's or the World Gold Council's page, with its date.
 
 ---
@@ -425,21 +425,21 @@ funds move faster still, and they carry no metal: what they add is the size of
 the move. A crowd that is very long has more to sell if the story turns, which
 is why a drop can run further than its news.
 
-**Where the rates channel actually lands.** Western investors are the buyers
-who care what a bond pays. Through 2022 and 2023, as real yields climbed, the
-gold funds' holdings fell — the first channel working, on the investors it
-reaches — while central banks bought more than ever and held the price up. They
-turned back to buying in 2024 and bought heavily in 2025 as the rally ran (as of
-2025). When this channel and the central banks pull the same way, the move has
-two legs under it; when they pull apart, the central banks have usually been the
-floor and investors the swing.
+**Where the rates channel actually lands.** Western investors are the buyers who
+care what a bond pays. Through 2022 and 2023, as real yields climbed, the gold
+funds' holdings fell — the first channel working, on the investors it reaches —
+while central banks bought more than ever and held the price up. They turned
+back to buying in 2024 and bought heavily in 2025 as the rally ran. When this
+channel and the central banks pull the same way, the move has two legs under it;
+when they pull apart, the central banks have usually been the floor and
+investors the swing.
 
 **Where to read it.** On Sunday and in a conversation she is handed the CFTC's
 weekly count of where the futures funds stand, and the two largest US gold
-funds, GLD and IAU: their assets and the money in or out over a month, three
-months and the year, from TradingView's screener. The World Gold Council's
-monthly flows, for funds everywhere, are read off its page, quoted with their
-date and source, never from somebody's summary.
+funds' assets and the money in or out over a month, three months and the year,
+from TradingView's screener. The World Gold Council's monthly flows, for funds
+everywhere, are read off its page, quoted with their date and source, never from
+somebody's summary.
 
 ---
 

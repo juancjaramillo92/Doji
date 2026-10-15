@@ -1,8 +1,10 @@
 # Eugenia — what the best systems do that she does not
 
-Research, 12 October 2026. Nothing here is implemented. The six parts are the
-ones the brief asked for, in its order, and the last section says what was read
-in code, what was read only as a vendor or a search summary stated it, and what
+Research, 12 October 2026, and a record of that day: §1 is the code as it
+stood, cited by the line numbers it had, and nothing here was implemented when
+it was written. What she does now is the README's. The six parts are the ones
+the brief asked for, in its order, and the last section says what was read in
+code, what was read only as a vendor or a search summary stated it, and what
 the network refused.
 
 **How to read the verdicts.** ADOPT is taken as it is done elsewhere. ADAPT is
@@ -12,7 +14,7 @@ cross a line `CLAUDE.md` calls the product is in §5, not in the ranking.
 
 ---
 
-## 1 · What she does today
+## 1 · What she did on 12 October
 
 Every entry is something read in this session, cited by file and line.
 

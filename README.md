@@ -94,7 +94,7 @@ scripts/health.mjs                      whether anything is running, asked from 
 scripts/eval.mjs                        whether Eugenia still behaves, asked of the model, by hand
 scripts/calibrate.mjs                   whether her map finds the levels he traded, by hand
 test/                                   node:test suites — see Tests
-.github/workflows/test.yml              runs the suite on every push
+.github/workflows/test.yml              runs the suite on every push, and says when the eval is owed
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
 .github/workflows/backup.yml            the daily copy of the tables nothing else holds
 .github/workflows/health.yml            the hourly outside check; a failed run is the alarm
@@ -440,6 +440,7 @@ single-sourced at run time:
 | the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow, the Apps Script and the charm's `charm/main/net.h` |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
 | each function's **gateway setting** | `config.toml`'s stanza and the deploy command's flag |
+| **what the eval reads** | `scripts/eval.mjs`'s imports and `file()` reads, and the paths `test.yml`'s eval-owed job compares with main |
 
 Copies are the cost; copies that can *disagree* are the risk.
 `test/agree.test.mjs` reads every copy of each — the app through the jsdom
@@ -985,24 +986,24 @@ filed at midnight under `Calendar` must not be counted as a print. The event
 descriptions are dropped, since she would pay for each on every request.
 
 **`?market=1` is the market around gold, as bars**: the dollar index, the two-
-and ten-year yields, the ten-year real yield and breakeven, silver, US crude, the
-S&P 500, the VIX and gold's volatility index (GVZ) — and abroad the German, French, Italian, UK and Japanese ten-year
-yields and EUR/USD, what the calendar's auctions and central banks are read
-against: France and Italy each against Germany is what lenders charge for the
-doubt, and the euro is more than half the dollar index. The quote batch refused on every probe with the scanners' 429, while the
-OHLCV read answered for every symbol, so each is twenty-five hourly bars folded by
-`foldBars` to where the first opened and where the last stands, each with its
-time. The real yield and the breakeven are FRED's daily series and are marked
-`daily`: the inflation the bond market expects and what is left of the ten-year
-once it is taken out, the two halves strategy §2's table reads apart, which the
-ten-year alone cannot tell. Symbols, names
-and units live in one list, `MARKET`, most-needed first; a symbol that fails is
-named in `missing`.
-`aroundList` states every line as a level beside the level at a stated time and
-computes no change, so a move cannot lose its window. The door is read ahead
-by the quarter-hourly job and she reads the copy (see *The market and the Fed's
-odds are read ahead*). A failed read is a sentence
-telling her not to quote the dollar or yields from a search.
+and ten-year yields, the ten-year real yield and breakeven, silver, US crude,
+the S&P 500, the VIX and gold's volatility index (GVZ) — and abroad the German,
+French, Italian, UK and Japanese ten-year yields and EUR/USD, what the
+calendar's auctions and central banks are read against: France and Italy each
+against Germany is what lenders charge for the doubt, and the euro is more than
+half the dollar index. The quote batch refused on every probe with the scanners'
+429, while the OHLCV read answered for every symbol, so each is twenty-five
+hourly bars folded by `foldBars` to where the first opened and where the last
+stands, each with its time. The real yield and the breakeven are FRED's daily
+series and are marked `daily`: what is left of the ten-year once expected
+inflation is taken out, and that inflation, the two halves strategy §2's table
+reads apart, which the ten-year alone cannot tell. Symbols, names and units live
+in one list, `MARKET`, most-needed first; a symbol that fails is named in
+`missing`. `aroundList` states every line as a level beside the level at a
+stated time and computes no change, so a move cannot lose its window. The door
+is read ahead by the quarter-hourly job and she reads the copy (see *The market
+and the Fed's odds are read ahead*). A failed read is a sentence telling her not
+to quote the dollar or yields from a search.
 
 **`?trend=1` is the weeks behind it** — the same `MARKET` list as daily closes
 a week, a month and three months of sessions back (`BACK`, 5, 21 and 63), each
@@ -1071,20 +1072,22 @@ Background, in one sentence at most, never a reason to trade.
 strategy §2 names. The gold reserves of China, Poland, India, Turkey and the
 Czech Republic, in tonnes, from TradingView's economic series
 (`ECONOMICS:<country>GRES`, `RESERVES`), folded by `foldReserves` to the newest
-five points, about a year of quarters, each on its date: the series runs months
-behind the official release, which is why the date is the point. And the two
-largest US gold funds (`FUNDS`, GLD and IAU) off the screener: assets under
-management and money in or out over a month, three months and the year
-(`FUND_COLUMNS`), folded by `foldFunds`, a column the screener does not serve
-null and never zero; the second probe read them in dollars (GLD $141.3B). Each
-economy and the funds' batch is its own call and its own failure, named in
-`missing`. The batch goes first and the economies three at a time, inside
-`DOOR_MS`: one economic read took eleven seconds on that probe, and five in a
-row at that pace outran it. `flowsList` gives levels on dates and computes
-no change, and `flowsBlock` reads the door directly, as the speculators' count
-is read, for the Sunday briefing and `get_around` alone: a quarter of
-central-bank buying is the story, and five weekday briefings repeating it are
-not. `test/fixtures/tradingview-reserves.json` is the 15 October capture.
+five points, about a year of quarters (`RESERVE_DAYS`), each on its date: the
+series runs months behind the official release, which is why the date is the
+point. A series in any unit but tonnes is refused rather than labelled tonnes.
+And the two largest US gold funds (`FUNDS`, GLD and IAU) off the screener:
+assets under management and money in or out over a month, three months and the
+year (`FUND_COLUMNS`), folded by `foldFunds`, a column the screener does not
+serve null and never zero, and a fund it does not hold named; the second probe
+read them in dollars (GLD $141.3B). Each economy and the funds' batch is its own
+call and its own failure, named in `missing`. The batch goes first and the
+economies three at a time, inside `DOOR_MS`: one economic read took eleven
+seconds on that probe, and five in a row at that pace outran it. `flowsList`
+gives levels on dates and computes no change, and `flowsBlock` reads the door
+directly, as the speculators' count is read, for the Sunday briefing and
+`get_around` alone: a quarter of central-bank buying is the story, and five
+weekday briefings repeating it are not.
+`test/fixtures/tradingview-reserves.json` is the 15 October capture.
 
 **`?volume=1` is what COMEX gold futures traded** — the exchange's own volume in
 the front-month contract (`COMEX:GC1!`), twenty-two daily bars folded by
@@ -3536,7 +3539,11 @@ ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs --plant
 
 Or from GitHub: **Actions → eval → Run workflow**, with `ANTHROPIC_API_KEY` as a
 repository secret; the verdicts and the cost are in the run's log, and a failed
-case fails the run.
+case fails the run. Nothing runs it unasked, so `test.yml` says when it is owed:
+a push to a branch whose prompts, cases or eval differ from main's carries the
+warning *The eval is owed*, and a branch is run through it before it is merged.
+`index.ts` is outside that list though the eval reads its model names: a warning
+on every change to the function is one nobody reads.
 
 **`npm run test:db` needs a Postgres server with pgvector, of the major version
 Supabase runs** — named once, in `test.yml`'s `PGCLUSTER`, and asserted by the

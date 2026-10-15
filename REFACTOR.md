@@ -678,9 +678,10 @@ day and carries what a pass misses.
 **Revisit if:** TradingView's quote batch answers, so one call serves the list.
 
 ### R-74 — computing the move over a week or a month
-**Why refused:** `trendList` states levels on dates, as `aroundList` does,
-because a change worked out here is a figure with its window stripped. She
-reads two dated levels and says the window.
+**Why refused:** `trendList` and `flowsList` state levels on dates, as
+`aroundList` does, because a change worked out here is a figure with its window
+stripped. She reads two dated levels and says the window. A fund's money in or
+out is the one figure over a window, and the screener names the window.
 **Revisit if:** she is seen getting the arithmetic between two levels wrong.
 
 ### R-75 — a scoreboard of the channels, kept by the nightly pass
@@ -688,6 +689,24 @@ reads two dated levels and says the window.
 read off the weeks behind the market, and the thesis carries which way the
 story is going; a scoreboard would be a third place saying it.
 **Revisit if:** the thesis keeps naming a force the weeks do not show moving.
+
+### R-76 — the flows read ahead into `eugenia_market`
+**Why refused:** the reserves are quarterly and months behind, and the funds'
+windows are a month and longer, so a copy kept fresh every quarter hour would
+be the same answer refetched. They reach two paths, the Sunday briefing and
+`get_around`, neither on a writer's clock that a slow read could cost, so
+`flowsBlock` reads the door directly, as `positioningBlock` does.
+**Revisit if:** the flows reach a weekday briefing, or the door is seen
+outrunning `DOOR_MS` from a path that waits on it.
+
+### R-77 — a database test for the reads' channel key
+**Why refused:** `eugenia_reads.channel` references `eugenia_channels` as a
+declaration, not a function, so `test/db`'s census does not ask for one, and the
+dump comparison already holds it fresh, re-run and upgraded. `agree.test.mjs`
+reads the key in `schema.sql` and holds the six names against the check and the
+seed; `verify.sql` asks only that the column is there.
+**Revisit if:** a write path to `eugenia_reads` starts choosing the channel from
+anything but the tool's enum.
 
 ---
 

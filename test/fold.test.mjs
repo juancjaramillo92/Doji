@@ -1187,7 +1187,7 @@ test('the weeks behind the market are levels on stated days, and no change is co
   assert.match(out, /daily closes a week, a month and three months back:/);
   assert.match(out, /· Dollar index 101\.2 on 8 Oct, 99\.5 on 16 Sept?, 97\.8 on 16 Jul/);
   assert.match(out, /· Ten-year breakeven inflation 2\.41% on 7 Oct/);
-  assert.match(out, /Not read: Gold volatility index \(GVZ\)\./);
+  assert.match(out, /Not read just now: Gold volatility index \(GVZ\)\./);
   assert.doesNotMatch(out, /\b(up|down|rose|fell|higher|lower)\b/);
 });
 
@@ -1199,10 +1199,11 @@ const RESERVES_READ = JSON.parse(readFileSync(new URL('./fixtures/tradingview-re
 
 test('a central bank\'s reserves fold to its newest five points, each a level on its date', () => {
   const cn = foldReserves(RESERVES_READ.CN);
-  assert.equal(cn.unit, 'TNE');
-  assert.deepEqual(cn.points.map(p => p.date), ['2025-06-01', '2025-09-01', '2025-12-01', '2026-03-01', '2026-06-01']);
-  assert.equal(cn.points.at(-1).tonnes, 2346.43);
+  assert.deepEqual(cn.map(p => p.date), ['2025-06-01', '2025-09-01', '2025-12-01', '2026-03-01', '2026-06-01']);
+  assert.equal(cn.at(-1).tonnes, 2346.43);
   assert.throws(() => foldReserves({ series: [] }), /no series/);
+  // A series in another unit is refused, never labelled tonnes.
+  assert.throws(() => foldReserves({ ...RESERVES_READ.CN, unit: 'USD' }), /a series in USD, not tonnes/);
 });
 
 test('a fund the screener does not hold is left out, and a column it does not serve is null, never zero', () => {
@@ -1251,7 +1252,8 @@ test('the flows read the funds first, then three economies at a time, in their o
   assert.equal(world.seen.most, 3, `${world.seen.most} economies were asked for at once`);
   assert.deepEqual(answer.reserves.map(r => r.name), RESERVES.map(r => r.name));
   assert.equal(answer.funds[0].aum, 141298600600);
-  assert.deepEqual(answer.missing, []);
+  // A fund the screener does not hold is named, never dropped in silence.
+  assert.deepEqual(answer.missing, [{ symbol: 'AMEX:IAU', name: 'AMEX:IAU', error: 'not served' }]);
 
   const realTimeout = AbortSignal.timeout;
   const open = setTimeout(() => {}, 1_000);
@@ -1262,7 +1264,7 @@ test('the flows read the funds first, then three economies at a time, in their o
     assert.equal(cut.funds.length, 1, 'the funds were lost with the economies not reached');
     assert.deepEqual(cut.reserves.map(r => r.name), ['China']);
     assert.deepEqual(cut.missing.map(m => [m.name, m.error]),
-      ['Poland', 'India', 'Turkey', 'Czech Republic'].map(n => [n, 'not reached in 35s']));
+      [['AMEX:IAU', 'not served'], ...['Poland', 'India', 'Turkey', 'Czech Republic'].map(n => [n, 'not reached in 35s'])]);
   } finally {
     clearTimeout(open);
     AbortSignal.timeout = realTimeout;
@@ -1270,7 +1272,7 @@ test('the flows read the funds first, then three economies at a time, in their o
 });
 
 test('the flows are levels on their dates, newest first, in tonnes and dollars, and a gap is said', async () => {
-  const reserve = (name, read) => ({ country: 'XX', name, ...foldReserves(read) });
+  const reserve = (name, read) => ({ country: 'XX', name, points: foldReserves(read) });
   const out = flowsList({
     reserves: [reserve('China', RESERVES_READ.CN), reserve('Turkey', RESERVES_READ.TR)],
     funds: [{ symbol: 'AMEX:GLD', name: 'SPDR Gold Shares', aum: 132.4e9, flow_1m: 2.1e9, flow_3m: -0.6e9, flow_ytd: null }],
@@ -6230,7 +6232,7 @@ test('every planted defect breaks a prompt and names a case that exists', () => 
   }
   // A plant that leaves a copy of its rule standing tests the copy, not the eval.
   const ban = EVAL.PLANTS.find(p => p.cases.includes('view-unasked-in-position')).breaks(EVAL.PROMPTS).SYSTEM;
-  assert.doesNotMatch(ban, /No view on where price goes|a view while he is in a position/,
+  assert.doesNotMatch(ban, /No view on where price goes|a view while he is in a position|If he asks where you think price goes/,
     'the position-ban plant leaves the writer a statement of the ban');
   const map = EVAL.PLANTS.find(p => p.cases.includes('critic-keeps-map-out-of-prose')).breaks(EVAL.PROMPTS);
   assert.doesNotMatch(map.SYSTEM, /THE MAP OF HIS CHARTS IS THE HOURS ON IT|NOT THE HOURS ON IT/,

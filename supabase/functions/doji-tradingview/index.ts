@@ -353,7 +353,7 @@ const tvCall = async (session: Record<string, string>, tool: AllowedTool, args: 
                       signal?: AbortSignal) =>
   unwrap(parseSse(await tvPost(session, tool, args, signal)), tool);
 
-/* What each of the three long doors may spend, so that it answers inside the
+/* What each long door may spend, so that it answers inside the
    READ_MS, 45 seconds, its caller waits, with what it has rather than with
    nothing: on 12 October the market's fourteen calls and the rates' six
    outran it, and a briefing and a reply lost both blocks whole. Ten seconds
@@ -451,11 +451,11 @@ export function foldCalendar(answer: any) {
    inflation the bond market expects, each a day or more behind, and neither
    may read as live: `daily` says so to whoever renders it. The two side by
    side are strategy §2's table, which neither answers alone. GVZ is what gold
-   options price its swing at over the next month. Abroad, the
-   ten-year yields she reads the calendar's auctions and central banks against
-   — France and Italy each against Germany is what lenders charge for the doubt
-   — and the euro, more than half the dollar index. The names live here, once,
-   beside the symbols — this list is the whole of what is read. */
+   options price its swing at over the next month. Abroad, the ten-year yields
+   she reads the calendar's auctions and central banks against — France and
+   Italy each against Germany is what lenders charge for the doubt — and the
+   euro, more than half the dollar index. The names live here, once, beside the
+   symbols — this list is the whole of what is read. */
 const MARKET = [
   { symbol: "TVC:DXY",     name: "Dollar index",              unit: "" },
   { symbol: "TVC:US02Y",   name: "Two-year Treasury yield",   unit: "%" },
@@ -595,11 +595,11 @@ async function readHeadlines() {
 
    The meeting dates are the Fed's published schedule — the calendar reaches a
    month and the odds need a year of meetings. Where the table runs short of a
-   year the strip is as long as the table, each meeting named by its date, and
-   a test fails half a year before the
-   table runs out, and every read checks the calendar: a decision it lists that
-   the table lacks refuses the answer, since odds against the wrong meeting are
-   a confident wrong number. The decision day is the second of the two. */
+   year the strip is as long as the table, each meeting named by its date. A
+   test fails half a year before the table runs out, and every read checks the
+   calendar: a decision it lists that the table lacks refuses the answer, since
+   odds against the wrong meeting are a confident wrong number. The decision
+   day is the second of the two. */
 export const FOMC = [
   "2026-10-28", "2026-12-09",
   "2027-01-27", "2027-03-17", "2027-04-28", "2027-06-09",
@@ -757,14 +757,23 @@ export const RESERVES = [
 export const FUNDS = ["AMEX:GLD", "AMEX:IAU"];
 export const FUND_COLUMNS = ["description", "aum", "fund_flows.1M", "fund_flows.3M", "fund_flows.YTD"];
 
-// The newest five points, about a year of quarters, as levels on their dates.
+const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+
+// Four hundred days reach five quarterly points, about a year.
+const RESERVE_DAYS = 400;
+
+/* The newest five points as levels on their dates. The series is read in the
+   tonnes it says it is in, and a series in any other unit is refused rather
+   than labelled tonnes. */
 export function foldReserves(answer: any) {
   const series = answer.series;
   if (!Array.isArray(series) || !series.length) throw new Error("no series");
-  return { unit: answer.unit, points: series.slice(-5).map((p: any) => ({ date: p.date, tonnes: p.value })) };
+  if (answer.unit !== "TNE") throw new Error(`a series in ${answer.unit}, not tonnes`);
+  return series.slice(-5).map((p: any) => ({ date: p.date, tonnes: p.value }));
 }
 
-// A fund the screener does not hold comes back in `missing`, never as zeros.
+// A column the screener does not serve is null, never zero; readFlows names a
+// fund it does not hold.
 export function foldFunds(answer: any) {
   return FUNDS.filter(s => answer.data?.[s]).map(s => {
     const d = answer.data[s];
@@ -776,19 +785,22 @@ export function foldFunds(answer: any) {
 export async function readFlows() {
   const signal = AbortSignal.timeout(DOOR_MS);
   const session = await tvSession();
-  const from = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
-  const reserves: Record<string, unknown>[] = [], missing: Record<string, string>[] = [];
-  let funds: Record<string, unknown>[] = [];
+  const from = day(-RESERVE_DAYS);
+  const reserves: Record<string, unknown>[] = [], missing: Record<string, string>[] = [],
+        unread: Record<string, string>[] = [];
+  let funds: { symbol: string }[] = [];
   try {
     funds = foldFunds(await tvCall(session, "mcp-tv-get-symbol-data-batch",
       { symbols: FUNDS, columns: FUND_COLUMNS }, signal));
+    for (const s of FUNDS.filter(s => !funds.some(f => f.symbol === s))) {
+      missing.push({ symbol: s, name: s, error: "not served" });
+    }
   } catch (err) {
     missing.push({ symbol: FUNDS.join(", "), name: "the gold funds", error: unreached(signal, err) });
   }
-  const unread: Record<string, string>[] = [];
   await inLanes(RESERVES, async (r, i) => {
     try {
-      reserves[i] = { ...r, ...foldReserves(await tvCall(session, "mcp-tv-get-economic-data",
+      reserves[i] = { ...r, points: foldReserves(await tvCall(session, "mcp-tv-get-economic-data",
         { symbol: `ECONOMICS:${r.country}GRES`, date_from: from }, signal)) };
     } catch (err) {
       unread[i] = { symbol: `ECONOMICS:${r.country}GRES`, name: r.name, error: unreached(signal, err) };
@@ -838,8 +850,6 @@ async function readVolume() {
                 the funds' screener columns, so the units can be read
 
    Every argument is written here; none is read from the request. */
-const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
-
 const GOLD = ["PEPPERSTONE:XAUUSD", "OANDA:XAUUSD", "FX_IDC:XAUUSD", "TVC:GOLD", "COMEX:GC1!"];
 const AROUND = MARKET.map(m => m.symbol);
 
@@ -880,7 +890,7 @@ const PROBES: Record<string, () => Call[]> = {
     ["mcp-tv-get-ohlcv", { symbol: "COMEX:GC1!", interval: "1D", count: 3 }],
   ],
   flows: () => [
-    ["mcp-tv-get-economic-data", { symbol: "ECONOMICS:CNGRES", date_from: day(-400) }],
+    ["mcp-tv-get-economic-data", { symbol: "ECONOMICS:CNGRES", date_from: day(-RESERVE_DAYS) }],
     ["mcp-tv-get-symbol-data-batch", { symbols: FUNDS, columns: FUND_COLUMNS }],
   ],
 };
