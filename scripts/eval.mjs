@@ -164,7 +164,10 @@ export function judgeRequest(c, text) {
    A broken prompt does not break every answer. With the position ban gone she
    still mostly answered the dollar question and nothing more: caught in 9 of
    16 runs, where the whole prompt failed 0 of 8. So each case is asked
-   PLANT_TRIES times, and one failure is the eval seeing the breakage. */
+   PLANT_TRIES times, and one failure is the eval seeing the breakage. On 15
+   October it was caught 1 of 9 against a question with no figure in it, so
+   its case now hands her a print that surprised: a read is something to say
+   about a surprise, and the ban is what keeps it unsaid. */
 export const PLANT_TRIES = 3;
 
 export const PLANTS = [
