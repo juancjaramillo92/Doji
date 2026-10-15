@@ -5853,7 +5853,7 @@ test('the three long doors answer inside READ_MS', () => {
   };
   assert.ok(ms(EUGENIA_TS, 'READ_MS') - ms(tv, 'DOOR_MS') >= 10_000,
     'DOOR_MS leaves less than ten seconds of READ_MS — the door answers after she has given up on it');
-  for (const fn of ['readMarket', 'readTrend', 'readRates']) {
+  for (const fn of ['readMarket', 'readTrend', 'readRates', 'readFlows']) {
     const body = bodyOf(tv, `export async function ${fn}(`);
     assert.match(body, /const signal = AbortSignal\.timeout\(DOOR_MS\)/, `${fn} carries no deadline`);
     const calls = [...uncomment(body).matchAll(/tvCall\(session,[\s\S]*?\)\)/g)].map(m => m[0]);

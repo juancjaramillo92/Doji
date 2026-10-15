@@ -28,7 +28,7 @@ import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } fr
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, unwrap, foldCalendar,
   calendarWindow, foldBars, foldHeadlines, FOMC, contractMonths, foldRates, oddsOf, unlisted, zq, foldSessions,
-  readMarket, readRates, foldTrend, BACK, foldReserves, foldFunds, FUNDS,
+  readMarket, readRates, foldTrend, BACK, foldReserves, foldFunds, FUNDS, readFlows, RESERVES,
 } from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
@@ -1211,6 +1211,62 @@ test('a fund the screener does not hold is left out, and a column it does not se
   assert.deepEqual(FUNDS, ['AMEX:GLD', 'AMEX:IAU']);
   assert.deepEqual(funds, [{ symbol: 'AMEX:GLD', name: 'SPDR Gold Shares', aum: 132.4e9,
     flow_1m: 2.1e9, flow_3m: -0.6e9, flow_ytd: null }]);
+});
+
+/* THE BATCH FIRST, THEN THREE ECONOMIES AT A TIME. One economic read took
+   eleven seconds on the second probe; five in a row at that pace outran
+   DOOR_MS. A server that answers by tool, counting how many calls it holds at
+   once, and one that stops after two, with DOOR_MS shortened. */
+function flowsTradingView({ answers = Infinity, wait = 0 } = {}) {
+  let served = 0, open = 0;
+  const seen = { most: 0, tools: [] };
+  const fetch = async (url, init = {}) => {
+    if (url.includes('/rest/v1/tradingview_auth')) {
+      return Response.json([{ id: 'current', access_token: 'A', expires_at: new Date(Date.now() + 3600_000).toISOString() }]);
+    }
+    const body = JSON.parse(init.body);
+    if (body.method === 'initialize') return new Response('{}', { headers: { 'mcp-session-id': 's' } });
+    if (body.method !== 'tools/call') return new Response('', { status: 202 });
+    seen.tools.push(body.params.name);
+    // A lane reaching the server after the deadline is refused at once.
+    if (init.signal?.aborted) throw init.signal.reason;
+    if (served++ >= answers) {
+      return new Promise((_, reject) => init.signal?.addEventListener('abort', () => reject(init.signal.reason)));
+    }
+    seen.most = Math.max(seen.most, ++open);
+    await new Promise(r => setTimeout(r, wait));
+    open--;
+    const answer = body.params.name === 'mcp-tv-get-symbol-data-batch'
+      ? { data: { 'AMEX:GLD': { description: 'SPDR Gold Shares', aum: 141298600600 } }, missing: [] }
+      : RESERVES_READ.CN;
+    return new Response(`data: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { structuredContent: answer } })}\n\n`);
+  };
+  return { fetch, seen };
+}
+
+test('the flows read the funds first, then three economies at a time, in their own order', async () => {
+  const world = flowsTradingView({ wait: 10 });
+  const answer = await stubbed(async () => { globalThis.fetch = world.fetch; return readFlows(); });
+  assert.equal(world.seen.tools[0], 'mcp-tv-get-symbol-data-batch', 'the funds are not read first');
+  assert.equal(world.seen.most, 3, `${world.seen.most} economies were asked for at once`);
+  assert.deepEqual(answer.reserves.map(r => r.name), RESERVES.map(r => r.name));
+  assert.equal(answer.funds[0].aum, 141298600600);
+  assert.deepEqual(answer.missing, []);
+
+  const realTimeout = AbortSignal.timeout;
+  const open = setTimeout(() => {}, 1_000);
+  try {
+    AbortSignal.timeout = () => realTimeout.call(AbortSignal, 30);
+    const slow = flowsTradingView({ answers: 2 });
+    const cut = await stubbed(async () => { globalThis.fetch = slow.fetch; return readFlows(); });
+    assert.equal(cut.funds.length, 1, 'the funds were lost with the economies not reached');
+    assert.deepEqual(cut.reserves.map(r => r.name), ['China']);
+    assert.deepEqual(cut.missing.map(m => [m.name, m.error]),
+      ['Poland', 'India', 'Turkey', 'Czech Republic'].map(n => [n, 'not reached in 35s']));
+  } finally {
+    clearTimeout(open);
+    AbortSignal.timeout = realTimeout;
+  }
 });
 
 test('the flows are levels on their dates, newest first, in tonnes and dollars, and a gap is said', async () => {
