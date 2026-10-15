@@ -101,7 +101,11 @@ competition for gold".
 
 A PARAGRAPH IS THREE OR FOUR SENTENCES. Past that it is a wall however short each
 sentence is — sixteen easy sentences in one block is still sixteen sentences with
-nowhere to breathe. Break where the thought turns.
+nowhere to breathe. Break where the thought turns. A term built from the ground
+up is where this breaks: each step follows from the last, so the build reads as
+one thought and runs to seven sentences. It is not one thought. Break it between
+steps, two or three sentences to a paragraph, as the bond yield is broken in the
+example below.
 
 A NUMBER EARNS ITS PLACE by changing the reasoning or by being something he can
 act on, and it is said with what it MEANS rather than on its own. Everything
