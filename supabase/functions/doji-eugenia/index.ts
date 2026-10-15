@@ -1425,8 +1425,9 @@ const RECORD_TOOL = {
     "had its chance and did not, and what you were handed shows that; 'untested' " +
     "when the day did not settle it, what would settle it is not in front of you, " +
     "or the test was gold's own price. Judge only the test you stated, never where " +
-    "price went. Say how firmly you said it, read off your own words. On a read that " +
-    "proved wrong, name the one link in the chain you misread.",
+    "price went. Say how firmly you said it, read off your own words, and which " +
+    "channel it ran through. On a read that proved wrong, name the one link in the " +
+    "chain you misread.",
   input_schema: {
     type: "object",
     properties: {
@@ -1436,10 +1437,12 @@ const RECORD_TOOL = {
       evidence: { type: "string", description: `What in front of you settled it, or why nothing did, at most ${READ_MAX} characters.` },
       firmness: { type: "string", enum: READ_FIRMNESS,
                   description: "'firm' when you said it as a view you held with conviction; 'light' when you said it as a lean." },
+      channel: { type: "string", enum: CHANNELS.map(([id]) => id),
+                 description: "The channel the read's chain ran down — where gold was reached from." },
       lesson: { type: "string",
                 description: `Only when the verdict is wrong: the one link in the chain you misread, in a sentence of at most ${NOTE_MAX} characters — "I read the dollar as leading when the two-year was". Never "be more careful".` },
     },
-    required: ["reading", "test", "verdict", "evidence", "firmness"],
+    required: ["reading", "test", "verdict", "evidence", "firmness", "channel"],
     additionalProperties: false,
   },
 } as const;
@@ -1448,7 +1451,8 @@ const RECORD_TOOL = {
    check constraint answers a bad one with a 400 that reads as a database
    fault. */
 async function recordRead(reading: unknown, test: unknown, verdict: unknown,
-                          evidence: unknown, firmness: unknown, lesson: unknown): Promise<string> {
+                          evidence: unknown, firmness: unknown, lesson: unknown,
+                          channel: unknown): Promise<string> {
   const said = String(reading ?? "").trim().slice(0, READ_MAX);
   const against = String(test ?? "").trim().slice(0, READ_MAX);
   if (!said || !against) return "A read is filed with what would prove it wrong, or not at all.";
@@ -1465,6 +1469,10 @@ async function recordRead(reading: unknown, test: unknown, verdict: unknown,
   const learnt = String(lesson ?? "").trim().slice(0, NOTE_MAX);
   if (v === 'wrong' && !learnt) return "A read that proved wrong is filed with the link you misread.";
   if (v !== 'wrong' && learnt) return "Only a read that proved wrong carries a lesson. File it without one.";
+  const ran = String(channel ?? "");
+  if (!CHANNELS.some(([id]) => id === ran)) {
+    return `"${ran}" is not a channel. They are ${CHANNELS.map(([id]) => id).join(", ")}.`;
+  }
   try {
     // A retry after a pass that failed half-way files the same reads again;
     // the same words on the same day are one read.
@@ -1473,7 +1481,7 @@ async function recordRead(reading: unknown, test: unknown, verdict: unknown,
       body: JSON.stringify([{
         given_on: nyDate(new Date()), reading: said, test: against, verdict: v,
         evidence: String(evidence ?? "").trim().slice(0, READ_MAX) || null,
-        firmness: firm, lesson: learnt || null,
+        firmness: firm, lesson: learnt || null, channel: ran,
       }]),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1860,7 +1868,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case CALL_TOOL.name:     return await makeCall(input.direction, input.entry, input.stop, input.target,
                                                input.condition);
     case RECORD_TOOL.name:   return await recordRead(input.reading, input.test, input.verdict, input.evidence,
-                                                 input.firmness, input.lesson);
+                                                 input.firmness, input.lesson, input.channel);
     default:
       console.error(`doji-eugenia: no handler for tool "${name}"`);
       return unserved(name);
@@ -2633,7 +2641,7 @@ export async function portraitBlock(): Promise<string> {
    come with it, because a count says how often and only the misses say what
    she keeps getting wrong. */
 type Read = { given_on: string; reading: string; test: string; verdict: string; evidence: string | null;
-              firmness: string | null; lesson: string | null };
+              firmness: string | null; lesson: string | null; channel: string | null };
 
 const RECORD_DAYS = 30;
 const RECORD_MISSES = 3;
@@ -2641,7 +2649,7 @@ const RECORD_MISSES = 3;
 // A read a message at most, so a month is never near the limit; it is there
 // because every read carries one.
 export function recordQuery(now = Date.now()): string {
-  return `eugenia_reads?select=given_on,reading,test,verdict,evidence,firmness,lesson` +
+  return `eugenia_reads?select=given_on,reading,test,verdict,evidence,firmness,lesson,channel` +
     `&given_on=gte.${nyDate(new Date(now - RECORD_DAYS * 86_400_000))}&order=id.desc&limit=200`;
 }
 
@@ -2656,6 +2664,19 @@ const tally = (rows: Read[]) => count(rows) + READ_FIRMNESS
   .filter(([, said]) => said.length)
   .map(([f, said]) => `; said ${f === 'firm' ? 'firmly' : 'lightly'}, ${count(said)}`).join("");
 
+/* And by the channel each ran through, by its spoken name: a count of misses
+   says how often, and only the channel says where her reading is weak. Reads
+   filed before the channel was asked are in no channel. */
+const byChannel = (rows: Read[]) => {
+  const ran = CHANNELS.map(([id, name]) => [name, rows.filter(r => r.channel === id)] as const)
+    .filter(([, reads]) => reads.length);
+  return ran.length
+    ? `\nBy the channel each ran through, proved wrong of those filed: ` +
+      ran.map(([name, reads]) => `${name} ${reads.filter(r => r.verdict === 'wrong').length} of ${reads.length}`)
+        .join(", ") + "."
+    : "";
+};
+
 const misses = (rows: Read[]) => rows.filter(r => r.verdict === 'wrong').slice(0, RECORD_MISSES)
   .map(r => `· ${civilDay(r.given_on)}: ${r.reading} (wrong if ${r.test}) — ${r.evidence ?? 'its test fired'}` +
             (r.lesson ? `. Misread: ${r.lesson}` : ""))
@@ -2665,7 +2686,7 @@ export function recordList(rows: Read[]): string {
   if (!rows.length) return "";
   const missed = misses(rows);
   return `\n\nYour record — every read of the last ${RECORD_DAYS} days, judged at night by the test ` +
-    `you stated: ${tally(rows)}.` + (missed ? `\nThe latest proved wrong:\n${missed}` : "");
+    `you stated: ${tally(rows)}.` + byChannel(rows) + (missed ? `\nThe latest proved wrong:\n${missed}` : "");
 }
 
 export async function recordBlock(): Promise<string> {

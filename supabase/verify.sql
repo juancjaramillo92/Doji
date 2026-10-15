@@ -385,14 +385,14 @@ from (values
        and tgname in ('eugenia_thesis_keep', 'eugenia_portrait_keep') and not tgisinternal),
    'eugenia_portrait_keep,eugenia_thesis_keep'),
 
-  -- record_read writes both and the record reads both; missing, every filing
-  -- is a 400 she reports as unsaved and the record goes blank.
-  ('her record carries how firmly and what she misread',
+  -- record_read writes all three and the record reads them; missing, every
+  -- filing is a 400 she reports as unsaved and the record goes blank.
+  ('her record carries how firmly, what she misread and through which channel',
    (select coalesce(string_agg(column_name, ',' order by column_name), 'none')
       from information_schema.columns
      where table_schema = 'public' and table_name = 'eugenia_reads'
-       and column_name in ('firmness', 'lesson')),
-   'firmness,lesson'),
+       and column_name in ('channel', 'firmness', 'lesson')),
+   'channel,firmness,lesson'),
 
   ('RLS on eugenia_runs',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_runs')),

@@ -1936,6 +1936,12 @@ makes a retry's refiling a no-op.
   she misread, which is what makes it teach rather than count; a lesson on a
   read that held is refused. Reads filed before either column existed count in
   the month and in neither half.
+- **Through which channel.** Each read is filed with the channel its chain ran
+  down, and the record counts the misses per channel by its spoken name, since a
+  count says how often she misses and only the channel says where her reading
+  is weak — the one to say less on until it holds. The column references
+  `eugenia_channels`, so the channels stay one list; reads filed before it are
+  in no channel.
 - **The record is hers.** A month of counts and the three newest misses go to the
   briefing and a reply, the two paths that give a read, and to the pass; never
   the trade look, which carries none and lands the moment a loss closes his day. It

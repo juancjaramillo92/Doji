@@ -702,6 +702,13 @@ alter table public.eugenia_reads add column if not exists firmness text
 alter table public.eugenia_reads add column if not exists lesson text
   constraint eugenia_reads_lesson_length check (char_length(lesson) between 1 and 200);
 
+-- The channel the read's chain ran down, so the record can say where her
+-- reading is weak as well as how often. A reference rather than a check, so
+-- the channels are one list, eugenia_channels', and a channel added there is
+-- one a read may carry. Null on every read filed before it.
+alter table public.eugenia_reads add column if not exists channel text
+  references public.eugenia_channels (channel);
+
 alter table public.eugenia_reads enable row level security;
 
 -- ─── Her own calls ─────────────────────────────────────────────────────────

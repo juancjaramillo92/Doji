@@ -3994,14 +3994,14 @@ test('how she reads him carries the day it last moved, and an absent one says no
 const READS = [
   { given_on: '2026-07-30', reading: 'a hot print is bad for gold', test: 'the two-year falls on it',
     verdict: 'wrong', evidence: 'the two-year fell eight basis points', firmness: 'firm',
-    lesson: 'I took the dollar as leading when the two-year was' },
+    lesson: 'I took the dollar as leading when the two-year was', channel: 'inflation' },
   { given_on: '2026-07-29', reading: 'claims do not move the Fed', test: 'December pricing moves',
-    verdict: 'held', evidence: 'December barely moved', firmness: 'light', lesson: null },
+    verdict: 'held', evidence: 'December barely moved', firmness: 'light', lesson: null, channel: 'jobs' },
   { given_on: '2026-07-28', reading: 'the dollar leads today', test: 'the dollar index falls',
-    verdict: 'untested', evidence: null, firmness: 'firm', lesson: null },
-  // Filed before firmness was asked: in the month, in neither half.
+    verdict: 'untested', evidence: null, firmness: 'firm', lesson: null, channel: 'inflation' },
+  // Filed before firmness and the channel were asked: in the month, in neither half, in no channel.
   ...['07-27', '07-24', '07-23'].map((d, i) => ({ given_on: `2026-${d}`, reading: `miss ${i}`,
-    test: 'a test', verdict: 'wrong', evidence: 'it fired', firmness: null, lesson: null })),
+    test: 'a test', verdict: 'wrong', evidence: 'it fired', firmness: null, lesson: null, channel: null })),
 ];
 
 test('her record counts every verdict and names the newest misses, three at most', () => {
@@ -4009,6 +4009,10 @@ test('her record counts every verdict and names the newest misses, three at most
   assert.match(out, /judged at night by the test you stated: 1 held, 4 proved wrong, 1 untested; /);
   assert.match(out, /said lightly, 1 held, 0 proved wrong, 0 untested; said firmly, 0 held, 1 proved wrong, 1 untested\./,
     'the record no longer splits by how firmly a read was said, or counts an unmarked read in a half');
+  // By spoken name, never the id, and a channel with no read is not listed.
+  assert.match(out, /By the channel each ran through, proved wrong of those filed: inflation itself 1 of 2, jobs 0 of 1\./,
+    'the record no longer says where her reading is weak, or counts an unmarked read in a channel');
+  assert.doesNotMatch(out, /the dollar \d/, 'a channel with no read is listed');
   assert.match(out, /Misread: I took the dollar as leading when the two-year was/,
     'a miss no longer says which link she misread');
   assert.match(out, /30 Jul: a hot print is bad for gold \(wrong if the two-year falls on it\) — the two-year fell/);
@@ -4450,11 +4454,15 @@ test('a read is filed once, with a verdict the table accepts, and never without 
       { reading: 'a read', test: 'a test', verdict: 'held', evidence: 'x', firmness: 'firm',
         lesson: 'nothing' }), /Only a read that proved wrong carries a lesson/,
       'a read that held is filed with a lesson from nothing');
+    assert.match(await serve('record_read',
+      { reading: 'a read', test: 'a test', verdict: 'held', evidence: 'x', firmness: 'firm', channel: 'rates' }),
+      /"rates" is not a channel/, 'a channel the reference refuses is sent, and fails as a database fault');
     assert.equal(posts.length, 0, 'a refused read still reached the database');
 
     assert.equal(await serve('record_read',
       { reading: 'a hot print is bad for gold', test: 'the two-year falls', verdict: 'wrong',
-        evidence: 'it fell', firmness: 'firm', lesson: 'I read the dollar as leading' }), 'Filed.');
+        evidence: 'it fell', firmness: 'firm', lesson: 'I read the dollar as leading',
+        channel: 'rates_vs_inflation' }), 'Filed.');
   });
   // A retry's refiling lands on the unique index and is dropped, not doubled.
   assert.match(posts[0].url, /eugenia_reads\?on_conflict=given_on,reading$/);
@@ -4463,6 +4471,7 @@ test('a read is filed once, with a verdict the table accepts, and never without 
   assert.equal(row.verdict, 'wrong');
   assert.equal(row.firmness, 'firm');
   assert.equal(row.lesson, 'I read the dollar as leading');
+  assert.equal(row.channel, 'rates_vs_inflation');
   assert.match(row.given_on, /^\d{4}-\d\d-\d\d$/, 'the read is not filed under a New York civil day');
 });
 
@@ -5441,7 +5450,7 @@ const TOOL_CALLS = [
   ['open_loop',     { kind: 'question', body: 'a question' }],
   ['close_loop',    { id: 1, resolution: 'answered' }],
   ['record_read',   { reading: 'a read', test: 'the two-year falls', verdict: 'untested', evidence: 'no close',
-                      firmness: 'light' }],
+                      firmness: 'light', channel: 'dollar' }],
   ['make_call',     { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market' }],
   ['get_releases',  { release: 'Core Inflation Rate MoM', months: 12 }],
 ];

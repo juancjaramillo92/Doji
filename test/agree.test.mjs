@@ -3435,6 +3435,15 @@ test('a read is filed with the verdicts and lengths the table accepts', () => {
     'index.ts sends a firmness the table refuses, or never sends one it accepts');
   const lesson = SCHEMA_SQL.match(/eugenia_reads_lesson_length check \(char_length\(lesson\) between 1 and (\d+)\)/);
   assert.equal(NOTE_MAX, Number(lesson?.[1]), 'index.ts truncates a lesson past what the table accepts');
+  /* THE CHANNELS ARE ONE LIST. The read's channel references eugenia_channels
+     rather than checking a copy of its ids, and the tool offers CHANNELS' ids
+     rather than typing them, so a channel added in one place is one a read can
+     carry everywhere. */
+  assert.match(SCHEMA_SQL, /alter table public\.eugenia_reads add column if not exists channel text\s+references public\.eugenia_channels \(channel\);/,
+    'a read\'s channel is no longer held to the channels\' own table');
+  const tool = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const RECORD_TOOL = {'));
+  assert.match(tool.slice(0, tool.indexOf('} as const;')), /channel: \{ type: "string", enum: CHANNELS\.map\(\(\[id\]\) => id\)/,
+    'record_read offers channels from a list of its own');
 });
 
 /* NEVER BY PRICE. A read graded on where gold went is a forecast with a score,
