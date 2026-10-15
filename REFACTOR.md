@@ -653,14 +653,15 @@ that has none. The map hands her the numbers his chart would show, each one
 timed. **Revisit if:** a judgment his rules ask for turns out to need the
 shape and not the numbers.
 
-### R-71 — a reader for the gold funds' holdings and the reserve series
-**Deferred, not refused.** §2 names both flows, and neither has a reader: SPDR's
-holdings file and the World Gold Council's pages refused this session's network,
-so nothing could be captured, and a reader written without a capture is one
-written before its probe. She reads both off their pages with `web_fetch`, dated
-and sourced. `?probe=flows` asks what TradingView carries.
-**Revisit if:** the probe answers with a reserve or holdings series, or a
-capture of SPDR's file is saved as a fixture.
+### R-71 — every central bank, and gold funds outside the US
+**Deferred, not refused.** `?flows=1` reads five central banks and two US funds
+off TradingView. Every other central bank is the IMF's data, and the funds in
+Europe and Asia the World Gold Council's; neither site answered this session's
+network, so nothing could be captured, and a reader written without a capture is
+one written before its probe. She reads both off their pages with `web_fetch`,
+dated and sourced.
+**Revisit if:** a capture of either is saved as a fixture, or a central bank
+outside the five starts moving the story.
 
 ### R-72 — gold's reaction to each print, filed beside it
 **Deferred, not refused.** `get_releases` says how a release ran against its

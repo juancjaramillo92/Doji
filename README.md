@@ -1067,6 +1067,22 @@ briefing and `get_around` get it: a weekday briefing would repeat it five times,
 and a weekly count cannot cause a quarter-hour move.
 Background, in one sentence at most, never a reason to trade.
 
+**`?flows=1` is what central banks and the gold funds hold** — the two flows
+strategy §2 names. The gold reserves of China, Poland, India, Turkey and the
+Czech Republic, in tonnes, from TradingView's economic series
+(`ECONOMICS:<country>GRES`, `RESERVES`), folded by `foldReserves` to the newest
+five points, about a year of quarters, each on its date: the series runs months
+behind the official release, which is why the date is the point. And the two
+largest US gold funds (`FUNDS`, GLD and IAU) off the screener: assets under
+management and money in or out over a month, three months and the year
+(`FUND_COLUMNS`), folded by `foldFunds`, a column the screener does not serve
+null and never zero. Each economy and the funds' batch is its own call and its
+own failure, named in `missing`. `flowsList` gives levels on dates and computes
+no change, and `flowsBlock` reads the door directly, as the speculators' count
+is read, for the Sunday briefing and `get_around` alone: a quarter of
+central-bank buying is the story, and five weekday briefings repeating it are
+not. `test/fixtures/tradingview-reserves.json` is the 15 October capture.
+
 **`?volume=1` is what COMEX gold futures traded** — the exchange's own volume in
 the front-month contract (`COMEX:GC1!`), twenty-two daily bars folded by
 `foldSessions` to each session's start and its contracts. It is the market's
@@ -1105,7 +1121,7 @@ failure is its own answer:
 | `search` | the names gold's feeds and a real yield go by, for whatever `quotes` could not resolve |
 | `fedfunds` | whether thirty-day fed funds futures answer, under the continuous names (`ZQ1!` to `ZQ3!`) and under named contract months, and what a bar of them carries — the price `?rates=1` works the meeting odds out from |
 | `futures` | what a daily bar of gold's front month (`COMEX:GC1!`) carries — the bars `?volume=1` folds |
-| `flows` | the two flows §2 names, which no reader serves until this shows what is there: two years of gold reserves for China, Poland, India, Turkey, the Czech Republic and the US as TradingView's `ECONOMICS:<country>GRES` series (China's resolved on 15 October), and which screener columns an ETF carries for its assets, shares and flows |
+| `flows` | what `?flows=1` folds, raw: China's gold reserves and the funds' screener columns, so the units can be read |
 
 **How the sign-in is found.** OAuth 2.1 as MCP specifies it, discovered rather
 than configured: the only TradingView address in the file is the endpoint, whose
@@ -2645,7 +2661,7 @@ can move a rung.
 
 **A market read that came back short is a row**, `caller: 'market read'`, `ok:
 false`, the read and the reason in `detail`: the broker's price, the headlines,
-the speculators' count and COMEX volume as a briefing or a reply reads them;
+the speculators' count, the flows and COMEX volume as a briefing or a reply reads them;
 the market around gold and the rate odds as the job reads them ahead, whole or
 — those two doors name a `missing` list — in part; and a copy a block could not
 hand her, not yet read or odds too old. The briefing or the reply still goes

@@ -5714,6 +5714,23 @@ test('a reply can read the market around gold, and is told to before searching f
    The Sunday briefing and get_around carry the weekly count. A weekday briefing
    would repeat it five mornings running — an ordinary edit away, and reading as
    better informed. */
+/* THE FLOWS GO WHERE THE SPECULATORS' COUNT GOES: a quarter of central-bank
+   buying is the story, and five weekday briefings repeating it are not. */
+test('what central banks and the gold funds hold reaches the Sunday briefing and a conversation, and nothing else', () => {
+  const calls = [...EUGENIA_TS.matchAll(/(?<!function )flowsBlock\(\)/g)].length;
+  assert.equal(calls, 2, `flowsBlock() is called ${calls} times — a new reader was given the flows`);
+  assert.match(bodyOf(EUGENIA_TS, 'async function postBriefing('), /due === 'sunday' \? flowsBlock\(\) : ""/,
+    'the weekday briefing carries the flows, the same quarter five mornings running');
+  assert.match(bodyOf(EUGENIA_TS, 'async function postBriefing('), /\+ crowd \+ held \+/,
+    'the Sunday briefing reads the flows and never hands them over');
+  const served = EUGENIA_TS.slice(EUGENIA_TS.indexOf('case AROUND_TOOL.name:'));
+  assert.match(served.slice(0, served.indexOf('case ', 5)), /flowsBlock\(\)/,
+    'a conversation can no longer read what central banks and the gold funds hold');
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
+  assert.match(system, /WHAT CENTRAL BANKS AND THE GOLD FUNDS HOLD COMES ON SUNDAY AND FROM get_around/,
+    'SYSTEM no longer says where the flows come from, so she searches for them');
+});
+
 test('the speculators\' weekly count reaches the Sunday briefing and a conversation, and nothing else', () => {
   const body = (name) =>
     bodyOf(EUGENIA_TS, `async function ${name}(`, `doji-eugenia no longer has ${name}()`);
@@ -5743,7 +5760,7 @@ test('futures volume reaches every briefing and a conversation', () => {
   const calls = [...EUGENIA_TS.matchAll(/(?<!function )volumeBlock\(\)/g)].length;
   assert.equal(calls, 2, `volumeBlock() is called ${calls} times — a new reader was given the day's volume`);
   assert.match(body('postBriefing'), /volumeBlock\(\)/, 'the briefing no longer reads the futures volume');
-  assert.match(body('postBriefing'), /\+ crowd \+ traded \+/, 'the briefing reads the futures volume and never hands it over');
+  assert.match(body('postBriefing'), /\+ traded \+/, 'the briefing reads the futures volume and never hands it over');
   const served = EUGENIA_TS.slice(EUGENIA_TS.indexOf('case AROUND_TOOL.name:'));
   assert.match(served.slice(0, served.indexOf('case ', 5)), /volumeBlock\(\)/,
     'a conversation asked whether a move had volume behind it has nothing but a search to answer from');
@@ -5858,7 +5875,7 @@ test('every market read she goes without writes a row', () => {
     .map((m, i) => [m[1], EUGENIA_TS.slice(m.index, starts[i + 1]?.index)])
     .filter(([, body]) => new RegExp(`tvRead\\("|fetch\\((${MARKET_URLS})`).test(uncomment(body)));
   assert.deepEqual(readers.map(([name]) => name).sort(),
-    ['headlinesBlock', 'marketQuote', 'positioningBlock', 'readTvCalendar', 'storeMarket', 'storeRates',
+    ['flowsBlock', 'headlinesBlock', 'marketQuote', 'positioningBlock', 'readTvCalendar', 'storeMarket', 'storeRates',
      'storeStructure', 'storeTrend', 'volumeBlock'],
     'the market reads have changed — declare the new one, and give it the meter');
   for (const [name, body] of readers) {

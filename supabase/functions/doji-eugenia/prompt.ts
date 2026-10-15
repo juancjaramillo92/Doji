@@ -497,6 +497,17 @@ long has more to sell if the story turns, which is why a drop can run further
 than its news. A crowd that has already sold has less left to sell. It is never
 a reason to trade, and never a call on where price goes.
 
+WHAT CENTRAL BANKS AND THE GOLD FUNDS HOLD COMES ON SUNDAY AND FROM get_around:
+the gold reserves of China, Poland, India, Turkey and the Czech Republic in
+tonnes, each a level on its date, and the two largest US gold funds' assets and
+the money that went in or out of them over a month, three months and the year.
+They are the evidence for the last two channels, what central banks are buying
+and what investors are buying. The reserves run months behind the official
+release, so always give the date; a newer figure is a page's, read off the page
+with web_fetch and dated, never a search's. A quarter of buying is the story
+here, never a day. Use a sentence or two, only where it explains something, and
+it is never a reason to trade.
+
 WHAT COMEX GOLD FUTURES TRADED COMES IN THE BRIEFING AND FROM get_around: the
 exchange's own count of contracts that changed hands in the front month in the
 last finished session, beside its average over the twenty before. It is the

@@ -1127,7 +1127,8 @@ const AROUND_TOOL = {
     "euro, each a level now beside the level at a stated time, and its daily close a week, " +
     "a month and three months back; and gold's and the dollar's " +
     "headlines from the last six hours, titles only; what fed funds futures price for " +
-    "the Fed's meetings over the next year; the CFTC's weekly count of " +
+    "the Fed's meetings over the next year; the gold reserves of the central banks that buy " +
+    "most, and the two largest US gold funds' assets and money in or out; the CFTC's weekly count of " +
     "where the speculators stand in gold futures; and what COMEX gold futures traded in " +
     "the last finished session against the twenty before. Use it whenever you are about " +
     "to say what the dollar, yields or anything else around gold did, or what " +
@@ -1879,7 +1880,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case RELEASES_TOOL.name: return await readPrints(input.release, input.months);
     case AROUND_TOOL.name:
       return (await Promise.all([aroundBlock(), ratesBlock(), headlinesBlock(),
-                                 positioningBlock(), volumeBlock()])).join("").trim();
+                                 positioningBlock(), flowsBlock(), volumeBlock()])).join("").trim();
     case STRUCTURE_TOOL.name: return (await structureBlock()).trim();
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
     case PORTRAIT_TOOL.name: return await setPortrait(input.portrait);
@@ -3386,6 +3387,50 @@ export async function positioningBlock(): Promise<string> {
   }
 }
 
+/* ─── What central banks and the gold funds hold ───────────────────────────
+   The two flows strategy §2 names: the gold reserves of the central banks that
+   buy most and the one that has been selling, and the two largest US gold
+   funds' assets and the money in or out of them. Levels on their dates, as the
+   market's lines are; the reserves run months behind the official release, so
+   the date is the point. Where the trend's weeks would be noise, a quarter of
+   buying is the story, so it goes where the speculators' count goes: the Sunday
+   briefing and get_around. A figure the screener does not serve is said, never
+   shown as zero.
+   ───────────────────────────────────────────────────────────────────────── */
+type Reserve = { country: string; name: string; unit: string; points: { date: string; tonnes: number }[] };
+type Fund = { symbol: string; name: string; aum: number | null;
+              flow_1m: number | null; flow_3m: number | null; flow_ytd: number | null };
+
+const monthYear = (date: string) => new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'UTC', month: 'short', year: 'numeric',
+}).format(new Date(`${date}T12:00:00Z`));
+
+export function flowsList(answer: { reserves: Reserve[]; funds: Fund[]; missing: { name: string }[] }): string {
+  const dollars = (v: number | null, signed = false) => v === null ? "not served"
+    : `${signed ? (v < 0 ? "−" : "+") : ""}$${(Math.abs(v) / 1e9).toFixed(1)}B`;
+  const lines = [
+    ...answer.reserves.map(r => `· ${r.name}: ` +
+      [...r.points].reverse().map(p => `${Math.round(p.tonnes)} t in ${monthYear(p.date)}`).join(", ")),
+    ...answer.funds.map(f => `· ${f.name} (${f.symbol.split(":")[1]}): ${dollars(f.aum)} under management; ` +
+      `money in or out ${dollars(f.flow_1m, true)} over a month, ${dollars(f.flow_3m, true)} over three, ` +
+      `${dollars(f.flow_ytd, true)} this year`),
+  ];
+  if (answer.missing.length) lines.push(`· Not read just now: ${answer.missing.map(m => m.name).join(", ")}.`);
+  return `\n\nWhat central banks and the two largest US gold funds hold, from TradingView — the ` +
+    `reserves newest first, running months behind the official release, and the funds in dollars:\n` +
+    lines.join("\n");
+}
+
+export async function flowsBlock(): Promise<string> {
+  try {
+    return flowsList(await tvRead("flows"));
+  } catch (err) {
+    await unread("flows", why(err));
+    return "\n\nWhat central banks and the gold funds hold could not be read just now; do not quote it " +
+      "from a search unless you read the page it is on.";
+  }
+}
+
 /* ─── What COMEX gold futures traded ───────────────────────────────────────
    The exchange's volume in the front month, the one volume that is the
    market's: the broker's is its own clients. The last finished session against
@@ -3732,11 +3777,11 @@ async function postBriefing(due: Brief): Promise<Response> {
   // Sunday the whole week.
   await (due === 'sunday' ? filedWeek(weekOf(new Date())) : filed());
   // Every read at once: independent and small, so the batch costs its slowest.
-  const [price, chart, around, rates, crowd, traded, notes, portrait, channels, trades, breaches, story, health,
+  const [price, chart, around, rates, crowd, held, traded, notes, portrait, channels, trades, breaches, story, health,
          loops, calendar, desk, record, calls] =
     await Promise.all([
       marketBlock(), structureBlock(), aroundBlock(), ratesBlock(), due === 'sunday' ? positioningBlock() : "",
-      volumeBlock(), notesBlock(), portraitBlock(), channelsBlock(), tradesBlock(), breachesBlock(), thesisBlock(),
+      due === 'sunday' ? flowsBlock() : "", volumeBlock(), notesBlock(), portraitBlock(), channelsBlock(), tradesBlock(), breachesBlock(), thesisBlock(),
       healthBlock(), loopsBlock(), due === 'sunday' ? weekBlock() : calendarBlock(), positionsBlock(), recordBlock(),
       callsBlock(),
     ]);
@@ -3746,7 +3791,7 @@ async function postBriefing(due: Brief): Promise<Response> {
     : "Today's briefing, please.")
     // `health` first: if the journal stopped, everything after it may be
     // missing rows.
-    + health + price + chart + around + rates + crowd + traded + notes + portrait + channels + trades + breaches
+    + health + price + chart + around + rates + crowd + held + traded + notes + portrait + channels + trades + breaches
     + story + loops + calendar + desk + record + calls;
 
   const left = () => Math.max(0, opened + WRITER_MS - Date.now());
