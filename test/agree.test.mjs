@@ -1413,6 +1413,28 @@ test('CI runs the database suite that npm test leaves out', () => {
     'test.yml no longer runs the database suite, and nothing else does');
 });
 
+/* ─── A prompt change says the eval is owed ──────────────────────────────────
+   The eval spends money, so nothing runs it unasked, and test.yml warns on a
+   branch that changed what it reads. Derived from the eval's own reads, so a
+   prompt file it starts to read is one the warning covers. index.ts is read
+   for the model names alone, and the warning on every change to it would be
+   one nobody reads.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('CI says the eval is owed on a branch that changed what it reads', () => {
+  const evalScript = source('scripts/eval.mjs');
+  const reads = [
+    ...[...evalScript.matchAll(/from '\.\.\/([^']+)'/g)].map(m => m[1]),
+    ...[...evalScript.matchAll(/file\('([^']+)'\)/g)].map(m => m[1]),
+  ];
+  assert.ok(reads.length >= 4, `the eval reads only ${reads.length} files — the reader has gone blind`);
+  const owed = [...reads.filter(f => f !== 'supabase/functions/doji-eugenia/index.ts'), 'scripts/eval.mjs'].sort();
+  const step = source('.github/workflows/test.yml')
+    .match(/git diff --quiet "\$\(git merge-base HEAD origin\/main\)" HEAD -- ([^|]+?) \|\|\s*echo "::warning title=The eval is owed::/);
+  assert.ok(step, 'test.yml no longer warns that the eval is owed');
+  assert.deepEqual(step[1].split(/\s+/).sort(), owed,
+    'the warning and the eval read different files, so a prompt change can pass unwarned');
+});
+
 /* ─── A tag is a name its owner can move; a commit is the code you read ──────
    Every `uses:` is a 40-character commit. `@v7` is what a person types from
    memory and re-fetches whatever the tag points at, so the audit of an action

@@ -94,7 +94,7 @@ scripts/health.mjs                      whether anything is running, asked from 
 scripts/eval.mjs                        whether Eugenia still behaves, asked of the model, by hand
 scripts/calibrate.mjs                   whether her map finds the levels he traded, by hand
 test/                                   node:test suites — see Tests
-.github/workflows/test.yml              runs the suite on every push
+.github/workflows/test.yml              runs the suite on every push, and says when the eval is owed
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
 .github/workflows/backup.yml            the daily copy of the tables nothing else holds
 .github/workflows/health.yml            the hourly outside check; a failed run is the alarm
@@ -440,6 +440,7 @@ single-sourced at run time:
 | the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow, the Apps Script and the charm's `charm/main/net.h` |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
 | each function's **gateway setting** | `config.toml`'s stanza and the deploy command's flag |
+| **what the eval reads** | `scripts/eval.mjs`'s imports and `file()` reads, and the paths `test.yml`'s eval-owed job compares with main |
 
 Copies are the cost; copies that can *disagree* are the risk.
 `test/agree.test.mjs` reads every copy of each — the app through the jsdom
@@ -3538,7 +3539,11 @@ ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs --plant
 
 Or from GitHub: **Actions → eval → Run workflow**, with `ANTHROPIC_API_KEY` as a
 repository secret; the verdicts and the cost are in the run's log, and a failed
-case fails the run.
+case fails the run. Nothing runs it unasked, so `test.yml` says when it is owed:
+a push to a branch whose prompts, cases or eval differ from main's carries the
+warning *The eval is owed*, and a branch is run through it before it is merged.
+`index.ts` is outside that list though the eval reads its model names: a warning
+on every change to the function is one nobody reads.
 
 **`npm run test:db` needs a Postgres server with pgvector, of the major version
 Supabase runs** — named once, in `test.yml`'s `PGCLUSTER`, and asserted by the
