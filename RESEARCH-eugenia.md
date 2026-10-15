@@ -121,16 +121,16 @@ what she does instead. *REFACTOR* names an entry that already decided it.
 | Background review after a run of turns | Hermes `agent/background_review.py` (head of 12 Oct 2026) | Claimed; no measurement in repo | The nightly pass, `index.ts:3223` | R-28 | Already the nightly pass | — | — | **REFUSE**, R-28 stands; its condition is not shown met |
 | Procedural skills written and patched by the agent, a curator that ages them to `stale` and `archived` | Hermes `skills.md`, `curator.md`; `/learn` (Jun 2026); `skills.auto_load` (v0.21.4, 21 Sep) | Claimed | Instruction notes, `prompt.ts:685` | R-29 deferred | Would be a second memory that changes behaviour | Medium | — | **DEFER**, R-29 stands |
 | Recall before every reply | Hermes; Honcho prewarm (`honcho.md`) | Claimed | She searches when she decides, `prompt.ts:747` | R-30 deferred | — | An embedding and a search a reply | `detail` already counts `search_memory` | **DEFER**, R-30 stands, still unmeasured |
-| Search with date bounds, newest/oldest sort, and a scroll around a hit | Hermes `sessions.md` §Session Search Tool; `session_search` bounds (v0.21.4) | Claimed | One query, twelve hits cut at 300 chars, no neighbours, `index.ts:324`–`345` | — | A hit "he said: yes" is useless without the turn before it | A tool and a REST read; or a signature change, which is a `drop` in `upgrade.sql` | A test driving the window around a planted id | **DEFER** — R-37 below |
-| Memory writes staged for the user's approval | Hermes `memory.md` §`write_approval` | Claimed | He audits after the fact with `/notes` and corrects by telling her | — | Adds a step to the one channel he uses | New table, a command, a send | — | **DEFER** — R-38 |
-| A diff of what the background pass changed, shown in chat | Hermes `memory.md` §`memory_notifications` | Claimed | `/notes` shows the current state, not what moved last night | — | A marker in `/notes` on notes written in the last day | Small | `notesList` test | **DEFER** — folded into R-38 |
+| Search with date bounds, newest/oldest sort, and a scroll around a hit | Hermes `sessions.md` §Session Search Tool; `session_search` bounds (v0.21.4) | Claimed | One query, twelve hits cut at 300 chars, no neighbours, `index.ts:324`–`345` | — | A hit "he said: yes" is useless without the turn before it | A tool and a REST read; or a signature change, which is a `drop` in `upgrade.sql` | A test driving the window around a planted id | **DEFER** — R-46 below |
+| Memory writes staged for the user's approval | Hermes `memory.md` §`write_approval` | Claimed | He audits after the fact with `/notes` and corrects by telling her | — | Adds a step to the one channel he uses | New table, a command, a send | — | **DEFER** — R-47 |
+| A diff of what the background pass changed, shown in chat | Hermes `memory.md` §`memory_notifications` | Claimed | `/notes` shows the current state, not what moved last night | — | A marker in `/notes` on notes written in the last day | Small | `notesList` test | **DEFER** — folded into R-47 |
 | Every memory mutation ledgered with before and after, rollback by entry | Hermes `curator.md` §Audit ledger; Letta Code memory as a git repo (`letta-code`, `reflection-v2.md`) | Two independent systems converged on it | Notes keep their trail; **the thesis and the portrait are one row overwritten**, `schema.sql:562`, `:586` | — | A trigger copying the old row into a history table | SQL only | `test:db`: two updates leave two history rows | **ADOPT** — item 6 |
-| Conclusions linked to their premises and source ids | Honcho `src/dreamer/specialists.py` (deduction/induction specialists) | Code verified; effect claimed | Portrait "seen more than once, counted with `check_rules` and `get_stats`", `prompt.ts:1075`–`1082`, with no link back | — | Ids in a free-text paragraph of 800 chars would crowd it | Medium | — | **DEFER** — R-39 |
+| Conclusions linked to their premises and source ids | Honcho `src/dreamer/specialists.py` (deduction/induction specialists) | Code verified; effect claimed | Portrait "seen more than once, counted with `check_rules` and `get_stats`", `prompt.ts:1075`–`1082`, with no link back | — | Ids in a free-text paragraph of 800 chars would crowd it | Medium | — | **DEFER** — R-48 |
 | Peer card: identity only, `INSTRUCTION` only when explicit, behaviour kept out | Honcho `PEER_CARD_SYSTEM_SECTION` | Code verified | Three note kinds; instruction "in his words", `prompt.ts:685` | — | Already the shape | — | — | Already done |
-| Bi-temporal facts (`valid_at`, `invalid_at`), contradiction only when both cannot be true | Graphiti `graphiti_core/edges.py:271`–`284`, `prompts/dedupe_edges.py` | Code verified | `superseded_by`; a commitment's period lives in its text | — | A structured `until` on commitments | Column, tool, nightly read | — | **DEFER** — R-40 |
+| Bi-temporal facts (`valid_at`, `invalid_at`), contradiction only when both cannot be true | Graphiti `graphiti_core/edges.py:271`–`284`, `prompts/dedupe_edges.py` | Code verified | `superseded_by`; a commitment's period lives in its text | — | A structured `until` on commitments | Column, tool, nightly read | — | **DEFER** — R-49 |
 | ADD / UPDATE / DELETE / NONE on each new fact | mem0 `mem0/configs/prompts.py:176` | Code verified | `remember` with `supersedes`, and "write almost nothing", `prompt.ts:1014` | — | Same model | — | — | Already done |
-| Multi-pass dialectic on the user model each N turns | Honcho via Hermes `honcho.md` | Claimed | Portrait once a night | — | A model call per N replies | High | — | **REFUSE** — R-41 |
-| Layered memory with decay | FinMem README (2024) | Backtest only | "A note that is merely old stays", `prompt.ts:704` | — | Decay is the opposite of her rule | — | — | **REFUSE** — R-42 |
+| Multi-pass dialectic on the user model each N turns | Honcho via Hermes `honcho.md` | Claimed | Portrait once a night | — | A model call per N replies | High | — | **REFUSE** — R-50 |
+| Layered memory with decay | FinMem README (2024) | Backtest only | "A note that is merely old stays", `prompt.ts:704` | — | Decay is the opposite of her rule | — | — | **REFUSE** — R-51 |
 
 ### Market reading and her record
 
@@ -139,10 +139,10 @@ what she does instead. *REFACTOR* names an entry that already decided it.
 | Reflection on a settled decision graded by return and alpha | TradingAgents `tradingagents/memory/reflection.py`, `settlement.py` (3 Oct 2026) | Their own README: "research purposes"; v0.3.1 and v0.4.0 (Jul, Aug 2026) fixed look-ahead in macro, sentiment and **the decision-log memory itself** | Graded by her stated test, `prompt.ts:1084` | R-25 | Crosses the line | — | — | **§5**, not ranked |
 | A written lesson stored with each failure, read on the next attempt | Reflexion (`noahshinn/reflexion`); Hermes "patch the skill that turned out wrong" (`background_review.py` `_SKILL_REVIEW_PROMPT`); Letta "fix the stale entry at the source" | Reflexion's paper is behind the blocked arXiv; code verified | A miss is filed with its evidence; **nothing records which link she misread**, `index.ts:2307` | — | A `lesson` on a `wrong` read: the link, in a sentence | One column, one tool field | Test on `recordList`, `test:db` | **ADAPT** — item 5 |
 | Calibration: say how sure, then score how sure against outcome | Good Judgment Project as summarised (search); ForecastBench (FRI, Jul 2026) | GJP: calibration tracking is "the standout finding" (secondary sources); FRI: frontier LLMs at or near superforecaster median on ForecastBench, with overlapping CIs | Three verdicts, no firmness; the record "sets how firmly", `prompt.ts:257` | — | Firmness filed at night as `light`/`firm`, the tally split by it, never said to him | One column, one tool field | `recordList` test, `test:db` | **ADAPT** — item 5 |
-| Ensemble several samples and aggregate | `llm_forecasting` README (NeurIPS 2024); ForecastBench top entries as summarised | Paper reports gains; read only through the README | One draft | — | Triples the briefing's draft cost for a read that is one sentence | High | — | **REFUSE** — R-43 |
-| Bull/bear researchers debating before a decision | TradingAgents `agents/researchers/*.py` | Backtest only | Her read must carry what would prove it wrong, `prompt.ts:243` | — | The falsifier is already the other side | — | — | **REFUSE** — R-43 |
-| An analyst team: market, news, sentiment, fundamentals agents | TradingAgents, FinRobot, ai-hedge-fund | Agent Market Arena (ACM, Apr 2026, as summarised): **architecture moves outcomes more than the backbone**; no independent edge shown | One writer with handed blocks | R-16 is about the file, not this | — | Several calls a briefing | — | **REFUSE** — R-43 |
-| Summaries that link each claim to its source document | Bloomberg AI summaries (press, as summarised) | Vendor | Numbers come from handed blocks; search prose is not quoted for a figure, `prompt.ts:412` | — | Telegram plain text; a link list is noise he skips | — | — | **DEFER** — R-44 |
+| Ensemble several samples and aggregate | `llm_forecasting` README (NeurIPS 2024); ForecastBench top entries as summarised | Paper reports gains; read only through the README | One draft | — | Triples the briefing's draft cost for a read that is one sentence | High | — | **REFUSE** — R-52 |
+| Bull/bear researchers debating before a decision | TradingAgents `agents/researchers/*.py` | Backtest only | Her read must carry what would prove it wrong, `prompt.ts:243` | — | The falsifier is already the other side | — | — | **REFUSE** — R-52 |
+| An analyst team: market, news, sentiment, fundamentals agents | TradingAgents, FinRobot, ai-hedge-fund | Agent Market Arena (ACM, Apr 2026, as summarised): **architecture moves outcomes more than the backbone**; no independent edge shown | One writer with handed blocks | R-16 is about the file, not this | — | Several calls a briefing | — | **REFUSE** — R-52 |
+| Summaries that link each claim to its source document | Bloomberg AI summaries (press, as summarised) | Vendor | Numbers come from handed blocks; search prose is not quoted for a figure, `prompt.ts:412` | — | Telegram plain text; a link list is noise he skips | — | — | **DEFER** — R-53 |
 
 ### Coaching
 
@@ -161,10 +161,10 @@ what she does instead. *REFACTOR* names an entry that already decided it.
 |---|---|---|---|---|---|---|---|---|
 | A behaviour eval: fixed inputs, real entry point, graded by counters and a rubric judge | Anthropic `claude-api` skill `shared/evals/build-eval.md`, `eval-audit.md` (cached 6 Oct 2026); Hermes `evals/` (dozens of wire probes) | Standard practice | **Nothing** — REFACTOR §1 | R-19 waits on it | A script beside `backup.mjs`, run by hand | Money per run, a fixture set he signs off | A planted prompt defect turns a case red | **ADOPT** — item 3 |
 | Per-message effort, so calls at two efforts share one cached prefix | Anthropic `shared/prompt-caching.md` §Invalidation hierarchy; beta `mid-conversation-output-config-2026-07-01`, Opus 5.5 | Documented | Briefing and critic differ in effort and write separate prefixes; measured, R-15 | **R-15** | New evidence R-15 could not have had | A header, an effort message, one morning measured | `wrote_1h` on the critic row reads 0 | **ADAPT** — item 7 |
-| Mid-conversation system messages for context | Same file; GA on Opus 5.5 | Documented | Context rides in the user turn because the shape "could not be exercised", `README.md:2224` | — | Operator authority for headlines and pages, which are external | A 400 risk on Sonnet's gate | — | **DEFER** — R-45 |
-| Cache diagnostics | Same file, beta `cache-diagnosis-2026-04-07` | Documented | `wrote_1h`/`wrote_5m` per row | — | Cache writes are 63% of her bill, `README.md:2512` | A header on every call | — | **DEFER** — R-45 |
-| Compaction, context editing, the memory tool | `claude-api` skill | Documented | Windows of twelve turns, twenty notes | — | Nothing to compact | — | — | **REFUSE** — R-46 |
-| Batch API for the nightly pass at half price | `claude-api` skill | Documented | One `ask` loop | — | The pass is a tool loop; a batch is one request | — | — | **REFUSE** — R-46 |
+| Mid-conversation system messages for context | Same file; GA on Opus 5.5 | Documented | Context rides in the user turn because the shape "could not be exercised", `README.md:2224` | — | Operator authority for headlines and pages, which are external | A 400 risk on Sonnet's gate | — | **DEFER** — R-54 |
+| Cache diagnostics | Same file, beta `cache-diagnosis-2026-04-07` | Documented | `wrote_1h`/`wrote_5m` per row | — | Cache writes are 63% of her bill, `README.md:2512` | A header on every call | — | **DEFER** — R-54 |
+| Compaction, context editing, the memory tool | `claude-api` skill | Documented | Windows of twelve turns, twenty notes | — | Nothing to compact | — | — | **REFUSE** — R-55 |
+| Batch API for the nightly pass at half price | `claude-api` skill | Documented | One `ask` loop | — | The pass is a tool loop; a batch is one request | — | — | **REFUSE** — R-55 |
 
 ---
 
@@ -389,87 +389,8 @@ top-level `effort` change causes" (`claude-api` skill,
 
 ## 4 · New REFACTOR.md entries
 
-In the register's format, numbered after R-36. These would be added in the
-first implementation commit.
-
-### R-37 — search by date, and a scroll around a hit
-**Deferred, not refused.** Hermes's `session_search` takes date bounds, sorts
-newest or oldest, and returns the turns around a match. Hers returns twelve
-hits cut at 300 characters with no neighbours, so a hit on his "yes, that one"
-says nothing about what he agreed to. A date argument changes `eugenia_search`'s
-signature, which is a `drop` run by hand. A scroll could be a plain read of the
-turns either side of an id, but hits carry no turn id today. Unmeasured, as R-30
-is.
-**Revisit if:** a reply's tally shows `search_memory` called twice or more in
-one turn for the same question, or he says she quoted him out of context.
-
-### R-38 — his approval before a note is kept, and a mark on what changed overnight
-**Deferred, not refused.** Hermes can stage every memory write for the user's
-yes, and announce each change in chat. Her notes are his correction channel, and
-staging would put a step in front of the only lever he uses. `/notes` shows what
-she holds but not what moved last night.
-**Revisit if:** a wrong note is found that shaped her for more than a week
-before he saw it.
-
-### R-39 — the portrait's claims linked to the notes and counts they rest on
-**Deferred, not refused.** Honcho's deduction and induction passes refuse a
-conclusion without its source ids. The portrait asks for each claim to be
-counted, but nothing links a sentence to what it counted. Ids inside an
-800-character paragraph read back to her as noise.
-**Revisit if:** the portrait is found carrying a claim no count supports.
-
-### R-40 — a commitment's period as a column
-**Deferred, not refused.** Graphiti stores when a fact stopped being true apart
-from when it was learned. A commitment's period lives in its words, and the
-nightly pass reads it there. A column would make *ended* computable instead of
-read.
-**Revisit if:** a commitment is retired before its period ended, or left open
-long after.
-
-### R-41 — reasoning about him every few replies
-**Why refused:** Honcho re-derives its model of the user every N turns, in up to
-three passes. Hers is a judgement across days, made once at night with the week
-in front of it. Doing it per reply is a model call per reply to answer a
-question whose evidence arrives once a day. R-28 is the same refusal for notes.
-**Revisit if:** R-28's condition is met.
-
-### R-42 — memory that decays with age
-**Why refused:** FinMem and its kin rank memories by recency and let the old
-ones fade. Hers keeps what is still true however old (`CONSOLIDATE`: "a note
-that is merely old stays"), and the window, the merge rule and search already
-handle volume.
-**Revisit if:** never on age alone.
-
-### R-43 — several drafts, a debate, or a team of analysts behind a read
-**Why refused:** TradingAgents and the forecasting systems sample many times,
-argue a bull against a bear, or split the analysis across agents. Her read is
-one sentence fenced by its own falsifier, and the briefing's cost is its
-draft. Several drafts multiply that cost for the one paragraph the rules
-already constrain hardest. Agent Market Arena's finding that architecture moves
-outcomes more than the backbone is a finding about trading P&L, which she is not
-graded on.
-**Revisit if:** the eval (item 3) shows her reads failing their own fence in a
-way a second opinion would catch.
-
-### R-44 — sources printed under the briefing
-**Deferred, not refused.** Bloomberg links its summaries to the documents behind
-them. Hers are spoken and read on a phone, and every figure she quotes already
-comes from a handed block rather than a page.
-**Revisit if:** he asks where a figure came from more than once.
-
-### R-45 — context as a mid-conversation system message, and cache diagnostics
-**Deferred, not refused.** Both are documented for Opus 5.5. The first gives
-handed context operator authority over web text, but the README records that
-shape as never exercised here, and a 400 kills every reply. The second would
-say where a prefix broke, but item 7 tests the one place a break is known.
-**Revisit if:** item 7's measurement leaves an unexplained write, or a page's
-text is seen steering a reply.
-
-### R-46 — compaction, context editing, the memory tool, the batch API
-**Why refused:** each solves a problem she does not have. Her windows are twelve
-turns and twenty notes, her memory is her own tables, and the nightly pass is a
-tool loop that a single batch request cannot run.
-**Revisit if:** a window is ever widened past what a request carries cheaply.
+The deferred and refused moves are in `REFACTOR.md` as R-46 to R-55, where the
+register keeps them with what would reopen each.
 
 ---
 
@@ -586,8 +507,8 @@ commit.
 | [Zella AI](https://tradezella.com/zella-ai), [help centre](https://intercom.help/tradezella-4066d388d93c/en/articles/11201153-what-is-zella-ai-tradezella-s-ai-trading-assistant) | 2026 | Stated (vendor) | Item 4 |
 | [Edgewonk review guide](https://edgewonk.com/blog/edgewonk-review-guide), [pricing](https://edgewonk.com/pricing) | undated | Stated (vendor) | Items 1, 4 |
 | [TraderSync review 2026](https://daytradingtoolkit.com/reviews/tradersync-review) | May 2026 | Stated (third party) | Item 4 |
-| [Bloomberg AI news summaries](https://www.bloomberg.com/company/press/investors-harness-bloombergs-expanded-ai-tools-to-discover-and-summarize-news) | 2025–26 | Stated (vendor) | R-44 |
-| Anthropic `claude-api` skill: `shared/prompt-caching.md` (invalidation hierarchy, per-message effort, mid-conversation system messages, cache diagnostics), `shared/evals/build-eval.md`, model tables | cached 6 Oct 2026 | Verified | Items 3, 7; R-45, R-46 |
+| [Bloomberg AI news summaries](https://www.bloomberg.com/company/press/investors-harness-bloombergs-expanded-ai-tools-to-discover-and-summarize-news) | 2025–26 | Stated (vendor) | R-53 |
+| Anthropic `claude-api` skill: `shared/prompt-caching.md` (invalidation hierarchy, per-message effort, mid-conversation system messages, cache diagnostics), `shared/evals/build-eval.md`, model tables | cached 6 Oct 2026 | Verified | Items 3, 7; R-54, R-55 |
 
 **What the network refused.** The session's egress policy answered 403 or
 failed DNS for arxiv.org, export.arxiv.org, huggingface.co, alphaxiv.org,
