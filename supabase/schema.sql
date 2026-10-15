@@ -689,6 +689,47 @@ alter table public.eugenia_reads add column if not exists firmness text
 alter table public.eugenia_reads add column if not exists lesson text
   constraint eugenia_reads_lesson_length check (char_length(lesson) between 1 and 200);
 
+-- ─── Her own calls ─────────────────────────────────────────────────────────
+-- A paper trade she would take, on his rules, filed before she says it and
+-- scored that night on what price did. Unlike a read, a call IS judged by where
+-- price went: that is what it is for. The function checks his rules before the
+-- insert; the table holds what no insert can get around.
+create table if not exists public.eugenia_calls (
+  id           bigserial primary key,
+  made_at      timestamptz not null default now(),
+
+  -- The next 17:00 New York roll on a weekday: the session the call belongs to.
+  expires_at   timestamptz not null,
+
+  direction    text not null
+    constraint eugenia_calls_direction_check check (direction in ('buy', 'sell')),
+  entry        numeric not null,
+  stop         numeric not null,
+  target       numeric not null,
+
+  -- What price has to do before the entry is live, in words; the entry is what
+  -- is scored.
+  condition    text not null
+    constraint eugenia_calls_condition_length check (char_length(condition) between 1 and 300),
+
+  -- Null until the pass scores it, and the PATCH is filtered on that.
+  outcome      text
+    constraint eugenia_calls_outcome_check check (outcome in (
+      'won', 'lost', 'scratch', 'open', 'untriggered', 'unread')),
+  triggered_at timestamptz,
+  closed_at    timestamptz,
+  closed_price numeric,
+  -- Dollars an ounce, signed: what the call made or lost.
+  result       numeric
+);
+
+-- One call a session, as he takes one entry a day: a second in the same
+-- session meets this and is refused. A plain unique index, so the insert's
+-- 409 is the answer.
+create unique index if not exists eugenia_calls_once on public.eugenia_calls (expires_at);
+
+alter table public.eugenia_calls enable row level security;
+
 alter table public.eugenia_reads enable row level security;
 
 -- ─── Open threads ──────────────────────────────────────────────────────────

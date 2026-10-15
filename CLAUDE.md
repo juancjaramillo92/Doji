@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 720 tests, eight suites
+npm test      # 728 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -232,20 +232,28 @@ what could not be verified.
 
 ### What she may never do
 
-- **The prohibitions in `prompt.ts` are the product.** *No signal* is enforced by
-  nothing but the sentence, so `agree.test.mjs` reads for the line on price in
-  `SYSTEM`, `CRITIC`, `TRIM` and `TRADE_EVENT`. The gates need it as much
-  as the writer: they REWRITE and run last. `CONSOLIDATE` inherits `SYSTEM`.
+- **The prohibitions in `prompt.ts` are the product.** Never what to do with a
+  position he holds, and nothing about direction unasked while he holds one, are
+  enforced by nothing but the sentences, so `agree.test.mjs` reads for them in
+  `SYSTEM`, `CRITIC`, `TRIM` and `TRADE_EVENT`. The gates need them as much as
+  the writer: they REWRITE and run last. `CONSOLIDATE` inherits `SYSTEM`.
+- **A forward level lives in a filed call and nowhere else.** Her calls are paper
+  trades on his rules — `callProblem` refuses one off them before `make_call`
+  files it — scored on price at night by `scoreCall`, every doubt against her.
+  Both gates keep a filed call whole and never change its numbers; `make_call` is
+  in `CHAT_TOOLS` and in no other set. `agree.test.mjs` holds the sentences and
+  the sets. `TRADE_EVENT` keeps the flat ban.
 - **Her read is fenced, not banned**: labelled as hers, with what would prove it
-  wrong, no level, and none while he is in a position. All four halves live in
-  `SYSTEM`, `CRITIC` and `TRIM`, and both gates are handed `positionsBlock()` to
-  judge the last. A printed level is a fact, never in the paragraph with her
-  read. A plan he has not taken is checked when he asks, against rules §7 marks
-  `journal` or R-08's arithmetic — `agree.test.mjs` reads the citations against
-  the table. `TRADE_EVENT` keeps the flat ban.
-- **Her record is judged by the test she stated, never by where price went**,
-  and it is hers: never on the trade look, never cited to him as a reason to
-  believe a read. A graded forecast pulls the next read toward one.
+  wrong, no level, and none unasked while he is in a position. All four halves
+  live in `SYSTEM`, `CRITIC` and `TRIM`, and both gates are handed
+  `positionsBlock()` to judge the last. A printed level is a fact, never in the
+  paragraph with her read. A plan he has not taken is checked when he asks,
+  against rules §7 marks `journal` or R-08's arithmetic — `agree.test.mjs` reads
+  the citations against the table.
+- **Her read record is judged by the test she stated, never by where price
+  went**, and it is hers: never on the trade look, never cited to him as a
+  reason to believe a read. Her calls are the one thing price judges, and their
+  record goes where the read record goes.
   `agree.test.mjs` reads the sentence in `CONSOLIDATE`, `record_read` and
   `SYSTEM`, and the trade look's absence.
 - **The verdict is not optional**: stated in `SYSTEM`, given room in the briefing

@@ -3,7 +3,7 @@
 -- ───────────────────────────────────────────────────────────────────────────
 -- The schema is applied by hand on purpose, which makes schema.sql a claim
 -- about the database. This tests the claim. It writes nothing: run the
--- whole file after any manual change and read the `ok` column — all 93 checks.
+-- whole file after any manual change and read the `ok` column — all 95 checks.
 --
 -- One statement, because a SQL editor shows only the last statement's result.
 -- The listings that say which object, grant or schedule are diagnose.sql.
@@ -32,8 +32,8 @@ from (values
      where table_schema = 'public'
        and table_name in ('eugenia_runs','eugenia_calendar','eugenia_thesis',
                           'eugenia_loops','eugenia_feedback','eugenia_portrait',
-                          'eugenia_reads','eugenia_rewrites')),
-   '8'),
+                          'eugenia_reads','eugenia_rewrites','eugenia_calls')),
+   '9'),
 
   -- The thesis is PATCHed by primary key, so a missing seed row is a 200 that
   -- lands nowhere: every rewrite dropped, silently.
@@ -417,6 +417,12 @@ from (values
   ('no policy on eugenia_reads',
    (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_reads')),
    '0'),
+  ('RLS on eugenia_calls',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_calls')),
+   'true'),
+  ('no policy on eugenia_calls',
+   (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_calls')),
+   '0'),
   ('RLS on eugenia_rewrites',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_rewrites')),
    'true'),
@@ -559,13 +565,15 @@ from (values
    (select coalesce(string_agg(indexname, ',' order by indexname), 'none')
       from pg_indexes where schemaname = 'public' and indexname in (
         'dispatch_job_at','dispatch_unsettled',
-        'eugenia_calendar_at','eugenia_calendar_ticker','eugenia_calendar_tv_id','eugenia_loops_open',
+        'eugenia_calendar_at','eugenia_calendar_ticker','eugenia_calendar_tv_id','eugenia_calls_once',
+        'eugenia_loops_open',
         'eugenia_notes_embedding','eugenia_notes_kind_id_desc','eugenia_notes_search',
         'eugenia_notes_trgm','eugenia_reads_once','eugenia_runs_at_desc','eugenia_runs_caller_at',
         'eugenia_turns_embedding','eugenia_turns_id_desc','eugenia_turns_search',
         'eugenia_turns_trgm','trades_user_open_day')),
    'dispatch_job_at,dispatch_unsettled,' ||
-   'eugenia_calendar_at,eugenia_calendar_ticker,eugenia_calendar_tv_id,eugenia_loops_open,' ||
+   'eugenia_calendar_at,eugenia_calendar_ticker,eugenia_calendar_tv_id,eugenia_calls_once,' ||
+   'eugenia_loops_open,' ||
    'eugenia_notes_embedding,eugenia_notes_kind_id_desc,eugenia_notes_search,' ||
    'eugenia_notes_trgm,eugenia_reads_once,eugenia_runs_at_desc,eugenia_runs_caller_at,' ||
    'eugenia_turns_embedding,eugenia_turns_id_desc,eugenia_turns_search,' ||

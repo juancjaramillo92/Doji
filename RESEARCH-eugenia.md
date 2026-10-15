@@ -475,6 +475,10 @@ tool loop that a single batch request cannot run.
 
 ## 5 · Decisions only he can make
 
+**Decided 15 October 2026:** A and B adopted, C refused. A shipped as *Her own
+calls* in the README — full paper trades on his rules, conditional where the
+setup is not there yet, scored on price at night; B as the setup check.
+
 These are the strongest ideas for making her "a better trader herself", and each
 crosses a line `CLAUDE.md` calls the product. They are set out, not proposed.
 

@@ -22,7 +22,7 @@ import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
-         READ_FIRMNESS, NOTE_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
+         READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled,
@@ -2594,6 +2594,18 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
     'the trade look is handed her record — it arrives while he is in a position, ' +
     'where a hit rate beside a message reads as a reason to act on her');
 
+  /* AND HER CALLS, where her record goes: a standing call she cannot see is a
+     second one made beside it, and the pass reads tonight's scores. Never the
+     trade look, where her own trade beside his is the most anchoring line there
+     could be. */
+  for (const fn of ['postBriefing', 'converse', 'postConsolidation']) {
+    assert.ok(reaches(reads(fn), 'callsBlock'),
+      `${fn} never gets callsBlock() into the message it sends — a call standing ` +
+      `today is invisible to her, and she makes a second beside it`);
+  }
+  assert.ok(!reaches(reads('postTradeEvent'), 'callsBlock'),
+    'the trade look is handed her calls — her own trade beside his, seconds after his fill');
+
   /* AND THE CONVERSATION WINDOW, ON EVERYTHING THAT SPEAKS: without it she says
      again what she said, and a repetition reads as emphasis. Hardest on the
      trade look, whose R-14/R-19 line fires on the print the briefing most likely
@@ -3320,6 +3332,15 @@ test('a read is filed with the verdicts and lengths the table accepts', () => {
    and a score pulls the next read toward one — the thing the prohibitions
    exist to stop. Enforced by nothing but the sentence, in the two places the
    grader reads it. */
+test('a call is filed with the sides, outcomes and condition length the table accepts', () => {
+  const vocab = (name) => SCHEMA_SQL.match(new RegExp(`eugenia_calls_${name}_check check \\(${name} in \\(([^)]*)\\)\\)`))?.[1]
+    ?.split(',').map(v => v.trim().replace(/'/g, ''));
+  assert.deepEqual(vocab('direction'), [...CALL_SIDES], 'make_call files a side the table refuses');
+  assert.deepEqual(vocab('outcome'), [...CALL_OUTCOMES], 'the scoring writes an outcome the table refuses');
+  const length = SCHEMA_SQL.match(/eugenia_calls_condition_length check \(char_length\(condition\) between 1 and (\d+)\)/);
+  assert.equal(CALL_MAX, Number(length?.[1]), 'make_call truncates a condition past what the table accepts');
+});
+
 test('a read is judged by the test she stated, never by where price went', () => {
   const consolidate = CONSOLIDATE.replace(/\s+/g, ' ');
   assert.match(consolidate, /a read is never judged by where price went/,
@@ -3531,6 +3552,48 @@ test('TRIM counts too, last, because replies broke the rule the critic fixed', (
    number, so each cited rule is read against §7's table: a judgment rule
    there would have her pronounce on what no row can see.
    ─────────────────────────────────────────────────────────────────────────── */
+
+/* ─── Her own calls ──────────────────────────────────────────────────────────
+   A level about what comes next is allowed in one shape only: a call filed with
+   make_call, on his rules, scored that night. Three things hold it, and each
+   is a sentence or a tool set. The writer files before she says; both gates,
+   which REWRITE and run last, keep a filed call whole and its numbers
+   unchanged, and keep none while he holds a position; and the trade look,
+   which reaches him in one, is never offered the tool. Scoring runs before
+   the pass reads, or the pass reads yesterday.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('a call is filed before it is said, kept whole by both gates, and never made on the trade look', () => {
+  const bodies = Object.fromEntries(
+    [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)]
+      .map(m => [m[1], m[2].replace(/\s+/g, ' ')]));
+  assert.match(bodies.SYSTEM, /FILE IT, THEN SAY IT\. Call make_call first/,
+    'SYSTEM no longer has her file a call before she says it — an unfiled call is never scored');
+  assert.match(bodies.SYSTEM, /said without filing them is a tip nobody scores/,
+    'the prohibitions no longer confine a forward level to a filed call');
+  assert.match(bodies.SYSTEM, /No trade management — never what to do with a position he holds/,
+    'SYSTEM no longer forbids telling him what to do with his position');
+  assert.match(bodies.SYSTEM, /no call while he has a position open, unless he asks for one/,
+    'SYSTEM may make a call unprompted while he holds a position');
+  for (const gate of ['CRITIC', 'TRIM']) {
+    assert.match(bodies[gate], /YOUR CALL IS THE ONE EXCEPTION/,
+      `${gate} no longer spares a filed call, so the last pass cuts the one level that was scored`);
+    assert.match(bodies[gate], /numbers? (?:are|is) never changed|never a number in it changed/,
+      `${gate} may change a number in a filed call, so what he reads is not what is scored`);
+  }
+  assert.match(bodies.TRADE_EVENT, /anything about where price goes/,
+    'the trade look no longer carries the flat ban');
+
+  const list = (set) => EUGENIA_TS.match(new RegExp(`const ${set}(?:: unknown\\[\\])? = \\[([\\s\\S]*?)\\];`))?.[1] ?? '';
+  assert.match(list('CHAT_TOOLS'), /CALL_TOOL/, 'make_call is not offered where she makes calls');
+  for (const set of ['TRADE_TOOLS', 'CONSOLIDATE_TOOLS', 'CRITIC_TOOLS']) {
+    assert.doesNotMatch(list(set), /CALL_TOOL/, `${set} offers make_call`);
+  }
+
+  const pass = uncomment(bodyOf(EUGENIA_TS, 'async function postConsolidation('));
+  assert.ok(pass.indexOf('await scoreCalls()') > -1 &&
+            pass.indexOf('await scoreCalls()') < pass.indexOf("ask([{ role: 'user', content: asked }]"),
+    'the calls are not scored before the pass reads them, so it judges yesterday');
+});
 
 test('a printed level may be named, never beside her read, in the writer and both gates', () => {
   const bodies = Object.fromEntries(

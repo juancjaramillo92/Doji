@@ -234,11 +234,11 @@ produced a confident wrong answer about which line was expensive.
 memory, not about time. The question is which operator runs per row and
 whether an index can serve it, and that is a measurement rather than a reading.
 
-### R-19 — a pattern filter on what she sends, behind *no signal*
+### R-19 — a pattern filter on what she sends, behind her prohibitions
 **Why refused:** an outside review in October 2026 proposed it as the one wall
 that is not a sentence. The prohibition is about meaning, and a pattern cannot
-read meaning: a printed level is a fact she may state, and a plan he has not
-taken is checked against his own numbers. A filter strict enough to catch a
+read meaning: a printed level is a fact she may state, a plan he has not taken
+is checked against his own numbers, and a filed call carries levels by design. A filter strict enough to catch a
 paraphrased signal holds real messages, and the path the review would start
 with, the trade event, is where a held message costs most. The trade event's
 exemption from `TRIM` is deliberate, for the reason `CLAUDE.md` gives. What the

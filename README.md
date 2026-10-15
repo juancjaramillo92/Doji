@@ -413,6 +413,7 @@ single-sourced at run time:
 | the **country his rules count** | `HOME` in `adherence.ts`, the default on `eugenia_calendar.country`, and the watch card's `.eq('country', 'US')` — and every rated read but the Sunday week filters on it |
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, the check constraint |
 | how **firmly a read was said** | `READ_FIRMNESS` in `doji-eugenia` and the check constraint on `eugenia_reads.firmness` |
+| her **calls' sides, outcomes and condition length** | `CALL_SIDES`, `CALL_OUTCOMES` and `CALL_MAX` in `doji-eugenia`, and the check constraints on `eugenia_calls` |
 | the **thesis length** | `THESIS_MAX` and the check constraint |
 | the **portrait length** | `PORTRAIT_MAX` and the check constraint |
 | the **verdicts a read may carry** | `READ_VERDICTS` in `index.ts` and the check constraint |
@@ -1209,7 +1210,8 @@ number that actually lands, a word when a position opens into one, and a
 conversation about any of it. **Weekdays at 08:00 ET, Sunday at 17:00 ET** — the
 gold open, so the week's first briefing lands with the market. She says hello
 her own way, Spanish or English, inside the first paragraph, and goes straight to
-the number. Reply and she answers — typed, by voice, or to a chart.
+the number. Reply and she answers — typed, by voice, or to a chart. And she
+trades beside you on paper, on your rules, scored on price — *Her own calls*.
 
 `schema.sql` holds her memory and her read of the journal, her meters,
 calendar and the trigger that tells her about a trade, and her clock; `prompt.ts` holds who she is,
@@ -1864,9 +1866,54 @@ makes a retry's refiling a no-op.
   believe one, never gives a read to improve it, and never holds one back to
   protect it. `/notes` shows it to him, so he can see what her reads are worth.
 
+### Her own calls
+
+**A coach who cannot do the thing is not one**, so she trades beside you on
+paper, on your rules, and is scored on price. A call is a trade she would take:
+buy or sell, an entry, a stop, a target, and what price has to do first. You
+decided this in October 2026, after the evidence on both sides was put to you
+(`RESEARCH-eugenia.md`, §5).
+
+- **On your rules, checked in code.** `make_call` refuses a call off them before
+  it is filed (`callProblem`): the stop no further than the $20 a full stop is
+  (R-02), the target $25 to $30 away (R-01), the reward at least 1:1.5 at entry
+  (R-08). One call a session, as you take one entry a day (R-12): the session is
+  the next 17:00 New York roll on a weekday (`expiryOf`), and a unique index on
+  that instant refuses a second.
+- **Filed before it is said.** A level about where price goes next is allowed
+  in a filed call and nowhere else, since a call in words alone is a tip nobody
+  scores. Both gates keep a filed call whole and never change a number in it.
+- **A call can wait for its setup.** In the morning the setup is usually not
+  there yet, so the call says what it waits for — *if price comes back to 4,000
+  and a fifteen-minute candle closes above it, buy at 4,002*. The condition is
+  hers to state; the entry is what is scored. *No call today* is a call too.
+- **Where.** At most one in the briefing, last, when she has one worth making,
+  and in a conversation when you ask. Never unasked while you hold a position,
+  never in the trade look, and never anything about what to do with a position
+  you hold.
+- **Scored at night, in code, every doubt against her** (`scoreCall`). Before the
+  nightly pass reads anything, `scoreCalls` asks `doji-mcp-sync?bars=1` for the
+  last thirty hours of minute bars and scores every call whose session ended:
+  whether price reached the entry, then whether the target or the stop came
+  first, the stop moved to break-even at +$20 as your R-04 moves yours. On the
+  bar that filled her only the stop counts; a bar touching both is a loss; the
+  break-even move starts on the next bar, since a bar's high and low cannot say
+  which came first. Outcomes are `won`, `lost`, `scratch`, `open` (still on at
+  the roll, marked at the last close), `untriggered`, and `unread` when the bars
+  do not reach back to the call. The PATCH is filtered on `outcome is null`, so
+  a retry never rescores one, and the run is a `caller: 'calls'` row either way.
+- **Her calls' record** — a month of outcomes, what the triggered ones made an
+  ounce, the newest losses, and any call still standing — goes where her read
+  record goes: the briefing, a reply and the pass, never the trade look.
+  `/notes` shows it to you. She gives it straight when you ask, losses first, and
+  never uses it to talk you into a trade.
+
+Her reads stay what they were — a view on the news, judged by the test she
+stated and never by price. A call is the one thing of hers price judges.
+
 ### What she remembers
 
-Ten tables, separated by how long a thing is true for. A turn rolls over inside
+Eleven tables, separated by how long a thing is true for. A turn rolls over inside
 a morning; a note about him outlives twenty of those; what he UNDERSTANDS
 outlives both; a thesis and a portrait are only ever current, so each is one row
 rewritten, and what each said before is kept beside it; a loop stays until it
@@ -1884,6 +1931,7 @@ closes; and the calendar and her record are the datasets here that compound.
 | `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar` |
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
 | `eugenia_rewrites` | what the thesis and the portrait said before each rewrite | never handed to her | a trigger on both, `eugenia_keep_rewrite` |
+| `eugenia_calls` | every call she made, and how price scored it | the last 30 days | her `make_call` tool; scored by the nightly pass |
 
 **Notes are how he corrects her, and the only way he can.** There is no settings
 page, the button under a briefing carries a verdict and not a reason, and the
@@ -1964,9 +2012,9 @@ sharing one instant — otherwise no quote rather than a wrong one.
 
 **Who gets what.** `notesBlock()` reaches **all four paths** — the briefing, a
 reply, the nightly pass and the trade look — and its absence would be silent:
-she carries on ignoring an instruction he believes she took. `portraitBlock()`
-and `recordBlock()` go to the briefing, a reply and the pass, and a test asserts
-neither reaches the trade look: it lands while he is in a position, where *"he
+she carries on ignoring an instruction he believes she took. `portraitBlock()`,
+`recordBlock()` and `callsBlock()` go to the briefing, a reply and the pass, and a
+test asserts none reaches the trade look: it lands while he is in a position, where *"he
 cuts winners early"* reads as an order about the trade he is in. The portrait is
 its own block so a failed read costs the paragraph and never his instructions. `channelsBlock()`
 goes to the three asked to build a term, since what moves gold runs through a
@@ -2350,7 +2398,9 @@ length he received and how it went out (`spoken in 19s`, or `sent as text`). A
 manual `?force=1` answers `accepted`, so the delivered row is where its length is
 read.
 
-**Two nightly meters write rows, both outcomes.** The embedding sweep writes
+**Three nightly meters write rows, both outcomes.** Her calls' scoring writes
+`caller: 'calls'`, since a broker door that stopped answering leaves every call
+unscored with nothing else to say so. The embedding sweep writes
 `caller: 'embeddings'`, because a dead vendor takes the semantic arm out while
 the lexical one keeps answering; the channel census writes `caller: 'channels'`,
 because a ladder that stopped moving looks like one with no reason to, and a rung
@@ -2648,10 +2698,11 @@ answer when something was read.**
 
 ### What she will not do, and what she may
 
-In the prompt rather than left to taste: **no signals** — no entry, no level to
-buy or sell at, no stop, no target, nothing about what to do with a position —
-and never more than one question at a time. No instruction note can widen that;
-one that narrows it is obeyed.
+In the prompt rather than left to taste: **nothing about what to do with a
+position you hold**, **no level about what comes next outside a call she
+filed**, **no view and no call unasked while you are in a position**, and never
+more than one question at a time. No instruction note can widen that; one that
+narrows it is obeyed.
 
 **Most of what she says is what the market is pricing.** *"A December cut is
 about 70% priced"* is a fact about today; saying it is most of what stops a
@@ -2659,16 +2710,17 @@ briefing reading like a wire feed.
 
 **She may give her read, fenced three ways**: said as *her read*, with what would
 prove her wrong in the same breath, and with no level in it — a read with a price
-in it is a signal. One per message, in the briefing or a conversation; the trade
-event carries none, landing at a moment she did not choose.
-**None at all while you are in a position**, where a view on price is advice about
-the trade. Both gates carry the same fence and are handed what you have on.
+in it is a call, made one way only. One per message, in the briefing or a
+conversation; the trade event carries none, landing at a moment she did not
+choose. **None unasked while you are in a position**; asked, it is a view on the
+market and never an instruction about your trade. Both gates carry the same
+fence and are handed what you have on.
 
 **A level price has already printed is a fact** — today's high and low, the
 previous close, where a release moved gold from and to — and checkable against
-your chart. A level attached to what comes next stays out, and so does any printed
-level in the paragraph holding her read: a level beside a direction is an entry
-with *buy* left out.
+your chart. A level attached to what comes next stays out unless it is a call she
+filed, and so does any printed level in the paragraph holding her read: outside a
+call, a level beside a direction is a call nobody scores.
 
 **She checks a plan you have not taken, when you ask, against your rules**: the
 stop and target distances (R-01, R-02), reward against risk at entry against R-08's
@@ -2680,8 +2732,7 @@ the fact: what you will wait for at the level before you click. **The levels
 stay yours**: she never suggests a different entry, stop
 or target, never says whether to take it, and never turns "the ratio is 1:1.1"
 into the target that would fix it; `TRIM` removes a level she offers in place of
-yours. Both this and the printed level were your decision when the no-signal rule
-was put to you: the rule stays, and these are what a coach does inside it.
+yours. Her own calls are hers and filed; your plan's levels are yours.
 
 **She judges trades — the decision, never the result** — against your rules and the
 plan you entered with. A loss inside your rules was a good trade; a win that broke

@@ -41,6 +41,7 @@ import {
   VOICE_TROUBLE,
   positionsList, isOpen, healthLine, sweepLine, serve, parseChannel, sayAloud, postSpeak,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock, portraitBlock, NOTES, recordBlock, recordList, recordQuery,
+  callProblem, expiryOf, scoreCall, callsList,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock,
@@ -3898,6 +3899,101 @@ test('her record counts every verdict and names the newest misses, three at most
   assert.equal(recordList([]), '');
 });
 
+/* ─── Her own calls ──────────────────────────────────────────────────────────
+   His rules, checked in code before a call is filed; the session it lives in;
+   and the score, every doubt against her. */
+test('a call off his rules is refused, and one on them is not', () => {
+  assert.equal(callProblem('buy', 4000, 3985, 4030), null, 'a $15 stop and a $30 target is his default trade');
+  assert.equal(callProblem('sell', 4000, 4020, 3970), null, 'the $20 ceiling itself is allowed');
+  assert.match(callProblem('buy', 4000, 3979, 4030), /R-02/, 'a stop past $20 is filed');
+  assert.match(callProblem('buy', 4000, 3990, 4020), /R-01/, 'a $20 target is filed');
+  assert.match(callProblem('buy', 4000, 4010, 4030), /stop below the entry/, 'a stop on the wrong side is filed');
+  assert.match(callProblem('buy', 4000, 3980, 4025), /R-08/,
+    'a $25 target over a $20 stop is 1:1.25, under the 1:1.5 his sequence asks for at entry');
+  assert.match(callProblem('long', 4000, 3985, 4030), /buy or sell/);
+});
+
+test('a call lives until the next 17:00 New York roll on a weekday', () => {
+  const until = (iso) => expiryOf(new Date(iso)).toISOString();
+  assert.equal(until('2026-10-14T13:00:00Z'), '2026-10-14T21:00:00.000Z', 'a Wednesday morning call outlives its session');
+  assert.equal(until('2026-10-14T21:00:00Z'), '2026-10-15T21:00:00.000Z', 'a call at the roll belongs to the session it opens');
+  assert.equal(until('2026-10-16T21:30:00Z'), '2026-10-19T21:00:00.000Z', 'a Friday evening call expires over the weekend');
+  assert.equal(until('2026-10-18T21:03:00Z'), '2026-10-19T21:00:00.000Z', "Sunday's call is Monday's session");
+  assert.equal(until('2026-11-02T15:00:00Z'), '2026-11-02T22:00:00.000Z', 'the roll is New York\'s 17:00 in winter too');
+});
+
+const CALL = { id: 1, made_at: '2026-10-14T13:00:00Z', expires_at: '2026-10-14T21:00:00Z', direction: 'buy',
+               entry: 4000, stop: 3985, target: 4030, condition: 'a retest of 4,000', outcome: null, result: null };
+const minute = (n, o) => ({ t: Date.parse('2026-10-14T13:00:00Z') + n * 60_000, open: 4010, high: 4012, low: 4008, close: 4010, ...o });
+const FROM = Date.parse('2026-10-13T20:00:00Z');
+
+test('a call is scored on price, every doubt against her', () => {
+  const score = (bars, call = CALL) => scoreCall(call, bars, FROM);
+  assert.equal(score([minute(1), minute(2)]).outcome, 'untriggered', 'price never came back to the entry');
+  const won = score([minute(1, { low: 3999 }), minute(2, { high: 4031 })]);
+  assert.deepEqual([won.outcome, won.result, won.closed_price], ['won', 30, 4030]);
+  assert.deepEqual([score([minute(1, { low: 3980, high: 4031 })]).outcome, score([minute(1, { low: 3980, high: 4031 })]).result],
+    ['lost', -15], 'on the bar that filled her, only the stop counts');
+  assert.equal(score([minute(1, { low: 3999, high: 4031 })]).outcome, 'open',
+    'the bar that filled her was read as reaching the target after the fill');
+  assert.equal(score([minute(1, { low: 3999 }), minute(2, { low: 3984, high: 4031 })]).outcome, 'lost',
+    'a bar touching both was read as the target first');
+  assert.equal(score([minute(1, { low: 3999 }), minute(2, { high: 4021, low: 3999 }), minute(3, { low: 3999 })]).outcome,
+    'scratch', 'R-04 did not move the stop to break-even after +$20');
+  assert.equal(score([minute(1, { low: 3999 }), minute(2, { high: 4021, low: 3999 })]).outcome, 'open',
+    'the stop moved on the same bar that reached +$20, which cannot say which came first');
+  const open = score([minute(1, { low: 3999 }), minute(2, { close: 4010.5 })]);
+  assert.deepEqual([open.outcome, open.result], ['open', 10.5], 'a call still on at the roll is marked at the last close');
+  assert.equal(score([minute(1, { low: 3999 }), { ...minute(0, { high: 4031 }), t: Date.parse(CALL.expires_at) }]).outcome,
+    'open', 'a bar after the roll was read into the session');
+  const sell = { ...CALL, direction: 'sell', entry: 4020, stop: 4035, target: 3990 };
+  assert.equal(score([minute(1, { high: 4021 }), minute(2, { low: 3989 })], sell).outcome, 'won');
+});
+
+test('a call the bars do not reach is unread, and a weekend is not a gap', () => {
+  assert.equal(scoreCall({ ...CALL, made_at: '2026-10-13T13:00:00Z' }, [minute(1, { low: 3999 })], FROM).outcome,
+    'unread', 'a call made before the bars begin was scored on half its session');
+  const friday = { ...CALL, made_at: '2026-10-16T21:30:00Z', expires_at: '2026-10-19T21:00:00Z' };
+  assert.notEqual(scoreCall(friday, [], Date.parse('2026-10-18T21:00:00Z')).outcome, 'unread',
+    'the hours the market was shut were read as bars nobody served');
+});
+
+test('her calls say how they ended, what they made, and which still stands', () => {
+  const now = Date.parse('2026-10-14T15:00:00Z');
+  const out = callsList([
+    { ...CALL, id: 3, made_at: '2026-10-14T13:00:00Z' },
+    { ...CALL, id: 2, made_at: '2026-10-13T13:00:00Z', expires_at: '2026-10-13T21:00:00Z', outcome: 'lost', result: -15 },
+    { ...CALL, id: 1, made_at: '2026-10-12T13:00:00Z', expires_at: '2026-10-12T21:00:00Z', outcome: 'won', result: 30 },
+    { ...CALL, id: 0, made_at: '2026-10-09T13:00:00Z', expires_at: '2026-10-09T21:00:00Z', outcome: 'untriggered' },
+  ], now);
+  assert.match(out, /4 made; 1 won, 1 lost, 0 scratch, 0 open, 1 untriggered, 0 unread\./);
+  assert.match(out, /The 2 that triggered made \+\$15\.00 an ounce/);
+  assert.match(out, /Standing until the 17:00 roll: buy 4000, stop 3985, target 4030, if a retest of 4,000/,
+    'the call still standing is not named, so she would make a second');
+  assert.match(out, /The latest lost:\n· 13 Oct: buy 4000/);
+  assert.equal(callsList([]), '');
+});
+
+test('a call is filed once a session, and a call off his rules never reaches the table', async () => {
+  const posts = [];
+  await stubbed(async () => {
+    globalThis.fetch = async (url, opts = {}) => {
+      posts.push({ url: String(url), body: opts.body });
+      return new Response(null, { status: posts.length > 1 ? 409 : 201 });
+    };
+    assert.match(await serve('make_call', { direction: 'buy', entry: 4000, stop: 3975, target: 4030, condition: 'now' }),
+      /R-02[\s\S]*Not filed/);
+    assert.equal(posts.length, 0, 'a call off his rules reached the database');
+    assert.match(await serve('make_call', { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market' }),
+      /^Filed: buy 4000, stop 3985, target 4030, until 17:00 ET/);
+    assert.match(await serve('make_call', { direction: 'sell', entry: 4000, stop: 4015, target: 3970, condition: 'at the market' }),
+      /already made this session's call/, 'a second call in a session is filed or swallowed');
+  });
+  const [row] = JSON.parse(posts[0].body);
+  assert.equal(Date.parse(row.expires_at), expiryOf(new Date(row.made_at)).getTime(),
+    'the call is filed under a session other than the one expiryOf names');
+});
+
 /* A month of New York days, read at the pass: 22:00 on 9 October is already
    the 10th in UTC, so a UTC day would start the window a day late. */
 test('her record is the last thirty New York days, newest first', () => {
@@ -5173,7 +5269,9 @@ const TOOL_CALLS = [
   ['set_portrait',  { portrait: 'a reading of him' }],
   ['open_loop',     { kind: 'question', body: 'a question' }],
   ['close_loop',    { id: 1, resolution: 'answered' }],
-  ['record_read',   { reading: 'a read', test: 'the two-year falls', verdict: 'untested', evidence: 'no close' }],
+  ['record_read',   { reading: 'a read', test: 'the two-year falls', verdict: 'untested', evidence: 'no close',
+                      firmness: 'light' }],
+  ['make_call',     { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market' }],
 ];
 
 /* AND THE LIST IS HELD AGAINST THE SWITCH: a tool added to `serve` and not
