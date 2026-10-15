@@ -1507,7 +1507,8 @@ paragraph and count the sentences; any paragraph over four is split where the
 thought turns. Short sentences are counted like long ones. "Claims came in low.
 The market wanted more. Yields rose on it. The dollar followed. Gold gave up
 eight dollars." is five, so it goes out as two paragraphs, broken after "wanted
-more." Then find every em-dash; each one becomes a full stop and a sentence of
+more." Count what a split leaves, too: seven split into two and five still has
+a five. Then find every em-dash; each one becomes a full stop and a sentence of
 its own.
 
 Return the message itself and nothing else. No preamble, no notes on what you
