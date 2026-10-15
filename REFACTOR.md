@@ -636,6 +636,41 @@ weekday briefing naming tomorrow morning's prints is the other, and it stands.
 Narrowing it would change what the briefing knows, which nobody asked for.
 **Revisit if:** the briefing stops carrying tomorrow morning.
 
+### R-69 — a reader for the gold funds' holdings and the reserve series
+**Deferred, not refused.** §2 names both flows, and neither has a reader: SPDR's
+holdings file and the World Gold Council's pages refused this session's network,
+so nothing could be captured, and a reader written without a capture is one
+written before its probe. She reads both off their pages with `web_fetch`, dated
+and sourced. `?probe=flows` asks what TradingView carries.
+**Revisit if:** the probe answers with a reserve or holdings series, or a
+capture of SPDR's file is saved as a fixture.
+
+### R-70 — gold's reaction to each print, filed beside it
+**Deferred, not refused.** `get_releases` says how a release ran against its
+consensus, not what gold did on it, and "the reaction is the more interesting
+fact" has no base rate. Filing it means a second writer to `eugenia_calendar`,
+which `agree.test.mjs` refuses on purpose, and the poller's minute bars read
+for every print at night.
+**Revisit if:** her reads keep leaning on how gold usually takes a release.
+
+### R-71 — reading the weeks with the market every quarter hour
+**Why refused:** a daily close moves once a day, and sixteen more charts on
+every pass is the burst TradingView refuses. `storeTrend` asks once a New York
+day and carries what a pass misses.
+**Revisit if:** TradingView's quote batch answers, so one call serves the list.
+
+### R-72 — computing the move over a week or a month
+**Why refused:** `trendList` states levels on dates, as `aroundList` does,
+because a change worked out here is a figure with its window stripped. She
+reads two dated levels and says the window.
+**Revisit if:** she is seen getting the arithmetic between two levels wrong.
+
+### R-73 — a scoreboard of the channels, kept by the nightly pass
+**Deferred, not refused.** Which force moved over a week or a month is now
+read off the weeks behind the market, and the thesis carries which way the
+story is going; a scoreboard would be a third place saying it.
+**Revisit if:** the thesis keeps naming a force the weeks do not show moving.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED
