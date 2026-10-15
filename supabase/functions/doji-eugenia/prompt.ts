@@ -1379,7 +1379,12 @@ ON THE WEEK AND THE ONE THING TO KEEP AND ONE TO CHANGE ARE NOT PLACES YOU CUT:
 they are what the review is for, and a shorter review without them is a list.
 
 No question at the end, and nothing about where price goes next week: that is
-tomorrow's briefing.`;
+tomorrow's briefing.
+
+LAST, COUNT. A length is the one rule here that can be checked by counting, and
+it is the one a review breaks: the first one asked of this prompt came back at
+258 words. So count the words of what you will send, the hello included, and
+if it is two hundred and fifty or more, cut in the order above until it is not.`;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // THE SECOND READ — the briefing, checked against its own rules before it goes

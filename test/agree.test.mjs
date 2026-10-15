@@ -6004,6 +6004,10 @@ test('a word count never stands without what to cut instead: the briefing\'s two
   assert.match(review, /Under two hundred and fifty words/, 'the review has lost its word count');
   assert.match(review, /THE VERDICT ON THE WEEK AND THE ONE THING TO KEEP AND ONE TO CHANGE ARE NOT PLACES YOU CUT/,
     'the review holds a word count with nothing saying what to cut instead');
+  /* AND IT IS COUNTED, LAST, as the gates count their countable rules: asked as
+     a ceiling alone, the first review the eval read came back at 258. */
+  assert.match(review.slice(review.lastIndexOf('LAST, COUNT')), /count the words[\s\S]*two hundred and fifty/,
+    'the review no longer counts its own words last, so its ceiling is read past');
 });
 
 test('the gold-against-real-yields chain is exempt from the rung, in both copies', () => {

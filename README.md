@@ -1490,7 +1490,8 @@ and nothing about where price goes next week, which is Sunday's briefing.
 Under 250 words, with what to cut first named beside the count — figures from
 his journal, then her calls, then a commitment kept — and the verdict and the
 one thing to keep and one to change never cut, since a ceiling alone cuts what
-the message is for.
+the message is for. **And she counts the words last**, as the gates count their
+countable rules: the first review the eval read came back at 258.
 
 She is handed the week computed — `get_stats`' summary with his answers,
 `check_rules`' verdicts, her calls and her record — with his notes, the
