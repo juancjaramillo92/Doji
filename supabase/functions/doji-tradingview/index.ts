@@ -305,7 +305,7 @@ async function callback(url: URL): Promise<Response> {
    which are signals by another name, and everything about companies. */
 const ALLOWED_TOOLS = [
   "mcp-tv-get-economic-calendar", "mcp-tv-get-economic-symbols", "mcp-tv-get-economic-data",
-  "mcp-tv-get-symbol-data-batch", "mcp-tv-get-screener-columns",
+  "mcp-tv-get-symbol-data-batch",
   "mcp-tv-get-ohlcv", "mcp-tv-get-news", "mcp-tv-search-symbols",
 ] as const;
 type AllowedTool = typeof ALLOWED_TOOLS[number];
@@ -739,6 +739,61 @@ export async function readRates() {
            missing: missing.filter(Boolean), calendar };
 }
 
+/* ─── What central banks and the gold funds hold ───────────────────────────
+   The two flows strategy §2 names, as TradingView serves them, found by
+   ?probe=flows on 15 October. The gold reserves of the central banks that buy
+   most and the one that has been selling, in tonnes: a series that lags the
+   official release, so each point carries its date. And the two largest US gold
+   funds' assets and money in or out, off the screener in dollars. Each
+   economy and the batch is its own call and its own failure, named in
+   `missing`. */
+export const RESERVES = [
+  { country: "CN", name: "China" }, { country: "PL", name: "Poland" },
+  { country: "IN", name: "India" }, { country: "TR", name: "Turkey" },
+  { country: "CZ", name: "Czech Republic" },
+];
+export const FUNDS = ["AMEX:GLD", "AMEX:IAU"];
+export const FUND_COLUMNS = ["description", "aum", "fund_flows.1M", "fund_flows.3M", "fund_flows.YTD"];
+
+// The newest five points, about a year of quarters, as levels on their dates.
+export function foldReserves(answer: any) {
+  const series = answer.series;
+  if (!Array.isArray(series) || !series.length) throw new Error("no series");
+  return { unit: answer.unit, points: series.slice(-5).map((p: any) => ({ date: p.date, tonnes: p.value })) };
+}
+
+// A fund the screener does not hold comes back in `missing`, never as zeros.
+export function foldFunds(answer: any) {
+  return FUNDS.filter(s => answer.data?.[s]).map(s => {
+    const d = answer.data[s];
+    return { symbol: s, name: d.description ?? s, aum: d.aum ?? null, flow_1m: d["fund_flows.1M"] ?? null,
+             flow_3m: d["fund_flows.3M"] ?? null, flow_ytd: d["fund_flows.YTD"] ?? null };
+  });
+}
+
+export async function readFlows() {
+  const signal = AbortSignal.timeout(DOOR_MS);
+  const session = await tvSession();
+  const from = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
+  const reserves: Record<string, unknown>[] = [], missing: Record<string, string>[] = [];
+  for (const r of RESERVES) {
+    try {
+      reserves.push({ ...r, ...foldReserves(await tvCall(session, "mcp-tv-get-economic-data",
+        { symbol: `ECONOMICS:${r.country}GRES`, date_from: from }, signal)) });
+    } catch (err) {
+      missing.push({ symbol: `ECONOMICS:${r.country}GRES`, name: r.name, error: unreached(signal, err) });
+    }
+  }
+  let funds: Record<string, unknown>[] = [];
+  try {
+    funds = foldFunds(await tvCall(session, "mcp-tv-get-symbol-data-batch",
+      { symbols: FUNDS, columns: FUND_COLUMNS }, signal));
+  } catch (err) {
+    missing.push({ symbol: FUNDS.join(", "), name: "the gold funds", error: unreached(signal, err) });
+  }
+  return { ok: true, reserves, funds, missing };
+}
+
 /* ─── What COMEX gold futures traded ───────────────────────────────────────
    The exchange's own volume, which the broker's feed cannot give: its volume
    is the broker's own clients. The front month's daily bars, each session's
@@ -776,11 +831,8 @@ async function readVolume() {
      fedfunds   fed funds futures under continuous and named months, and what
                 a bar carries
      futures    what a daily bar of gold's front month carries
-     flows      the two flows §2 names and no reader yet serves: two years
-                of the gold reserves of the central banks that buy most, as
-                TradingView's economic series (China's resolved, GRES, on
-                15 October), and which screener columns an ETF carries for its
-                assets and its flows, read for GLD and IAU
+     flows      what ?flows=1 folds, raw: one economy's gold reserves and
+                the funds' screener columns, so the units can be read
 
    Every argument is written here; none is read from the request. */
 const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
@@ -825,11 +877,8 @@ const PROBES: Record<string, () => Call[]> = {
     ["mcp-tv-get-ohlcv", { symbol: "COMEX:GC1!", interval: "1D", count: 3 }],
   ],
   flows: () => [
-    ...["CN", "PL", "IN", "TR", "CZ", "US"].map((c): Call =>
-      ["mcp-tv-get-economic-data", { symbol: `ECONOMICS:${c}GRES`, date_from: day(-730), date_to: day(0) }]),
-    ["mcp-tv-get-screener-columns", { market: "etf", search: "flow" }],
-    ["mcp-tv-get-screener-columns", { market: "etf", search: "asset" }],
-    ["mcp-tv-get-screener-columns", { market: "etf", search: "shares" }],
+    ["mcp-tv-get-economic-data", { symbol: "ECONOMICS:CNGRES", date_from: day(-400) }],
+    ["mcp-tv-get-symbol-data-batch", { symbols: FUNDS, columns: FUND_COLUMNS }],
   ],
 };
 
@@ -899,12 +948,13 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return json({ ok: true, events: foldCalendar(answer) });
     }
 
-    // ?market=1, ?trend=1, ?news=1, ?rates=1 and ?volume=1 read only what is fixed above.
+    // ?market=1, ?trend=1, ?news=1, ?rates=1, ?volume=1 and ?flows=1 read only what is fixed above.
     if (url.searchParams.get("market") === "1") return json(await readMarket());
     if (url.searchParams.get("trend") === "1") return json(await readTrend());
     if (url.searchParams.get("news") === "1") return json(await readHeadlines());
     if (url.searchParams.get("rates") === "1") return json(await readRates());
     if (url.searchParams.get("volume") === "1") return json(await readVolume());
+    if (url.searchParams.get("flows") === "1") return json(await readFlows());
 
     const asked = url.searchParams.get("probe");
     if (asked) {
@@ -914,7 +964,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return plain(await probe(asked));
     }
 
-    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1, ?trend=1, ?news=1, ?rates=1, ?volume=1 or ?probe=" }, 400);
+    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1, ?trend=1, ?news=1, ?rates=1, ?volume=1, ?flows=1 or ?probe=" }, 400);
   } catch (err) {
     console.error("doji-tradingview:", why(err));
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);

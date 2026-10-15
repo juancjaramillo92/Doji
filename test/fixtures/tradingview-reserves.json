@@ -1,0 +1,81 @@
+{
+ "_read": "?probe=flows, 2026-10-15T20:08:34Z: mcp-tv-get-economic-data structuredContent, unchanged",
+ "CN": {
+  "count": 7,
+  "description": "China Gold Reserves",
+  "notice": "Economic data notice: the latest point lags the official release; recent values are subject to revision by the source. For scheduled releases with forecast and just-published actual figures use get_economic_calendar; to find alternative indicators or other countries' series use get_economic_symbols.",
+  "scale": 100,
+  "series": [
+   {
+    "date": "2024-12-01",
+    "value": 2279.56
+   },
+   {
+    "date": "2025-03-01",
+    "value": 2292.31
+   },
+   {
+    "date": "2025-06-01",
+    "value": 2298.53
+   },
+   {
+    "date": "2025-09-01",
+    "value": 2303.5
+   },
+   {
+    "date": "2025-12-01",
+    "value": 2306.3
+   },
+   {
+    "date": "2026-03-01",
+    "value": 2313.46
+   },
+   {
+    "date": "2026-06-01",
+    "value": 2346.43
+   }
+  ],
+  "success": true,
+  "symbol": "ECONOMICS:CNGRES",
+  "unit": "TNE"
+ },
+ "TR": {
+  "count": 7,
+  "description": "Turkey Gold Reserves",
+  "notice": "Economic data notice: the latest point lags the official release; recent values are subject to revision by the source. For scheduled releases with forecast and just-published actual figures use get_economic_calendar; to find alternative indicators or other countries' series use get_economic_symbols.",
+  "scale": 100,
+  "series": [
+   {
+    "date": "2024-12-01",
+    "value": 614.97
+   },
+   {
+    "date": "2025-03-01",
+    "value": 623.92
+   },
+   {
+    "date": "2025-06-01",
+    "value": 634.76
+   },
+   {
+    "date": "2025-09-01",
+    "value": 641.28
+   },
+   {
+    "date": "2025-12-01",
+    "value": 613.7
+   },
+   {
+    "date": "2026-03-01",
+    "value": 534.85
+   },
+   {
+    "date": "2026-06-01",
+    "value": 530.62
+   }
+  ],
+  "success": true,
+  "symbol": "ECONOMICS:TRGRES",
+  "unit": "TNE"
+ }
+}

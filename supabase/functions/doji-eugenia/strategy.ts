@@ -19,7 +19,7 @@
    interpolates it — the copy here was the unreachable one. */
 import { PITCH } from "./prompt.ts";
 
-export const VERSION = "v1.26";
+export const VERSION = "v1.27";
 
 /* The whole strategy said once, interpolated into ALWAYS and §0. */
 const SUMMARY = `XAUUSD only, intraday to multi-session, positions held for the move they were
@@ -110,7 +110,7 @@ export const SECTIONS: Record<string, string> = {
 
   "0": `## 0 · Header
 
-**Version** ${VERSION} · **Supersedes** v1.25
+**Version** ${VERSION} · **Supersedes** v1.26
 
 ### Summary
 
@@ -400,6 +400,14 @@ exactly when it becomes the explanation for a move nothing else accounts for.
 Late in 2025 gold passed US Treasuries to become the largest reserve asset by
 value, which is the scale of the shift in one number.
 
+**Where to read it.** On Sunday and in a conversation she is handed the gold
+reserves of China, Poland, India, Turkey and the Czech Republic, in tonnes, as
+TradingView's economic series: a level on each date, months behind the official
+release. Through the year to June 2026 Poland went from 515t to 632t, the Czech
+Republic from 62t to 82t, China from 2,299t to 2,346t, India held near 880t, and
+Turkey sold from 635t to 531t. A month newer than the last point is read off the
+central bank's or the World Gold Council's page, with its date.
+
 ---
 
 ### What investors are buying
@@ -426,11 +434,12 @@ turned back to buying in 2024 and bought heavily in 2025 as the rally ran (as of
 two legs under it; when they pull apart, the central banks have usually been the
 floor and investors the swing.
 
-**Where to read it.** The CFTC's weekly count of where the futures funds stand
-is handed to her on Sunday and in a conversation. The gold funds' holdings are
-not handed to her: the World Gold Council publishes the flows monthly, and SPDR
-GLD's tonnes daily. A figure from either is read off the page it is on, quoted
-with its date and its source, never from somebody's summary of it.
+**Where to read it.** On Sunday and in a conversation she is handed the CFTC's
+weekly count of where the futures funds stand, and the two largest US gold
+funds, GLD and IAU: their assets and the money in or out over a month, three
+months and the year, from TradingView's screener. The World Gold Council's
+monthly flows, for funds everywhere, are read off its page, quoted with their
+date and source, never from somebody's summary.
 
 ---
 
@@ -2171,6 +2180,7 @@ it stays as written, because correcting the record would falsify it.
 
 | Version | Change | From lesson |
 |---|---|---|
+| v1.27 | **The two flows are handed to her.** The central banks' gold reserves — China, Poland, India, Turkey, the Czech Republic — in tonnes, and GLD's and IAU's assets and money in or out, read from TradingView and handed to the Sunday briefing and a conversation. Each channel's *Where to read it* says so, and the central banks' gives the year to June 2026 as it read on 15 October. Reference material only; no rule changed. | A probe of what TradingView serves |
 | v1.26 | **A sixth channel: what investors are buying.** Gold funds and futures funds — the flow that turns fastest, where haven buying arrives, and where the rates channel actually lands, on the investors who care what a bond pays. Their holdings fell through 2022 and 2023 while central banks held the price up, and turned back to buying as the rally ran. The CFTC's weekly count is handed to her; the funds' holdings are read off the World Gold Council's and SPDR's pages, dated and sourced. A new rung on her map, starting \`unseen\`. Reference material only; no rule changed. | The 2022–2025 market, which five channels could not tell |
 | v1.25 | **§2 says the real-yield link broke in 2022.** The first channel was called dominant on a −0.82 correlation measured before 2022; since then real yields rose to fifteen-year highs and gold rose to records, carried by central-bank buying the yield does not price. The channel now says so, with the figures dated, and that the referee test — gold moving with real yields or against them — decides which channel is in control on the day. §3's part 7 says the comparison is the mechanism and not the whole price. Reference material only; no rule changed. | Reading her framework against the market since 2022 |
 | v1.24 | **A sweep re-entry follows only a stop tighter than $20.** A full stop is $20 on a linear ladder, so it is the day's 4% at every rung, and R-11 had already ended the day R-03's one exception was meant to continue — a re-entry after a full stop could only ever breach R-11. R-03 now allows no entry after a full stop, and §5's claim that a full stop at a small rung spends well under the limit is corrected. **Coming down a rung is his judgment**: "the implied account has halved" could not be measured, since \`size_oz × 500\` moves only with the size, so the rule names no number and she does not raise it. The summary says the stop is never widened and tightened only under R-19, where it said never tightened. §2's figures are marked as dated. R-19 stays narrow, by his decision. **R-17's bad stretch is crazy trading, not losing with proper entries.** **What he says of himself, brought up to date**: about four trades a week where it was two or three; no preference between long and short; his current focus is finding his rhythm. The changelog's *Effective from* column goes — never filled, it was twenty-five \`[decide]\` markers for something nothing reads. | A point-by-point review with him |

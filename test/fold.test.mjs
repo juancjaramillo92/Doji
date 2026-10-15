@@ -28,7 +28,7 @@ import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } fr
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, unwrap, foldCalendar,
   calendarWindow, foldBars, foldHeadlines, FOMC, contractMonths, foldRates, oddsOf, unlisted, zq, foldSessions,
-  readMarket, readRates, foldTrend, BACK,
+  readMarket, readRates, foldTrend, BACK, foldReserves, foldFunds, FUNDS,
 } from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
@@ -49,6 +49,7 @@ import {
   releaseName, printsQuery, printsList, RELEASE_PRINTS,
   sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
   volumeList, volumeBlock, keptMarket, storeMarket, storeRates, storeTrend, trendList, trendBlock,
+  flowsList, flowsBlock,
   structureList, structureBlock, storeStructure,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
@@ -1188,6 +1189,48 @@ test('the weeks behind the market are levels on stated days, and no change is co
   assert.match(out, /· Ten-year breakeven inflation 2\.41% on 7 Oct/);
   assert.match(out, /Not read: Gold volatility index \(GVZ\)\./);
   assert.doesNotMatch(out, /\b(up|down|rose|fell|higher|lower)\b/);
+});
+
+/* ─── What central banks and the gold funds hold ─────────────────────────────
+   The reserves are the ?probe=flows capture of 15 October, unchanged. The
+   funds' answer is shaped as the quote batch answers, since the batch with
+   these columns had not been captured: GLD served, IAU missing. */
+const RESERVES_READ = JSON.parse(readFileSync(new URL('./fixtures/tradingview-reserves.json', import.meta.url), 'utf8'));
+
+test('a central bank\'s reserves fold to its newest five points, each a level on its date', () => {
+  const cn = foldReserves(RESERVES_READ.CN);
+  assert.equal(cn.unit, 'TNE');
+  assert.deepEqual(cn.points.map(p => p.date), ['2025-06-01', '2025-09-01', '2025-12-01', '2026-03-01', '2026-06-01']);
+  assert.equal(cn.points.at(-1).tonnes, 2346.43);
+  assert.throws(() => foldReserves({ series: [] }), /no series/);
+});
+
+test('a fund the screener does not hold is left out, and a column it does not serve is null, never zero', () => {
+  const funds = foldFunds({ data: { 'AMEX:GLD': { description: 'SPDR Gold Shares', aum: 132.4e9,
+    'fund_flows.1M': 2.1e9, 'fund_flows.3M': -0.6e9 } }, missing: [{ symbol: 'AMEX:IAU' }] });
+  assert.deepEqual(FUNDS, ['AMEX:GLD', 'AMEX:IAU']);
+  assert.deepEqual(funds, [{ symbol: 'AMEX:GLD', name: 'SPDR Gold Shares', aum: 132.4e9,
+    flow_1m: 2.1e9, flow_3m: -0.6e9, flow_ytd: null }]);
+});
+
+test('the flows are levels on their dates, newest first, in tonnes and dollars, and a gap is said', async () => {
+  const reserve = (name, read) => ({ country: 'XX', name, ...foldReserves(read) });
+  const out = flowsList({
+    reserves: [reserve('China', RESERVES_READ.CN), reserve('Turkey', RESERVES_READ.TR)],
+    funds: [{ symbol: 'AMEX:GLD', name: 'SPDR Gold Shares', aum: 132.4e9, flow_1m: 2.1e9, flow_3m: -0.6e9, flow_ytd: null }],
+    missing: [{ name: 'Poland' }],
+  });
+  assert.match(out, /· China: 2346 t in Jun 2026, 2313 t in Mar 2026, 2306 t in Dec 2025, 2304 t in Sept? 2025, 2299 t in Jun 2025/);
+  assert.match(out, /· Turkey: 531 t in Jun 2026, 535 t in Mar 2026/);
+  assert.match(out, /· SPDR Gold Shares \(GLD\): \$132\.4B under management; money in or out \+\$2\.1B over a month, −\$0\.6B over three, not served this year/);
+  assert.match(out, /Not read just now: Poland\./);
+  assert.match(out, /running months behind the official release/);
+  // No direction word: the levels are dated, and the reading is hers.
+  assert.doesNotMatch(out, /\b(up|down|rose|fell|bought|sold)\b/);
+  await stubbed(async () => {
+    globalThis.fetch = async () => new Response('{}', { status: 502 });
+    assert.match(await flowsBlock(), /could not be read just now; do not quote it from a search/);
+  });
 });
 
 /* ONCE A NEW YORK DAY. A daily close moves once a day, and sixteen charts a
