@@ -534,6 +534,17 @@ turns and twenty notes, her memory is her own tables, and the nightly pass is a
 tool loop that a single batch request cannot run.
 **Revisit if:** a window is ever widened past what a request carries cheaply.
 
+
+### R-56 — interpolating the call rules into `SYSTEM`
+**Why refused:** `SYSTEM` tells her the rules her calls are held to in words —
+*twenty dollars*, *twenty-five to thirty*, *one and a half times* — and
+`make_call`'s description interpolates the same constants. Interpolating
+`SYSTEM` too would single-source the numbers, but it changes the prompt she
+reads, which is a behaviour change to be run through `scripts/eval.mjs`, for a
+fact that has not moved. The words stay, and `agree.test.mjs` holds them to
+`callProblem`'s constants.
+**Revisit if:** one of the call rules changes, when the edit is a prompt change
+anyway.
 ---
 
 ## 3 · THE NEXT STEP — DECIDED
