@@ -242,14 +242,16 @@ function r01(rows: TradeRow[]): RuleResult {
    cap only. Whether the stop was respected needs planned_sl, which almost no
    row carries yet, so §7 keeps it out.
    ───────────────────────────────────────────────────────────────────────── */
+export const FULL_STOP = 20;
+
 function r02(rows: TradeRow[]): RuleResult {
   const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
   for (const t of rows) {
     if (!isBroker(t) || !closed(t) || (t.pnl as number) >= 0) continue;
     if (!priced(t)) { unknown.push(t.id); continue; }
-    if (gap(t) > 20 + CENT) fail.push(t.id); else pass.push(t.id);
+    if (gap(t) > FULL_STOP + CENT) fail.push(t.id); else pass.push(t.id);
   }
-  return result('R-02', 'losses further than $20 from entry — the cap only, never whether it was respected',
+  return result('R-02', `losses further than $${FULL_STOP} from entry — the cap only, never whether it was respected`,
                 pass, fail, unknown);
 }
 
@@ -264,8 +266,6 @@ function r02(rows: TradeRow[]): RuleResult {
    than three entries cannot breach whatever they are. A known breach stands
    regardless.
    ───────────────────────────────────────────────────────────────────────── */
-export const FULL_STOP = 20;
-
 function r03(rows: TradeRow[]): RuleResult {
   const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
 
