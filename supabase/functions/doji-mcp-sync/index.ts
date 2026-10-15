@@ -522,6 +522,56 @@ export function foldCandles(bars: Bar[]): Candle[] | null {
   }));
 }
 
+/* His charts up to `to`, at CHARTS' windows. One chart at a time, each failure
+   its own, for ?bars=raw's reason; a chart that will not read is named rather
+   than served short, and the rest are still worth having. */
+async function readCharts(session: Record<string, string>, to: number, charts: readonly typeof CHARTS[number][] = CHARTS) {
+  const out: Record<string, Candle[]> = {};
+  const missing: { period: string; error: string }[] = [];
+  for (const c of charts) {
+    try {
+      const got = await mcpCall(session, "get_trendbars", {
+        symbolId: SYMBOL_IDS[0], period: c.period,
+        fromTimestamp: String(to - c.hours * 3600_000), toTimestamp: String(to),
+      });
+      const candles = foldCandles(got.trendbars ?? []);
+      if (!candles) throw new Error("a bar that will not read");
+      if (!candles.length) throw new Error("no bars");
+      out[c.period] = candles;
+    } catch (err) {
+      missing.push({ period: c.period, error: why(err) });
+    }
+  }
+  return { charts: out, missing };
+}
+
+/* ─── His charts at his own entries ────────────────────────────────────────
+   For scripts/calibrate.mjs, which folds her map at the minute of each of his
+   newest entries and asks whether it had the level he traded. The trades come
+   from the table, never the request, so the door still puts nothing a caller
+   sends into a broker call. The two level charts only, and only bars closed by
+   the minute he clicked: one that closed after it holds prices he could not
+   have seen, and a map drawn from it would find his level by looking ahead. */
+const ENTRIES = 20;
+const LEVEL_CHARTS = CHARTS.filter(c => c.period === "H_1" || c.period === "M_30");
+
+async function readEntries(session: Record<string, string>) {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/trades?select=id,direction,entry_time,entry_price` +
+    `&entry_time=not.is.null&entry_price=not.is.null&deleted=is.false&id=like.PID*` +
+    `&order=entry_time.desc&limit=${ENTRIES}`,
+    { headers: sbHeaders() });
+  if (!res.ok) throw new Error(`Entry read failed (HTTP ${res.status}): ${await res.text()}`);
+  const out = [];
+  for (const t of await res.json() as { id: string; direction: string; entry_time: string; entry_price: number }[]) {
+    const at = Math.floor(Date.parse(t.entry_time) / MINUTE) * MINUTE;
+    const { charts, missing } = await readCharts(session, at, LEVEL_CHARTS);
+    for (const c of LEVEL_CHARTS) charts[c.period] = charts[c.period]?.filter(b => b.t + c.ms <= at);
+    out.push({ ...t, at, charts, missing });
+  }
+  return out;
+}
+
 /* The newest closed trades still missing a figure, a few a poll — one path for
    a fresh close and for the year behind it, newest first so a new close never
    queues behind the backlog. Too short to measure is skipped at no broker
@@ -583,9 +633,10 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     const bars      = url.searchParams.get("bars") === "raw";
     const day       = url.searchParams.get("bars") === "1";
     const structure = url.searchParams.get("structure") === "1";
+    const entries   = url.searchParams.get("entries") === "1";
     // The read-only probes answer over the weekend, when rows get looked at.
     if (!force && !raw && !tools && !posns && !market && !marketRaw && !bars && !day && !structure &&
-        !marketOpen()) {
+        !entries && !marketOpen()) {
       // A skip is a completed run: unmarked, the heartbeat freezes over the
       // weekend close and reads as a dead sync every Sunday evening.
       await heartbeat("poller");
@@ -657,28 +708,15 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return json({ ok: true, symbol: SYMBOL_IDS[0], from, bars: candles });
     }
 
-    /* ?structure=1 — his six charts, folded, for Eugenia's map. One chart at
-       a time, each failure its own, for ?bars=raw's reason below; a chart
-       that will not read is named rather than served short, and the rest are
-       still worth having. */
+    /* ?structure=1 — his six charts, folded, for Eugenia's map. */
     if (structure) {
-      const charts: Record<string, Candle[]> = {};
-      const missing: { period: string; error: string }[] = [];
-      for (const c of CHARTS) {
-        try {
-          const got = await mcpCall(session, "get_trendbars", {
-            symbolId: SYMBOL_IDS[0], period: c.period,
-            fromTimestamp: String(to - c.hours * 3600_000), toTimestamp: String(to),
-          });
-          const candles = foldCandles(got.trendbars ?? []);
-          if (!candles) throw new Error("a bar that will not read");
-          if (!candles.length) throw new Error("no bars");
-          charts[c.period] = candles;
-        } catch (err) {
-          missing.push({ period: c.period, error: why(err) });
-        }
-      }
-      return json({ ok: true, symbol: SYMBOL_IDS[0], at: to, charts, missing });
+      return json({ ok: true, symbol: SYMBOL_IDS[0], at: to, ...await readCharts(session, to) });
+    }
+
+    /* ?entries=1 — his level charts at each of his newest entries, for
+       scripts/calibrate.mjs. */
+    if (entries) {
+      return json({ ok: true, symbol: SYMBOL_IDS[0], entries: await readEntries(session) });
     }
 
     /* ?bars=raw — minute bars at six ages, raw: their shape, their scale, and

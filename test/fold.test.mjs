@@ -58,12 +58,13 @@ import {
   SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, HIGH, HOME, weekOf, STOP_GRACE_MIN,
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import {
-  turns, biasOf, sweepsOf, foldStructure, TURN, ON_GRID, EDGE, REACH, GRID,
+  turns, biasOf, sweepsOf, poolsOf, foldStructure, READINGS, GRID, CANDLES,
 } from '../supabase/functions/doji-eugenia/structure.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { backup, readAll, TABLES } from '../scripts/backup.mjs';
 import { lastRun, stale } from '../scripts/health.mjs';
+import { score, table, readingsGrid, NEAR } from '../scripts/calibrate.mjs';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -858,7 +859,7 @@ const candle = (t, high, low, close = (high + low) / 2) => ({ t, open: close, hi
 const series = (start, ms, highs, lows) => highs.map((h, i) => candle(start + i * ms, h, lows[i]));
 
 test('a turn clears TURN bars before it and is not beaten after, and the newest bars are never one', () => {
-  assert.equal(TURN, 3, 'the fixtures below are drawn for three bars a side');
+  assert.equal(READINGS.TURN, 3, 'the fixtures below are drawn for three bars a side');
   const highs = [10, 11, 12, 20, 12, 11, 20, 9, 8, 7, 30, 29, 28];
   const lows  = highs.map(h => h - 2);
   lows[7] = 1;
@@ -909,6 +910,44 @@ test('a sweep is a wick through a standing turn that closed back', () => {
     [{ period: 'M_15', at: 7 * HOUR, level: 1, kind: 'low', wick: 0.5, close: 6 }]);
 });
 
+/* His step 2's liquidity pool: two highs that printed level, apart, with price
+   gone away between them and nothing trading through since. The second of the
+   two is never a turn, so the pool is read off the bars. */
+test('a pool is two equal highs, apart, that price left and has not taken since', () => {
+  assert.deepEqual([READINGS.EQUAL, READINGS.TURN, READINGS.ON_GRID], [1.5, 3, 3], 'the fixtures are drawn for these');
+  const flat = 4000;
+  const bars = (highs, lows) => series(0, HOUR, highs, lows ?? highs.map(h => h - 1));
+  // 4010 then 4009, five bars apart, with lows of 4000 between: one pool at 4010.
+  const top = [4010, 4005, 4004, 4003, 4004, 4009, 4006];
+  const lows = [4008, flat, flat, flat, flat, 4007, 4005];
+  assert.deepEqual(poolsOf('H_1', bars(top, lows)).filter(p => p.kind === 'high'),
+    [{ price: 4010, kind: 'high', periods: ['H_1'], touches: [0, 5 * HOUR] }]);
+  // Taken: a bar since has traded above it by more than EQUAL. One within EQUAL
+  // of the ceiling is another touch of it, and lifts the pool to its high.
+  assert.deepEqual(poolsOf('H_1', bars([...top, 4012], [...lows, 4005])).filter(p => p.kind === 'high'), []);
+  assert.deepEqual(poolsOf('H_1', bars([...top, 4011], [...lows, 4005])).filter(p => p.kind === 'high')
+    .map(p => [p.price, p.touches.length]), [[4011, 2]]);
+  // Too close together: three bars apart is one move, not two failures.
+  assert.deepEqual(poolsOf('H_1', bars([4010, 4005, 4004, 4009.5, 4006], [4008, flat, flat, 4007, 4005]))
+    .filter(p => p.kind === 'high'), []);
+  // Price never left: lows of 4008 are not $3 from a 4010 ceiling.
+  assert.deepEqual(poolsOf('H_1', bars(top, lows.map(l => Math.max(l, 4008)))).filter(p => p.kind === 'high'), []);
+  // A third touch joins the pool rather than making a second.
+  const triple = poolsOf('H_1', bars([...top, 4003, 4002, 4003, 4002, 4009.8], [...lows, flat, flat, flat, flat, 4007]))
+    .filter(p => p.kind === 'high');
+  assert.deepEqual(triple.map(p => [p.price, p.touches.length]), [[4010, 3]]);
+  // Through the whole fold, a pool is drawn only within REACH of price.
+  const at = { M_5: [candle(10 * HOUR, 4001, 3999, 4000)] };
+  const highs = (charts) => foldStructure({ ...charts, ...at }, 11 * HOUR).pools.filter(p => p.kind === 'high');
+  assert.deepEqual(highs({ H_1: bars(top, lows) }).map(p => p.price), [4010]);
+  assert.deepEqual(highs({ H_1: bars(top.map(h => h + 100), lows.map(l => l + 100)) }), [],
+    `a pool more than $${READINGS.REACH} from price is on the map`);
+  // Mirrored: equal lows with price gone above between them.
+  const floor = poolsOf('M_30', bars([4002, 4010, 4010, 4010, 4010, 4002, 4003], [3990, 4004, 4005, 4004, 4005, 3990.5, 3995]))
+    .filter(p => p.kind === 'low');
+  assert.deepEqual(floor.map(p => [p.price, p.kind]), [[3990, 'low']]);
+});
+
 /* The map's fixture, at 10:07 New York on Thursday 15 October 2026. The 1H
    holds a high turn at 4049 (the week's top), a low at 3980 (its bottom) and a
    high at 4024.5; the 30m a low at 4023 that is newer and the same level, and
@@ -944,7 +983,7 @@ test('the map reads his level charts in his words, off printed bars only', () =>
     [4023, 'both', ['H_1', 'M_30'], 4025, null],
     [3980, 'low', ['H_1'], null, 'bottom'],
   ]);
-  assert.ok(!map.levels.some(l => l.price === 4100), `a turn more than $${REACH} away is on the map`);
+  assert.ok(!map.levels.some(l => l.price === 4100), `a turn more than $${READINGS.REACH} away is on the map`);
   assert.deepEqual(map.grid, [
     { price: 3975, round: false, turned: false }, { price: 4000, round: true, turned: false },
     { price: 4025, round: false, turned: true }, { price: 4050, round: true, turned: true },
@@ -957,15 +996,22 @@ test('the map reads his level charts in his words, off printed bars only', () =>
   // Over the weekend the newest daily bar has closed, and there is no today.
   const weekend = foldStructure({ D_1: MAP_CHARTS.D_1 }, Date.UTC(2026, 9, 17, 12));
   assert.deepEqual([weekend.adr, weekend.today], [45, null]);
-  // The last CLOSED candle of each entry chart, never the one forming.
-  assert.deepEqual(map.candles.map(c => [c.period, c.bar.t]),
-    [['M_15', MAP_HOUR - HOUR / 4], ['M_5', MAP_HOUR]]);
+  // The last CLOSED candles of each entry chart, oldest first, never the one
+  // forming: four 15m, and the two 5m the fixture has closed.
+  assert.equal(CANDLES, 4);
+  assert.deepEqual(map.candles.map(c => [c.period, c.bars.map(b => b.t)]), [
+    ['M_15', [0, 1, 2, 3].map(i => MAP_HOUR - HOUR + i * HOUR / 4)],
+    ['M_5', [MAP_HOUR - 5 * 60_000, MAP_HOUR]],
+  ]);
+  // The 30m lows at 4024 and 4023, five bars apart with price gone $3 above
+  // between them and nothing under since, are one pool at the lower.
+  assert.deepEqual(map.pools.map(p => [p.price, p.kind, p.periods, p.touches.length]), [[4023, 'low', ['M_30'], 2]]);
   // A session's range so far includes the bar still forming.
   assert.equal(map.sessions.at(-1).to, MAP_HOUR + HOUR / 4);
   assert.equal(map.sessions.at(-1).low, 4020);
   assert.deepEqual(map.bias.map(b => [b.period, b.trend]), [['D_1', null], ['H_1', null]]);
   assert.deepEqual(map.sweeps, []);
-  assert.ok(ON_GRID >= 2 && EDGE >= 1, 'the fixture is drawn for a level two dollars off its quarter');
+  assert.ok(READINGS.ON_GRID >= 2 && READINGS.EDGE >= 1, 'the fixture is drawn for a level two dollars off its quarter');
 });
 
 test('the map is said as hers, with every price timed and nothing about what comes next', () => {
@@ -980,11 +1026,45 @@ test('the map is said as hers, with every price timed and nothing about what com
   assert.match(out, /No wick through a turn closed back in the last day\./);
   assert.match(out, /09:00 ET to 10:15 so far, 4020 to 4031/);
   assert.match(out, /averaged \$50 over the last 14 sessions; this session has covered \$30 so far\./);
-  assert.match(out, /The last closed 5m candle opened at 10:00 ET: open 4026, high 4028, low 4024, close 4026\./);
+  assert.match(out, /The last closed 5m candles, oldest first: 09:55 ET open 4025, high 4027, low 4023, close 4025; 10:00 ET open 4026, high 4028, low 4024, close 4026\./);
+  assert.match(out, /The last closed 15m candles, oldest first: 09:00 ET open 4026/);
+  assert.match(out, /· 4023 — equal lows, on the 30m, touched 05:00 ET, 07:30 ET/);
+  assert.match(structureList({ ...foldStructure(MAP_CHARTS, MAP_NOW), pools: [] }, MAP_NOW),
+    /No equal highs or lows still rest within \$60\./);
   assert.match(out, /Not read just now: the 4H\. Say so rather than judging a step off a chart you do not have\./);
   assert.doesNotMatch(out, /\b(will|next|likely|expect|should)\b/i);
   // A map with no bar at all is said as no map.
   assert.match(structureList(foldStructure({}, MAP_NOW), MAP_NOW), /could not be read just now, so you have no map/);
+});
+
+/* THE CALIBRATION SCORES A READING BY WHAT IT FOUND OF HIS, NOT BY HOW MUCH IT
+   DREW. On the map's fixture the level charts draw 4049 (the week's top),
+   4023 (inside) and 3980 (the bottom); three entries are scored against them. */
+test('the calibration scores her map by the levels he traded, against chance', () => {
+  const charts = { H_1: MAP_CHARTS.H_1, M_30: MAP_CHARTS.M_30 };
+  const entry = (id, price) => ({ id, entry_price: price, at: MAP_NOW, charts, missing: [] });
+  const entries = [entry('PID1', 4024), entry('PID2', 4047), entry('PID3', 4000)];
+  const setups = { PID1: 'Break & Retest', PID2: 'Break & Retest' };
+  const today = readingsGrid().find(r => r.TURN === READINGS.TURN && r.ON_GRID === READINGS.ON_GRID &&
+                                         r.EDGE === READINGS.EDGE);
+  assert.ok(today, "today's readings are not in the grid, so the run cannot say whether they are beaten");
+  assert.equal(readingsGrid().length, 36);
+  assert.equal(NEAR, 3);
+  const got = score(entries, setups, today);
+  // 4024 is $1 from 4023 and 4047 $2 from 4049; 4000 is $20 from 3980.
+  assert.deepEqual([got.hits, got.median], [2, 2]);
+  // Three levels within $60 cover three $6 windows of $120: 15% by chance.
+  assert.equal(got.chance, 0.15);
+  assert.equal(Math.round(got.lift * 100) / 100, 4.44);
+  // A Break & Retest belongs inside the range: 4023 agrees, 4049 at its top does not.
+  assert.deepEqual([got.agreed, got.judged], [1, 2]);
+  assert.equal(score(entries, { PID2: 'Support & Resistance' }, today).agreed, 1);
+  // An entry the map draws nothing for is a miss, and chance is not paid for it.
+  const blind = score([{ ...entry('PID4', 4024), charts: {} }], {}, today);
+  assert.deepEqual([blind.hits, blind.chance, blind.lift, blind.median], [0, 0, 0, null]);
+  const out = table([got]);
+  assert.match(out, /^3 entries, within \$3 of a level/);
+  assert.match(out, /\* TURN 3  ON_GRID 3  EDGE 5  at a level 67% \(chance 15%, lift 4\.44\)  median \$2  setup agrees 1\/2/);
 });
 
 /* THE WINDOWS STAY INSIDE WHAT ONE ANSWER HAS BEEN SEEN TO CARRY: a four-hour

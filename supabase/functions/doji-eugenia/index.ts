@@ -37,7 +37,7 @@ import {
   type TradeRow, type Standing, type Stop, type RuleResult,
 } from "./adherence.ts";
 import { journalStats, statsList } from "./journal.ts";
-import { foldStructure, EDGE, REACH, GRID, ADR_SESSIONS, type Structure, type Turn } from "./structure.ts";
+import { foldStructure, READINGS, GRID, ADR_SESSIONS, type Structure, type Turn } from "./structure.ts";
 import {
   env, secretMatches, json, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY, why, marketOpen, CHARTS,
   type Candle, type Period,
@@ -1041,8 +1041,9 @@ const STRUCTURE_TOOL = {
     "His six charts, read off his own broker's bars every quarter hour: the turns on the daily, " +
     "4H and 1H and the sequence they make; where price has turned on the 1H and 30m, with the $25 " +
     "grid beside them and where the two agree; which of those sit at the edge of the week's hourly " +
-    "range and which inside it; wicks through a turn that closed back; the sessions' ranges; the " +
-    "average daily range; and the last closed 15m and 5m candles. Use it before judging his bias or " +
+    "range and which inside it; equal highs and lows still resting, the liquidity pools of his " +
+    "step 2; wicks through a turn that closed back; the sessions' ranges; the average daily range; " +
+    "and the last four closed 15m and 5m candles. Use it before judging his bias or " +
     "his level when he has sent no chart, and before filing a call, whose levels come off it. It is " +
     "your map, computed the same way every time, and not his. Every figure in it has already " +
     "printed; like get_market, it says nothing about where price goes next.",
@@ -3002,15 +3003,20 @@ export function structureList(s: Structure, now = Date.now()): string {
   ];
   if (s.range) {
     lines.push(`The week of hourly bars runs from ${turn(s.range.low)} to ${turn(s.range.high)}. A level ` +
-      `within $${EDGE} of either end is at its edge; anything between is inside the range.`);
+      `within $${READINGS.EDGE} of either end is at its edge; anything between is inside the range.`);
   }
-  lines.push(`Where price has turned, on the 1H and 30m, within $${REACH} of ${s.last.close}:`,
+  lines.push(`Where price has turned, on the 1H and 30m, within $${READINGS.REACH} of ${s.last.close}:`,
     ...(s.levels.length ? s.levels.map(l => `· ${l.price} — ` +
       (l.sides === 'both' ? "turned both ways, a level that has flipped" : `a ${l.sides}`) +
       `, on the ${l.periods.map(name).join(" and ")}, newest ${when(l.at)}` +
       (l.quarter === null ? "" : `; on the ${l.quarter} ${l.quarter % (2 * GRID) === 0 ? "round number" : "quarter"}`) +
       (l.edge ? `; at the ${l.edge} of the week's range` : s.range ? "; inside the range" : "")) : ["· none"]),
-    `The grid within $${REACH}: ` + s.grid.map(q =>
+    ...(s.pools.length
+      ? ["Where highs or lows have printed level and still rest, the stops beyond them not yet taken:",
+         ...s.pools.map(p => `· ${p.price} — equal ${p.kind}s, on the ${p.periods.map(name).join(" and ")}, ` +
+           `touched ${p.touches.map(when).join(", ")}`)]
+      : [`No equal highs or lows still rest within $${READINGS.REACH}.`]),
+    `The grid within $${READINGS.REACH}: ` + s.grid.map(q =>
       `${q.price} (${q.round ? "round" : "quarter"}${q.turned ? ", a turn sits on it" : ""})`).join(", ") + ".");
   lines.push(...(s.sweeps.length
     ? ["Wicks through a turn that closed back, in the last day:",
@@ -3026,8 +3032,8 @@ export function structureList(s: Structure, now = Date.now()): string {
     lines.push(`The daily range has averaged $${s.adr} over the last ${ADR_SESSIONS} sessions` +
       (s.today === null ? "." : `; this session has covered $${s.today} so far.`));
   }
-  lines.push(...s.candles.map(c => `The last closed ${name(c.period)} candle opened at ${when(c.bar.t)}: ` +
-    `open ${c.bar.open}, high ${c.bar.high}, low ${c.bar.low}, close ${c.bar.close}.`));
+  lines.push(...s.candles.map(c => `The last closed ${name(c.period)} candles, oldest first: ` +
+    c.bars.map(b => `${when(b.t)} open ${b.open}, high ${b.high}, low ${b.low}, close ${b.close}`).join("; ") + "."));
   if (s.missing.length) {
     lines.push(`Not read just now: the ${s.missing.map(name).join(", ")}. Say so rather than judging a ` +
       `step off a chart you do not have.`);
