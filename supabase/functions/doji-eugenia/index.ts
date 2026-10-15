@@ -37,7 +37,7 @@ import {
   type TradeRow, type Standing, type Stop, type RuleResult,
 } from "./adherence.ts";
 import { journalStats, statsList } from "./journal.ts";
-import { foldStructure, EDGE, REACH, GRID, ADR_SESSIONS, type Structure, type Turn } from "./structure.ts";
+import { foldStructure, READINGS, GRID, ADR_SESSIONS, type Structure, type Turn } from "./structure.ts";
 import {
   env, secretMatches, json, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY, why, marketOpen, CHARTS,
   type Candle, type Period,
@@ -3002,15 +3002,15 @@ export function structureList(s: Structure, now = Date.now()): string {
   ];
   if (s.range) {
     lines.push(`The week of hourly bars runs from ${turn(s.range.low)} to ${turn(s.range.high)}. A level ` +
-      `within $${EDGE} of either end is at its edge; anything between is inside the range.`);
+      `within $${READINGS.EDGE} of either end is at its edge; anything between is inside the range.`);
   }
-  lines.push(`Where price has turned, on the 1H and 30m, within $${REACH} of ${s.last.close}:`,
+  lines.push(`Where price has turned, on the 1H and 30m, within $${READINGS.REACH} of ${s.last.close}:`,
     ...(s.levels.length ? s.levels.map(l => `· ${l.price} — ` +
       (l.sides === 'both' ? "turned both ways, a level that has flipped" : `a ${l.sides}`) +
       `, on the ${l.periods.map(name).join(" and ")}, newest ${when(l.at)}` +
       (l.quarter === null ? "" : `; on the ${l.quarter} ${l.quarter % (2 * GRID) === 0 ? "round number" : "quarter"}`) +
       (l.edge ? `; at the ${l.edge} of the week's range` : s.range ? "; inside the range" : "")) : ["· none"]),
-    `The grid within $${REACH}: ` + s.grid.map(q =>
+    `The grid within $${READINGS.REACH}: ` + s.grid.map(q =>
       `${q.price} (${q.round ? "round" : "quarter"}${q.turned ? ", a turn sits on it" : ""})`).join(", ") + ".");
   lines.push(...(s.sweeps.length
     ? ["Wicks through a turn that closed back, in the last day:",

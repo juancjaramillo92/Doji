@@ -1940,8 +1940,9 @@ broker token stays in the poller, as for `get_market` — and `foldStructure` in
   forming included; **the average daily range** over fourteen sessions and what
   this one has covered; **the last closed 15m and 5m candles**.
 
-`TURN`, `ON_GRID`, `EDGE` and `REACH` are readings rather than facts, named so
-each can be argued with. `structureList` says the map with every price timed,
+`TURN`, `ON_GRID`, `EDGE` and `REACH` are readings rather than facts, kept in
+one object, `READINGS`, so each can be argued with and the calibration can fold
+under others. `structureList` says the map with every price timed,
 and says it is **hers**: his structure is drawn in TradingView and deliberately
 kept nowhere here, so where he sends a chart his chart decides. A chart the
 door did not read is named, in the map and in a `market read` row.

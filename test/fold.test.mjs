@@ -58,7 +58,7 @@ import {
   SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, HIGH, HOME, weekOf, STOP_GRACE_MIN,
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import {
-  turns, biasOf, sweepsOf, foldStructure, TURN, ON_GRID, EDGE, REACH, GRID,
+  turns, biasOf, sweepsOf, foldStructure, READINGS, GRID,
 } from '../supabase/functions/doji-eugenia/structure.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts';
@@ -858,7 +858,7 @@ const candle = (t, high, low, close = (high + low) / 2) => ({ t, open: close, hi
 const series = (start, ms, highs, lows) => highs.map((h, i) => candle(start + i * ms, h, lows[i]));
 
 test('a turn clears TURN bars before it and is not beaten after, and the newest bars are never one', () => {
-  assert.equal(TURN, 3, 'the fixtures below are drawn for three bars a side');
+  assert.equal(READINGS.TURN, 3, 'the fixtures below are drawn for three bars a side');
   const highs = [10, 11, 12, 20, 12, 11, 20, 9, 8, 7, 30, 29, 28];
   const lows  = highs.map(h => h - 2);
   lows[7] = 1;
@@ -944,7 +944,7 @@ test('the map reads his level charts in his words, off printed bars only', () =>
     [4023, 'both', ['H_1', 'M_30'], 4025, null],
     [3980, 'low', ['H_1'], null, 'bottom'],
   ]);
-  assert.ok(!map.levels.some(l => l.price === 4100), `a turn more than $${REACH} away is on the map`);
+  assert.ok(!map.levels.some(l => l.price === 4100), `a turn more than $${READINGS.REACH} away is on the map`);
   assert.deepEqual(map.grid, [
     { price: 3975, round: false, turned: false }, { price: 4000, round: true, turned: false },
     { price: 4025, round: false, turned: true }, { price: 4050, round: true, turned: true },
@@ -965,7 +965,7 @@ test('the map reads his level charts in his words, off printed bars only', () =>
   assert.equal(map.sessions.at(-1).low, 4020);
   assert.deepEqual(map.bias.map(b => [b.period, b.trend]), [['D_1', null], ['H_1', null]]);
   assert.deepEqual(map.sweeps, []);
-  assert.ok(ON_GRID >= 2 && EDGE >= 1, 'the fixture is drawn for a level two dollars off its quarter');
+  assert.ok(READINGS.ON_GRID >= 2 && READINGS.EDGE >= 1, 'the fixture is drawn for a level two dollars off its quarter');
 });
 
 test('the map is said as hers, with every price timed and nothing about what comes next', () => {

@@ -15,16 +15,22 @@
 import { CHARTS, type Candle, type Period } from "../_shared/edge.ts";
 import { sessionAt } from "./journal.ts";
 
-/* Readings rather than facts, as STRETCH is, named so each can be argued with. */
-// Bars on either side a turn must clear: on the hour, a turn that held three.
-export const TURN = 3;
-// A turn this close to a quarter sits on it, and two turns this close are one.
-export const ON_GRID = 3;
-// This close to the week's high or low is at the edge — R-06's extreme.
-export const EDGE = 5;
-// As far from price as the map is drawn: a call waits for its level and then
-// reaches $30 beyond it, so twice the target.
-export const REACH = 60;
+/* Readings rather than facts, as STRETCH is, named so each can be argued with,
+   and one object so scripts/calibrate.mjs can fold his past entries under
+   others and see which find the levels he traded. */
+export const READINGS = {
+  // Bars on either side a turn must clear: on the hour, a turn that held three.
+  TURN: 3,
+  // A turn this close to a quarter sits on it, and two turns this close are one.
+  ON_GRID: 3,
+  // This close to the week's high or low is at the edge — R-06's extreme.
+  EDGE: 5,
+  // As far from price as the map is drawn: a call waits for its level and then
+  // reaches $30 beyond it, so twice the target.
+  REACH: 60,
+};
+export type Readings = typeof READINGS;
+
 // The newest wicks through a turn that closed back, the last day's only.
 export const SWEEPS = 3;
 
@@ -66,10 +72,10 @@ const closed = (bars: Candle[], p: Period, now: number) => bars.filter(b => b.t 
 /* A bar whose high clears TURN bars before it and is not beaten by TURN after
    it — the first of two equal highs is the turn. A low, mirrored. The newest
    TURN bars can never be one: nothing yet says price turned there. */
-export function turns(bars: Candle[]): Turn[] {
+export function turns(bars: Candle[], turn = READINGS.TURN): Turn[] {
   const out: Turn[] = [];
-  for (let i = TURN; i < bars.length - TURN; i++) {
-    const b = bars[i], before = bars.slice(i - TURN, i), after = bars.slice(i + 1, i + 1 + TURN);
+  for (let i = turn; i < bars.length - turn; i++) {
+    const b = bars[i], before = bars.slice(i - turn, i), after = bars.slice(i + 1, i + 1 + turn);
     if (before.every(x => x.high < b.high) && after.every(x => x.high <= b.high)) {
       out.push({ price: b.high, at: b.t, kind: 'high' });
     }
@@ -82,8 +88,8 @@ export function turns(bars: Candle[]): Turn[] {
 
 /* The two newest turns of each kind, and the sequence they make. Fewer than two
    of either is no sequence, never a guess at one. */
-export function biasOf(period: Period, bars: Candle[]): Bias {
-  const all = turns(bars);
+export function biasOf(period: Period, bars: Candle[], turn = READINGS.TURN): Bias {
+  const all = turns(bars, turn);
   const highs = all.filter(t => t.kind === 'high').slice(-2);
   const lows = all.filter(t => t.kind === 'low').slice(-2);
   const trend = highs.length < 2 || lows.length < 2 ? null
@@ -96,10 +102,10 @@ export function biasOf(period: Period, bars: Candle[]): Bias {
 /* A wick beyond a turn that closed back on the side it came from, while the
    turn still stood: no bar between had closed beyond it. §4.2's sweep. The
    bars that confirm a turn cannot be one, since none of them clears it. */
-export function sweepsOf(period: Period, bars: Candle[], since: number): Sweep[] {
+export function sweepsOf(period: Period, bars: Candle[], since: number, turn = READINGS.TURN): Sweep[] {
   const index = new Map(bars.map((b, i) => [b.t, i]));
   const out: Sweep[] = [];
-  for (const s of turns(bars)) {
+  for (const s of turns(bars, turn)) {
     const from = index.get(s.at)!;
     const above = s.kind === 'high';
     for (let i = from + 1; i < bars.length; i++) {
@@ -116,14 +122,14 @@ export function sweepsOf(period: Period, bars: Candle[], since: number): Sweep[]
 /* Turns from the two level charts, newest first, merged where they are one
    level; a high and a low on one price is a level that has flipped. */
 function levelsOf(charts: Partial<Record<Period, Candle[]>>, now: number, price: number,
-                  range: { high: Turn; low: Turn } | null): Level[] {
+                  range: { high: Turn; low: Turn } | null, r: Readings): Level[] {
   const found = (['H_1', 'M_30'] as const).flatMap(p =>
-    turns(closed(charts[p] ?? [], p, now)).map(t => ({ ...t, period: p })));
+    turns(closed(charts[p] ?? [], p, now), r.TURN).map(t => ({ ...t, period: p })));
   found.sort((a, b) => b.at - a.at);
   const levels: Level[] = [];
   for (const t of found) {
-    if (Math.abs(t.price - price) > REACH) continue;
-    const same = levels.find(l => Math.abs(l.price - t.price) <= ON_GRID);
+    if (Math.abs(t.price - price) > r.REACH) continue;
+    const same = levels.find(l => Math.abs(l.price - t.price) <= r.ON_GRID);
     if (same) {
       if (same.sides !== t.kind) same.sides = 'both';
       if (!same.periods.includes(t.period)) same.periods.push(t.period);
@@ -132,10 +138,10 @@ function levelsOf(charts: Partial<Record<Period, Candle[]>>, now: number, price:
     const quarter = Math.round(t.price / GRID) * GRID;
     levels.push({
       price: t.price, sides: t.kind, periods: [t.period], at: t.at,
-      quarter: Math.abs(t.price - quarter) <= ON_GRID ? quarter : null,
+      quarter: Math.abs(t.price - quarter) <= r.ON_GRID ? quarter : null,
       edge: !range ? null
-        : Math.abs(t.price - range.high.price) <= EDGE ? 'top'
-        : Math.abs(t.price - range.low.price) <= EDGE ? 'bottom'
+        : Math.abs(t.price - range.high.price) <= r.EDGE ? 'top'
+        : Math.abs(t.price - range.low.price) <= r.EDGE ? 'bottom'
         : null,
     });
   }
@@ -160,7 +166,8 @@ function sessionsOf(bars: Candle[], p: Period, since: number): Session[] {
   return out;
 }
 
-export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: number): Structure {
+export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: number,
+                              r = READINGS): Structure {
   const read = (p: Period) => closed(charts[p] ?? [], p, now);
   const missing = CHARTS.filter(c => !charts[c.period]?.length).map(c => c.period);
   // The newest bar of the finest chart read: what price was when the map was.
@@ -177,10 +184,10 @@ export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: nu
     low: { price: bottom.low, at: bottom.t, kind: 'low' as const },
   } : null;
 
-  const levels = last ? levelsOf(charts, now, last.close, range) : [];
+  const levels = last ? levelsOf(charts, now, last.close, range, r) : [];
   const grid: Quarter[] = [];
   if (last) {
-    for (let q = Math.ceil((last.close - REACH) / GRID) * GRID; q <= last.close + REACH; q += GRID) {
+    for (let q = Math.ceil((last.close - r.REACH) / GRID) * GRID; q <= last.close + r.REACH; q += GRID) {
       grid.push({ price: q, round: q % (2 * GRID) === 0, turned: levels.some(l => l.quarter === q) });
     }
   }
@@ -191,11 +198,11 @@ export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: nu
   return {
     last,
     bias: (['D_1', 'H_4', 'H_1'] as const).map(p => [p, read(p)] as const)
-      .filter(([, bars]) => bars.length).map(([p, bars]) => biasOf(p, bars)),
+      .filter(([, bars]) => bars.length).map(([p, bars]) => biasOf(p, bars, r.TURN)),
     range,
     levels,
     grid,
-    sweeps: (['H_1', 'M_15'] as const).flatMap(p => sweepsOf(p, read(p), since))
+    sweeps: (['H_1', 'M_15'] as const).flatMap(p => sweepsOf(p, read(p), since, r.TURN))
       .sort((a, b) => b.at - a.at).slice(0, SWEEPS),
     sessions: sessionsOf(charts.M_15 ?? [], 'M_15', since),
     candles: (['M_15', 'M_5'] as const).map(p => ({ period: p, bar: read(p).at(-1) }))
