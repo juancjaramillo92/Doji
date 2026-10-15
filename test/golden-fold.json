@@ -653,6 +653,20 @@
         "avgLoss": 53.79
       },
       "rr": 1.78,
+      "discipline": {
+        "rules": {
+          "followed": 0,
+          "answered": 0
+        },
+        "sl": {
+          "followed": 0,
+          "answered": 0
+        },
+        "tp": {
+          "followed": 0,
+          "answered": 0
+        }
+      },
       "settled": 1,
       "fellBack": 18,
       "seam": 0,
@@ -728,6 +742,6 @@
       ],
       "bySetup": []
     },
-    "statsTold": "The last 7 days, computed from the rows rather than read off them:\n· 19 trades, 0 journalled\n· 5.26% win rate — 1 win, 8 loss, 10 break-even, over 19 decided. Break-evens are IN that denominator.\n· gross $96.24, losses $459.84, net $-363.60, over 19 rows carrying a P&L\n· 1 of those are the broker's settled figure and 18 fell back to the folded one, which carries no swap — so the net above is short by whatever those 18 accrued across a 17:00 roll. Say so if you give him this total.\n· average win $95.64, average loss $53.79, realised reward-to-risk 1:1.78 — realised, not planned\n\nBy session:\n· Asian: 7 trades, 0% win rate over 7 decided, net $-86.80\n· London: 1 trade, 0% win rate over 1 decided, net $-73.12\n· London+NY: 9 trades, 0% win rate over 9 decided, net $-221.24\n· New York: 2 trades, 50% win rate over 2 decided, net $17.56"
+    "statsTold": "The last 7 days, computed from the rows rather than read off them:\n· 19 trades, 0 journalled\n· 5.26% win rate — 1 win, 8 loss, 10 break-even, over 19 decided. Break-evens are IN that denominator.\n· gross $96.24, losses $459.84, net $-363.60, over 19 rows carrying a P&L\n· 1 of those are the broker's settled figure and 18 fell back to the folded one, which carries no swap — so the net above is short by whatever those 18 accrued across a 17:00 roll. Say so if you give him this total.\n· average win $95.64, average loss $53.79, realised reward-to-risk 1:1.78 — realised, not planned\n· his own answers: rules followed on 0 of 0 answered (19 unanswered); stop respected on 0 of 0 answered (19 unanswered); target respected on 0 of 0 answered (19 unanswered). The stop and target answers are given at open, so they record intent rather than what happened\n\nBy session:\n· Asian: 7 trades, 0% win rate over 7 decided, net $-86.80\n· London: 1 trade, 0% win rate over 1 decided, net $-73.12\n· London+NY: 9 trades, 0% win rate over 9 decided, net $-221.24\n· New York: 2 trades, 50% win rate over 2 decided, net $17.56"
   }
 }

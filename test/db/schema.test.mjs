@@ -244,6 +244,37 @@ test('a release changing moves updated_at, and filing it again unchanged does no
   assert.equal(moved(`actual = '0.3%'`), true, 'a new actual did not move updated_at');
 });
 
+/* ─── What the story and the portrait said before ───────────────────────── */
+
+test('a rewrite of the story or the portrait keeps what it replaced, and the same words keep nothing', () => {
+  sql(`truncate public.eugenia_rewrites;`);
+  const before = sql(`select thesis from public.eugenia_thesis where id = 'current';`);
+  sql(`update public.eugenia_thesis set thesis = 'The Fed hiked; the market bets on a pause.',
+         moved_on = '2026-10-12' where id = 'current';
+       update public.eugenia_thesis set moved_on = '2026-10-13' where id = 'current';
+       update public.eugenia_portrait set portrait = 'He cuts winners before the target.' where id = 'current';
+       update public.eugenia_portrait set portrait = 'He cuts winners before the target.' where id = 'current';`);
+  // The thesis's date moving alone keeps nothing; the portrait rewritten to
+  // the same words keeps nothing the second time.
+  assert.equal(sql(`select string_agg(kind, ',' order by id) from public.eugenia_rewrites;`), 'thesis,portrait',
+    'each changed text should keep one copy, and a change to anything else none');
+  assert.equal(sql(`select body from public.eugenia_rewrites where kind = 'thesis';`), before,
+    'the thesis kept something other than the text it replaced');
+  assert.match(sql(`select body from public.eugenia_rewrites where kind = 'portrait';`), /^No portrait yet/,
+    'the portrait kept something other than the seed it replaced');
+});
+
+/* ─── Her own calls ─────────────────────────────────────────────────────── */
+
+test('a second call in one session is refused, and a call of no kind is not filed', () => {
+  const call = (side = 'buy') => `insert into public.eugenia_calls (expires_at, direction, entry, stop, target, condition)
+    values ('2026-10-14 21:00+00', '${side}', 4000, 3985, 4030, 'at the market');`;
+  sql(`truncate public.eugenia_calls;` + call());
+  assert.throws(() => sql(call('sell')), /eugenia_calls_once/, 'a second call in the session was filed');
+  assert.throws(() => sql(`truncate public.eugenia_calls;` + call('long')), /eugenia_calls_direction_check/,
+    'a call that is neither a buy nor a sell was filed');
+});
+
 /* ─── The dispatch watcher, on a planted clock ──────────────────────────── */
 
 const T = `'2026-10-07 17:00+00'::timestamptz`;

@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 725 tests, eight suites
+npm test      # 742 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -143,7 +143,9 @@ what each suite covers.
   see two of `esc`'s five replacements; a direct test holds those.
 
 Nothing here sees pixels, realtime, auth, or the live database — `verify.sql`
-is that check and a person runs it. Say so on any visual change. State on handback what was verified by running, what by reading, and
+is that check and a person runs it. Nor whether the model still obeys her
+prompts: `scripts/eval.mjs` asks that, by hand, with `--plant` first; a prompt
+change is run through it before and after. Say so on any visual change. State on handback what was verified by running, what by reading, and
 what could not be verified.
 
 ---
@@ -232,20 +234,29 @@ what could not be verified.
 
 ### What she may never do
 
-- **The prohibitions in `prompt.ts` are the product.** *No signal* is enforced by
-  nothing but the sentence, so `agree.test.mjs` reads for the line on price in
-  `SYSTEM`, `CRITIC`, `TRIM` and `TRADE_EVENT`. The gates need it as much
-  as the writer: they REWRITE and run last. `CONSOLIDATE` inherits `SYSTEM`.
+- **The prohibitions in `prompt.ts` are the product.** Never what to do with a
+  position he holds, and nothing about direction unasked while he holds one, are
+  enforced by nothing but the sentences, so `agree.test.mjs` reads for them in
+  `SYSTEM`, `CRITIC`, `TRIM` and `TRADE_EVENT`. The gates need them as much as
+  the writer: they REWRITE and run last. `CONSOLIDATE` inherits `SYSTEM`.
+- **A forward level lives in a filed call and nowhere else.** Her calls are paper
+  trades on his rules — `callProblem` refuses one off them before `make_call`
+  files it — scored on price at night by `scoreCall`, every doubt against her.
+  Both gates keep a filed call whole and never change its numbers; `make_call` is
+  in `CHAT_TOOLS` and in no other set. `agree.test.mjs` holds the sentences and
+  the sets. `TRADE_EVENT` keeps the flat ban.
 - **Her read is fenced, not banned**: labelled as hers, with what would prove it
-  wrong, no level, and none while he is in a position. All four halves live in
-  `SYSTEM`, `CRITIC` and `TRIM`, and both gates are handed `positionsBlock()` to
-  judge the last. A printed level is a fact, never in the paragraph with her
-  read. A plan he has not taken is checked when he asks, against rules §7 marks
-  `journal` or R-08's arithmetic — `agree.test.mjs` reads the citations against
-  the table. `TRADE_EVENT` keeps the flat ban.
-- **Her record is judged by the test she stated, never by where price went**,
-  and it is hers: never on the trade look, never cited to him as a reason to
-  believe a read. A graded forecast pulls the next read toward one.
+  wrong, no level, and none unasked while he is in a position. All four halves
+  live in `SYSTEM`, `CRITIC` and `TRIM`, and both gates are handed
+  `positionsBlock()` to judge the last. A printed level is a fact, never in the
+  paragraph with her read. A plan he has not taken is checked when he asks, in
+  two halves — the rules §7 marks `journal`, and R-08's sequence, judgment rules
+  she now judges — and ends in whether she would take it; the levels stay his.
+  `agree.test.mjs` reads each half's citations against the table.
+- **Her read record is judged by the test she stated, never by where price
+  went**, and it is hers: never on the trade look, never cited to him as a
+  reason to believe a read. Her calls are the one thing price judges, and their
+  record goes where the read record goes.
   `agree.test.mjs` reads the sentence in `CONSOLIDATE`, `record_read` and
   `SYSTEM`, and the trade look's absence.
 - **The verdict is not optional**: stated in `SYSTEM`, given room in the briefing
@@ -303,9 +314,9 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
 - **Every read of a growing table carries a limit and takes the newest rows.**
   Select newest-first and reverse, as `recent()` does. `agree.test.mjs` refuses
   `order=id.asc` under a limit.
-- **`notesBlock()` reaches all four paths, `portraitBlock()` all but the trade
-  look, `channelsBlock()` the three that teach, `recent()` the three that speak**
-  (not the nightly pass), `positionsBlock()` three.
+- **`notesBlock()` reaches every path, `portraitBlock()` all but the trade
+  look, `channelsBlock()` the three that teach, `recent()` everything that
+  speaks** (not the nightly pass), `positionsBlock()` four.
   The trade look's reads sit after its early returns. `agree.test.mjs` reads every
   body, and asserts the absences too.
 - **Loops close.** `readLoops` takes the newest ten, so a loop that cannot close
@@ -404,7 +415,10 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
 - **A beta flag is a header on a raw fetch**, never a `betas` field.
 - **The container is mandatory once web search is in play**; neither tool sets
   `strict: true`.
-- **Effort is per caller**; nothing runs `low`.
+- **Effort is per caller**; nothing runs `low`. On Opus it rides as an
+  effort-only system message (`effortMessages`) under one top-level
+  `BASE_EFFORT`, so callers on one array share one cached prefix; the message is
+  sent, never stored.
 - **`MAX_ROUNDS` is a backstop** at ten, and `TURN_MS` its twin for time — one
   signal per turn, at `pace_line`'s share. `rounds` and `model` are columns; a
   successful turn's `detail` is its client-tool tally. Read `rounds` before

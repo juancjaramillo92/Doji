@@ -37,6 +37,10 @@ export const TABLES = [
   ['eugenia_loops',    'id'],
   ['eugenia_calendar', 'id'],
   ['eugenia_feedback', 'id'],
+  // Her calls and what the story and the portrait said before: neither can be
+  // rebuilt from anything else.
+  ['eugenia_calls',    'id'],
+  ['eugenia_rewrites', 'id'],
   // The stop history R-19 is judged on; the broker keeps only the final stop.
   ['trade_stops',      ['id', 'seen_at']],
 ];

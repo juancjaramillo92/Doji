@@ -495,6 +495,36 @@ async function readBars(session: Record<string, string>, from: number, to: numbe
   return bars;
 }
 
+/* ─── The day's bars, for Eugenia's own calls ──────────────────────────────
+   She makes paper calls on his rules and they are scored at night on what
+   price did, which needs the path, not a quote. She never holds the broker
+   token, so the read is a door here, and like every door it takes nothing from
+   the request: the window is fixed. Thirty hours reaches a call made just after
+   one 17:00 roll from the 22:00 pass after the next, and a Sunday call from
+   before the open.
+
+   Display prices, open to close, oldest first. A bar that will not read refuses
+   them all, as bestPrice refuses a figure: a dropped bar could hold the stop. */
+export const CALL_HOURS = 30;
+
+export interface Candle { t: number; open: number; high: number; low: number; close: number }
+
+export function foldCandles(bars: any[]): Candle[] | null {
+  const out = (bars ?? []).map(b => ({
+    t: Number(b?.timestamp), open: Number(b?.open), high: Number(b?.high),
+    low: Number(b?.low), close: Number(b?.close),
+  }));
+  const readable = (c: Candle) => Number.isFinite(c.t) &&
+    [c.open, c.high, c.low, c.close].every(n => Number.isFinite(n) && n > 0);
+  if (!out.every(readable)) return null;
+  // Chunks meet at their edges, so a bar can come back twice.
+  const byMinute = new Map(out.map(c => [c.t, c]));
+  return [...byMinute.values()].sort((a, b) => a.t - b.t).map(c => ({
+    t: c.t, open: fromPipettes(c.open), high: fromPipettes(c.high),
+    low: fromPipettes(c.low), close: fromPipettes(c.close),
+  }));
+}
+
 /* The newest closed trades still missing a figure, a few a poll — one path for
    a fresh close and for the year behind it, newest first so a new close never
    queues behind the backlog. Too short to measure is skipped at no broker
@@ -554,8 +584,9 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     const market    = url.searchParams.get("market") === "1";
     const marketRaw = url.searchParams.get("market") === "raw";
     const bars      = url.searchParams.get("bars") === "raw";
+    const day       = url.searchParams.get("bars") === "1";
     // The read-only probes answer over the weekend, when rows get looked at.
-    if (!force && !raw && !tools && !posns && !market && !marketRaw && !bars && !marketOpen()) {
+    if (!force && !raw && !tools && !posns && !market && !marketRaw && !bars && !day && !marketOpen()) {
       // A skip is a completed run: unmarked, the heartbeat freezes over the
       // weekend close and reads as a dead sync every Sunday evening.
       await heartbeat("poller");
@@ -616,6 +647,15 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       // Thrown rather than served empty: an unreadable price is not zero.
       if (!spot) throw new Error("get_spot_prices returned no readable bid/ask");
       return json({ ok: true, symbol: SYMBOL_IDS[0], ...spot });
+    }
+
+    /* ?bars=1 — the last CALL_HOURS of minute bars, folded, for scoring her
+       calls. Thrown rather than served short when one will not read. */
+    if (day) {
+      const from = Math.floor((to - CALL_HOURS * 3600_000) / MINUTE) * MINUTE;
+      const candles = foldCandles(await readBars(session, from, to));
+      if (!candles) throw new Error("get_trendbars returned a bar that will not read");
+      return json({ ok: true, symbol: SYMBOL_IDS[0], from, bars: candles });
     }
 
     /* ?bars=raw — minute bars at six ages, raw: their shape, their scale, and

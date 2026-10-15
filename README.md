@@ -41,6 +41,7 @@ manifest `background_color`, a dark `color-scheme` and an
 README.md                               the contract: what the app does and why
 CLAUDE.md                               how to work on it; the README outranks it
 REFACTOR.md                             every move refused, and why
+RESEARCH-eugenia.md                     what other systems do that Eugenia did not
 index.html                              the entire application
 icon-512.png                            home-screen icon
 vercel.json                             no-cache header for the app shell
@@ -89,10 +90,11 @@ charm/                                  firmware for the charm — see The charm
   tools/fonts.sh                        turns the typeface into the charm's fonts and the page's
 scripts/backup.mjs                      the paged read behind the daily copy
 scripts/health.mjs                      whether anything is running, asked from outside
+scripts/eval.mjs                        whether Eugenia still behaves, asked of the model, by hand
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
-.github/workflows/backup.yml            the daily copy of the nine tables nothing else holds
+.github/workflows/backup.yml            the daily copy of the tables nothing else holds
 .github/workflows/health.yml            the hourly outside check; a failed run is the alarm
 .github/workflows/charm.yml             builds the charm firmware, kept as a download; main's is her update
 .github/dependabot.yml                  monthly update PRs, both ecosystems
@@ -416,6 +418,8 @@ single-sourced at run time:
 | the **economies the calendar reads** | `CALENDAR_COUNTRIES` in `doji-tradingview` and the countries `wanted` keeps in `doji-eugenia` |
 | the **country his rules count** | `HOME` in `adherence.ts`, the default on `eugenia_calendar.country`, and the watch card's `.eq('country', 'US')` — and every rated read but the Sunday week filters on it |
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, the check constraint |
+| how **firmly a read was said** | `READ_FIRMNESS` in `doji-eugenia` and the check constraint on `eugenia_reads.firmness` |
+| her **calls' sides, outcomes and condition length** | `CALL_SIDES`, `CALL_OUTCOMES` and `CALL_MAX` in `doji-eugenia`, and the check constraints on `eugenia_calls` |
 | the **thesis length** | `THESIS_MAX` and the check constraint |
 | the **portrait length** | `PORTRAIT_MAX` and the check constraint |
 | the **verdicts a read may carry** | `READ_VERDICTS` in `index.ts` and the check constraint |
@@ -498,10 +502,11 @@ add-on.
 
 **A copy of what exists nowhere else is taken daily, outside Supabase.**
 `scripts/backup.mjs`, run every night by `.github/workflows/backup.yml`, reads
-eleven tables into one JSON artifact: `trades`, whose journal columns only
-you can supply, and the ten of hers with no other source — the channel map,
-notes, turns, thesis, portrait, her record, open loops, calendar, feedback, and
-every stop and target a position carried. `trades` goes whole, the soft-deleted
+thirteen tables into one JSON artifact: `trades`, whose journal columns only
+you can supply, and the twelve of hers with no other source — the channel map,
+notes, turns, thesis, portrait, her record, open loops, calendar, feedback,
+every stop and target a position carried, her calls, and what the thesis and
+the portrait said before each rewrite. `trades` goes whole, the soft-deleted
 rows included: a restore without them lets the poller rebuild every trade you
 removed. `eugenia_runs` is left out: the largest table, and facts about model
 calls rather than about you.
@@ -748,6 +753,10 @@ when a suspicious row gets looked at.
 - **`?bars=raw`** returns fifteen minutes of `M_1` bars at six ages — now, and
   7, 30, 90, 180 and 365 days back, each moved to a Tuesday–Thursday 14:00 UTC —
   one request at a time, since a single `504` took the batch with it.
+- **`?bars=1`** returns the last thirty hours of `M_1` bars in dollars, oldest
+  first, for Eugenia to score her own calls against at night (*Her own calls*).
+  The window is fixed, so like every other door it puts nothing from the request
+  into a broker call; a bar that will not read refuses them all.
 
 ```sh
 curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?raw=1&hours=72" \
@@ -1211,7 +1220,8 @@ number that actually lands, a word when a position opens into one, and a
 conversation about any of it. **Weekdays at 08:00 ET, Sunday at 17:00 ET** — the
 gold open, so the week's first briefing lands with the market. She says hello
 her own way, Spanish or English, inside the first paragraph, and goes straight to
-the number. Reply and she answers — typed, by voice, or to a chart.
+the number. Reply and she answers — typed, by voice, or to a chart. And she
+trades beside you on paper, on your rules, scored on price — *Her own calls*.
 
 `schema.sql` holds her memory and her read of the journal, her meters,
 calendar and the trigger that tells her about a trade, and her clock; `prompt.ts` holds who she is,
@@ -1397,6 +1407,25 @@ Friday — plus any trade that CLOSED since then, R-15's Friday hold. The rules 
 handed the failures and told when nothing broke. A breach gets the fact, her
 verdict and the lesson in three short sentences, then back to the market. Closed
 trades only: a verdict on an open one is a hard prohibition.
+
+### Saturday, a review of his week
+
+**Every coach has a cadence that is not about one trade**; otherwise she speaks
+about his trading only when a rule breaks. So at 10:00 New York on
+Saturday, the one morning no market is open and nothing else is due
+(`reviewDue`, composed into `dueNow`), she reviews his week: how he followed
+the rules a row can check, his own answers — how often he marked his rules
+broken and how many he left blank, the one record of entering on the touch —
+what he committed to and whether he kept it, one thing to keep and one to
+change, and her own calls in a sentence. Process, never P&L as the measure,
+and nothing about where price goes next week, which is Sunday's briefing.
+
+She is handed the week computed — `get_stats`' summary with his answers,
+`check_rules`' verdicts, her calls and her record — with his notes, the
+portrait and what he has on, and may read a trade or a section of his rules
+(`REVIEW_TOOLS`). `TRIM` gates it, it is spoken through `sayAloud`, and it is
+stored under `[saturday review]`. **No retry**: a review a day late is about a
+week already behind him, so a failure apologises and `?review=1` runs it by hand.
 
 ### The calendar — filed for her every quarter hour
 
@@ -1648,11 +1677,11 @@ to repeat himself for a fault that is not his. The audio goes to the vendor with
 **both** its extension and its `audio/ogg` type, since providers differ in which
 they read.
 
-**A chart** she can see, and the prohibitions do not move because she can. She
-may describe it and take it as context; on a trade not yet taken she may not say
-whether a setup is valid or a level will hold — a picture is the most tempting
-place in this system to give a signal. A chart of a closed trade she judges the
-way she judges the journal.
+**A chart** she can see. She describes it, and on a trade not yet taken she
+judges the setup against your pre-trade sequence and says whether she would
+take it, as she does a plan you give her (*What she will not do, and what she
+may*). On a position you hold, the prohibitions hold: never what to do with it.
+A chart of a closed trade she judges the way she judges the journal.
 
 Neither is stored as sent: the transcript is kept, the image is not — a megabyte
 of base64 would be resent as history for six exchanges. `stamped` appends the
@@ -1858,6 +1887,13 @@ makes a retry's refiling a no-op.
   untested, and `SYSTEM` asks her to name a link in the chain instead — the
   two-year, the dollar, the next meeting's pricing — which is also the part he
   learns from.
+- **How firmly, and what she misread.** Each read is filed with how firmly she
+  said it, off her own words — firm or light — and the month is counted whole
+  and then by each, since a firm read that misses as often as a light one is
+  firmness telling him nothing. A miss is filed with the one link in the chain
+  she misread, which is what makes it teach rather than count; a lesson on a
+  read that held is refused. Reads filed before either column existed count in
+  the month and in neither half.
 - **The record is hers.** A month of counts and the three newest misses go to the
   briefing and a reply, the two paths that give a read, and to the pass; never
   the trade look, which carries none and arrives while he is in a position. It
@@ -1866,13 +1902,58 @@ makes a retry's refiling a no-op.
   believe one, never gives a read to improve it, and never holds one back to
   protect it. `/notes` shows it to him, so he can see what her reads are worth.
 
+### Her own calls
+
+**A coach who cannot do the thing is not one**, so she trades beside you on
+paper, on your rules, and is scored on price. A call is a trade she would take:
+buy or sell, an entry, a stop, a target, and what price has to do first. You
+decided this in October 2026, after the evidence on both sides was put to you
+(`RESEARCH-eugenia.md`, §5).
+
+- **On your rules, checked in code.** `make_call` refuses a call off them before
+  it is filed (`callProblem`): the stop no further than the $20 a full stop is
+  (R-02), the target $25 to $30 away (R-01), the reward at least 1:1.5 at entry
+  (R-08). One call a session, as you take one entry a day (R-12): the session is
+  the next 17:00 New York roll on a weekday (`expiryOf`), and a unique index on
+  that instant refuses a second.
+- **Filed before it is said.** A level about where price goes next is allowed
+  in a filed call and nowhere else, since a call in words alone is a tip nobody
+  scores. Both gates keep a filed call whole and never change a number in it.
+- **A call can wait for its setup.** In the morning the setup is usually not
+  there yet, so the call says what it waits for — *if price comes back to 4,000
+  and a fifteen-minute candle closes above it, buy at 4,002*. The condition is
+  hers to state; the entry is what is scored. *No call today* is a call too.
+- **Where.** At most one in the briefing, last, when she has one worth making,
+  and in a conversation when you ask. Never unasked while you hold a position,
+  never in the trade look, and never anything about what to do with a position
+  you hold.
+- **Scored at night, in code, every doubt against her** (`scoreCall`). Before the
+  nightly pass reads anything, `scoreCalls` asks `doji-mcp-sync?bars=1` for the
+  last thirty hours of minute bars and scores every call whose session ended:
+  whether price reached the entry, then whether the target or the stop came
+  first, the stop moved to break-even at +$20 as your R-04 moves yours. On the
+  bar that filled her only the stop counts; a bar touching both is a loss; the
+  break-even move starts on the next bar, since a bar's high and low cannot say
+  which came first. Outcomes are `won`, `lost`, `scratch`, `open` (still on at
+  the roll, marked at the last close), `untriggered`, and `unread` when the bars
+  do not reach back to the call. The PATCH is filtered on `outcome is null`, so
+  a retry never rescores one, and the run is a `caller: 'calls'` row either way.
+- **Her calls' record** — a month of outcomes, what the triggered ones made an
+  ounce, the newest losses, and any call still standing — goes where her read
+  record goes: the briefing, a reply and the pass, never the trade look.
+  `/notes` shows it to you. She gives it straight when you ask, losses first, and
+  never uses it to talk you into a trade.
+
+Her reads stay what they were — a view on the news, judged by the test she
+stated and never by price. A call is the one thing of hers price judges.
+
 ### What she remembers
 
-Nine tables, separated by how long a thing is true for. A turn rolls over inside
+Twelve tables, separated by how long a thing is true for. A turn rolls over inside
 a morning; a note about him outlives twenty of those; what he UNDERSTANDS
 outlives both; a thesis and a portrait are only ever current, so each is one row
-rewritten; a loop stays until it closes; and the calendar and her record are the
-datasets here that compound.
+rewritten, and what each said before is kept beside it; a loop stays until it
+closes; and the calendar and her record are the datasets here that compound.
 
 | | Holds | Window | Written by |
 |---|---|---|---|
@@ -1886,6 +1967,8 @@ datasets here that compound.
 | `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar` |
 | `eugenia_market` | the market around gold and the Fed's odds, read ahead | 1 row per door, rewritten | the quarter-hourly job, `storeMarket` and `storeRates` |
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
+| `eugenia_rewrites` | what the thesis and the portrait said before each rewrite | never handed to her | a trigger on both, `eugenia_keep_rewrite` |
+| `eugenia_calls` | every call she made, and how price scored it | the last 30 days | her `make_call` tool; scored by the nightly pass |
 
 **Notes are how he corrects her, and the only way he can.** There is no settings
 page, the button under a briefing carries a verdict and not a reason, and the
@@ -1906,6 +1989,12 @@ his own word outlives the commitment. Its own kind because the two are read in
 opposite directions. `/notes` lists them between what he told her and what she
 noticed.
 
+**A commitment with a moment in it is the one that gets kept.** A plan that
+names its trigger is kept far more often than a resolution, and §9 says his
+failure has one trigger: the touch. So when he commits to something with no
+*when*, her one question is when it applies, and the note is written in his
+answer's words. The moment is his to name, never hers to supply.
+
 **What the notes add up to is one paragraph, and it outlives them.** She is shown
 the newest twenty of each kind, so the twenty-first fact pushes the oldest out of
 view: still searchable, but shaping nothing unless she thinks to look. The
@@ -1919,6 +2008,16 @@ facts — in the briefing and a reply, never the trade look — and never hands 
 him as a verdict; `/notes` shows it to him in the
 second person, and he corrects it the way he corrects anything — by telling her,
 which the pass reads that night.
+
+**A rewrite keeps what it replaced.** The story and the portrait are one row
+each, rewritten at night, and the portrait shapes every briefing and reply. A
+rewrite that drops something true about him would otherwise be gone the moment
+it landed. So `eugenia_keep_rewrite`, one trigger function on both tables,
+copies the old text and the day it last moved into `eugenia_rewrites` whenever
+the text changes; a rewrite to the same words keeps nothing. It is for him and
+for repair, read by hand, and nothing hands it to her: a portrait she could
+read back a month of would argue with itself. Putting an old one back is an
+update of the row, which keeps the one it replaces in turn.
 
 **Every list says how many it holds, and one past the window says so.** The read
 takes one row more than the twenty it shows, so each heading carries its count —
@@ -1948,11 +2047,11 @@ before it is sent: when the forward look is empty, the newest two rows inside th
 speaking worker's budget are taken only if they are a briefing and its marker
 sharing one instant — otherwise no quote rather than a wrong one.
 
-**Who gets what.** `notesBlock()` reaches **all four paths** — the briefing, a
-reply, the nightly pass and the trade look — and its absence would be silent:
-she carries on ignoring an instruction he believes she took. `portraitBlock()`
-and `recordBlock()` go to the briefing, a reply and the pass, and a test asserts
-neither reaches the trade look: it lands while he is in a position, where *"he
+**Who gets what.** `notesBlock()` reaches **every path** — the briefing, a
+reply, the nightly pass, the Saturday review and the trade look — and its absence would be silent:
+she carries on ignoring an instruction he believes she took. `portraitBlock()`,
+`recordBlock()` and `callsBlock()` go to the briefing, a reply and the pass, and a
+test asserts none reaches the trade look: it lands while he is in a position, where *"he
 cuts winners early"* reads as an order about the trade he is in. The portrait is
 its own block so a failed read costs the paragraph and never his instructions. `channelsBlock()`
 goes to the three asked to build a term, since what moves gold runs through a
@@ -2237,6 +2336,14 @@ The view is `security_invoker`, which a view is **not** by default: without it,
 RLS would depend on whoever ran `schema.sql` rather than on who is asking, and
 a grant widened by mistake would leak every user's trades.
 
+**`get_stats` carries his own three answers**, as the app's discipline bars count
+them: followed over answered, the unanswered said apart, since every fill
+arrives blank and a blank counted as a miss would sink every rate. The rules
+answer matters most. §9 says entering on the touch leaves no trace in any
+price, and his false is its only record, so the share he marks broken is the
+measure of what he is working on. A test hands the same rows to both and reads
+the bars off his screen.
+
 **Context goes in the user turn, not a mid-conversation system message.** That
 shape would keep the cached prefix intact, but it could not be exercised from
 where this was built, and a 400 there kills every reply. Nothing in the context is
@@ -2347,7 +2454,9 @@ length he received and how it went out (`spoken in 19s`, or `sent as text`). A
 manual `?force=1` answers `accepted`, so the delivered row is where its length is
 read.
 
-**Two nightly meters write rows, both outcomes.** The embedding sweep writes
+**Three nightly meters write rows, both outcomes.** Her calls' scoring writes
+`caller: 'calls'`, since a broker door that stopped answering leaves every call
+unscored with nothing else to say so. The embedding sweep writes
 `caller: 'embeddings'`, because a dead vendor takes the semantic arm out while
 the lexical one keeps answering; the channel census writes `caller: 'channels'`,
 because a ladder that stopped moving looks like one with no reason to, and a rung
@@ -2609,9 +2718,21 @@ quarter-hourly job clustered several looks into one morning. One reply could not
 say how replies arrive. The week to 2026-10-08 had eighteen: fourteen within an
 hour of the turn before them, six within five minutes — so eight a week wrote
 again a prefix the hour would still have held, and `CHAT_TOOLS` takes the hour.
-The weekday briefing shares that array but not its effort, so it reads nothing
-the replies wrote and pays 2× for its own write; the replies more than cover it.
-So it is `1h` for `CHAT_TOOLS` and `5m` for the rest. `cached` counts
+So it is `1h` for `CHAT_TOOLS` and `5m` for the rest.
+
+**Effort is a message, so one array is one prefix.** The effort at the top of a
+request renders ahead of the tools and the system prompt, and the briefing at
+`high` once read nothing the replies at `medium` wrote, paying 2× for a copy of
+the same prefix. On Opus every request now sends one top-level effort,
+`BASE_EFFORT`, and the caller's own as an effort-only system message at the
+head of the conversation (`effortMessages`, beta
+`mid-conversation-output-config-2026-07-01`, a header beside the fallback one),
+which changes effort without touching what is cached before it. Each caller
+still runs at its own effort and `eugenia_runs.effort` records that one. Sonnet's
+one caller, `trim`, has its own array and keeps its effort at the top. **Whether
+it worked is one morning's rows**: the first reply after a briefing should read
+the hour's prefix (`cached`) rather than write it (`wrote_1h`). The message is
+sent and never stored, so it is not a role a turn may have. `cached` counts
 reads; `wrote_1h` and `wrote_5m` count writes, kept apart because their rates
 differ.
 
@@ -2646,10 +2767,11 @@ answer when something was read.**
 
 ### What she will not do, and what she may
 
-In the prompt rather than left to taste: **no signals** — no entry, no level to
-buy or sell at, no stop, no target, nothing about what to do with a position —
-and never more than one question at a time. No instruction note can widen that;
-one that narrows it is obeyed.
+In the prompt rather than left to taste: **nothing about what to do with a
+position you hold**, **no level about what comes next outside a call she
+filed**, **no view and no call unasked while you are in a position**, and never
+more than one question at a time. No instruction note can widen that; one that
+narrows it is obeyed.
 
 **Most of what she says is what the market is pricing.** *"A December cut is
 about 70% priced"* is a fact about today; saying it is most of what stops a
@@ -2657,27 +2779,35 @@ briefing reading like a wire feed.
 
 **She may give her read, fenced three ways**: said as *her read*, with what would
 prove her wrong in the same breath, and with no level in it — a read with a price
-in it is a signal. One per message, in the briefing or a conversation; the trade
-event carries none, landing at a moment she did not choose.
-**None at all while you are in a position**, where a view on price is advice about
-the trade. Both gates carry the same fence and are handed what you have on.
+in it is a call, made one way only. One per message, in the briefing or a
+conversation; the trade event carries none, landing at a moment she did not
+choose. **None unasked while you are in a position**; asked, it is a view on the
+market and never an instruction about your trade. Both gates carry the same
+fence and are handed what you have on.
 
 **A level price has already printed is a fact** — today's high and low, the
 previous close, where a release moved gold from and to — and checkable against
-your chart. A level attached to what comes next stays out, and so does any printed
-level in the paragraph holding her read: a level beside a direction is an entry
-with *buy* left out.
+your chart. A level attached to what comes next stays out unless it is a call she
+filed, and so does any printed level in the paragraph holding her read: outside a
+call, a level beside a direction is a call nobody scores.
 
-**She checks a plan you have not taken, when you ask, against your rules**: the
-stop and target distances (R-01, R-02), reward against risk at entry against R-08's
-1:1.5, a high-rated US release inside R-14's thirty minutes, whether the day already
-rules out an entry (R-03, R-11, R-12, R-16), something already open (R-10), the
-Friday close (R-15). Whether the setup is the right kind of level is judgment and
-stays yours. **The levels stay yours**: she never suggests a different entry, stop
-or target, never says whether to take it, and never turns "the ratio is 1:1.1"
-into the target that would fix it; `TRIM` removes a level she offers in place of
-yours. Both this and the printed level were your decision when the no-signal rule
-was put to you: the rule stays, and these are what a coach does inside it.
+**She checks a plan you have not taken, when you ask, two ways.** Against the
+rules a row can answer: the stop and target distances (R-01, R-02), reward
+against risk at entry against R-08's 1:1.5, a high-rated US release inside
+R-14's thirty minutes, whether the day already rules out an entry (R-03, R-11,
+R-12, R-16), something already open (R-10), the Friday close (R-15). And against
+your pre-trade sequence, which no row can see and which you decided in October
+2026 she should judge: R-08's four steps in order — the bias, the level (R-05's
+interior for Break & Retest, R-06's outer extreme for Support & Resistance), the
+confirmation rather than the touch (R-07), the ratio — reading §4 and §6 first
+so she holds you to what you wrote, and naming any step she cannot see. **Then
+she says whether she would take it**, as hers, and you decide. Her one question
+is your own probe for the touch, asked before the fact: what you will wait for
+at the level before you click. **The levels stay yours**: she never suggests a
+different entry, stop or target and never turns "the ratio is 1:1.1" into the
+target that would fix it; `TRIM` removes a level she offers in place of yours.
+Her own trades are calls she files, never edits of yours. A test holds the two
+halves to the kinds of rule §7 says they are.
 
 **She judges trades — the decision, never the result** — against your rules and the
 plan you entered with. A loss inside your rules was a good trade; a win that broke
@@ -3185,6 +3315,25 @@ globs `test/*.test.mjs` one level deep, so a test in a subfolder would silently
 not run — `test/db` is the one subfolder, on purpose, with its own command and
 its own CI job, and `agree.test.mjs` holds that both still name it.
 
+**Whether she still behaves is `scripts/eval.mjs`, run by hand.** Every rule that
+matters most about her is a sentence, and no suite can say whether the model
+still obeys it. The eval sends the cases in `test/fixtures/eval-cases.json` —
+the failures this README records and the rules his decisions added — through her
+real prompts, built as the reply, both gates and the trade look build them, and
+grades the answer: what is countable in code (em-dashes, sentences a paragraph,
+words, questions, patterns that must or must not appear), the rest by an Opus
+judge against a criterion written per case, answered as JSON a schema fixes.
+**`--plant` runs first** the cases a deliberately broken prompt must fail, and
+stops if one passes: an eval that cannot fail says nothing. It costs money, so
+it is never in `npm test`; what can be checked without the model is —
+`fold.test.mjs` holds every case well formed, the counters against planted text,
+each request against its call site, and every plant against the prompt it
+breaks. Run it before and after any prompt change, and read the cases first:
+
+```sh
+ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs --plant
+```
+
 **`npm run test:db` needs a Postgres server with pgvector, of the major version
 Supabase runs** — named once, in `test.yml`'s `PGCLUSTER`, and asserted by the
 suite, so a Supabase upgrade is that one value changed — reached through the
@@ -3306,7 +3455,7 @@ one `net.http_post` each.
 
 | Function | What a holder of the secret can do |
 |---|---|
-| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`) or minute bars (`?bars=raw`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
+| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`), minute bars (`?bars=raw`), or the day's bars for her calls (`?bars=1`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
 | `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code. `?consolidate=1` is the one that does more than spend: it runs the nightly pass, which WRITES memory — notes written and superseded, channel rungs moved, loops closed. `?embed=1` spends at the embedding vendor. `?calendar=1` files the calendar and spends nothing, and a `{trade}` body reaches the trade look |
 | `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
 

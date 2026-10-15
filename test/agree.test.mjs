@@ -22,10 +22,11 @@ import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
-         parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
+         READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
-import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled }
+import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled,
+         discipline }
   from '../supabase/functions/doji-eugenia/journal.ts';
 import { HOME } from '../supabase/functions/doji-eugenia/adherence.ts';
 
@@ -882,6 +883,29 @@ test('a commitment is recorded, audited, held against his trades and retired', (
   assert.match(bodies.CONSOLIDATE, /HOLD THE DAY AGAINST WHAT HE COMMITTED TO/,
     'the nightly pass no longer checks the day against his commitments or ' +
     'retires the ones whose period is over');
+});
+
+/* ─── The moment a plan is kept or broken ────────────────────────────────────
+   A plan that names its trigger is kept far more often than one that does not,
+   and §9 says his failure has one trigger: the touch. Two sentences carry it,
+   and nothing structural does, so this reads for both. R-07's probe is quoted
+   as the rules table words it, so a reworded rule fails the copy here.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('she asks for the moment a commitment applies, and asks his probe for the touch before the fact', () => {
+  const system = SYSTEM.replace(/\s+/g, ' ');
+  assert.match(system, /A COMMITMENT WITH A WHEN IN IT IS THE ONE THAT GETS KEPT/,
+    'SYSTEM no longer asks him when a commitment applies, so "be more patient" is ' +
+    'recorded as he said it and names no moment the habit fires in');
+  assert.match(system, /The moment is his to name, never yours to supply/,
+    'SYSTEM asks for the moment but no longer says it is his — she would write ' +
+    'a commitment he never made');
+  assert.match(system, /YOUR ONE QUESTION IS HIS OWN PROBE FOR THE TOUCH, ASKED BEFORE THE FACT/,
+    'a plan check no longer asks what he will wait for at the level');
+
+  const probe = ALWAYS.match(/\| R-07 \|[^\n]*?\*"([^"]+)"\*/)?.[1];
+  assert.ok(probe, 'the rules table no longer words R-07 as a probe');
+  assert.ok(system.includes(`"${probe}"`),
+    `SYSTEM quotes R-07's probe differently from the rules table ("${probe}")`);
 });
 
 /* ─── Who the database and Gmail think they are calling ─────────────────────
@@ -2035,9 +2059,10 @@ test('every answer dueNow can give is dispatched by postScheduled', () => {
 });
 
 /* ─── The critic is given no tool, and not for the obvious reason ────────────
-   An empty array is the cheaper write as well as the stricter one: the critic
-   differs from the briefing in effort too, so sharing its array still writes a
-   prefix of its own. REFACTOR.md R-15 carries the figures.
+   An empty array is the stricter choice and was the cheaper write while the
+   critic's effort differed at the top of the request. With effort a message,
+   the array is all that keeps it off the briefing's prefix; moving it is the
+   next measurement, one caller at a time. REFACTOR.md R-15 carries the figures.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the critic is offered no tool at all', () => {
@@ -2634,6 +2659,18 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
     'the trade look is handed her record — it arrives while he is in a position, ' +
     'where a hit rate beside a message reads as a reason to act on her');
 
+  /* AND HER CALLS, where her record goes: a standing call she cannot see is a
+     second one made beside it, and the pass reads tonight's scores. Never the
+     trade look, where her own trade beside his is the most anchoring line there
+     could be. */
+  for (const fn of ['postBriefing', 'converse', 'postConsolidation']) {
+    assert.ok(reaches(reads(fn), 'callsBlock'),
+      `${fn} never gets callsBlock() into the message it sends — a call standing ` +
+      `today is invisible to her, and she makes a second beside it`);
+  }
+  assert.ok(!reaches(reads('postTradeEvent'), 'callsBlock'),
+    'the trade look is handed her calls — her own trade beside his, seconds after his fill');
+
   /* AND THE CONVERSATION WINDOW, ON EVERYTHING THAT SPEAKS: without it she says
      again what she said, and a repetition reads as emphasis. Hardest on the
      trade look, whose R-14/R-19 line fires on the print the briefing most likely
@@ -3092,7 +3129,11 @@ test('the roles a turn may have are the roles she actually writes', () => {
   const declared = checkValues(EUGENIA_SQL, 'eugenia_turns_role_check');
   assert.ok(declared, 'schema.sql no longer constrains eugenia_turns.role');
 
-  const named = [...new Set([...EUGENIA_TS.matchAll(/role:\s*["'](\w+)["']/g)].map(m => m[1]))];
+  // The effort message is sent at the head of a request and never stored, so
+  // its role is not one a turn may have.
+  const sent = EUGENIA_TS.replace(/export const effortMessages[\s\S]*?: messages;/, '');
+  assert.notEqual(sent, EUGENIA_TS, 'effortMessages is gone, so this no longer knows which role is only sent');
+  const named = [...new Set([...sent.matchAll(/role:\s*["'](\w+)["']/g)].map(m => m[1]))];
   assert.ok(named.length >= 2,
     `only ${named.length} roles written in doji-eugenia — the reader has gone blind`);
   for (const role of named) {
@@ -3348,12 +3389,27 @@ test('a read is filed with the verdicts and lengths the table accepts', () => {
   }
   const evidence = SCHEMA_SQL.match(/eugenia_reads_evidence_length check \(char_length\(evidence\) <= (\d+)\)/);
   assert.equal(READ_MAX, Number(evidence?.[1]), 'index.ts truncates evidence past what the table accepts');
+  const firmness = SCHEMA_SQL.match(/eugenia_reads_firmness_check check \(firmness in \(([^)]*)\)\)/);
+  assert.ok(firmness, 'schema.sql no longer bounds how firmly a read was said');
+  assert.deepEqual(firmness[1].split(',').map(v => v.trim().replace(/'/g, '')), [...READ_FIRMNESS],
+    'index.ts sends a firmness the table refuses, or never sends one it accepts');
+  const lesson = SCHEMA_SQL.match(/eugenia_reads_lesson_length check \(char_length\(lesson\) between 1 and (\d+)\)/);
+  assert.equal(NOTE_MAX, Number(lesson?.[1]), 'index.ts truncates a lesson past what the table accepts');
 });
 
 /* NEVER BY PRICE. A read graded on where gold went is a forecast with a score,
    and a score pulls the next read toward one — the thing the prohibitions
    exist to stop. Enforced by nothing but the sentence, in the two places the
    grader reads it. */
+test('a call is filed with the sides, outcomes and condition length the table accepts', () => {
+  const vocab = (name) => SCHEMA_SQL.match(new RegExp(`eugenia_calls_${name}_check check \\(${name} in \\(([^)]*)\\)\\)`))?.[1]
+    ?.split(',').map(v => v.trim().replace(/'/g, ''));
+  assert.deepEqual(vocab('direction'), [...CALL_SIDES], 'make_call files a side the table refuses');
+  assert.deepEqual(vocab('outcome'), [...CALL_OUTCOMES], 'the scoring writes an outcome the table refuses');
+  const length = SCHEMA_SQL.match(/eugenia_calls_condition_length check \(char_length\(condition\) between 1 and (\d+)\)/);
+  assert.equal(CALL_MAX, Number(length?.[1]), 'make_call truncates a condition past what the table accepts');
+});
+
 test('a read is judged by the test she stated, never by where price went', () => {
   const consolidate = CONSOLIDATE.replace(/\s+/g, ' ');
   assert.match(consolidate, /a read is never judged by where price went/,
@@ -3566,6 +3622,48 @@ test('TRIM counts too, last, because replies broke the rule the critic fixed', (
    there would have her pronounce on what no row can see.
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* ─── Her own calls ──────────────────────────────────────────────────────────
+   A level about what comes next is allowed in one shape only: a call filed with
+   make_call, on his rules, scored that night. Three things hold it, and each
+   is a sentence or a tool set. The writer files before she says; both gates,
+   which REWRITE and run last, keep a filed call whole and its numbers
+   unchanged, and keep none while he holds a position; and the trade look,
+   which reaches him in one, is never offered the tool. Scoring runs before
+   the pass reads, or the pass reads yesterday.
+   ─────────────────────────────────────────────────────────────────────────── */
+test('a call is filed before it is said, kept whole by both gates, and never made on the trade look', () => {
+  const bodies = Object.fromEntries(
+    [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)]
+      .map(m => [m[1], m[2].replace(/\s+/g, ' ')]));
+  assert.match(bodies.SYSTEM, /FILE IT, THEN SAY IT\. Call make_call first/,
+    'SYSTEM no longer has her file a call before she says it — an unfiled call is never scored');
+  assert.match(bodies.SYSTEM, /said without filing them is a tip nobody scores/,
+    'the prohibitions no longer confine a forward level to a filed call');
+  assert.match(bodies.SYSTEM, /No trade management — never what to do with a position he holds/,
+    'SYSTEM no longer forbids telling him what to do with his position');
+  assert.match(bodies.SYSTEM, /no call while he has a position open, unless he asks for one/,
+    'SYSTEM may make a call unprompted while he holds a position');
+  for (const gate of ['CRITIC', 'TRIM']) {
+    assert.match(bodies[gate], /YOUR CALL IS THE ONE EXCEPTION/,
+      `${gate} no longer spares a filed call, so the last pass cuts the one level that was scored`);
+    assert.match(bodies[gate], /numbers? (?:are|is) never changed|never a number in it changed/,
+      `${gate} may change a number in a filed call, so what he reads is not what is scored`);
+  }
+  assert.match(bodies.TRADE_EVENT, /anything about where price goes/,
+    'the trade look no longer carries the flat ban');
+
+  const list = (set) => EUGENIA_TS.match(new RegExp(`const ${set}(?:: unknown\\[\\])? = \\[([\\s\\S]*?)\\];`))?.[1] ?? '';
+  assert.match(list('CHAT_TOOLS'), /CALL_TOOL/, 'make_call is not offered where she makes calls');
+  for (const set of ['TRADE_TOOLS', 'CONSOLIDATE_TOOLS', 'CRITIC_TOOLS']) {
+    assert.doesNotMatch(list(set), /CALL_TOOL/, `${set} offers make_call`);
+  }
+
+  const pass = uncomment(bodyOf(EUGENIA_TS, 'async function postConsolidation('));
+  assert.ok(pass.indexOf('await scoreCalls()') > -1 &&
+            pass.indexOf('await scoreCalls()') < pass.indexOf("ask([{ role: 'user', content: asked }]"),
+    'the calls are not scored before the pass reads them, so it judges yesterday');
+});
+
 test('a printed level may be named, never beside her read, in the writer and both gates', () => {
   const bodies = Object.fromEntries(
     [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)]
@@ -3579,7 +3677,7 @@ test('a printed level may be named, never beside her read, in the writer and bot
   }
 });
 
-test('a plan he gives her is checked against his rules, and the levels stay his', () => {
+test('a plan he gives her is checked against his rules and his sequence, and the levels stay his', () => {
   const body = (name) => EUGENIA_PROMPT.match(new RegExp(`export const ${name} = \`([\\s\\S]*?)\`;`))[1]
     .replace(/\s+/g, ' ');
   const system = body('SYSTEM');
@@ -3587,26 +3685,39 @@ test('a plan he gives her is checked against his rules, and the levels stay his'
   assert.ok(at > -1, 'SYSTEM no longer tells her how to check a plan he has not taken');
   const section = system.slice(at, system.indexOf('WHEN HE SENDS A CHART', at));
   assert.match(section, /THE LEVELS STAY HIS\. Never suggest a different entry, stop or target/,
-    'the plan check no longer forbids her offering levels of her own — that is the signal, by another door');
+    'the plan check no longer forbids her offering levels of her own in place of his');
+  assert.match(section, /THEN SAY WHETHER YOU WOULD TAKE IT/,
+    'the plan check no longer ends in whether she would take it, which is what he asked');
+  assert.match(section, /Read §4 and §6 with get_strategy before you judge a step/,
+    'she judges his setup against her idea of one rather than the sequence he wrote');
 
   const trim = body('TRIM');
   assert.match(trim, /check of a plan he gave you against his own rules stays/,
     'TRIM no longer keeps a plan check, so the gate on every reply can cut the one she was asked for');
+  assert.match(trim, /your judgment of his setup and whether you would take it/,
+    'TRIM no longer keeps her judgment of his setup');
   assert.match(trim, /A level YOU offer in place of his/,
     'TRIM no longer removes a level she offers in place of his');
 
-  // Every rule cited is one a journal row can answer, or R-08, whose step 4 is
-  // arithmetic on the numbers he gave.
+  /* TWO HALVES, TWO KINDS OF RULE. What a row can answer cites §7's journal rules
+     or R-08's arithmetic; the sequence is R-08's steps, whose levels and
+     confirmation are judgment rules. Every citation must exist in the table. */
   const rows = [...ALWAYS.matchAll(/^\| (R-\d+) \|.*\| (journal|judgment) \|/gm)];
   const journal = new Set(rows.filter(m => m[2] === 'journal').map(m => m[1]));
-  assert.ok(journal.size >= 10, `read ${journal.size} journal rules out of §7 — the reader has gone blind`);
-  const cited = [...new Set(section.match(/R-\d+/g))];
-  assert.ok(cited.length >= 8, `the plan check cites ${cited.length} rules — the reader has gone blind`);
-  for (const r of cited) {
+  const judgment = new Set(rows.filter(m => m[2] === 'judgment').map(m => m[1]));
+  assert.ok(journal.size >= 10 && judgment.size >= 4,
+    `read ${journal.size} journal and ${judgment.size} judgment rules out of §7 — the reader has gone blind`);
+  const half = (from, to) => section.slice(section.indexOf(from), section.indexOf(to));
+  const byRow = [...new Set(half('AGAINST THE RULES A ROW CAN ANSWER', 'AGAINST HIS PRE-TRADE SEQUENCE').match(/R-\d+/g))];
+  assert.ok(byRow.length >= 8, `the row half cites ${byRow.length} rules — the reader has gone blind`);
+  for (const r of byRow) {
     assert.ok(journal.has(r) || r === 'R-08',
-      `the plan check cites ${r}, which §7 does not mark journal — she would be ` +
-      `pronouncing on a judgment rule no row can see`);
+      `the row half cites ${r}, which §7 does not mark journal — a row cannot answer it`);
   }
+  const bySequence = [...new Set(half('AGAINST HIS PRE-TRADE SEQUENCE', 'THEN SAY WHETHER').match(/R-\d+/g))];
+  assert.deepEqual(bySequence.sort(), ['R-05', 'R-06', 'R-07', 'R-08'],
+    'the sequence half no longer names the steps R-08 runs through');
+  for (const r of bySequence) assert.ok(judgment.has(r), `${r} is not a judgment rule in §7`);
 });
 
 test('her read on price is fenced in the writer and in both gates', () => {
@@ -3915,6 +4026,8 @@ const BY_HAND = {
   history:     'the weeks he has already traded, walked once from the date ' +
                'given so R-14 and R-19 can judge them — the nightly pass only ' +
                'ever files the week it runs in',
+  review:      'the Saturday review out of its hour — it has no retry, so a ' +
+               'failed one is made up by hand rather than a week late',
   speak:       'the briefing\'s second worker, opened by postBriefing itself ' +
                'rather than by a schedule — and by a person re-sending a ' +
                'briefing that was stored and never reached him',
@@ -4583,6 +4696,15 @@ test('the journal stats compute what the app computes, row for row', async () =>
     assert.deepEqual(money(rows), { ...app.money(rows) }, 'the money split differs');
     assert.deepEqual(averages(rows), { ...app.averages(rows) }, 'the averages differ');
 
+    /* His three answers, read off the bars the app draws: each bar's title is
+       followed/answered, Rules then Stop Loss then Take Profit. */
+    const bars = [...app.disciplineBars(rows).matchAll(/title="(\d+)\/(\d+) followed"/g)]
+      .map(m => ({ followed: Number(m[1]), answered: Number(m[2]) }));
+    const d = discipline(rows);
+    assert.deepEqual([d.rules, d.sl, d.tp], bars,
+      'his discipline answers differ from the bars on his screen — she would say ' +
+      'he followed his rules at a rate his own journal does not show');
+
     /* Every half hour of a year, so both daylight-saving seasons of all four
        centres are crossed; the boundaries are whole hours. */
     for (let at = Date.UTC(2026, 0, 1); at < Date.UTC(2027, 0, 1); at += 30 * 60_000) {
@@ -4856,13 +4978,14 @@ test('the briefing goes out as she wrote it, hello included, and the hello is he
 
 test('every message she writes goes out through sayAloud', () => {
   /* THE HALF THE FUNCTION CANNOT GUARANTEE: a path calling `say` directly works
-     and is silent. Four sites — the briefing's two (the speaking worker and
-     postBriefing's fallback), then the trade event and the reply. `/notes`, the apologies, the short operational lines and the
+     and is silent. Five sites — the briefing's two (the speaking worker and
+     postBriefing's fallback), then the Saturday review, the trade event and the
+     reply. `/notes`, the apologies, the short operational lines and the
      charm's copy keep `say` deliberately — the charm's voice is on the charm. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
-  assert.equal(spoken, 4,
-    `${spoken} call sites speak where four should — a message she writes that goes ` +
+  assert.equal(spoken, 5,
+    `${spoken} call sites speak where five should — a message she writes that goes ` +
     `out through say() alone arrives correctly and silently`);
 });
 
@@ -5880,6 +6003,20 @@ test('the refusal fallback rides only with the model it is proven on', () => {
     'the header and the field are a pair and either alone is a 400');
 });
 
+test('the effort a caller asks for is the one it runs at, and the top of every Opus request is one value', () => {
+  /* THE PREFIX IS SHARED ONLY IF THE TOP IS ONE VALUE, and the caller still
+     runs at its own effort only if the message carries it — with the beta
+     header beside it, or the message is a 400 on every call. */
+  const at = EUGENIA_TS.indexOf('async function call(');
+  const body = EUGENIA_TS.slice(at, EUGENIA_TS.indexOf('\n  if (!res.ok)', at));
+  assert.match(body, /messages: effortMessages\(messages, effort, model\)/,
+    'the conversation is sent without the caller\'s effort, so every Opus caller runs at the top one');
+  assert.match(body, /output_config: \{ effort: model === OPUS \? BASE_EFFORT : effort \}/,
+    'the top-level effort varies by caller again, so each writes its own copy of the prefix');
+  assert.match(body, /model === OPUS\s*\n?\s*\?\s*\{ "anthropic-beta": "[^"]*mid-conversation-output-config-2026-07-01/,
+    'the effort message is sent without its beta header, a 400 on every Opus call');
+});
+
 /* ─── The gate reaches every message she composes ────────────────────────────
    The briefing has the critic and every reply has TRIM, and the writing rules
    answer for both.
@@ -5914,6 +6051,7 @@ const SENDS = {
                          'Telegram received',
                     stored: 'by postBriefing — this reads the stored turn ' +
                             'rather than writing one' },
+  postReview:     { gate: 'trim',     carries: 'review' },
   handleMessage:  { gate: 'trim',     carries: 'answer', through: 'converse' },
   hearCharm:      { gate: 'trim',     carries: 'answer', through: 'converse',
                     copy: 'the charm speaks what this returns, through ' +

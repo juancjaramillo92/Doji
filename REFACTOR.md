@@ -24,7 +24,7 @@ any change that touches it.
 | retrieval quality | a golden set that does not exist |
 | the Apps Script's Gmail half | `gs.mjs` reaches the parser only |
 | an Edge Function path no test can drive | `types.test.mjs` for the names in it; the rest by reading |
-| whether a prompt still behaves | a red-team set that does not exist |
+| whether a prompt still behaves | `scripts/eval.mjs`, run by hand with his key — nothing in `npm test` calls the model |
 | the charm's firmware beyond its pure C | `charm.test.mjs`'s census for the names in it; the charm workflow's build for the rest of its code; the board itself for what it does |
 
 ---
@@ -97,6 +97,14 @@ earn its time and cost if the critic were letting rule breaks through, and in
 October 2026 it had revised every briefing since its verdicts were first
 recorded — all six, by 1 to 11 per cent. Ask `eugenia_runs` for `critic
 verdict` rows before reopening it on that ground.
+
+**Since October 2026 effort is a message on Opus** (README, *What a turn
+cost*): the top of every request carries one effort and the caller's own rides
+inside the conversation, so the effort difference that decided this is gone
+from the prefix. What still keeps the critic off the briefing's prefix is its
+array alone. Moving it — the briefing's array with `tool_choice: none` — is the
+next measurement, made by itself, with the critic's `wrote_1h` and `cached` read
+the morning after. Not before the effort change has its own morning of rows.
 
 **And the shape to carry away:** the request field that broke this was not the
 one the change touched. A cache key spans every field that renders ahead of the
@@ -234,16 +242,16 @@ produced a confident wrong answer about which line was expensive.
 memory, not about time. The question is which operator runs per row and
 whether an index can serve it, and that is a measurement rather than a reading.
 
-### R-19 — a pattern filter on what she sends, behind *no signal*
+### R-19 — a pattern filter on what she sends, behind her prohibitions
 **Why refused:** an outside review in October 2026 proposed it as the one wall
 that is not a sentence. The prohibition is about meaning, and a pattern cannot
-read meaning: a printed level is a fact she may state, and a plan he has not
-taken is checked against his own numbers. A filter strict enough to catch a
+read meaning: a printed level is a fact she may state, a plan he has not taken
+is checked against his own numbers, and a filed call carries levels by design. A filter strict enough to catch a
 paraphrased signal holds real messages, and the path the review would start
 with, the trade event, is where a held message costs most. The trade event's
 exemption from `TRIM` is deliberate, for the reason `CLAUDE.md` gives. What the
-review actually found is §1's last row: there is no red-team set, so nothing
-says whether the prompts still behave.
+review actually found was §1's last row: nothing said whether the prompts still
+behave. `scripts/eval.mjs` now asks it, by hand.
 **Revisit if:** that set exists, and shows a violation with a shape a pattern
 catches and no real message shares.
 

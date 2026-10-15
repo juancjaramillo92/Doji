@@ -617,6 +617,54 @@ on conflict (id) do nothing;
 
 alter table public.eugenia_portrait enable row level security;
 
+-- ─── What the story and the portrait said before ───────────────────────────
+-- Both are one row rewritten each night, and the portrait shapes every
+-- briefing and reply. A rewrite that loses something true about him is
+-- otherwise gone the moment it lands, with nothing to compare it against or
+-- put back. So every change keeps the text it replaced, by trigger rather than
+-- by the function, which never has to remember. Read by a person; nothing
+-- hands it to her.
+create table if not exists public.eugenia_rewrites (
+  id          bigserial primary key,
+
+  -- Which of the two, named as its table is less the prefix.
+  kind        text not null
+    constraint eugenia_rewrites_kind_check check (kind in ('thesis', 'portrait')),
+
+  -- The text that was replaced, and the day it had last moved.
+  body        text not null,
+  moved_on    date,
+
+  replaced_at timestamptz not null default now()
+);
+
+alter table public.eugenia_rewrites enable row level security;
+
+-- One function for both, since each table's text column is named as its kind.
+-- Compared as jsonb, as eugenia_calendar_touch compares, so neither column is
+-- spelled here; a rewrite to the same words keeps nothing.
+create or replace function public.eugenia_keep_rewrite()
+returns trigger
+language plpgsql
+as $$
+declare
+  kind text := replace(tg_table_name, 'eugenia_', '');
+begin
+  if to_jsonb(old) ->> kind is distinct from to_jsonb(new) ->> kind then
+    insert into public.eugenia_rewrites (kind, body, moved_on)
+      values (kind, to_jsonb(old) ->> kind, old.moved_on);
+  end if;
+  return new;
+end $$;
+
+create or replace trigger eugenia_thesis_keep
+  after update on public.eugenia_thesis
+  for each row execute function public.eugenia_keep_rewrite();
+
+create or replace trigger eugenia_portrait_keep
+  after update on public.eugenia_portrait
+  for each row execute function public.eugenia_keep_rewrite();
+
 -- ─── Her record ────────────────────────────────────────────────────────────
 -- Every read she gave, filed by the nightly pass with a verdict on the test
 -- she stated — never on where price went. A row per read; she is handed the
@@ -642,6 +690,58 @@ create table if not exists public.eugenia_reads (
 -- What a retry's refiling lands on: the same words on the same day are one
 -- read. A plain unique index, for PostgREST's `on_conflict` to infer.
 create unique index if not exists eugenia_reads_once on public.eugenia_reads (given_on, reading);
+
+-- How firmly she said it, read off her own words at night, so her record can
+-- say whether her firm reads miss as often as her light ones; and on a miss,
+-- the one link in the chain she misread, so a miss teaches rather than counts.
+-- Added after the table, so a fresh build and the live one end with the same
+-- column order; null on every read filed before them. That a lesson rides only
+-- on a miss is the function's check: a column check may not name another.
+alter table public.eugenia_reads add column if not exists firmness text
+  constraint eugenia_reads_firmness_check check (firmness in ('light', 'firm'));
+alter table public.eugenia_reads add column if not exists lesson text
+  constraint eugenia_reads_lesson_length check (char_length(lesson) between 1 and 200);
+
+-- ─── Her own calls ─────────────────────────────────────────────────────────
+-- A paper trade she would take, on his rules, filed before she says it and
+-- scored that night on what price did. Unlike a read, a call IS judged by where
+-- price went: that is what it is for. The function checks his rules before the
+-- insert; the table holds what no insert can get around.
+create table if not exists public.eugenia_calls (
+  id           bigserial primary key,
+  made_at      timestamptz not null default now(),
+
+  -- The next 17:00 New York roll on a weekday: the session the call belongs to.
+  expires_at   timestamptz not null,
+
+  direction    text not null
+    constraint eugenia_calls_direction_check check (direction in ('buy', 'sell')),
+  entry        numeric not null,
+  stop         numeric not null,
+  target       numeric not null,
+
+  -- What price has to do before the entry is live, in words; the entry is what
+  -- is scored.
+  condition    text not null
+    constraint eugenia_calls_condition_length check (char_length(condition) between 1 and 300),
+
+  -- Null until the pass scores it, and the PATCH is filtered on that.
+  outcome      text
+    constraint eugenia_calls_outcome_check check (outcome in (
+      'won', 'lost', 'scratch', 'open', 'untriggered', 'unread')),
+  triggered_at timestamptz,
+  closed_at    timestamptz,
+  closed_price numeric,
+  -- Dollars an ounce, signed: what the call made or lost.
+  result       numeric
+);
+
+-- One call a session, as he takes one entry a day: a second in the same
+-- session meets this and is refused. A plain unique index, so the insert's
+-- 409 is the answer.
+create unique index if not exists eugenia_calls_once on public.eugenia_calls (expires_at);
+
+alter table public.eugenia_calls enable row level security;
 
 alter table public.eugenia_reads enable row level security;
 

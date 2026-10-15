@@ -28,16 +28,16 @@
 // Secrets:  EUGENIA_BOT_TOKEN, EUGENIA_WEBHOOK_SECRET, TELEGRAM_CHAT_ID,
 //           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
-import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, TRADE_EVENT, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
+import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, TRADE_EVENT, REVIEW, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // Pure and imported, so the parts that decide are testable.
 import {
-  checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker, HIGH, HOME, weekOf,
+  checkRules, adherenceList, dayStanding, DAY_LOSS, isBroker, HIGH, HOME, weekOf, FULL_STOP, TO_BREAK_EVEN,
   type TradeRow, type Standing, type Stop, type RuleResult,
 } from "./adherence.ts";
 import { journalStats, statsList } from "./journal.ts";
 import {
-  env, secretMatches, json, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY, why
+  env, secretMatches, json, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY, why, marketOpen
 } from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("EUGENIA_BOT_TOKEN");
@@ -93,12 +93,21 @@ export function consolidateRetryDue(now: Date): boolean {
   return nyClock(now).hour === 23;
 }
 
+/* The weekly review: Saturday at 10:00 New York, the one morning no market is
+   open and nothing else is due. No retry: a review a day late is about a week
+   already behind him. A failure apologises, and ?review=1 runs it by hand. */
+export function reviewDue(now: Date): boolean {
+  const { wd, hour } = nyClock(now);
+  return wd === 6 && hour === 10;
+}
+
 /* What this hour owes — one answer, because the schedules overlap and each
    being right alone settles nothing. */
 export function dueNow(now: Date, briefed: boolean, consolidated: boolean):
-    Brief | 'consolidate' | null {
+    Brief | 'consolidate' | 'review' | null {
   const brief = briefDue(now);
   if (brief) return brief;
+  if (reviewDue(now)) return 'review';
   const retry = retryDue(now);
   if (retry && !briefed) return retry;
   // The gate makes 23:00 a retry rather than a second pass.
@@ -736,8 +745,13 @@ const STATS_TOOL = {
   description:
     "The journal summarised over the last N days — win rate, wins/losses/break-evens, " +
     "gross, losses and net, average win and average loss, the realised " +
-    "reward-to-risk, how much of the total is the broker's settled figure, and " +
-    "the same broken down by session and by setup. These are " +
+    "reward-to-risk, how much of the total is the broker's settled figure, his " +
+    "own answers to whether he followed his rules, respected his stop and " +
+    "respected his target, each over the trades that answered it with the " +
+    "unanswered counted apart, and the same broken down by session and by " +
+    "setup. The rules answer is the only record of entering on the touch, §9 of " +
+    "his strategy, so a rate of it over a stretch with many blanks is a rate of " +
+    "his answering as much as of his discipline: say so. These are " +
     "the figures his own journal app shows him, computed from the rows the same " +
     "way, so they agree with what is on his screen. USE THIS RATHER THAN WORKING " +
     "IT OUT of get_trades: a break-even is measured in price and sits in the win " +
@@ -1291,6 +1305,9 @@ async function closeLoop(id: unknown, resolution: unknown): Promise<string> {
    ───────────────────────────────────────────────────────────────────────── */
 export const READ_VERDICTS = ['held', 'wrong', 'untested'] as const;
 export const READ_MAX = 300;
+// How firmly a read was said, read off her words at night: the two halves the
+// record compares, since a firm read should miss less often than a light one.
+export const READ_FIRMNESS = ['light', 'firm'] as const;
 
 const RECORD_TOOL = {
   name: "record_read",
@@ -1301,7 +1318,8 @@ const RECORD_TOOL = {
     "had its chance and did not, and what you were handed shows that; 'untested' " +
     "when the day did not settle it, what would settle it is not in front of you, " +
     "or the test was gold's own price. Judge only the test you stated, never where " +
-    "price went.",
+    "price went. Say how firmly you said it, read off your own words. On a read that " +
+    "proved wrong, name the one link in the chain you misread.",
   input_schema: {
     type: "object",
     properties: {
@@ -1309,8 +1327,12 @@ const RECORD_TOOL = {
       test: { type: "string", description: `What you said would prove it wrong, at most ${READ_MAX} characters.` },
       verdict: { type: "string", enum: READ_VERDICTS },
       evidence: { type: "string", description: `What in front of you settled it, or why nothing did, at most ${READ_MAX} characters.` },
+      firmness: { type: "string", enum: READ_FIRMNESS,
+                  description: "'firm' when you said it as a view you held with conviction; 'light' when you said it as a lean." },
+      lesson: { type: "string",
+                description: `Only when the verdict is wrong: the one link in the chain you misread, in a sentence of at most ${NOTE_MAX} characters — "I read the dollar as leading when the two-year was". Never "be more careful".` },
     },
-    required: ["reading", "test", "verdict", "evidence"],
+    required: ["reading", "test", "verdict", "evidence", "firmness"],
     additionalProperties: false,
   },
 } as const;
@@ -1319,7 +1341,7 @@ const RECORD_TOOL = {
    check constraint answers a bad one with a 400 that reads as a database
    fault. */
 async function recordRead(reading: unknown, test: unknown, verdict: unknown,
-                          evidence: unknown): Promise<string> {
+                          evidence: unknown, firmness: unknown, lesson: unknown): Promise<string> {
   const said = String(reading ?? "").trim().slice(0, READ_MAX);
   const against = String(test ?? "").trim().slice(0, READ_MAX);
   if (!said || !against) return "A read is filed with what would prove it wrong, or not at all.";
@@ -1327,6 +1349,15 @@ async function recordRead(reading: unknown, test: unknown, verdict: unknown,
   if (!(READ_VERDICTS as readonly string[]).includes(v)) {
     return `"${v}" is not a verdict. They are ${READ_VERDICTS.join(", ")}.`;
   }
+  const firm = String(firmness ?? "");
+  if (!(READ_FIRMNESS as readonly string[]).includes(firm)) {
+    return `"${firm}" is not how firmly a read was said. It is ${READ_FIRMNESS.join(" or ")}.`;
+  }
+  // A miss teaches only with the link named; a lesson on anything else is a
+  // lesson from nothing.
+  const learnt = String(lesson ?? "").trim().slice(0, NOTE_MAX);
+  if (v === 'wrong' && !learnt) return "A read that proved wrong is filed with the link you misread.";
+  if (v !== 'wrong' && learnt) return "Only a read that proved wrong carries a lesson. File it without one.";
   try {
     // A retry after a pass that failed half-way files the same reads again;
     // the same words on the same day are one read.
@@ -1335,6 +1366,7 @@ async function recordRead(reading: unknown, test: unknown, verdict: unknown,
       body: JSON.stringify([{
         given_on: nyDate(new Date()), reading: said, test: against, verdict: v,
         evidence: String(evidence ?? "").trim().slice(0, READ_MAX) || null,
+        firmness: firm, lesson: learnt || null,
       }]),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1342,6 +1374,191 @@ async function recordRead(reading: unknown, test: unknown, verdict: unknown,
   } catch (err) {
     console.error("doji-eugenia: read not filed —", why(err));
     return UNSAVED;
+  }
+}
+
+/* ─── Her own calls ────────────────────────────────────────────────────────
+   A coach who cannot do the thing is not one, so she trades on paper, on HIS
+   rules, and is scored on price. A call is filed before it is said, so nothing
+   she offers escapes the record: a call in words alone is a tip nobody scores.
+
+   The rules are checked here rather than trusted to the prompt, the way
+   adherence.ts checks his: the stop no further than the $20 a full stop is
+   (R-02), the target $25 to $30 away (R-01), the reward at least one and a half
+   times the risk (R-08's fourth step). One call a session, as he takes one
+   entry a day (R-12), and it lives until the next 17:00 New York roll on a
+   weekday — a unique index on that instant is the whole of the one-a-session
+   rule.
+   ───────────────────────────────────────────────────────────────────────── */
+export const CALL_SIDES = ['buy', 'sell'] as const;
+// R-01's two targets, the exception and the default.
+export const TARGET_MIN = 25, TARGET_MAX = 30;
+// R-08's fourth step, at entry.
+export const RR_MIN = 1.5;
+export const CALL_MAX = 300;
+
+const MINUTE = 60_000;
+const HOUR = 3_600_000;
+
+const CALL_TOOL = {
+  name: "make_call",
+  description:
+    "File your own call — a trade you would take, by HIS rules — so that it is scored " +
+    "on price tonight. File it before you say it; a call you only say is never scored. " +
+    "The stop at most $" + FULL_STOP + " from entry, the target $" + TARGET_MIN + " to $" +
+    TARGET_MAX + " from it, the reward at least " + RR_MIN + " times the risk; one call a " +
+    "session, living until the next 17:00 New York roll. The condition is what price has " +
+    "to do before the entry is live, in his words for it — a retest, a candle closing " +
+    "back above a level — or 'at the market' for now. The entry is the price you would " +
+    "be filled at once it is met, and it is what is scored.",
+  input_schema: {
+    type: "object",
+    properties: {
+      direction: { type: "string", enum: CALL_SIDES },
+      entry:     { type: "number", description: "The price you would be filled at." },
+      stop:      { type: "number", description: "Where the idea is wrong." },
+      target:    { type: "number", description: "Where you take it." },
+      condition: { type: "string", description: `What price has to do first, at most ${CALL_MAX} characters.` },
+    },
+    required: ["direction", "entry", "stop", "target", "condition"],
+    additionalProperties: false,
+  },
+} as const;
+
+/* His rules, as a sentence she can act on, or null. Pure, so each is driven
+   both ways. */
+export function callProblem(direction: unknown, entry: number, stop: number, target: number): string | null {
+  if (!(CALL_SIDES as readonly unknown[]).includes(direction)) return `A call is ${CALL_SIDES.join(" or ")}.`;
+  if (![entry, stop, target].every(n => Number.isFinite(n) && n > 0)) return "A call needs an entry, a stop and a target, as prices.";
+  const buy = direction === 'buy';
+  if (buy ? !(stop < entry && entry < target) : !(target < entry && entry < stop)) {
+    return `A ${direction} has its stop ${buy ? "below" : "above"} the entry and its target ${buy ? "above" : "below"} it.`;
+  }
+  const risk = Math.abs(entry - stop), reward = Math.abs(target - entry);
+  if (risk > FULL_STOP) return `The stop is $${risk.toFixed(2)} away; R-02 allows $${FULL_STOP} at most.`;
+  if (reward < TARGET_MIN || reward > TARGET_MAX) {
+    return `The target is $${reward.toFixed(2)} away; R-01 takes $${TARGET_MAX}, or $${TARGET_MIN} where the level is hard to reach.`;
+  }
+  if (reward / risk < RR_MIN) return `That is 1:${(reward / risk).toFixed(2)}; R-08 asks for 1:${RR_MIN} at entry.`;
+  return null;
+}
+
+/* The next 17:00 New York roll on a weekday, strictly after the call: the
+   gold session it belongs to. Walked by the hour, since New York moves by
+   whole hours. */
+export function expiryOf(made: Date): Date {
+  let t = Math.floor(made.getTime() / HOUR) * HOUR + HOUR;
+  for (;;) {
+    const { wd, hour } = nyClock(new Date(t));
+    if (hour === ROLL_HOUR && wd >= 1 && wd <= 5) return new Date(t);
+    t += HOUR;
+  }
+}
+
+/* Never throws, for writeNote's reason. A second call in a session meets the
+   unique index and is told so, not stored. */
+async function makeCall(direction: unknown, entry: unknown, stop: unknown, target: unknown,
+                        condition: unknown): Promise<string> {
+  const [e, s, t] = [entry, stop, target].map(Number);
+  const problem = callProblem(direction, e, s, t);
+  if (problem) return `${problem} Not filed; a call off his rules is not one you make.`;
+  const when = String(condition ?? "").trim().slice(0, CALL_MAX);
+  if (!when) return "Say what price has to do first, or 'at the market'. Not filed.";
+  const made = new Date();
+  const until = expiryOf(made);
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/eugenia_calls`, {
+      method: "POST", headers: sbHeaders("return=minimal"),
+      body: JSON.stringify([{ made_at: made.toISOString(), expires_at: until.toISOString(),
+                              direction, entry: e, stop: s, target: t, condition: when }]),
+    });
+    if (res.status === 409) {
+      return "You already made this session's call, and it stands until the 17:00 roll. Say that rather than making another.";
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return `Filed: ${direction} ${e}, stop ${s}, target ${t}, until ${nyTime(until.toISOString())} ET ${weekday(nyDate(until))}.`;
+  } catch (err) {
+    console.error("doji-eugenia: call not filed —", why(err));
+    return "That call did not file, so it will not be scored. Do not state it as one.";
+  }
+}
+
+/* ─── Scoring a call on what price did ─────────────────────────────────────
+   In code, at night, off the broker's minute bars: a model asked whether a
+   target was hit before a stop is the arithmetic a model does worst. Every
+   doubt goes against her: on the bar that filled her, only the stop counts;
+   a bar touching both stop and target is a loss; the stop moves to break-even
+   at +$20 as R-04 moves his, from the bar after the one that reached it, since
+   a bar's high and low cannot say which came first. The condition is hers to
+   state and is not checked; the entry is what is scored. A call whose session
+   the bars do not reach is `unread`, never a guess.
+   ───────────────────────────────────────────────────────────────────────── */
+export const CALL_OUTCOMES = ['won', 'lost', 'scratch', 'open', 'untriggered', 'unread'] as const;
+
+export type Candle = { t: number; open: number; high: number; low: number; close: number };
+export type Call = { id: number; made_at: string; expires_at: string; direction: string;
+                     entry: number; stop: number; target: number; condition: string;
+                     outcome: string | null; result: number | null };
+export type Score = { outcome: typeof CALL_OUTCOMES[number]; triggered_at: string | null;
+                      closed_at: string | null; closed_price: number | null; result: number | null };
+
+export function scoreCall(c: Call, candles: Candle[], from: number): Score {
+  const made = Date.parse(c.made_at), ends = Date.parse(c.expires_at);
+  const none = { triggered_at: null, closed_at: null, closed_price: null, result: null };
+  // The market was open somewhere between the call and the first bar served.
+  for (let h = made; h < from; h += HOUR) if (marketOpen(new Date(h))) return { outcome: 'unread', ...none };
+
+  const start = Math.ceil(made / MINUTE) * MINUTE;
+  const bars = candles.filter(b => b.t >= start && b.t + MINUTE <= ends);
+  const buy = c.direction === 'buy';
+  const at = bars.findIndex(b => b.low <= c.entry && c.entry <= b.high);
+  if (at < 0) return { outcome: 'untriggered', ...none };
+
+  const gain = (p: number) => Math.round((buy ? p - c.entry : c.entry - p) * 100) / 100;
+  const close = (b: Candle, price: number, outcome: Score['outcome']): Score => ({
+    outcome, triggered_at: new Date(bars[at].t).toISOString(),
+    closed_at: new Date(b.t + MINUTE).toISOString(), closed_price: price, result: gain(price),
+  });
+  let stop = c.stop;
+  for (let i = at; i < bars.length; i++) {
+    const b = bars[i];
+    if (buy ? b.low <= stop : b.high >= stop) return close(b, stop, stop === c.entry ? 'scratch' : 'lost');
+    if (i > at && (buy ? b.high >= c.target : b.low <= c.target)) return close(b, c.target, 'won');
+    if (gain(buy ? b.high : b.low) >= TO_BREAK_EVEN) stop = c.entry;
+  }
+  const last = bars[bars.length - 1];
+  return close(last, last.close, 'open');
+}
+
+/* Tonight's scoring: every call whose session has ended and is not yet scored,
+   against one read of the bars. The PATCH is filtered on `outcome is null`, so
+   a retry never rescores one. Both outcomes are a row; never throws. */
+async function scoreCalls(): Promise<void> {
+  try {
+    const due = await readRows<Call>('Calls',
+      `eugenia_calls?select=*&outcome=is.null&expires_at=lte.${new Date().toISOString()}` +
+      `&order=id.desc&limit=10`);
+    if (!due.length) return;
+    const res = await fetch(`${SB_URL}/functions/v1/doji-mcp-sync?bars=1`, {
+      headers: { "x-doji-key": CRON_SECRET }, signal: AbortSignal.timeout(READ_MS),
+    });
+    if (!res.ok) throw new Error(`bars: HTTP ${res.status}`);
+    const served = await res.json();
+    if (!served?.ok || !Array.isArray(served.bars)) throw new Error("bars: no readable answer");
+    const scored: string[] = [];
+    for (const c of due) {
+      const score = scoreCall(c, served.bars, served.from);
+      const put = await fetch(`${SB_URL}/rest/v1/eugenia_calls?id=eq.${c.id}&outcome=is.null`, {
+        method: "PATCH", headers: sbHeaders("return=representation"), body: JSON.stringify(score),
+      });
+      if (!put.ok) throw new Error(`call ${c.id}: HTTP ${put.status}`);
+      if ((await put.json()).length) scored.push(`${c.id} ${score.outcome}`);
+    }
+    await recordRun({ caller: 'calls', ok: true, detail: `scored ${scored.length}: ${scored.join(", ")}` });
+  } catch (err) {
+    const reason = why(err);
+    console.error("doji-eugenia: calls not scored —", reason);
+    await recordRun({ caller: 'calls', ok: false, detail: reason.slice(0, 500) });
   }
 }
 
@@ -1397,6 +1614,7 @@ const CHAT_TOOLS = [
   SEARCH_TOOL,
   STRATEGY_TOOL,
   LOOP_TOOL,
+  CALL_TOOL,
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, PORTRAIT_TOOL, CLOSE_TOOL,
                            RECORD_TOOL, CHECK_TOOL, STATS_TOOL];
@@ -1432,6 +1650,21 @@ const MODELS: Record<string, string> = {
 
 export const modelFor = (label: string): string => MODELS[label] ?? OPUS;
 
+/* One effort at the top of every Opus request, and the caller's own as an
+   effort-only system message at the head of `messages`. The top-level effort
+   renders ahead of the tools and the system prompt, so two callers on one
+   array at two efforts each wrote their own copy of the same prefix: the
+   briefing at `high` read nothing the replies at `medium` wrote (R-15). Said
+   as a message, the effort changes nothing before it, and every caller on an
+   array shares one prefix. A beta, so a header, and with Opus alone, as
+   `fallbacks` is. */
+export const BASE_EFFORT: Effort = 'high';
+
+export const effortMessages = (messages: any[], effort: Effort, model: string): any[] =>
+  model === OPUS && effort !== BASE_EFFORT
+    ? [{ role: "system", content: [], output_config: { effort } }, ...messages]
+    : messages;
+
 async function call(messages: any[], effort: Effort, tools: unknown[],
                     model: string, signal: AbortSignal, container?: string) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -1445,7 +1678,7 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
       // decline there costs nothing a fallback would save. The header and the
       // field go together.
       ...(model === OPUS
-          ? { "anthropic-beta": "server-side-fallback-2026-07-01" }
+          ? { "anthropic-beta": "server-side-fallback-2026-07-01,mid-conversation-output-config-2026-07-01" }
           : {}),
       "content-type": "application/json",
     },
@@ -1456,18 +1689,18 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
          rides here. The window is a property of the tool ARRAY, where the key
          starts: each array is its own prefix. The chat array keeps the hour
          because fourteen of a week's eighteen replies came within an hour of the
-         turn before, six within five minutes. The briefing shares that array,
-         never reuses it, and pays 2× for the write. Everything else is five
+         turn before, six within five minutes. The briefing shares that array
+         and, its effort a message, the prefix too. Everything else is five
          minutes, which the rounds within a turn keep alive. `ttl` is a plain
          field, not a beta. */
       system: [{ type: "text", text: SYSTEM + ALWAYS,
                  cache_control: { type: "ephemeral",
                                   ttl: tools === CHAT_TOOLS ? "1h" : "5m" } }],
-      messages,
+      messages: effortMessages(messages, effort, model),
       // Server tools need no loop here; the rest are executed below.
       tools,
       thinking: { type: "adaptive" },
-      output_config: { effort },
+      output_config: { effort: model === OPUS ? BASE_EFFORT : effort },
       // A decline would otherwise cost the briefing and a retry's searches.
       // `fallbacks: "default"` re-runs on another model inside this call,
       // routed by refusal category; a decline before output is not billed.
@@ -1521,7 +1754,10 @@ export async function serve(name: string, input: any): Promise<string> {
     case PORTRAIT_TOOL.name: return await setPortrait(input.portrait);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
     case CLOSE_TOOL.name:    return await closeLoop(input.id, input.resolution);
-    case RECORD_TOOL.name:   return await recordRead(input.reading, input.test, input.verdict, input.evidence);
+    case CALL_TOOL.name:     return await makeCall(input.direction, input.entry, input.stop, input.target,
+                                               input.condition);
+    case RECORD_TOOL.name:   return await recordRead(input.reading, input.test, input.verdict, input.evidence,
+                                                 input.firmness, input.lesson);
     default:
       console.error(`doji-eugenia: no handler for tool "${name}"`);
       return unserved(name);
@@ -2082,7 +2318,7 @@ type Channel = { channel: string; state: string; evidence: string | null; moved_
 export function notesList(told: Note[], noticed: Note[], channels: Channel[],
                           loops: Loop[] = [], story: Thesis | null = null,
                           promised: Note[] = [], portrait: Portrait | null = null,
-                          record: Read[] = []): string {
+                          record: Read[] = [], calls: Call[] = []): string {
   const list = (ns: Note[]) => inWindow(ns).map(noteLine).join("\n");
   const missed = misses(record);
   // Not loopsList, which is written to her about her own threads.
@@ -2107,6 +2343,7 @@ export function notesList(told: Note[], noticed: Note[], channels: Channel[],
       ? `My reads over the last ${RECORD_DAYS} days, each judged by the test I stated and never by ` +
         `where price went: ${tally(record)}.` + (missed ? `\nThe latest I got wrong:\n${missed}` : "")
       : "",
+    callsList(calls, Date.now(), "My").trim(),
     `Where you stand on each channel:\n${channelsList(channels)}`,
   ].filter(Boolean).join("\n\n");
 }
@@ -2292,7 +2529,8 @@ export async function portraitBlock(): Promise<string> {
    short enough that it is about how she reads now. The three newest misses
    come with it, because a count says how often and only the misses say what
    she keeps getting wrong. */
-type Read = { given_on: string; reading: string; test: string; verdict: string; evidence: string | null };
+type Read = { given_on: string; reading: string; test: string; verdict: string; evidence: string | null;
+              firmness: string | null; lesson: string | null };
 
 const RECORD_DAYS = 30;
 const RECORD_MISSES = 3;
@@ -2300,15 +2538,24 @@ const RECORD_MISSES = 3;
 // A read a message at most, so a month is never near the limit; it is there
 // because every read carries one.
 export function recordQuery(now = Date.now()): string {
-  return `eugenia_reads?select=given_on,reading,test,verdict,evidence` +
+  return `eugenia_reads?select=given_on,reading,test,verdict,evidence,firmness,lesson` +
     `&given_on=gte.${nyDate(new Date(now - RECORD_DAYS * 86_400_000))}&order=id.desc&limit=200`;
 }
 
-const tally = (rows: Read[]) => READ_VERDICTS.map(v =>
+const count = (rows: Read[]) => READ_VERDICTS.map(v =>
   `${rows.filter(r => r.verdict === v).length} ${v === 'wrong' ? 'proved wrong' : v}`).join(", ");
 
+/* The whole month, then each firmness on its own: a firm read should miss less
+   often than a light one, and only the split can say whether it does. Reads
+   filed before firmness was asked are in the whole and in neither half. */
+const tally = (rows: Read[]) => count(rows) + READ_FIRMNESS
+  .map(f => [f, rows.filter(r => r.firmness === f)] as const)
+  .filter(([, said]) => said.length)
+  .map(([f, said]) => `; said ${f === 'firm' ? 'firmly' : 'lightly'}, ${count(said)}`).join("");
+
 const misses = (rows: Read[]) => rows.filter(r => r.verdict === 'wrong').slice(0, RECORD_MISSES)
-  .map(r => `· ${civilDay(r.given_on)}: ${r.reading} (wrong if ${r.test}) — ${r.evidence ?? 'its test fired'}`)
+  .map(r => `· ${civilDay(r.given_on)}: ${r.reading} (wrong if ${r.test}) — ${r.evidence ?? 'its test fired'}` +
+            (r.lesson ? `. Misread: ${r.lesson}` : ""))
   .join("\n");
 
 export function recordList(rows: Read[]): string {
@@ -2323,6 +2570,43 @@ export async function recordBlock(): Promise<string> {
     return recordList(await readRows<Read>('Reads', recordQuery()));
   } catch (err) {
     console.error("doji-eugenia: record unavailable —", why(err));
+    return "";
+  }
+}
+
+/* Her calls, the month of them, scored on price: how many triggered and how
+   they ended, what the triggered ones made an ounce, the newest losses, and any
+   call still standing, so she says it stands rather than making another. To the
+   briefing, a reply and the pass, as the record goes; never the trade look. */
+export function callsQuery(now = Date.now()): string {
+  return `eugenia_calls?select=*` +
+    `&made_at=gte.${new Date(now - RECORD_DAYS * 86_400_000).toISOString()}&order=id.desc&limit=60`;
+}
+
+const callLine = (c: Call) =>
+  `${c.direction} ${c.entry}, stop ${c.stop}, target ${c.target}, if ${c.condition}`;
+
+export function callsList(rows: Call[], now = Date.now(), to = "Your"): string {
+  if (!rows.length) return "";
+  const scored = rows.filter(c => c.outcome);
+  const by = (o: string) => scored.filter(c => c.outcome === o).length;
+  const traded = scored.filter(c => c.result !== null);
+  const net = Math.round(traded.reduce((sum, c) => sum + Number(c.result), 0) * 100) / 100;
+  const standing = rows.filter(c => !c.outcome && Date.parse(c.expires_at) > now);
+  const lost = scored.filter(c => c.outcome === 'lost').slice(0, RECORD_MISSES);
+  return `\n\n${to} calls over the last ${RECORD_DAYS} days, scored on price by his rules: ` +
+    `${rows.length} made; ${CALL_OUTCOMES.map(o => `${by(o)} ${o}`).join(", ")}` +
+    (rows.length > scored.length + standing.length ? `, ${rows.length - scored.length - standing.length} not yet scored` : "") + `.` +
+    (traded.length ? ` The ${traded.length} that triggered made ${net >= 0 ? "+" : "-"}$${Math.abs(net).toFixed(2)} an ounce.` : "") +
+    (standing.length ? `\nStanding until the 17:00 roll: ${standing.map(callLine).join("; ")}.` : "") +
+    (lost.length ? `\nThe latest lost:\n${lost.map(c => `· ${civilDay(nyDate(new Date(c.made_at)))}: ${callLine(c)}`).join("\n")}` : "");
+}
+
+export async function callsBlock(): Promise<string> {
+  try {
+    return callsList(await readRows<Call>('Calls', callsQuery()));
+  } catch (err) {
+    console.error("doji-eugenia: calls unavailable —", why(err));
     return "";
   }
 }
@@ -2929,6 +3213,7 @@ export const APOLOGY: Record<string, string> = {
   trade:        "Something broke while I was looking at your position, jefe.",
   embed:        "I could not file what I remember for searching, jefe.",
   speak:        "Your briefing is written, jefe, but I could not send it. Ask me for it.",
+  review:       "Your weekly review broke on my side, jefe. Ask me and I will go through your week.",
   reply:        "Something broke on my side, jefe. Try again in a moment.",
 };
 
@@ -2965,6 +3250,9 @@ async function postScheduled(url: URL): Promise<Response> {
     const speak = url.searchParams.get("speak");
     if (speak) { job = 'speak'; return await postSpeak(speak); }
 
+    // The weekly review, by hand: a failed Saturday has no retry.
+    if (url.searchParams.get("review") === "1") { job = 'review'; return await postReview(); }
+
     const now = new Date();
     if (url.searchParams.get("force") === "1") {
       return await postBriefing(briefDue(now) ?? briefKind(now));
@@ -2974,6 +3262,7 @@ async function postScheduled(url: URL): Promise<Response> {
     const [briefed, consolidated] = await Promise.all([briefedToday(), consolidatedToday()]);
     const due = dueNow(now, briefed, consolidated);
     if (due === 'consolidate') { job = 'consolidate'; return await postConsolidation(); }
+    if (due === 'review') { job = 'review'; return await postReview(); }
     if (due) return await postBriefing(due);
 
     return json({ ok: true, skipped: "nothing due this hour" });
@@ -3136,11 +3425,11 @@ async function postBriefing(due: Brief): Promise<Response> {
   await (due === 'sunday' ? filedWeek(weekOf(new Date())) : filed());
   // Every read at once: independent and small, so the batch costs its slowest.
   const [price, around, rates, crowd, traded, notes, portrait, channels, trades, breaches, story, health, loops,
-         calendar, desk, record] =
+         calendar, desk, record, calls] =
     await Promise.all([
       marketBlock(), aroundBlock(), ratesBlock(), due === 'sunday' ? positioningBlock() : "", volumeBlock(),
       notesBlock(), portraitBlock(), channelsBlock(), tradesBlock(), breachesBlock(), thesisBlock(), healthBlock(),
-      loopsBlock(), due === 'sunday' ? weekBlock() : calendarBlock(), positionsBlock(), recordBlock(),
+      loopsBlock(), due === 'sunday' ? weekBlock() : calendarBlock(), positionsBlock(), recordBlock(), callsBlock(),
     ]);
 
   const asked = (due === 'sunday'
@@ -3149,7 +3438,7 @@ async function postBriefing(due: Brief): Promise<Response> {
     // `health` first: if the journal stopped, everything after it may be
     // missing rows.
     + health + price + around + rates + crowd + traded + notes + portrait + channels + trades + breaches + story
-    + loops + calendar + desk + record;
+    + loops + calendar + desk + record + calls;
 
   const left = () => Math.max(0, opened + WRITER_MS - Date.now());
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
@@ -3234,6 +3523,32 @@ export async function postSpeak(due: string): Promise<Response> {
   return json({ ok: true, spoke: due, heard });
 }
 
+/* ─── The weekly review ────────────────────────────────────────────────────
+   Every coach has a cadence that is not about one trade: a look at the week's
+   process. Saturday, when no market is open, so it lands on nothing he is in
+   the middle of. She is handed the week computed — his stats with his own
+   answers, his rules, her calls — so nothing in it is counted by eye. TRIM
+   gates it, as every message she starts but the briefing and the trade look.
+   ───────────────────────────────────────────────────────────────────────── */
+export const reviewMarker = '[saturday review]';
+
+// His journal and his rules, to look at one trade or read why a rule exists.
+const REVIEW_TOOLS = [TRADES_TOOL, STRATEGY_TOOL];
+
+async function postReview(): Promise<Response> {
+  const [history, notes, portrait, stats, rules, calls, record, desk, story] = await Promise.all([
+    recent(), notesBlock(), portraitBlock(), readStats(7), checkAdherence(7), callsBlock(), recordBlock(),
+    positionsBlock(), thesisBlock(),
+  ]);
+  const asked = `${REVIEW}\n\nHis week, computed from the rows:\n${stats}\n\nHis rules over the week:\n${rules}` +
+    notes + portrait + calls + record + desk;
+  const draft = await ask([...history, { role: 'user', content: asked }], 'high', 'saturday review', REVIEW_TOOLS);
+  const review = await trim(draft, desk, story);
+  await remember([{ role: 'user', content: reviewMarker }, { role: 'assistant', content: review }]);
+  await sayAloud(review);
+  return json({ ok: true, reviewed: review.length });
+}
+
 /* How silence is said. The whole reply, allowing a full stop; "Nothing much
    has changed except…" is news and goes through. Err toward sending: a
    swallowed message is invisible. */
@@ -3299,6 +3614,8 @@ export async function feedbackBlock(): Promise<string> {
 }
 
 async function postConsolidation(): Promise<Response> {
+  // Scored first, so the pass reads tonight's outcomes; never throws.
+  await scoreCalls();
   const day = await turnsSince(CONSOLIDATE_HOURS);
 
   /* A silent day skips the model call but still leaves a row, or 23:00 runs it
@@ -3311,15 +3628,15 @@ async function postConsolidation(): Promise<Response> {
   // differently, which most days' transcripts never mention. And the market
   // around gold and the Fed pricing as they closed, which is what a read's
   // stated test is judged against.
-  const [notes, portrait, channels, trades, story, loops, calendar, verdicts, desk, record, around, rates] =
+  const [notes, portrait, channels, trades, story, loops, calendar, verdicts, desk, record, calls, around, rates] =
     await Promise.all([
       notesBlock(), portraitBlock(), channelsBlock(), tradesBlock(),
       thesisBlock(), loopsBlock(), calendarBlock(), feedbackBlock(), positionsBlock(), recordBlock(),
-      aroundBlock(), ratesBlock(),
+      callsBlock(), aroundBlock(), ratesBlock(),
     ]);
 
   const asked = CONSOLIDATE + notes + portrait + channels + trades + story + loops + calendar +
-    verdicts + desk + record + around + rates +
+    verdicts + desk + record + around + rates + calls +
     `\n\nThe day, oldest first:\n\n` +
     day.map(t => `${t.role === 'user' ? 'him' : 'you'}: ${t.content}`).join("\n\n");
 
@@ -3594,9 +3911,9 @@ async function handleFeedback(query: any): Promise<void> {
    stored, like the rest of the context. "" from Telegram. */
 async function converse(text: string, blocks: any[], quoting: Promise<string | null>,
                         device: string): Promise<{ asked: string; answer: string; volume: number | null }> {
-  const [history, notes, portrait, channels, story, loops, calendar, desk, record, quoted] = await Promise.all([
+  const [history, notes, portrait, channels, story, loops, calendar, desk, record, calls, quoted] = await Promise.all([
     recent(), notesBlock(), portraitBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
-    calendarBlock(), positionsBlock(), recordBlock(), quoting,
+    calendarBlock(), positionsBlock(), recordBlock(), callsBlock(), quoting,
   ]);
   // A marker with the opening words is stored, so the nightly pass knows
   // which message "too long" was about; the quote itself is not.
@@ -3612,7 +3929,8 @@ async function converse(text: string, blocks: any[], quoting: Promise<string | n
     `\n\nYour answer reaches him as a voice note, so write it ` +
     `to be heard: plain sentences, no headings, and nothing that only works ` +
     `on a page. Its length is whatever the answer needs.`;
-  const context = asked + about + aloud + device + notes + portrait + channels + story + loops + calendar + desk + record;
+  const context = asked + about + aloud + device + notes + portrait + channels + story + loops + calendar + desk + record +
+    calls;
   const draft = await ask(
     [...history, {
       role: 'user',
@@ -3703,11 +4021,12 @@ async function handleMessage(update: any): Promise<void> {
     if (text.trim().toLowerCase() === '/notes') {
       try {
         // Everything she keeps that he cannot otherwise see, in one message.
-        const [told, noticed, channels, loops, story, promised, portrait, record] = await Promise.all([
+        const [told, noticed, channels, loops, story, promised, portrait, record, calls] = await Promise.all([
           readNotes('instruction'), readNotes('fact'), readChannels(), readLoops(), readThesis(),
           readNotes('commitment'), readPortrait(), readRows<Read>('Reads', recordQuery()),
+          readRows<Call>('Calls', callsQuery()),
         ]);
-        await say(notesList(told, noticed, channels, loops, story, promised, portrait, record));
+        await say(notesList(told, noticed, channels, loops, story, promised, portrait, record, calls));
       } catch (err) {
         console.error("doji-eugenia: notes unavailable —", why(err));
         await say("I cannot read my notes just now, jefe.");
