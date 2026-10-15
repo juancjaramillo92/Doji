@@ -744,6 +744,10 @@ when a suspicious row gets looked at.
 - **`?bars=raw`** returns fifteen minutes of `M_1` bars at six ages — now, and
   7, 30, 90, 180 and 365 days back, each moved to a Tuesday–Thursday 14:00 UTC —
   one request at a time, since a single `504` took the batch with it.
+- **`?bars=1`** returns the last thirty hours of `M_1` bars in dollars, oldest
+  first, for Eugenia to score her own calls against at night (*Her own calls*).
+  The window is fixed, so like every other door it puts nothing from the request
+  into a broker call; a bar that will not read refuses them all.
 
 ```sh
 curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?raw=1&hours=72" \
@@ -3301,7 +3305,7 @@ one `net.http_post` each.
 
 | Function | What a holder of the secret can do |
 |---|---|
-| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`) or minute bars (`?bars=raw`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
+| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`), minute bars (`?bars=raw`), or the day's bars for her calls (`?bars=1`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
 | `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code. `?consolidate=1` is the one that does more than spend: it runs the nightly pass, which WRITES memory — notes written and superseded, channel rungs moved, loops closed. `?embed=1` spends at the embedding vendor. `?calendar=1` files the calendar and spends nothing, and a `{trade}` body reaches the trade look |
 | `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
 

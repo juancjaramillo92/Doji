@@ -20,7 +20,7 @@ import { secretMatches, nyClock, nyDate, marketOpen, parseSse } from '../supabas
 import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
   lookbackFor, foldHours, balanceTarget,
-  fromPipettes, foldSpot, PIPETTES, openPlans, barSpan, bestPrice, stopChanges, sliced,
+  fromPipettes, foldSpot, PIPETTES, openPlans, barSpan, bestPrice, foldCandles, stopChanges, sliced,
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
@@ -4482,6 +4482,20 @@ test('a real minute bar is in pipettes, and the best price comes out in dollars'
   // 14:09's high, the top of the window, read as a price and not a pipette count.
   assert.equal(bestPrice(BARS, 'BUY', at('14:00:30'), at('14:14:10')), 4380.14);
   assert.equal(bestPrice(BARS, 'SELL', at('14:00:30'), at('14:14:10')), 4364.64);
+});
+
+test('the day\'s bars reach her in dollars, oldest first, once each, or not at all', () => {
+  /* What ?bars=1 serves for scoring her calls: the same capture, folded. A
+     duplicate is two chunks meeting at an edge; an unreadable bar refuses the
+     lot, since the one dropped could hold the stop. */
+  const candles = foldCandles([...BARS].reverse().concat(BARS[0]));
+  assert.equal(candles.length, 16, 'a bar two chunks both returned is counted twice');
+  assert.deepEqual(candles[0], { t: 1789653600000, open: 4367.57, high: 4368.54, low: 4364.48, close: 4365.48 },
+    'the first minute is not read in dollars, or not first');
+  assert.ok(candles.every((c, i) => !i || c.t > candles[i - 1].t), 'the bars are not oldest first');
+  assert.equal(Math.max(...candles.map(c => c.high)), 4380.14);
+  assert.equal(foldCandles([...BARS, { ...BARS[3], close: null }]), null,
+    'a bar that will not read is dropped and the rest served, short by the one that mattered');
 });
 
 test('the minute he entered in and the minute he left in are never read', () => {
