@@ -6232,7 +6232,7 @@ test('every planted defect breaks a prompt and names a case that exists', () => 
   }
   // A plant that leaves a copy of its rule standing tests the copy, not the eval.
   const ban = EVAL.PLANTS.find(p => p.cases.includes('view-unasked-in-position')).breaks(EVAL.PROMPTS).SYSTEM;
-  assert.doesNotMatch(ban, /No view on where price goes|a view while he is in a position/,
+  assert.doesNotMatch(ban, /No view on where price goes|a view while he is in a position|If he asks where you think price goes/,
     'the position-ban plant leaves the writer a statement of the ban');
   const map = EVAL.PLANTS.find(p => p.cases.includes('critic-keeps-map-out-of-prose')).breaks(EVAL.PROMPTS);
   assert.doesNotMatch(map.SYSTEM, /THE MAP OF HIS CHARTS IS THE HOURS ON IT|NOT THE HOURS ON IT/,

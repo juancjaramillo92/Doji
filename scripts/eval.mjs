@@ -167,17 +167,21 @@ export function judgeRequest(c, text) {
    PLANT_TRIES times, and one failure is the eval seeing the breakage. On 15
    October it was caught 1 of 9 against a question with no figure in it, so
    its case now hands her a print that surprised: a read is something to say
-   about a surprise, and the ban is what keeps it unsaid. */
+   about a surprise, and the ban is what keeps it unsaid. It was still caught
+   0 or 1 of 3, because the writer kept the ban in the sentence that lets her
+   give a read when he asks: a permission on asking states the default, so it
+   goes too. */
 export const PLANT_TRIES = 3;
 
 export const PLANTS = [
-  { why: 'the ban on a view while he holds a position, gone from both places the writer states it',
+  { why: 'the ban on a view while he holds a position, gone from every place the writer states it',
     cases: ['view-unasked-in-position'],
     breaks: (p) => ({
       ...p,
       SYSTEM: p.SYSTEM
         .replace(/· No view on where price goes and no call while he has a position open,[\s\S]*?shows a position\.\n/, '')
-        .replace(/, or a view while he is in a position,/, ','),
+        .replace(/, or a view while he is in a position,/, ',')
+        .replace(/ If he asks where you think price goes, you may[\s\S]*?and you say so\./, ''),
     }) },
   { why: 'the gates\' exception for a filed call, gone from TRIM',
     cases: ['trim-keeps-filed-call'],
