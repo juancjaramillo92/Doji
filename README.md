@@ -58,7 +58,7 @@ supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
   doji-eugenia/prompt.ts                who she is, and what she may never say
   doji-eugenia/strategy.ts              what he decided; she cannot write it
   doji-eugenia/journal.ts               the app's arithmetic, ported so she can reach it
-  doji-eugenia/adherence.ts             the thirteen rules a journal row can answer
+  doji-eugenia/adherence.ts             the twelve rules a journal row can answer
 supabase/functions/doji-tradingview/    Edge Function: the TradingView sign-in
 doji_gmail_sync.gs                      Apps Script: broker email parser
 charm/                                  firmware for the charm — see The charms
@@ -426,7 +426,7 @@ single-sourced at run time:
 | the **length of a filed read** | `READ_MAX` and the three check constraints on `eugenia_reads` |
 | the **two writers' names** | `sync_health_id_check`, the seed beside it, and each function's `heartbeat("…")` call |
 | the **columns of `eugenia_runs`** | the table, the object literals `recordRun` is called with, and the `verify.sql` row on the cache-write columns |
-| **which rules a row can answer** | §7's `Evaluable` column and the thirteen predicates in `adherence.ts` |
+| **which rules a row can answer** | §7's `Evaluable` column and the twelve predicates in `adherence.ts` |
 | the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union, and `pace_line`'s `owed \|\| ' briefing delivered'` |
 | the **number of scheduled jobs** | the `cron.schedule` calls in `schema.sql` and the count `verify.sql` asserts |
 | a **long door's deadline** | `DOOR_MS` in `doji-tradingview` and `READ_MS` in `doji-eugenia`, ten seconds apart for the boot, the sign-in and the wire |
@@ -1225,7 +1225,7 @@ trades beside you on paper, on your rules, scored on price — *Her own calls*.
 
 `schema.sql` holds her memory and her read of the journal, her meters,
 calendar and the trigger that tells her about a trade, and her clock; `prompt.ts` holds who she is,
-`strategy.ts` what he decided, `adherence.ts` the thirteen rules a row can
+`strategy.ts` what he decided, `adherence.ts` the twelve rules a row can
 answer; `index.ts` is the wiring.
 
 **The conversation and what she remembers are two tables, and stay two.**
@@ -1448,8 +1448,8 @@ rates Lagarde medium and every auction and China's reserves low, and rates a doz
 surveys high. About 12 events a week, out of more than 100 listed. China's gold
 imports are not on TradingView's calendar. A row from abroad carries its country
 at the head of its name (*FR Inflation Rate YoY Prel (Sep)*), because three
-economies publish that title in one hour. **None of it is one of his**: R-14 and
-R-19 and the trade event's warning all read `country=eq.US` (`HOME`, beside
+economies publish that title in one hour. **None of it is one of his**: R-19
+and the trade event's warning both read `country=eq.US` (`HOME`, beside
 `HIGH` in `adherence.ts`), and a list that carries a line from abroad tells her
 so once. The rolling list and the Sunday week carry it; the week takes only what
 is rated high, so abroad that is the central banks' decisions and headline
@@ -1552,7 +1552,7 @@ rules read back at the moment they apply**:
 
 | Event | What she may say |
 |---|---|
-| opened | a high-impact US print is pending and he is now in a position — R-14 is about standing aside before one, R-19 about a position inherited into one |
+| opened | a high-impact US print is pending and he is now in a position — R-20 is his caution around one, R-19 about a position inherited into one |
 | closed | that fill took the day past −4% of the account his size implies, and R-11 says the day ends there |
 
 Naming the rule is citation; saying what he should do is not hers, and the
@@ -1582,18 +1582,18 @@ silence is the method, and he answers there because he started it.
 
 ### Checking his rules
 
-§7 of the strategy writes a predicate for all eighteen rules and §8 the
+§7 of the strategy writes a predicate or a probe for all eighteen rules and §8 the
 population filters and the three verdicts. Applying seven filters and
 three-state logic over four hundred rows by eye is what a model does worst, and
 a rate over the wrong population looks exactly like one over the right.
-`adherence.ts` evaluates the thirteen rules a row can answer — **R-01, R-02,
-R-03, R-04, R-10, R-11, R-12, R-13, R-14, R-15, R-16, R-18 and R-19** — and
+`adherence.ts` evaluates the twelve rules a row can answer — **R-01, R-02,
+R-03, R-04, R-10, R-11, R-12, R-13, R-15, R-16, R-18 and R-19** — and
 `check_rules` serves it. §7's `Evaluable` column decides the set, and `agree`
 holds the two lists together.
 
-**R-14 and R-19 are judged against TradingView's calendar** — he defined high
-impact, at v1.20, as a US release TradingView rates high, so one calendar serves
-the briefing, the trade event and the rules. Rows with no TradingView id are not
+**R-19 is judged against TradingView's calendar** — he defined high impact, at
+v1.20, as a US release TradingView rates high, so one calendar serves the
+briefing, the trade event and the rules. Rows with no TradingView id are not
 read, and neither are rows from abroad. **A week nobody fetched is not a quiet week**: `calendar_weeks`
 records each week a whole-week fetch landed for, and
 an entry outside one is `unknown`. Both markers go through `fileWeek`, which
@@ -1754,7 +1754,7 @@ to avoid — given only prohibitions the model reads every sentence the same
 length and shape. The arc is set at the **paragraph**, since the writing rules
 fix sentence length and sixteen identical falls are the metronome itself: only
 a paragraph's last sentence fully lands. Its last line is pronunciation — `08:30
-ET`, R-11, R-14/R-19, comma'd levels — said in the instruction rather than
+ET`, R-11, comma'd levels — said in the instruction rather than
 rewritten, so the stored text stays the text he reads.
 
 **`TTS_SPEED` is 1.3**, off what he was already doing: playing every note at 1.5x
@@ -2058,7 +2058,7 @@ goes to the three asked to build a term, since what moves gold runs through a
 channel and a message saying the dollar came off teaches nothing to someone for
 whom the dollar is `unseen`. The conversation window goes to everything that
 speaks — not the nightly pass, which reads its own twenty-four hours. It matters
-most on the trade look, whose R-14/R-19 line fires on the print the briefing is
+most on the trade look, whose R-19/R-20 line fires on the print the briefing is
 likeliest to have named. Its reads sit *after* its early returns, so an ordinary
 fill costs nothing. A test reads every one of these.
 
@@ -2091,7 +2091,7 @@ The trade look is reached *from* the position and already holds its row.
 **What she may do with it is narrower than what she can see, by design.**
 Unprompted it stops anything setup-flavoured while a position is open, and lets
 her name a collision his own rules name — a high-impact US print against an open
-position (R-14, R-19), or a day past R-11. When *he* raises the position she
+position (R-19, R-20), or a day past R-11. When *he* raises the position she
 discusses it properly and refuses one thing: what to do with it. **His levels
 never appear in a message she starts** — a briefing framed around the number he
 is long from reads as relevance and is the opposite. That guard is a prompt
@@ -2302,15 +2302,18 @@ P&L against `size_oz × 500`. R-11 is not R-03: a full stop at a small rung ends
 the day under R-03 having spent well under 4%, and three smaller losses can spend
 the 4% without R-03 seeing anything. His definition of a full stop, settled at
 v1.14, is what made R-03 `journal`. **R-12** caps him at one entry a day, two only
-for a sweep re-entry; **R-13** pins a rung change to a month boundary; **R-14**
-stands him aside before a high-impact release; **R-15** closes anything live
-before the Friday close; **R-16** keeps him off low-volume days; **R-17** stops him
+for a sweep re-entry; **R-13** pins a rung change to a month boundary; **R-15**
+closes anything live before the Friday close; **R-16** keeps him off low-volume
+days; **R-17** stops him
 when the trading itself deteriorates — behaviour rather than a number, so
 `judgment`. **R-18** — stop and target are resting broker orders and a position is
 never closed by hand — makes R-01 and R-02 exact. **R-19** is the one exception to
 *never tightened*: a high-impact print landing on a position inherited from an
 earlier session takes it to break-even if in profit, a closer invalidation if
-not, and the target never moves. R-09 was retired at v1.18.
+not, and the target never moves. **R-20** lets him trade at any hour, cautious
+around a top-priority release — a judgment, since caution has no number. R-09 was
+retired at v1.18, and R-14 — no entry in the thirty minutes before a release — at
+v1.23.
 
 **§4: the two setups differ by method, not location.** Break & Retest is a
 continuation trade through a level that has broken and flipped; Support &
@@ -2541,7 +2544,7 @@ backlog waiting* means the key is unset, and a drained archive (`0 filled, 0
 left`) accuses nobody. `verify.sql` ends with the count still unembedded, which
 should fall to zero and stay there.
 
-R-14 is `unknown` on every trade until a week is marked in `calendar_weeks`, and
+R-19 is `unknown` on every trade until a week is marked in `calendar_weeks`, and
 a release carries its series `ticker` only once filed, so walk the history door
 once from a year back, or from his first trade if that is earlier (`select
 min(open_day) from trades`):
@@ -2793,8 +2796,8 @@ call, a level beside a direction is a call nobody scores.
 
 **She checks a plan you have not taken, when you ask, two ways.** Against the
 rules a row can answer: the stop and target distances (R-01, R-02), reward
-against risk at entry against R-08's 1:1.5, a high-rated US release inside
-R-14's thirty minutes, whether the day already rules out an entry (R-03, R-11,
+against risk at entry against R-08's 1:1.5, any high-rated US release due while
+it would be on, whether the day already rules out an entry (R-03, R-11,
 R-12, R-16), something already open (R-10), the Friday close (R-15). And against
 your pre-trade sequence, which no row can see and which you decided in October
 2026 she should judge: R-08's four steps in order — the bias, the level (R-05's
@@ -3364,7 +3367,7 @@ home-screen shortcut and every bookmark open `/`.
 
 | File | Covers |
 |---|---|
-| `test/fold.test.mjs` | the pure logic of all five Edge Functions, `_shared` and `adherence.ts`: a real `get_deals` capture folded and cross-checked against the real email for the trade they share; the poller's fold, windows, balance and plan rules; the email boundary and its three outcomes; Gladys's grammar, rendering and settling, with the two redraws agreeing on every before-state; Eugenia's schedules walked hour by hour, her renderings, gates, voice fallback and tool loop driven through `ask()`; every one of the thirteen rules in both directions; and the TradingView sign-in and folds |
+| `test/fold.test.mjs` | the pure logic of all five Edge Functions, `_shared` and `adherence.ts`: a real `get_deals` capture folded and cross-checked against the real email for the trade they share; the poller's fold, windows, balance and plan rules; the email boundary and its three outcomes; Gladys's grammar, rendering and settling, with the two redraws agreeing on every before-state; Eugenia's schedules walked hour by hour, her renderings, gates, voice fallback and tool loop driven through `ask()`; every one of the twelve rules in both directions; and the TradingView sign-in and folds |
 | `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load, save and soft delete, the scratch rule and aggregates, the money split and averages, the week boundary, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the snapshot, the offline boot, and the watch card |
 | `test/golden.test.mjs` | the snapshot: the real page on fixed fixtures and a frozen clock, every derived value and every panel's markup compared against `test/golden.json`, plus `Dates.session` swept across the four DST changeovers; and `test/golden-fold.json`, everything the folds return off the real captures — the rows the poller writes through its two windows, the email parsed and bounded, the calendar folded, and Eugenia's rule verdicts, day standings and stats over that week, with what she is told about each. Regenerate with `GOLDEN=write npm test`, deliberately, in the commit that changes behaviour — never to make a red run go away |
 | `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the charm driven end to end through the real turn — the reply read as the charm reads its frames, silence first, the recording transcribed as the Ogg it is, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, its headers in her turn and the volume she set sent ahead of her voice and nowhere else, the battery line spoken after her answer and neither copied nor stored, a wordless recording answered on the charm alone, and the door refusing a missing vendor, an empty recording and a wrong key; and the briefing on the charm, her ready line then today's briefing read as `pcm` in frames, the right day's briefing asked for, a `204` while none is stored; and Gladys's charm told what waits oldest first and a week back, its answer writing exactly one of the four columns, an edit, a stray column and a malformed body refused, and the door shut without its secret |

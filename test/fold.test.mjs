@@ -55,7 +55,7 @@ import {
 import {
   checkRules, adherenceList, settle, dayStanding, easter, lowVolumeDays,
   nyInstant, nyWall, crossesFridayClose, nearFridayClose, CLOSEOUT_MIN,
-  SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, NEWS_MIN, HIGH, HOME, weekOf, STOP_GRACE_MIN,
+  SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, HIGH, HOME, weekOf, STOP_GRACE_MIN,
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts';
@@ -2797,7 +2797,7 @@ test('a list holding anything from abroad says once that his rules do not count 
   const out = calendarList([row('EU ECB Interest Rate Decision', 'EU'), row('GDP Growth Rate QoQ Adv', 'US')],
     Date.parse('2026-10-29T11:00:00Z'));
   assert.match(out, /08:15 ET EU ECB Interest Rate Decision, rated high — due/);
-  assert.equal(out.match(/R-14 and R-19 count US releases alone/g)?.length, 1);
+  assert.equal(out.match(/his rules count US releases alone/g)?.length, 1);
   assert.doesNotMatch(calendarList([row('GDP Growth Rate QoQ Adv', 'US')], Date.parse('2026-10-29T11:00:00Z')),
     /abroad/);
 });
@@ -2838,8 +2838,8 @@ test('the quarter-hourly filing keeps to twelve hours back and twenty-eight ahea
 });
 
 /* A WEEK IS MARKED COVERED ONLY AFTER ITS ROWS. A mark in front of rows that
-   never landed is a covered week with no releases, which R-14 passes every
-   entry in. */
+   never landed is a covered week with no releases, in which R-19 never looks
+   for a print. */
 async function weekWrites(week, failRows = false) {
   const sent = [];
   return await stubbed(async () => {
@@ -2874,7 +2874,7 @@ test('a week whose rows did not land is not marked covered', async () => {
   const { filed, sent } = await weekWrites('2026-09-27', true);
   assert.ok(filed instanceof Error);
   assert.ok(!sent.some(s => s.url?.includes('calendar_weeks')),
-    'a week was marked covered with its releases refused — R-14 would pass every entry in it');
+    'a week was marked covered with its releases refused — R-19 would never look for a print in it');
 });
 
 test('the history walks Sundays in New York from the date given, through a clock change', () => {
@@ -3323,7 +3323,7 @@ test('R-18 reads a close with no broker alert as a hand close, and spares the Fr
   assert.deepEqual([open.passed, open.failed, open.unresolved], [0, 0, 0]);
 });
 
-/* ─── R-14, against the calendar TradingView rates ──────────────────────── */
+/* ─── The calendar R-19 is judged against ──────────────────────────────── */
 
 test('an instant files under the Sunday its week began, in New York', () => {
   // Sunday 19:00 New York is Monday UTC, and still the week that began that Sunday.
@@ -3334,37 +3334,7 @@ test('an instant files under the Sunday its week began, in New York', () => {
   assert.equal(weekOf(new Date('2026-09-27T05:00:00Z')), '2026-09-27');
 });
 
-test('R-14 fails an entry in the thirty minutes before a release rated high, and nothing else', () => {
-  const cpi = '2026-10-14T12:30:00Z';                      // 08:30 New York
-  const cal = { releases: [cpi], weeks: new Set(['2026-10-11']) };
-  const at = (iso, id = 'PIDx') => trade({ id, entry_time: iso, open_day: '2026-10-14' });
-  const r = (rows) => verdictOf(rows, 'R-14', Date.parse('2026-10-20T00:00:00Z'));
-  const rr = (rows, c = cal) => checkRules(rows, Date.parse('2026-10-20T00:00:00Z'), c)
-    .find(x => x.rule === 'R-14');
-
-  const inside = rr([at('2026-10-14T12:05:00Z')]);
-  assert.deepEqual([inside.verdict, inside.failed, inside.ids], ['fail', 1, ['PIDx']]);
-  // Exactly thirty minutes before is inside the floor; thirty-one is not.
-  assert.equal(rr([at('2026-10-14T12:00:00Z')]).verdict, 'fail');
-  /* PAST THE FLOOR IS HIS JUDGEMENT, not a pass: the stand-aside is
-     open-ended and he set only the part no reading of it excuses. */
-  assert.equal(rr([at('2026-10-14T11:59:00Z')]).verdict, 'unknown');
-  assert.equal(rr([at('2026-10-14T09:00:00Z')]).verdict, 'unknown',
-    'an entry hours ahead of CPI on its own day was passed');
-  // After the print, and on a day with nothing ahead, is a pass.
-  assert.equal(rr([at('2026-10-14T12:31:00Z')]).verdict, 'pass');
-  assert.equal(rr([at('2026-10-13T13:00:00Z')]).verdict, 'pass');
-
-  /* A WEEK NOBODY FETCHED LOOKS EXACTLY LIKE A QUIET ONE, which is what
-     calendar_weeks exists for: unfetched, the entry is unknown, not pass. */
-  assert.equal(rr([at('2026-10-14T12:05:00Z')], { releases: [], weeks: new Set() }).verdict, 'unknown');
-  assert.equal(rr([at('2026-10-14T12:05:00Z')], { releases: [], weeks: new Set(['2026-10-11']) }).verdict, 'pass');
-  // And with no calendar handed at all, which is every caller but check_rules.
-  assert.equal(r([at('2026-10-14T12:05:00Z')]).verdict, 'unknown');
-  assert.equal(NEWS_MIN, 30);
-});
-
-test("R-14's reads cover the trades' window, TradingView's high-rated US releases only, newest first", () => {
+test("R-19's calendar reads cover the trades' window, TradingView's high-rated US releases only, newest first", () => {
   const now = Date.parse('2026-10-20T15:00:00Z');
   const since = tradesQuery(30, now).match(/open_day=gte\.([\d-]+)/)[1];
   const rel = releasesQuery(30, now), wk = weeksQuery(30, now);
@@ -3379,7 +3349,7 @@ test("R-14's reads cover the trades' window, TradingView's high-rated US release
   assert.match(wk, /order=week\.desc&limit=\d+/);
 });
 
-test("a full release read covers only the weeks it reached, so R-14 cannot pass an entry for want of a print", async () => {
+test("a full release read covers only the weeks it reached, so R-19 cannot skip a position for want of a print", async () => {
   /* The read takes the newest releases. On a year long enough to fill it, the
      oldest weeks are marked fetched while their releases never arrived. Driven
      through check_rules, because the guard is in the read. */
@@ -3393,7 +3363,7 @@ test("a full release read covers only the weeks it reached, so R-14 cannot pass 
   // Every release is in the last few weeks, so none is near the old entry.
   const recent = (n) => Array.from({ length: n }, (_, i) => ({ at: day(1 + i / 40).toISOString() }));
   const weeks = [{ week: weekOf(entry) }, { week: weekOf(day(1)) }];
-  const r14 = async (releases) => {
+  const r19 = async (releases) => {
     return await stubbed(async () => {
       globalThis.fetch = async (url) => {
         const u = String(url);
@@ -3401,13 +3371,16 @@ test("a full release read covers only the weeks it reached, so R-14 cannot pass 
           : u.includes('calendar_weeks') ? weeks : [];
         return { ok: true, status: 200, json: async () => rows };
       };
-      return (await serve('check_rules', { days: 365 })).split('\n').find(l => l.startsWith('R-14'));
+      return (await serve('check_rules', { days: 365 })).split('\n').find(l => l.startsWith('R-19'));
     });
   };
-  assert.match(await r14(recent(RULE_RELEASES - 1)), /^R-14: PASS/,
-    'a read short of its bound covers every week it was handed, and this entry has no print near it');
-  assert.match(await r14(recent(RULE_RELEASES)), /^R-14: UNKNOWN/,
-    'a full read still counts the oldest week as covered, so an entry nothing was read for passes');
+  /* COUNTS, NOT VERDICTS: a covered week with no print in the span leaves the
+     position out of R-19's population, and an uncovered one makes it unknown —
+     both read UNKNOWN. */
+  assert.match(await r19(recent(RULE_RELEASES - 1)), /^R-19: UNKNOWN \(0 pass, 0 fail, 0 unknown\)/,
+    'a read short of its bound covers every week it was handed, and no print landed on this position');
+  assert.match(await r19(recent(RULE_RELEASES)), /^R-19: UNKNOWN \(0 pass, 0 fail, 1 unknown\)/,
+    'a full read still counts the oldest week as covered, so a position nothing was read for drops out unseen');
   // The week the oldest release falls in is partial, and is left out too.
   const edge = [...recent(RULE_RELEASES - 1), { at: entry.toISOString() }];
   assert.ok(!coveredWeeks([weekOf(entry)], edge).has(weekOf(entry)));
@@ -3455,7 +3428,8 @@ test('R-19 judges the stop in force when a print lands on a position from an ear
   assert.equal(r([high, { seen_at: '2026-10-14T12:00:00Z', sl: 4025, tp: 3970 }], sell).verdict, 'fail');
 
   /* NARROW BECAUSE §6 MADE IT NARROW: opened in the session the print lands
-     in, it is R-14's business and not in this population at all. */
+     in, it was taken on at entry — R-20's caution — and not in this population
+     at all. */
   const same = r([first], buy({ entry_time: '2026-10-14T12:00:00Z', open_day: '2026-10-14' }));
   assert.deepEqual([same.passed, same.failed, same.unresolved], [0, 0, 0]);
 
@@ -5541,12 +5515,12 @@ test('breachesList names only what broke, and says so when nothing did', () => {
   const r = (rule, verdict, ids = []) => ({ rule, verdict, passed: 1, failed: verdict === 'fail' ? 1 : 0,
     unresolved: 0, ids, why: 'because' });
   assert.equal(breachesList(null), '', 'no closed trade in the window still produced a sentence');
-  assert.match(breachesList([r('R-01', 'pass'), r('R-14', 'unknown')]), /No closed trade since your last briefing broke/,
+  assert.match(breachesList([r('R-01', 'pass'), r('R-04', 'unknown')]), /No closed trade since your last briefing broke/,
     'a window with nothing broken says nothing, and she is left to work it out from the rows');
-  const out = breachesList([r('R-01', 'pass'), r('R-12', 'fail', ['PID9']), r('R-14', 'unknown')]);
+  const out = breachesList([r('R-01', 'pass'), r('R-12', 'fail', ['PID9']), r('R-04', 'unknown')]);
   assert.match(out, /R-12: FAIL/, 'a broken rule is not named');
   assert.match(out, /PID9/, 'the trade that broke it is not named, so he cannot check it');
-  assert.doesNotMatch(out, /R-01|R-14/, 'a rule that did not break is in the list of breaches');
+  assert.doesNotMatch(out, /R-01|R-04/, 'a rule that did not break is in the list of breaches');
 });
 
 test('the briefing is handed what Friday broke on Sunday, and what the weekend hold broke on Monday', async () => {

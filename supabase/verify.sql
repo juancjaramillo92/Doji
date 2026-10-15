@@ -443,7 +443,7 @@ from (values
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.dispatch')),
    'true'),
 
-  -- Without it R-14 is unknown on every trade.
+  -- Without it R-19 is unknown on every trade.
   ('RLS on calendar_weeks',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.calendar_weeks')),
    'true'),

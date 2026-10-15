@@ -628,11 +628,11 @@ function windowStart(days: unknown, now: number, back: number): string {
   return new Date(Date.UTC(y, m - 1, d - n - back)).toISOString().slice(0, 10);
 }
 
-/* R-14's reads over check_rules' window: TradingView's high-rated US releases
-   — only rows with its id, since her older typed ones were never a rating he
-   chose — a day early, as a UTC bound would drop the evening before; and the
-   fetched weeks a further seven back, since the window's first day sits in a
-   week that began before it. */
+/* R-19's calendar reads over check_rules' window: TradingView's high-rated US
+   releases — only rows with its id, since her older typed ones were never a
+   rating he chose — a day early, as a UTC bound would drop the evening before;
+   and the fetched weeks a further seven back, since the window's first day sits
+   in a week that began before it. */
 export const RULE_RELEASES = 500;
 
 export function releasesQuery(days: unknown, now = Date.now()): string {
@@ -641,9 +641,9 @@ export function releasesQuery(days: unknown, now = Date.now()): string {
 }
 
 /* A full read of the releases is not the whole window either: the oldest weeks
-   would still be marked fetched while their releases never arrived, and R-14
-   would pass every entry in them. So a full read covers only the weeks after
-   the one its oldest release falls in. */
+   would still be marked fetched while their releases never arrived, and R-19
+   would never look for a print in them. So a full read covers only the weeks
+   after the one its oldest release falls in. */
 export function coveredWeeks(weeks: string[], releases: { at: string }[]): Set<string> {
   const reach = releases.length === RULE_RELEASES ? weekOf(new Date(releases[releases.length - 1].at)) : '';
   return new Set(weeks.filter(w => w > reach));
@@ -678,20 +678,20 @@ async function readTrades(days: unknown): Promise<string> {
 /* ─── His own rules, evaluated ─────────────────────────────────────────────
    Whether each row satisfies a predicate HE wrote — what a judgment stands on,
    not a judgment. The prompt has her state it first, so he always holds the
-   half he can check. adherence.ts says why thirteen.
+   half he can check. adherence.ts says why twelve.
    ───────────────────────────────────────────────────────────────────────── */
 const CHECK_TOOL = {
   name: "check_rules",
   description:
-    "Check his journal against the thirteen rules a row can actually answer — R-01, " +
-    "R-02, R-03, R-04, R-10, R-11, R-12, R-13, R-14, R-15, R-16, R-18 and R-19 — over the last N days. Returns a " +
+    "Check his journal against the twelve rules a row can actually answer — R-01, " +
+    "R-02, R-03, R-04, R-10, R-11, R-12, R-13, R-15, R-16, R-18 and R-19 — over the last N days. Returns a " +
     "verdict per rule with the counts behind it and the rows that failed. Use it " +
     "whenever he asks how he has been following his rules, or before saying " +
     "anything about his discipline: this is computed from the rows, so it is not " +
     "something to reproduce by reading trades yourself. A verdict of unknown means " +
-    "the data cannot decide it and is NEVER the same as a pass. The other five " +
+    "the data cannot decide it and is NEVER the same as a pass. The other six " +
     "rules are judgment rules and nothing stored can check them — say so " +
-    "rather than implying the thirteen are the whole strategy.",
+    "rather than implying the twelve are the whole strategy.",
   input_schema: {
     type: "object",
     properties: {
@@ -703,7 +703,7 @@ const CHECK_TOOL = {
 } as const;
 
 /* The four reads and the evaluation, shared by the tool and the briefing so
-   R-14 cannot be judged against a calendar in one and nothing in the other.
+   R-19 cannot be judged against a calendar in one and nothing in the other.
    `keep` narrows only the trades. Null when nothing was kept — not a pass. */
 async function readRules(days: unknown, keep: (t: TradeRow) => boolean = () => true):
     Promise<{ results: RuleResult[] | null; reach: string }> {
@@ -841,7 +841,7 @@ interface TvEvent {
    bond auctions in Germany, France, Italy and Britain, less the bills, which it
    names in months; China's reserves. An auction is kept though TradingView
    files some under `Calendar`, the marker's indicator, at their own minute.
-   None of it counts for R-14 or R-19, which are about US releases. */
+   None of it counts for R-19 or R-20, which are about US releases. */
 const BANKS = ['EU', 'GB', 'JP'], AUCTIONS = ['DE', 'FR', 'IT', 'GB'];
 
 export function wanted(e: TvEvent): boolean {
@@ -2766,7 +2766,7 @@ export function calendarList(rows: Release[], now = Date.now(),
            (r.prior ? ` after ${r.prior}` : "");
   });
   return `\n\n${heading}:\n${lines.join("\n")}` + (rows.some(r => r.country !== HOME)
-    ? `\n· A line led by a country code is from abroad and filed as context: R-14 and R-19 ` +
+    ? `\n· A line led by a country code is from abroad and filed as context: his rules ` +
       `count US releases alone.`
     : "");
 }
@@ -2787,7 +2787,7 @@ export async function calendarBlock(): Promise<string> {
 /* ─── The week ahead, for the briefing that opens it ───────────────────────
    The Sunday briefing's rolling calendar reaches Monday evening, so a Thursday
    CPI reached it only if a search did. It gets the week instead, high only —
-   the US releases R-14 stands him aside for, and abroad the central banks'
+   the US releases he is cautious around, and abroad the central banks'
    decisions and headline inflation — replacing the rolling list rather than
    sitting beside it, since one print twice reads as two things.
    ───────────────────────────────────────────────────────────────────────── */
@@ -3241,7 +3241,7 @@ async function postScheduled(url: URL): Promise<Response> {
     // the trickle a failed vendor call leaves.
     if (url.searchParams.get("embed") === "1")       { job = 'embed';       return await postEmbed(); }
 
-    // The calendar's history, walked once by hand: R-14 and R-19 judge only
+    // The calendar's history, walked once by hand: R-19 judges only
     // weeks a whole-week fetch covered.
     const history = url.searchParams.get("history");
     if (history) { job = 'history'; return await postHistory(history); }
@@ -3665,7 +3665,7 @@ async function postConsolidation(): Promise<Response> {
     await recordRun({ caller: 'embeddings', ok: false, detail: reason.slice(0, 500) });
   }
 
-  // The whole week, which R-14 and R-19 judge against — the quarter-hourly
+  // The whole week, which R-19 judges against — the quarter-hourly
   // filing never marks one covered. Wrapped inside filedWeek.
   await filedWeek(weekOf(new Date()));
 
@@ -3695,7 +3695,8 @@ async function recordChannels() {
    Still no verdict; she may say only his own rules, at the moment they apply:
 
      opened — a high-impact US print is pending and he is now in a position:
-              R-14 and R-19. Citing them is hers; deciding what he does is not.
+              R-20's caution, and R-19 if it runs into a later session. Citing
+              them is hers; deciding what he does is not.
      closed — that fill took the day past −4%: R-11 says the day ends there.
 
    Both branches decide from data before any model call, so an ordinary fill

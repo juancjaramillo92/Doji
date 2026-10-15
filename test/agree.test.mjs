@@ -2673,7 +2673,7 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
 
   /* AND THE CONVERSATION WINDOW, ON EVERYTHING THAT SPEAKS: without it she says
      again what she said, and a repetition reads as emphasis. Hardest on the
-     trade look, whose R-14/R-19 line fires on the print the briefing most likely
+     trade look, whose R-19/R-20 line fires on the print the briefing most likely
      named. postConsolidation reads its own fixed twenty-four hours. */
   for (const fn of SENDS) {
     assert.ok(reaches(reads(fn), 'recent'),
@@ -3181,7 +3181,7 @@ test('the importance a release may carry is the one the table accepts', () => {
    which of theirs are filed, so the two lists are one fact in two files: an
    economy asked for and never kept is paid for on every filing, and one kept
    and never asked for is a selection that can never fire. And everything that
-   acts on a release — R-14 and R-19, the trade warning — counts the US alone,
+   acts on a release — R-19 and R-20, the trade warning — counts the US alone,
    while only the Sunday week and the rolling list carry what is filed from
    abroad.
    ─────────────────────────────────────────────────────────────────────────── */
@@ -3220,7 +3220,7 @@ test('only US releases are counted or warned of', () => {
       continue;
     }
     assert.ok(body.includes('country=eq.${HOME}'),
-      `${decl} reads releases from abroad as his, so a print in Tokyo stands him aside`);
+      `${decl} reads releases from abroad as his, so a print in Tokyo is one of his`);
   }
   for (const decl of LISTS) assert.ok(reads.includes(decl), `${decl} is declared a list and reads no rating`);
 
@@ -4024,7 +4024,7 @@ const BY_HAND = {
                'this runs the nightly pass out of that schedule, which is how a ' +
                'missed night is made up without waiting for the next one',
   history:     'the weeks he has already traded, walked once from the date ' +
-               'given so R-14 and R-19 can judge them — the nightly pass only ' +
+               'given so R-19 can judge them — the nightly pass only ' +
                'ever files the week it runs in',
   review:      'the Saturday review out of its hour — it has no retry, so a ' +
                'failed one is made up by hand rather than a week late',
@@ -5395,13 +5395,13 @@ test('the poller fills best_price once, newest first, and counts what it wrote',
 });
 
 test("the nightly pass files the week, meters both outcomes, and check_rules reads it", () => {
-  /* fileWeek and r14 are driven in fold.test.mjs; a pass that stopped filing
-     leaves R-14 unknown on every trade with nothing erroring. The call sites,
+  /* fileWeek and r19 are driven in fold.test.mjs; a pass that stopped filing
+     leaves R-19 unknown on every trade with nothing erroring. The call sites,
      both meters and the calendar handed to the rules are read. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const pass = bodyOf(src, 'async function postConsolidation(');
   assert.match(pass, /await filedWeek\(weekOf\(new Date\(\)\)\)/,
-    'the nightly pass no longer files the week R-14 is judged against');
+    'the nightly pass no longer files the week R-19 is judged against');
   const week = bodyOf(src, 'async function filedWeek(');
   assert.match(week, /caller: 'calendar week', ok: true/, 'the week filing records no success');
   assert.match(week, /caller: 'calendar week', ok: false/, 'the week filing records no failure');
@@ -5411,7 +5411,7 @@ test("the nightly pass files the week, meters both outcomes, and check_rules rea
   assert.match(body, /releasesQuery\(days\)/, 'check_rules no longer reads the releases');
   assert.match(body, /weeksQuery\(days\)/, 'check_rules no longer reads which weeks were fetched');
   assert.match(body, /checkRules\(kept, Date\.now\(\), \{/,
-    'check_rules hands the rules no calendar, so R-14 is unknown on every trade');
+    'check_rules hands the rules no calendar, so R-19 is unknown on every trade');
   assert.match(body, /stopsQuery\(days\)/, 'check_rules no longer reads the stop history');
   assert.match(body, /\}, stops\)/,
     'check_rules hands the rules no stop history, so R-19 is unknown on every trade');

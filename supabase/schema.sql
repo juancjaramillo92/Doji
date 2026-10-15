@@ -806,7 +806,7 @@ create index if not exists eugenia_turns_trgm
 
 -- ─── A position opened or closed ───────────────────────────────────────────
 -- Tells her within two minutes of the poller seeing it. What she may say is his
--- own rules read back — R-14/R-19 on a print pending against an open position,
+-- own rules read back — R-19/R-20 on a print pending against an open position,
 -- R-11 on a close that took the day past its limit — and the function decides
 -- from data before any model call, so the common case costs nothing.
 create or replace function public.trades_eugenia_on_event()
@@ -1451,13 +1451,13 @@ revoke all on public.tradingview_auth from anon, authenticated;
 
 -- ═══ Which calendar weeks were fetched whole ════════════════════════════
 
--- R-14 reads high-impact US releases from eugenia_calendar, and a week nobody
--- fetched reads exactly like a quiet week, in which every entry would pass. A
+-- R-19 reads high-impact US releases from eugenia_calendar, and a week nobody
+-- fetched reads exactly like a quiet week, in which no print is looked for. A
 -- week is marked here only by a fetch of that whole week, after its releases
 -- are written, so a mark never stands in front of missing rows.
 
 create table if not exists public.calendar_weeks (
-  -- The Sunday, New York, the week began on — R-14's `weekOf`.
+  -- The Sunday, New York, the week began on — adherence.ts's `weekOf`.
   week        date        primary key,
   fetched_at  timestamptz not null default now()
 );

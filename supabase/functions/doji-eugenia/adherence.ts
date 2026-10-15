@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// THE STRATEGY, EXECUTED — the thirteen rules a row can actually answer
+// THE STRATEGY, EXECUTED — the twelve rules a row can actually answer
 // ───────────────────────────────────────────────────────────────────────────
 // §7 writes a predicate per rule and §8 the population filters and three
 // verdicts. Applied by hand over four hundred rows, a rate over the wrong
@@ -7,7 +7,7 @@
 // code, and pure: rows in, verdicts out, no clock but the one passed in, which
 // is what lets every rule be driven both ways from a test.
 //
-// Thirteen, because §7's Evaluable column decides it: `journal` rules only. A
+// Twelve, because §7's Evaluable column decides it: `journal` rules only. A
 // judgment rule reporting `pass` is the "no violations" claim §8 warns about.
 //
 // It judges whether a row satisfies a predicate HE wrote — a fact about his own
@@ -458,19 +458,14 @@ function r13(rows: TradeRow[]): RuleResult {
   return result('R-13', 'calendar months carrying more than one position size', pass, fail, []);
 }
 
-/* ─── R-14 ─────────────────────────────────────────────────────────────────
-   No entries before a high-impact release. §7: none in the 30 minutes before a
-   US release TradingView rates high; one with a release later that day but
-   further off is unknown. Thirty minutes is the floor no reading excuses, and
-   the rest is his judgement — unknown, never pass. HIGH and HOME are his
+/* ─── The calendar R-19 is judged against ──────────────────────────────────
+   High impact is a US release TradingView rates high. HIGH and HOME are his
    decision (v1.20), imported by the query that reads the calendar; the
    calendar also holds releases from abroad, and none of them is one of his.
 
    A week nobody fetched is not a quiet week: `weeks` is evidence of a
-   whole-week fetch, and an entry outside one is unknown. After the print is
-   not checked; he set no number for it.
+   whole-week fetch, and a position outside one is unknown.
    ───────────────────────────────────────────────────────────────────────── */
-export const NEWS_MIN = 30;
 export const HIGH = 'high';
 export const HOME = 'US';
 
@@ -480,22 +475,6 @@ export interface Calendar { releases: string[]; weeks: Set<string> }
 export function weekOf(at: Date): string {
   const w = nyWall(at);
   return new Date(Date.UTC(w.y, w.m - 1, w.d - w.wd)).toISOString().slice(0, 10);
-}
-
-function r14(rows: TradeRow[], cal: Calendar): RuleResult {
-  const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
-  const prints = cal.releases.map(r => +new Date(r));
-  for (const t of rows) {
-    if (!isBroker(t) || !t.entry_time) continue;
-    const entry = new Date(t.entry_time), e = +entry;
-    if (!cal.weeks.has(weekOf(entry))) { unknown.push(t.id); continue; }
-    const day = nyDate(entry);
-    const ahead = prints.filter(p => p > e && nyDate(new Date(p)) === day);
-    if (prints.some(p => p > e && p - e <= NEWS_MIN * 60_000)) fail.push(t.id);
-    else (ahead.length ? unknown : pass).push(t.id);
-  }
-  return result('R-14', `entries in the ${NEWS_MIN} minutes before a US release rated high`,
-                pass, fail, unknown);
 }
 
 /* ─── R-15 ─────────────────────────────────────────────────────────────────
@@ -591,7 +570,8 @@ function r18(rows: TradeRow[], now: number): RuleResult {
    break-even; losing, tighten; target never moves; never wider. §7: judged at
    the first high-rated US release inside the span whose session differs from
    the entry's, against the stop and target then in force. Narrow because §6
-   made it so: a print in the entry's own session is R-14's.
+   made it so: a print in the entry's own session was taken on at entry, and
+   is R-20's caution, which no row can see.
 
    A stop tightened short of break-even is the rule when losing and a breach
    when winning, and no row says which it was: unknown. At or past break-even
@@ -660,7 +640,7 @@ export function checkRules(rows: TradeRow[], now = Date.now(),
                            cal: Calendar = { releases: [], weeks: new Set() },
                            stops: Map<string, Stop[]> = new Map()): RuleResult[] {
   return [r01(rows), r02(rows), r03(rows), r04(rows), r10(rows, now), r11(rows),
-          r12(rows), r13(rows), r14(rows, cal), r15(rows), r16(rows), r18(rows, now),
+          r12(rows), r13(rows), r15(rows), r16(rows), r18(rows, now),
           r19(rows, cal, stops)];
 }
 
