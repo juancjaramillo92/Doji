@@ -1076,8 +1076,11 @@ behind the official release, which is why the date is the point. And the two
 largest US gold funds (`FUNDS`, GLD and IAU) off the screener: assets under
 management and money in or out over a month, three months and the year
 (`FUND_COLUMNS`), folded by `foldFunds`, a column the screener does not serve
-null and never zero. Each economy and the funds' batch is its own call and its
-own failure, named in `missing`. `flowsList` gives levels on dates and computes
+null and never zero; the second probe read them in dollars (GLD $141.3B). Each
+economy and the funds' batch is its own call and its own failure, named in
+`missing`. The batch goes first and the economies three at a time, inside
+`DOOR_MS`: one economic read took eleven seconds on that probe, and five in a
+row at that pace outran it. `flowsList` gives levels on dates and computes
 no change, and `flowsBlock` reads the door directly, as the speculators' count
 is read, for the Sunday briefing and `get_around` alone: a quarter of
 central-bank buying is the story, and five weekday briefings repeating it are
@@ -1487,7 +1490,8 @@ and nothing about where price goes next week, which is Sunday's briefing.
 Under 250 words, with what to cut first named beside the count — figures from
 his journal, then her calls, then a commitment kept — and the verdict and the
 one thing to keep and one to change never cut, since a ceiling alone cuts what
-the message is for.
+the message is for. **And she counts the words last**, as the gates count their
+countable rules: the first review the eval read came back at 258.
 
 She is handed the week computed — `get_stats`' summary with his answers,
 `check_rules`' verdicts, her calls and her record — with his notes, the

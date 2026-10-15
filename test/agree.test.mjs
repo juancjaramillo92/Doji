@@ -5853,7 +5853,7 @@ test('the three long doors answer inside READ_MS', () => {
   };
   assert.ok(ms(EUGENIA_TS, 'READ_MS') - ms(tv, 'DOOR_MS') >= 10_000,
     'DOOR_MS leaves less than ten seconds of READ_MS — the door answers after she has given up on it');
-  for (const fn of ['readMarket', 'readTrend', 'readRates']) {
+  for (const fn of ['readMarket', 'readTrend', 'readRates', 'readFlows']) {
     const body = bodyOf(tv, `export async function ${fn}(`);
     assert.match(body, /const signal = AbortSignal\.timeout\(DOOR_MS\)/, `${fn} carries no deadline`);
     const calls = [...uncomment(body).matchAll(/tvCall\(session,[\s\S]*?\)\)/g)].map(m => m[0]);
@@ -6004,6 +6004,10 @@ test('a word count never stands without what to cut instead: the briefing\'s two
   assert.match(review, /Under two hundred and fifty words/, 'the review has lost its word count');
   assert.match(review, /THE VERDICT ON THE WEEK AND THE ONE THING TO KEEP AND ONE TO CHANGE ARE NOT PLACES YOU CUT/,
     'the review holds a word count with nothing saying what to cut instead');
+  /* AND IT IS COUNTED, LAST, as the gates count their countable rules: asked as
+     a ceiling alone, the first review the eval read came back at 258. */
+  assert.match(review.slice(review.lastIndexOf('LAST, COUNT')), /count the words[\s\S]*two hundred and fifty/,
+    'the review no longer counts its own words last, so its ceiling is read past');
 });
 
 test('the gold-against-real-yields chain is exempt from the rung, in both copies', () => {

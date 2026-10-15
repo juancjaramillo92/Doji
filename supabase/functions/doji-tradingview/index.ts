@@ -744,9 +744,11 @@ export async function readRates() {
    ?probe=flows on 15 October. The gold reserves of the central banks that buy
    most and the one that has been selling, in tonnes: a series that lags the
    official release, so each point carries its date. And the two largest US gold
-   funds' assets and money in or out, off the screener in dollars. Each
-   economy and the batch is its own call and its own failure, named in
-   `missing`. */
+   funds' assets and money in or out, off the screener in dollars, as the
+   second probe showed (GLD $141.3B on 15 October). Each economy and the batch
+   is its own call and its own failure, named in `missing`. The batch first,
+   then the economies three at a time: one economic read took eleven seconds on
+   the second probe, and five in a row at that pace outran DOOR_MS. */
 export const RESERVES = [
   { country: "CN", name: "China" }, { country: "PL", name: "Poland" },
   { country: "IN", name: "India" }, { country: "TR", name: "Turkey" },
@@ -776,14 +778,6 @@ export async function readFlows() {
   const session = await tvSession();
   const from = new Date(Date.now() - 400 * 86_400_000).toISOString().slice(0, 10);
   const reserves: Record<string, unknown>[] = [], missing: Record<string, string>[] = [];
-  for (const r of RESERVES) {
-    try {
-      reserves.push({ ...r, ...foldReserves(await tvCall(session, "mcp-tv-get-economic-data",
-        { symbol: `ECONOMICS:${r.country}GRES`, date_from: from }, signal)) });
-    } catch (err) {
-      missing.push({ symbol: `ECONOMICS:${r.country}GRES`, name: r.name, error: unreached(signal, err) });
-    }
-  }
   let funds: Record<string, unknown>[] = [];
   try {
     funds = foldFunds(await tvCall(session, "mcp-tv-get-symbol-data-batch",
@@ -791,7 +785,16 @@ export async function readFlows() {
   } catch (err) {
     missing.push({ symbol: FUNDS.join(", "), name: "the gold funds", error: unreached(signal, err) });
   }
-  return { ok: true, reserves, funds, missing };
+  const unread: Record<string, string>[] = [];
+  await inLanes(RESERVES, async (r, i) => {
+    try {
+      reserves[i] = { ...r, ...foldReserves(await tvCall(session, "mcp-tv-get-economic-data",
+        { symbol: `ECONOMICS:${r.country}GRES`, date_from: from }, signal)) };
+    } catch (err) {
+      unread[i] = { symbol: `ECONOMICS:${r.country}GRES`, name: r.name, error: unreached(signal, err) };
+    }
+  });
+  return { ok: true, reserves: reserves.filter(Boolean), funds, missing: [...missing, ...unread.filter(Boolean)] };
 }
 
 /* ─── What COMEX gold futures traded ───────────────────────────────────────
