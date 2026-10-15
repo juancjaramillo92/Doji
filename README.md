@@ -765,9 +765,9 @@ when a suspicious row gets looked at.
 - **`?structure=1`** returns his six charts — daily, 4H, 1H, 30m, 15m and 5m —
   in dollars, oldest first, for Eugenia's map of them (*Her map of his
   charts*). `CHARTS` in `_shared/edge.ts` names each period and how far back it
-  is read, one copy for the poller and her; no window asks for more than 240
-  bars, the most one answer has been seen to carry. One chart at a time, and a
-  chart that will not read is named in `missing` rather than served short.
+  is read, one copy for the poller and her, through the same split read as every
+  other bar (below). One chart at a time, and a chart that will not read is
+  named in `missing` rather than served short.
 - **`?entries=1`** returns the 1H and 30m as they stood at each of his twenty
   newest entries, read from the table rather than the request, and only bars
   closed by the minute he clicked: one closed after holds prices he could not
@@ -815,6 +815,16 @@ in under half a second; a bar carries `timestamp` (the minute it opens), `open`,
 `high`, `low`, `close` and `volume`, a range is inclusive at both ends, and it is
 in pipettes. That is what `best_price` is built on, and
 `test/fixtures/ctrader-get-trendbars.txt` is one such window, unchanged.
+
+**One read carries at most 1000 bars and 30 days, and asks for the 1000.** The
+tool counts its answer back from `toTimestamp`, 100 bars unless `count` asks
+for more, and refuses a window over 30 days; its own description says so, kept
+as `test/fixtures/ctrader-get-trendbars.json`, and a test holds `BAR_MAX` and
+`RANGE_MAX_MS` to it. Asked without `count`, any window over 100 bars came back
+as its newest 100 and nothing said so. So every bar the poller folds is read by
+`readTrendbars`, which asks for `BAR_MAX`, splits the window (`barWindows`) to
+900 bars and 30 days at most, and throws on an answer holding `BAR_MAX`, a cut
+page rather than a full one; `agree.test.mjs` holds that it is the only read.
 
 **The plan is read off the open position.** A live position carries `stopLoss`
 and `takeProfit`, so the poller records both as first seen and every change in
