@@ -757,6 +757,8 @@ export const RESERVES = [
 export const FUNDS = ["AMEX:GLD", "AMEX:IAU"];
 export const FUND_COLUMNS = ["description", "aum", "fund_flows.1M", "fund_flows.3M", "fund_flows.YTD"];
 
+const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+
 // Four hundred days reach five quarterly points, about a year.
 const RESERVE_DAYS = 400;
 
@@ -848,8 +850,6 @@ async function readVolume() {
                 the funds' screener columns, so the units can be read
 
    Every argument is written here; none is read from the request. */
-const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
-
 const GOLD = ["PEPPERSTONE:XAUUSD", "OANDA:XAUUSD", "FX_IDC:XAUUSD", "TVC:GOLD", "COMEX:GC1!"];
 const AROUND = MARKET.map(m => m.symbol);
 
