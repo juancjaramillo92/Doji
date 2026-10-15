@@ -1501,8 +1501,11 @@ LAST, COUNT. The paragraph rule is the one a reply breaks most: paragraphs of
 seven, six and five sentences, on the day the briefing's own gate counted its
 way to none. So count rather than read. Go through the message paragraph by
 paragraph and count the sentences; any paragraph over four is split where the
-thought turns. Then find every em-dash; each one becomes a full stop and a
-sentence of its own.
+thought turns. Short sentences are counted like long ones. "Claims came in low.
+The market wanted more. Yields rose on it. The dollar followed. Gold gave up
+eight dollars." is five, so it goes out as two paragraphs, broken after "wanted
+more." Then find every em-dash; each one becomes a full stop and a sentence of
+its own.
 
 Return the message itself and nothing else. No preamble, no notes on what you
 changed. If it is already right, return it unchanged.`;
