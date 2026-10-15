@@ -23,7 +23,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 import { readFileSync } from 'node:fs';
 import { SYSTEM, CRITIC, TRIM, TRADE_EVENT } from '../supabase/functions/doji-eugenia/prompt.ts';
-import { ALWAYS } from '../supabase/functions/doji-eugenia/strategy.ts';
+import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts';
 
 const file = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
@@ -41,16 +41,21 @@ export const MODEL = {
    Each mirrors its call site in index.ts: converse for a reply, critique() and
    trim() for the gates, postTradeEvent for the trade look. agree.test.mjs holds
    the gates' two markers against the function's. `prompts` is a parameter so
-   a planted defect can hand in a broken copy. */
+   a planted defect can hand in a broken copy. A case whose prompt tells her to
+   read a section names it as `strategy`, and is handed the section itself,
+   read from the module get_strategy serves. */
+const context = (c) => (c.context ?? '') +
+  (c.strategy ? `\n\nWhat get_strategy returned for §${c.strategy}:\n\n${SECTIONS[c.strategy]}` : '');
+
 export const PATHS = {
   reply:  (c) => ({ model: MODEL.opus, effort: 'medium',
-                    content: `${c.context ?? ''}\n\n${c.asked}` }),
+                    content: `${context(c)}\n\n${c.asked}` }),
   critic: (c, p) => ({ model: MODEL.opus, effort: 'medium',
-                       content: `${p.CRITIC}${c.context ?? ''}\n\nTHE BRIEFING:\n\n${c.draft}` }),
+                       content: `${p.CRITIC}${context(c)}\n\nTHE BRIEFING:\n\n${c.draft}` }),
   trim:   (c, p) => ({ model: MODEL.sonnet, effort: 'medium',
-                       content: `${p.TRIM}${c.context ?? ''}\n\nTHE MESSAGE:\n\n${c.draft}` }),
+                       content: `${p.TRIM}${context(c)}\n\nTHE MESSAGE:\n\n${c.draft}` }),
   trade:  (c, p) => ({ model: MODEL.opus, effort: 'medium',
-                       content: `${p.TRADE_EVENT}\n\n${c.situation}${c.context ?? ''}` }),
+                       content: `${p.TRADE_EVENT}\n\n${c.situation}${context(c)}` }),
 };
 
 export const PROMPTS = { SYSTEM, CRITIC, TRIM, TRADE_EVENT };
@@ -93,9 +98,15 @@ export const COUNTERS = {
   },
 };
 
-/* Every counted check and every pattern, as a list of what failed. */
+/* Every counted check and every pattern, as a list of what failed. She is sent
+   no tools, so a tool she reaches for comes back as text: that is not a
+   message, and a judge told to pass what a criterion does not touch passed it.
+   It fails whatever else the case checks, and says the case is short of an
+   answer, not that the prompt is wrong. */
 export function counted(c, text) {
   const failed = [];
+  const reached = text.match(/<invoke name="([^"]+)"/);
+  if (reached) failed.push(`reached for ${reached[1]}, which this case does not serve: hand her its answer`);
   for (const [name, arg] of Object.entries(c.counts ?? {})) {
     const said = COUNTERS[name](text, arg);
     if (said !== true) failed.push(said);

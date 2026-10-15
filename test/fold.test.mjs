@@ -58,7 +58,7 @@ import {
   SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, NEWS_MIN, HIGH, HOME, weekOf, STOP_GRACE_MIN,
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
-import { ALWAYS } from '../supabase/functions/doji-eugenia/strategy.ts';
+import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { backup, readAll, TABLES } from '../scripts/backup.mjs';
 import { lastRun, stale } from '../scripts/health.mjs';
 
@@ -5678,6 +5678,7 @@ test('every eval case names a path, carries what that path needs, and checks som
       assert.ok(EVAL.COUNTERS[name], `${c.id} counts ${name}, which no counter is`);
     }
     for (const re of [...(c.must ?? []), ...(c.mustNot ?? [])]) new RegExp(re, 'i');
+    if (c.strategy) assert.ok(SECTIONS[c.strategy], `${c.id} is handed §${c.strategy}, which the strategy does not hold`);
     assert.ok(Object.keys(c.counts ?? {}).length || c.must || c.mustNot || c.equals || c.judge?.length,
       `${c.id} checks nothing, so it passes whatever she writes`);
   }
@@ -5698,6 +5699,8 @@ test('the eval counts what the gates are told to count', () => {
   assert.match(EVAL.counted(c({ words: 3 }), 'one two three four')[0], /4 words/);
   assert.match(EVAL.counted({ mustNot: ['\\bcut\\b'] }, 'a cut is priced')[0], /has \/\\bcut\\b\//);
   assert.match(EVAL.counted({ must: ['4,?002'] }, 'buy at 4,003')[0], /missing/);
+  assert.match(EVAL.counted({}, '<invoke name="get_market">\n</invoke>')[0], /reached for get_market/,
+    'a tool she reached for was graded as her message');
 });
 
 test('each eval path asks what its call site asks, of the model it runs on', () => {
