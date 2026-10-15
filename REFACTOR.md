@@ -534,7 +534,18 @@ turns and twenty notes, her memory is her own tables, and the nightly pass is a
 tool loop that a single batch request cannot run.
 **Revisit if:** a window is ever widened past what a request carries cheaply.
 
-### R-56 — several Opus packets to an Ogg page on the charm
+### R-56 — interpolating the call rules into `SYSTEM`
+**Why refused:** `SYSTEM` tells her the rules her calls are held to in words —
+*twenty dollars*, *twenty-five to thirty*, *one and a half times* — and
+`make_call`'s description interpolates the same constants. Interpolating
+`SYSTEM` too would single-source the numbers, but it changes the prompt she
+reads, which is a behaviour change to be run through `scripts/eval.mjs`, for a
+fact that has not moved. The words stay, and `agree.test.mjs` holds them to
+`callProblem`'s constants.
+**Revisit if:** one of the call rules changes, when the edit is a prompt change
+anyway.
+
+### R-57 — several Opus packets to an Ogg page on the charm
 **Deferred, not refused.** `ogg.c` writes one 20 ms packet a page, and each
 page's head is 28 bytes against a packet of about 60 at 24 kbit/s, so a
 quarter or more of a five-minute file is heads — about 1.3 MB where packing
@@ -543,14 +554,14 @@ pages would make it under a megabyte. It fits her door's 3 MB and the room
 the specification page by page. **Revisit if:** the upload's time shows in
 how long he waits for her, or the room on the board proves short.
 
-### R-57 — the five-minute tick without a gap in the recording
+### R-58 — the five-minute tick without a gap in the recording
 **Deferred, not refused.** The tick half a minute before the end plays on the
 same task that reads the microphones, so about a fifth of a second of his
 voice is not recorded while it sounds. Playing it beside the recording means
 a second task on a codec pair that is opened and closed together. **Revisit
 if:** a transcript is seen to lose the words said over the tick.
 
-### R-58 — one wait for the sleep screen reaching the panel
+### R-59 — one wait for the sleep screen reaching the panel
 **Why refused:** `main.c`'s `LAST_FRAME_MS` (200 ms) and the journal's two
 face frames both wait for the dark to be drawn, but before different things:
 the first before deep sleep stops the chip, which the panel must have

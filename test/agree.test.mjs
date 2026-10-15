@@ -22,13 +22,13 @@ import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
-         READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_MAX, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
+         READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_MAX, RR_MIN, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
-import { CONSOLIDATE, SYSTEM, PITCH } from '../supabase/functions/doji-eugenia/prompt.ts';
+import { CONSOLIDATE, SYSTEM, PITCH, REVIEW } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled,
          discipline }
   from '../supabase/functions/doji-eugenia/journal.ts';
-import { HOME } from '../supabase/functions/doji-eugenia/adherence.ts';
+import { HOME, FULL_STOP, TO_BREAK_EVEN, TARGET_MIN, TARGET_MAX } from '../supabase/functions/doji-eugenia/adherence.ts';
 
 // A repository file, read once however many tests ask for it.
 const READ = new Map();
@@ -3416,6 +3416,20 @@ test('a call is filed with the sides, outcomes and condition length the table ac
   assert.equal(CALL_MAX, Number(length?.[1]), 'make_call truncates a condition past what the table accepts');
 });
 
+/* SYSTEM tells her the rules make_call holds her to in words, and callProblem
+   checks them in numbers. A rule moved in one and not the other has her filing
+   calls the tool refuses, or describing a limit the tool does not keep. */
+test('the call rules she is told are the ones make_call checks', () => {
+  const WORDS = { 20: 'twenty', 25: 'twenty-five', 30: 'thirty', 1.5: 'one and a half' };
+  const system = SYSTEM.replace(/\s+/g, ' ');
+  for (const [said, why] of [
+    [`the stop at most ${WORDS[FULL_STOP]} dollars from entry`, 'the stop cap'],
+    [`the target ${WORDS[TARGET_MIN]} to ${WORDS[TARGET_MAX]} away`, 'the target band'],
+    [`the reward at least ${WORDS[RR_MIN]} times the risk`, 'the reward floor'],
+    [`break-even at plus ${WORDS[TO_BREAK_EVEN]}`, 'the break-even move'],
+  ]) assert.ok(system.includes(said), `SYSTEM no longer states ${why} as make_call and scoreCall hold it: "${said}"`);
+});
+
 test('a read is judged by the test she stated, never by where price went', () => {
   const consolidate = CONSOLIDATE.replace(/\s+/g, ' ');
   assert.match(consolidate, /a read is never judged by where price went/,
@@ -5807,10 +5821,11 @@ test('the briefing opens on the weeks, in the writer and in the critic', () => {
     'the critic no longer names the opening it replaces, so it can keep one');
 });
 
-test('the word count never outranks the teaching block, in either copy', () => {
+test('a word count never stands without what to cut instead: the briefing\'s two copies and the review', () => {
   /* A CEILING ON ITS OWN CUTS THE TEACHING, the longest thing on the page. The
      count is safe only beside what to cut INSTEAD, so a copy holding the count
-     alone reproduces that. */
+     alone reproduces that. The review's teaching is its verdict and its one
+     thing to keep and one to change. */
   const writer = EUGENIA_PROMPT.slice(0, EUGENIA_PROMPT.indexOf('export const CRITIC'));
   const critic = EUGENIA_PROMPT.slice(EUGENIA_PROMPT.indexOf('export const CRITIC'));
   for (const [who, half] of [['writer', writer], ['critic', critic]]) {
@@ -5819,6 +5834,10 @@ test('the word count never outranks the teaching block, in either copy', () => {
       `the ${who} holds a word count with nothing saying what to cut instead — ` +
       `which is the arrangement that stopped her teaching the first time`);
   }
+  const review = REVIEW.replace(/\s+/g, ' ');
+  assert.match(review, /Under two hundred and fifty words/, 'the review has lost its word count');
+  assert.match(review, /THE VERDICT ON THE WEEK AND THE ONE THING TO KEEP AND ONE TO CHANGE ARE NOT PLACES YOU CUT/,
+    'the review holds a word count with nothing saying what to cut instead');
 });
 
 test('the gold-against-real-yields chain is exempt from the rung, in both copies', () => {
