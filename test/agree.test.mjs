@@ -5113,6 +5113,21 @@ test('every reason a voice note fails is one the handler can actually reach', ()
     'the extension has nothing to go on');
 });
 
+/* EVERY BAR READ ASKS FOR THE MOST AND REFUSES A CUT PAGE, and there is one.
+   Without `count` the broker answers a window's newest 100 bars; best_price
+   and her calls' scores were read that way for weeks, short and silent. A
+   second read beside readTrendbars would bring that back, so the census is
+   of every get_trendbars call that parses its answer. */
+test('every bar the poller folds is read through readTrendbars, which asks for the most', () => {
+  const src = source('supabase/functions/doji-mcp-sync/index.ts');
+  const calls = [...uncomment(src).matchAll(/mcpCall\(session, "get_trendbars"/g)];
+  assert.equal(calls.length, 1, `get_trendbars is parsed in ${calls.length} places — one bypasses the window split and the count`);
+  const body = bodyOf(src, 'async function readTrendbars(', 'doji-mcp-sync no longer has readTrendbars()');
+  assert.match(body, /count: BAR_MAX,/, 'readTrendbars no longer asks for the most, so a window over 100 bars comes back cut');
+  assert.match(body, /for \(const w of barWindows\(from, to, ms\)\)/, 'readTrendbars no longer splits its window');
+  assert.match(body, /if \(page\.length >= BAR_MAX\) throw/, 'an answer at the most is trusted rather than read as cut');
+});
+
 /* THE CALIBRATION'S DOOR CANNOT LOOK AHEAD, and nothing can drive it: it is a
    network read. A bar that closed after he clicked holds prices he could not
    have seen, and a map drawn from it finds his level by knowing where price

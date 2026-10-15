@@ -21,6 +21,7 @@ import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
   lookbackFor, foldHours, balanceTarget,
   fromPipettes, foldSpot, PIPETTES, openPlans, barSpan, bestPrice, foldCandles, stopChanges, sliced,
+  barWindows, BAR_MAX, RANGE_MAX_MS,
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
@@ -1067,14 +1068,44 @@ test('the calibration scores her map by the levels he traded, against chance', (
   assert.match(out, /\* TURN 3  ON_GRID 3  EDGE 5  at a level 67% \(chance 15%, lift 4\.44\)  median \$2  setup agrees 1\/2/);
 });
 
-/* THE WINDOWS STAY INSIDE WHAT ONE ANSWER HAS BEEN SEEN TO CARRY: a four-hour
-   chunk of minute bars, 240. A wider window could come back cut, and a map
-   drawn short says nothing about it. */
-test('no chart asks the broker for more bars than one answer has been seen to carry', () => {
-  assert.deepEqual(CHARTS.map(c => c.period), ['D_1', 'H_4', 'H_1', 'M_30', 'M_15', 'M_5']);
-  for (const c of CHARTS) {
-    assert.ok(c.hours * HOUR / c.ms <= 240, `${c.period} asks for ${c.hours * HOUR / c.ms} bars`);
+/* EVERY READ STAYS INSIDE WHAT ONE ANSWER CAN CARRY, as the broker's own
+   description of the tool states it: 1000 bars and 30 days. Asked for more, it
+   answers its newest bars and says nothing, which is how every chart of the
+   map and every chunk behind best_price came back as its newest 100. */
+test('the broker\'s limits on one bar read are the ones the poller holds itself to', () => {
+  const tool = JSON.parse(readFileSync(new URL('./fixtures/ctrader-get-trendbars.json', import.meta.url), 'utf8'));
+  assert.equal(tool.name, 'get_trendbars');
+  const count = tool.inputSchema.properties.count.description;
+  assert.match(count, /default 100, clamped to (\d+)/);
+  assert.equal(BAR_MAX, Number(count.match(/clamped to (\d+)/)[1]), 'BAR_MAX is not the clamp the broker states');
+  assert.match(count, /counted back from toTimestamp/, 'the capture no longer says which bars a short answer keeps');
+  const days = Number(tool.description.match(/must not exceed (\d+) days/)[1]);
+  assert.equal(RANGE_MAX_MS, days * 86_400_000, 'RANGE_MAX_MS is not the window the broker states');
+  for (const p of CHARTS.map(c => c.period)) assert.ok(tool.inputSchema.properties.period.enum.includes(p), `${p} is not a period it serves`);
+});
+
+test('a bar read is split into windows that cover it whole, inside both limits', () => {
+  const reads = [
+    ...CHARTS.map(c => [c.period, c.ms, c.hours * HOUR]),
+    // ?bars=1's thirty hours of minutes, and a trade held a day and a half.
+    ['M_1 calls', 60_000, 30 * HOUR], ['M_1 trade', 60_000, 36 * HOUR + 7 * 60_000],
+  ];
+  const to = Date.UTC(2026, 9, 15, 18, 53);
+  for (const [name, ms, span] of reads) {
+    const ws = barWindows(to - span, to, ms);
+    assert.equal(ws[0].from, to - span, `${name} starts late`);
+    assert.equal(ws.at(-1).to, to, `${name} ends early`);
+    ws.forEach((w, i) => {
+      if (i) assert.equal(w.from, ws[i - 1].to, `${name} leaves a gap between windows`);
+      assert.ok(w.to - w.from <= RANGE_MAX_MS, `${name} asks for more than 30 days in one read`);
+      // Ends inclusive: a window of n bar lengths holds n + 1 bars.
+      assert.ok((w.to - w.from) / ms + 1 < BAR_MAX, `${name} can fill an answer, which reads as cut`);
+    });
   }
+  // The daily's 120 days are four reads; the four-hour's 30 days exactly one.
+  assert.equal(barWindows(to - 2880 * HOUR, to, 86_400_000).length, 4);
+  assert.equal(barWindows(to - 720 * HOUR, to, 4 * HOUR).length, 1);
+  assert.deepEqual(barWindows(to, to, 60_000), []);
 });
 
 test('his charts are read ahead by the job, and the map a failed pass leaves stands', async () => {

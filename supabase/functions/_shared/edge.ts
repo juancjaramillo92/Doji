@@ -170,10 +170,8 @@ export interface Candle { t: number; open: number; high: number; low: number; cl
 
 /* His six charts, §4's three jobs: bias on the daily, 4H and 1H, levels on the
    1H and 30m, the entry on the 15m and 5m. The poller reads each as far back
-   as `hours` and Eugenia folds them, so the list is one copy for both. No
-   window holds more than 240 bars, the most one answer has been seen to carry
-   (a four-hour chunk of minutes): nothing has established where the broker
-   cuts a page, and a cut one would draw a map short without saying so. */
+   as `hours`, split where the broker's limits on one read fall, and Eugenia
+   folds them, so the list is one copy for both. */
 export const CHARTS = [
   { period: "D_1",  name: "daily", ms: 86_400_000, hours: 2_880 },
   { period: "H_4",  name: "4H",    ms: 14_400_000, hours: 720 },

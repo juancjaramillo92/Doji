@@ -479,18 +479,39 @@ export function bestPrice(bars: Bar[], direction: string, entryMs: number, close
   return fromPipettes(direction === "BUY" ? Math.max(...side) : Math.min(...side));
 }
 
-/* Four hours a request: nothing has established how many bars one answer
-   carries, and a page cut short reports a best price low, silently. */
-const BAR_CHUNK_MS = 4 * 3600_000;
+/* ─── What one bar read can carry ──────────────────────────────────────────
+   get_trendbars counts its answer back from toTimestamp: 100 bars unless
+   `count` asks for more, never more than 1000, over a window of 30 days at
+   most — its own description, kept in test/fixtures/ctrader-get-trendbars.json.
+   Asked without `count`, a window over 100 bars came back as its newest 100
+   and said nothing: every chart of her map on 15 October, and every four-hour
+   chunk of minutes behind best_price and her calls' scores before it. So
+   every read asks for the most, a window is split well inside both limits,
+   and an answer holding the most is a cut page, thrown rather than trusted. */
+export const BAR_MAX = 1000;
+export const RANGE_MAX_MS = 30 * 86_400_000;
+const WINDOW_BARS = 900;
 
-async function readBars(session: Record<string, string>, from: number, to: number): Promise<Bar[]> {
+// Pure, so the splitting is driven. Windows meet at their edges, and a bar
+// there comes back twice; both readers below are indifferent to that.
+export function barWindows(from: number, to: number, ms: number): { from: number; to: number }[] {
+  const span = Math.min(RANGE_MAX_MS, WINDOW_BARS * ms);
+  const out: { from: number; to: number }[] = [];
+  for (let at = from; at < to; at += span) out.push({ from: at, to: Math.min(at + span, to) });
+  return out;
+}
+
+async function readTrendbars(session: Record<string, string>, period: string, ms: number,
+                             from: number, to: number): Promise<Bar[]> {
   const bars: Bar[] = [];
-  for (let at = from; at < to; at += BAR_CHUNK_MS) {
+  for (const w of barWindows(from, to, ms)) {
     const got = await mcpCall(session, "get_trendbars", {
-      symbolId: SYMBOL_IDS[0], period: "M_1",
-      fromTimestamp: String(at), toTimestamp: String(Math.min(at + BAR_CHUNK_MS, to) - MINUTE),
+      symbolId: SYMBOL_IDS[0], period, count: BAR_MAX,
+      fromTimestamp: String(w.from), toTimestamp: String(w.to),
     });
-    bars.push(...(got.trendbars ?? []));
+    const page: Bar[] = got.trendbars ?? [];
+    if (page.length >= BAR_MAX) throw new Error(`get_trendbars ${period} answered ${page.length} bars, its most: the window was cut`);
+    bars.push(...page);
   }
   return bars;
 }
@@ -530,11 +551,7 @@ async function readCharts(session: Record<string, string>, to: number, charts: r
   const missing: { period: string; error: string }[] = [];
   for (const c of charts) {
     try {
-      const got = await mcpCall(session, "get_trendbars", {
-        symbolId: SYMBOL_IDS[0], period: c.period,
-        fromTimestamp: String(to - c.hours * 3600_000), toTimestamp: String(to),
-      });
-      const candles = foldCandles(got.trendbars ?? []);
+      const candles = foldCandles(await readTrendbars(session, c.period, c.ms, to - c.hours * 3600_000, to));
       if (!candles) throw new Error("a bar that will not read");
       if (!candles.length) throw new Error("no bars");
       out[c.period] = candles;
@@ -596,7 +613,7 @@ async function fillExcursions(session: Record<string, string>): Promise<number> 
   let wrote = 0;
   for (const t of due) {
     const span = barSpan(t.entry, t.close) as { from: number; to: number };
-    const best = bestPrice(await readBars(session, span.from, span.to), t.direction, t.entry, t.close);
+    const best = bestPrice(await readTrendbars(session, "M_1", MINUTE, span.from, span.to), t.direction, t.entry, t.close);
     if (best === null) continue;
     if (await writeOnce(t.id, "best_price", best)) wrote++;
   }
@@ -703,7 +720,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
        calls. Thrown rather than served short when one will not read. */
     if (day) {
       const from = Math.floor((to - CALL_HOURS * 3600_000) / MINUTE) * MINUTE;
-      const candles = foldCandles(await readBars(session, from, to));
+      const candles = foldCandles(await readTrendbars(session, "M_1", MINUTE, from, to));
       if (!candles) throw new Error("get_trendbars returned a bar that will not read");
       return json({ ok: true, symbol: SYMBOL_IDS[0], from, bars: candles });
     }
