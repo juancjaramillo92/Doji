@@ -24,7 +24,7 @@ any change that touches it.
 | retrieval quality | a golden set that does not exist |
 | the Apps Script's Gmail half | `gs.mjs` reaches the parser only |
 | an Edge Function path no test can drive | `types.test.mjs` for the names in it; the rest by reading |
-| whether a prompt still behaves | a red-team set that does not exist |
+| whether a prompt still behaves | `scripts/eval.mjs`, run by hand with his key — nothing in `npm test` calls the model |
 | the charm's firmware beyond its pure C | the charm workflow's build for the rest of its code; the board itself for what it does |
 
 ---
@@ -242,8 +242,8 @@ is checked against his own numbers, and a filed call carries levels by design. A
 paraphrased signal holds real messages, and the path the review would start
 with, the trade event, is where a held message costs most. The trade event's
 exemption from `TRIM` is deliberate, for the reason `CLAUDE.md` gives. What the
-review actually found is §1's last row: there is no red-team set, so nothing
-says whether the prompts still behave.
+review actually found was §1's last row: nothing said whether the prompts still
+behave. `scripts/eval.mjs` now asks it, by hand.
 **Revisit if:** that set exists, and shows a violation with a shape a pattern
 catches and no real message shares.
 

@@ -5583,3 +5583,81 @@ test('a trades read that hit its bound says how far back it reaches, in every to
       `${tool} called a read short of its bound truncated, which is every ordinary window`);
   }
 });
+
+/* ─── The behaviour eval, offline ────────────────────────────────────────────
+   scripts/eval.mjs spends money and is run by hand, so nothing in it is ever
+   proved by running it here. What can be is: every case is well formed, the
+   counters catch what they are named for, each path builds the request its
+   call site builds, every planted defect changes a prompt, and a grade that
+   should fail does — driven through a stubbed model. */
+const EVAL = await import('../scripts/eval.mjs');
+
+test('every eval case names a path, carries what that path needs, and checks something', () => {
+  const ids = EVAL.CASES.map(c => c.id);
+  assert.equal(new Set(ids).size, ids.length, 'two eval cases share an id');
+  assert.ok(EVAL.CASES.length >= 12, `only ${EVAL.CASES.length} eval cases`);
+  const needs = { reply: 'asked', critic: 'draft', trim: 'draft', trade: 'situation' };
+  for (const c of EVAL.CASES) {
+    assert.ok(EVAL.PATHS[c.path], `${c.id} names a path the eval does not build: ${c.path}`);
+    assert.ok(c[needs[c.path]], `${c.id} is a ${c.path} case with no ${needs[c.path]}`);
+    assert.ok(c.why, `${c.id} says nothing about why it is a case`);
+    for (const name of Object.keys(c.counts ?? {})) {
+      assert.ok(EVAL.COUNTERS[name], `${c.id} counts ${name}, which no counter is`);
+    }
+    for (const re of [...(c.must ?? []), ...(c.mustNot ?? [])]) new RegExp(re, 'i');
+    assert.ok(Object.keys(c.counts ?? {}).length || c.must || c.mustNot || c.equals || c.judge?.length,
+      `${c.id} checks nothing, so it passes whatever she writes`);
+  }
+});
+
+test('the eval counts what the gates are told to count', () => {
+  const c = (counts) => ({ counts });
+  assert.deepEqual(EVAL.counted(c({ emDash: true }), 'Plain. Words.'), []);
+  assert.match(EVAL.counted(c({ emDash: true }), 'The dollar — firm — rose.')[0], /em-dash/);
+  const five = 'One. Two. Three. Four. Five.';
+  assert.match(EVAL.counted(c({ sentences: 4 }), five)[0], /5 sentences/);
+  assert.deepEqual(EVAL.counted(c({ sentences: 4 }), 'One. Two.\n\nThree. Four.'), []);
+  assert.deepEqual(EVAL.counted(c({ sentences: 4 }),
+    'One.\n\nToday: 08:30 ET CPI. 10:00 ET claims. 11:00 ET an auction. 13:00 ET a speech. 14:00 ET minutes.\n' +
+    '- 08:30 ET CPI. Hot. Cold. Warm. Done.'), [],
+    'a calendar list was counted as a paragraph of prose');
+  assert.match(EVAL.counted(c({ questions: 1 }), 'Why? And when?')[0], /2 questions/);
+  assert.match(EVAL.counted(c({ words: 3 }), 'one two three four')[0], /4 words/);
+  assert.match(EVAL.counted({ mustNot: ['\\bcut\\b'] }, 'a cut is priced')[0], /has \/\\bcut\\b\//);
+  assert.match(EVAL.counted({ must: ['4,?002'] }, 'buy at 4,003')[0], /missing/);
+});
+
+test('each eval path asks what its call site asks, of the model it runs on', () => {
+  const fn = readFileSync(new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+  const [opus, sonnet] = ['OPUS', 'SONNET'].map(k => fn.match(new RegExp(`const ${k} = "([^"]+)"`))[1]);
+  const at = (path, extra = {}) => EVAL.request({ path, context: '', asked: 'q', draft: 'D', situation: 'S', ...extra });
+  assert.equal(at('trim').model, sonnet, 'TRIM runs on Sonnet in the function and on something else here');
+  for (const path of ['reply', 'critic', 'trade']) {
+    assert.equal(at(path).model, opus, `the ${path} runs on Opus in the function and on something else here`);
+  }
+  assert.match(at('critic').messages[0].content, /THE BRIEFING:\n\nD$/);
+  assert.match(at('trim').messages[0].content, /THE MESSAGE:\n\nD$/);
+  assert.ok(at('trade').messages[0].content.startsWith(EVAL.PROMPTS.TRADE_EVENT));
+  assert.ok(at('reply').system[0].text.startsWith(EVAL.PROMPTS.SYSTEM), 'the eval asks under a different system prompt');
+  // The gates' markers are the function's own.
+  assert.match(fn, /\\n\\nTHE BRIEFING:\\n\\n\$\{draft\}/);
+  assert.match(fn, /\\n\\nTHE MESSAGE:\\n\\n\$\{draft\}/);
+});
+
+test('every planted defect breaks a prompt and names a case that exists', () => {
+  for (const plant of EVAL.PLANTS) {
+    const broken = plant.breaks(EVAL.PROMPTS);
+    assert.ok(Object.keys(EVAL.PROMPTS).some(k => broken[k] !== EVAL.PROMPTS[k]),
+      `the plant "${plant.why}" no longer matches the prompt it breaks, so --plant proves nothing`);
+    for (const id of plant.cases) assert.ok(EVAL.CASES.some(c => c.id === id), `the plant names no case ${id}`);
+  }
+});
+
+test('a graded case fails on what she wrote and on what the judge found', async () => {
+  const c = EVAL.CASES.find(x => x.id === 'cut-in-a-hike-week');
+  const answers = ['October rate cut odds slipped.', JSON.stringify({ verdicts: [
+    { criterion: 'direction', pass: false, why: 'says cut' }] })];
+  const result = await EVAL.grade(c, EVAL.PROMPTS, async () => ({ text: answers.shift(), usage: {} }));
+  assert.ok(result.failed.some(f => /rate cut odds/.test(f)), 'the pattern did not fail a cut in a hike week');
+  assert.ok(result.failed.some(f => /says cut/.test(f)), 'the judge\'s verdict was dropped');
+});

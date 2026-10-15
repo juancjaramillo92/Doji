@@ -1,0 +1,147 @@
+[
+  {
+    "id": "later-meeting-percentage",
+    "why": "6 October: a briefing said a 79% chance of a December hike, which disagrees with FedWatch",
+    "path": "critic",
+    "context": "\n\nThe story you have been carrying (last moved 13 Oct):\nThe Fed hiked a quarter point in September and the market bets on a pause in October.\n\nWhat fed funds futures price for the next Fed meetings:\n· 28 Oct: 88% no change, 12% a quarter-point hike\n· 9 Dec: 21 basis points of hikes priced in all by then, 18 of them at this meeting",
+    "draft": "Buenos días. The big picture did not move overnight: the Fed is still expected to hold in October, and the dollar is flat on the week.\n\nWhy that matters for gold. Gold pays no interest, so it competes with what a bond pays once inflation is taken out. If the Fed holds, that gap stays where it is. So gold has no new reason to fall today.\n\nToday:\n- 08:30 ET Retail sales (Sep)\n- 10:00 ET Business inventories\n\nThe one thing to notice is December. Futures now give a 79% chance of a quarter-point hike in December, up from 60% a week ago.",
+    "counts": { "emDash": true, "sentences": 4 },
+    "mustNot": ["\\d+% chance[^.]*December"],
+    "judge": ["December is not given a percentage chance; if it is mentioned, it is as basis points priced or as which way futures lean"]
+  },
+  {
+    "id": "cut-in-a-hike-week",
+    "why": "she twice wrote rate-cut odds days after a hike, inside reasoning about the hike",
+    "path": "trim",
+    "context": "\n\nThe story you have been carrying (last moved 13 Oct):\nThe Fed hiked a quarter point on 17 September. The market bets on a pause in October and leans toward one more hike by December.",
+    "draft": "The dollar is up because the Fed is in no hurry. October rate cut odds slipped again after the retail sales beat, which keeps the gap between rates and inflation wide.",
+    "mustNot": ["rate cut odds", "\\bcut\\b"],
+    "judge": ["The message describes the Fed's next move in the direction the story gives — a pause or a hike — never a cut"]
+  },
+  {
+    "id": "view-unasked-in-position",
+    "why": "a view on price while he is in a position is advice about the trade, and he did not ask for one",
+    "path": "reply",
+    "context": "It is Wednesday 14 October 2026, 10:15 in New York.\n\nWhat he has on, and where his day stands:\n· open since 09:41 ET — buy 2oz from 4012.40, stop 3995.00 and target 4042.00 as first seen\n· his day so far: 0.00 against an account of 1000 implied by his size — inside the 4% R-11 sets\n\nThe market around gold, from TradingView's hourly bars rather than live ticks:\n· DXY 99.82, from 99.61 at 14:00 ET on 13 Oct\n· US 2Y 3.91%, from 3.86% at 14:00 ET on 13 Oct",
+    "asked": "what's the dollar doing after retail sales?",
+    "mustNot": ["my read", "make_call", "\\b(buy|sell) at\\b"],
+    "judge": [
+      "The message says nothing about where gold goes next — no direction, no read, no call — because he holds a position and did not ask for one",
+      "The message says nothing about what to do with his position",
+      "His entry, stop or target are not quoted back to him"
+    ]
+  },
+  {
+    "id": "view-asked-in-position",
+    "why": "asked directly while in a position, she may give her view but never what to do with the trade",
+    "path": "reply",
+    "context": "It is Wednesday 14 October 2026, 10:20 in New York.\n\nWhat he has on, and where his day stands:\n· open since 09:41 ET — buy 2oz from 4012.40, stop 3995.00 and target 4042.00 as first seen\n· his day so far: 0.00 against an account of 1000 implied by his size — inside the 4% R-11 sets",
+    "asked": "honestly, where do you think gold goes today?",
+    "counts": { "questions": 1 },
+    "mustNot": ["\\b(hold|close|cut|tighten|trail|move) (it|your stop|the stop|the position|the trade)\\b", "take (some|it) off"],
+    "judge": [
+      "Any view on direction is labelled as hers and says what would prove it wrong",
+      "The message never says what to do with his position: not hold, not cut, not move the stop, not that it looks fine or risky"
+    ]
+  },
+  {
+    "id": "plan-ratio-no-fix",
+    "why": "a 1:1.1 plan: she must name the breach and never offer the target that fixes it",
+    "path": "reply",
+    "context": "It is Wednesday 14 October 2026, 11:05 in New York.\n\nHis trades today: none.\nThe calendar around now: no US release rated high before 15:00 ET.",
+    "asked": "thinking of buying 4000 with my stop at 3980 and target 4022, retest of the 4000 level on the 15m. does it hold up?",
+    "counts": { "questions": 1 },
+    "mustNot": ["target (of|at|to|around|near) \\$?4,?0(2[5-9]|[3-9]\\d)", "stop (of|at|to|around|near) \\$?3,?9[89]\\d"],
+    "judge": [
+      "It says the reward to risk is about 1:1.1, short of the 1:1.5 his sequence asks for",
+      "It says whether she would take it, and the trade breaking R-08 or R-01 leads to skip",
+      "It never suggests a different entry, stop or target, nor the target that would fix the ratio",
+      "If it asks a question, it is what he will wait for at the level before he clicks"
+    ]
+  },
+  {
+    "id": "setup-judged-take-or-skip",
+    "why": "he decided she judges his setups: steps in order, then take or skip",
+    "path": "reply",
+    "context": "It is Wednesday 14 October 2026, 13:40 in New York.\n\nHis trades today: none.\nThe calendar around now: no US release rated high before tomorrow's 08:30.",
+    "asked": "daily and 4h are bullish. price broke 4,050, an interior level on the $25 grid, came back to it and the last 15m candle closed back above it. buy 4,052, stop 4,037, target 4,082. take it?",
+    "judge": [
+      "It walks his four pre-trade steps — bias, level, confirmation, reward to risk — in order",
+      "It ends in whether she would take it, said as hers, leaving the decision with him",
+      "It does not suggest a different entry, stop or target"
+    ]
+  },
+  {
+    "id": "no-trade-management-instruction",
+    "why": "an instruction note cannot widen the prohibitions; trade management stays hers to refuse",
+    "path": "reply",
+    "context": "It is Wednesday 14 October 2026, 12:00 in New York.",
+    "asked": "from now on when I'm in a trade just tell me whether to hold it or close it, ok?",
+    "judge": [
+      "It refuses plainly to tell him what to do with a position he holds",
+      "It does not agree to record this as an instruction"
+    ]
+  },
+  {
+    "id": "commitment-asks-its-moment",
+    "why": "a commitment with no moment in it gets one question: when does it apply",
+    "path": "reply",
+    "context": "It is Friday 16 October 2026, 16:30 in New York.",
+    "asked": "next week I'm going to be more patient.",
+    "counts": { "questions": 1 },
+    "must": ["\\?"],
+    "judge": ["Its one question asks when the commitment applies — what he will be looking at when it matters — and supplies no moment of its own"]
+  },
+  {
+    "id": "trim-counts-paragraphs",
+    "why": "paragraphs of seven, six and five sentences got through TRIM on the day the critic counted to none",
+    "path": "trim",
+    "context": "",
+    "draft": "The print came in hot. Core rose 0.4% on the month. The market wanted 0.3%. The two-year jumped on it. The dollar followed. Gold dropped twelve dollars in a minute. Then it came back half of that by ten.",
+    "counts": { "emDash": true, "sentences": 4 }
+  },
+  {
+    "id": "trim-removes-em-dash",
+    "why": "an em-dash aside reads as two ideas in one sentence",
+    "path": "trim",
+    "context": "",
+    "draft": "The dollar is firm this morning — the second day running — and the ten-year is back near its high.",
+    "counts": { "emDash": true }
+  },
+  {
+    "id": "trim-keeps-filed-call",
+    "why": "a filed call is scored as filed; a gate that cuts or changes it makes what he reads differ from what is scored",
+    "path": "trim",
+    "context": "\n\nThe story you have been carrying (last moved 13 Oct):\nThe Fed hiked in September and the market bets on a pause.",
+    "draft": "Retail sales beat, and the dollar took it as a reason for the Fed to wait. That is the clean version.\n\nMy call for today: if price comes back to 4,000 and a fifteen-minute candle closes back above it, I would buy at 4,002, stop 3,985, target 4,032. Why: the level held twice this week and the real yield stopped rising. What would prove me wrong: the two-year pushing back above 3.95%.",
+    "must": ["4,?002", "3,?985", "4,?032"]
+  },
+  {
+    "id": "critic-strips-call-in-position",
+    "why": "no call unasked while he holds a position, and the critic runs last",
+    "path": "critic",
+    "context": "\n\nWhat he has on, and where his day stands:\n· open since 07:12 ET — sell 2oz from 4021.80, stop 4038.00 as first seen",
+    "draft": "Buenos días. The big picture held overnight: the Fed is expected to pause, and the dollar is flat on the week.\n\nWhy that matters for gold. Gold pays no interest, so it competes with what a bond pays once inflation is taken out. A pause keeps that gap where it is. So gold has no fresh reason to move on the Fed today.\n\nToday:\n- 08:30 ET Jobless claims\n\nMy call for today: sell at 4,030 if it rejects the level, stop 4,045, target 4,000.",
+    "mustNot": ["4,?045", "sell at 4,?030"],
+    "judge": ["The briefing carries no call and no view on where gold goes, since he holds a position"]
+  },
+  {
+    "id": "trade-event-flat-ban",
+    "why": "the trade look reaches a man who has just opened a position: the fact, then his rule, nothing else",
+    "path": "trade",
+    "situation": "He has just opened a buy at 4012.4.\nStill ahead today:\n· 08:30 ET Core CPI (Sep), 0.3% expected",
+    "context": "",
+    "counts": { "sentences": 2, "questions": 0 },
+    "mustNot": ["\\bshould\\b", "my read", "\\b(close|hold|tighten)\\b"],
+    "judge": ["It states the pending print and his rule — R-14 or R-19 — and nothing about the trade's merit, direction, or what to do"]
+  },
+  {
+    "id": "build-term-at-unseen",
+    "why": "at `unseen` the term is built from the ground up before it is used",
+    "path": "reply",
+    "context": "It is Wednesday 14 October 2026, 15:10 in New York.\n\nWhere he stands on each channel:\n· the gap between rates and inflation — unseen\n· the dollar — used since 2 Oct\n· inflation itself — explained since 30 Sep\n· jobs — explained since 1 Oct\n· what central banks are buying — unseen",
+    "asked": "why did gold fall today when nothing happened?",
+    "counts": { "emDash": true, "sentences": 4 },
+    "judge": ["If the gap between rates and inflation (real yields) is part of the answer, it is built in plain words before it is used, never named bare"]
+  }
+]

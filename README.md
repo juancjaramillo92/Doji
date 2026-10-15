@@ -90,6 +90,7 @@ charm/                                  firmware for the charm — see The charm
   tools/fonts.sh                        turns the typeface into the charm's fonts and the page's
 scripts/backup.mjs                      the paged read behind the daily copy
 scripts/health.mjs                      whether anything is running, asked from outside
+scripts/eval.mjs                        whether Eugenia still behaves, asked of the model, by hand
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
@@ -3263,6 +3264,25 @@ The suites run on every push through `.github/workflows/test.yml`. The script
 globs `test/*.test.mjs` one level deep, so a test in a subfolder would silently
 not run — `test/db` is the one subfolder, on purpose, with its own command and
 its own CI job, and `agree.test.mjs` holds that both still name it.
+
+**Whether she still behaves is `scripts/eval.mjs`, run by hand.** Every rule that
+matters most about her is a sentence, and no suite can say whether the model
+still obeys it. The eval sends the cases in `test/fixtures/eval-cases.json` —
+the failures this README records and the rules his decisions added — through her
+real prompts, built as the reply, both gates and the trade look build them, and
+grades the answer: what is countable in code (em-dashes, sentences a paragraph,
+words, questions, patterns that must or must not appear), the rest by an Opus
+judge against a criterion written per case, answered as JSON a schema fixes.
+**`--plant` runs first** the cases a deliberately broken prompt must fail, and
+stops if one passes: an eval that cannot fail says nothing. It costs money, so
+it is never in `npm test`; what can be checked without the model is —
+`fold.test.mjs` holds every case well formed, the counters against planted text,
+each request against its call site, and every plant against the prompt it
+breaks. Run it before and after any prompt change, and read the cases first:
+
+```sh
+ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs --plant
+```
 
 **`npm run test:db` needs a Postgres server with pgvector, of the major version
 Supabase runs** — named once, in `test.yml`'s `PGCLUSTER`, and asserted by the

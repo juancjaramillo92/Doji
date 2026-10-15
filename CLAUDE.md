@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 728 tests, eight suites
+npm test      # 733 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -143,7 +143,9 @@ what each suite covers.
   see two of `esc`'s five replacements; a direct test holds those.
 
 Nothing here sees pixels, realtime, auth, or the live database — `verify.sql`
-is that check and a person runs it. Say so on any visual change. State on handback what was verified by running, what by reading, and
+is that check and a person runs it. Nor whether the model still obeys her
+prompts: `scripts/eval.mjs` asks that, by hand, with `--plant` first; a prompt
+change is run through it before and after. Say so on any visual change. State on handback what was verified by running, what by reading, and
 what could not be verified.
 
 ---
