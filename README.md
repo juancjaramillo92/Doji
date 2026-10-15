@@ -2266,6 +2266,9 @@ arrives from the model and a blank is something she would fill in herself.
 
 **The asymmetry is the point.** A document that decides whether he followed his
 rules cannot be edited by the thing checking them. She has no write path to it.
+Her own view — her read, her calls, her judgment of a plan — sits beside it, and
+§0 draws that line; a case the record makes reaches it only as a proposal she
+puts to him.
 
 **The Evaluable column is what the rules table is for.** `journal` means a row can
 answer it today, `field` that a column would have to exist first, `judgment` that
