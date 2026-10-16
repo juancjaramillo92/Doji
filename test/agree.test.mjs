@@ -2975,6 +2975,9 @@ const UNMARKED = {
     'and nothing the mark could truthfully say',
   'unauthorized':
     'a caller without the cron secret — a knock at the door rather than a run',
+  'replay is a whole number':
+    'a replay asked for a day the door does not serve — a knock at the door, ' +
+    'answered before the broker is reached',
   'symbol: SYMBOL_IDS[0]':
     'the quote door, which is a different job on the same function: marking it ' +
     'would let her price reads hold last_ok open over a dead poll',

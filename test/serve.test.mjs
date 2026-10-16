@@ -566,6 +566,30 @@ function tradingViewAnswer(name, args) {
   return { structuredContent: RESERVES.CN };
 }
 
+/* The replay door is read by a script rather than by her, and the script folds
+   it with her own folds: a key renamed at the door is a map she cannot read or
+   a call scored on no bars, and neither reaches a test that types the answer. */
+test('the replay door serves the script a map and a session it can score', async () => {
+  const poller = await serving('doji-mcp-sync');
+  const { request: asked, replayed } = await import('../scripts/replay.mjs');
+  respond = async (url, init) => {
+    const body = JSON.parse(init.body);
+    if (body.method === 'initialize') return new Response('{}', { headers: { 'mcp-session-id': 's' } });
+    if (body.method !== 'tools/call') return new Response('', { status: 202 });
+    return new Response(TRENDBARS);
+  };
+  const res = await poller(new Request('https://fn.test/functions/v1/doji-mcp-sync?replay=1', { headers: { 'x-doji-key': 'cron' } }));
+  assert.equal(res.status, 200);
+  const served = await res.json();
+  assert.ok(served.bars.length, 'the door served the session no minute bars');
+  assert.match(asked(served).messages[0].content, /This is YOUR map/, 'the map the script folds from the door is no map');
+  const r = replayed({ call: true, direction: 'buy', entry: 4000, stop: 3985, target: 4030, confirm: 'market', why: 'x' }, served);
+  assert.ok(r.call && !['refused', 'none', 'unread'].includes(r.outcome),
+    `the script scored the served session as "${r.outcome}", as though the door served no bars from its hour`);
+  const bad = await poller(new Request('https://fn.test/functions/v1/doji-mcp-sync?replay=0', { headers: { 'x-doji-key': 'cron' } }));
+  assert.equal(bad.status, 400, 'a replay of no day was read as a default');
+});
+
 test('every answer the poller and doji-tradingview serve Eugenia is one she reads', async () => {
   const poller = await serving('doji-mcp-sync');
   const tv = await serving('doji-tradingview');

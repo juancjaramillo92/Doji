@@ -94,6 +94,7 @@ scripts/backup.mjs                      the paged read behind the daily copy
 scripts/health.mjs                      whether anything is running, asked from outside
 scripts/eval.mjs                        whether Eugenia still behaves, asked of the model, by hand
 scripts/calibrate.mjs                   whether her map finds the levels he traded, by hand
+scripts/replay.mjs                      what her calls would have done on past mornings, by hand
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push, and says when the eval is owed
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
@@ -102,6 +103,7 @@ test/                                   node:test suites — see Tests
 .github/workflows/charm.yml             builds the charm firmware, kept as a download; main's is her update
 .github/workflows/calibrate.yml         runs scripts/calibrate.mjs, by hand from the Actions tab
 .github/workflows/eval.yml              runs scripts/eval.mjs --plant, by hand from the Actions tab
+.github/workflows/replay.yml            runs scripts/replay.mjs, by hand from the Actions tab
 .github/dependabot.yml                  monthly update PRs, both ecosystems
 package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
@@ -778,10 +780,17 @@ when a suspicious row gets looked at.
   is read, one copy for the poller and her, through the same split read as every
   other bar (below). One chart at a time, and a chart that will not read is
   named in `missing` rather than served short.
-- **`?entries=1`** returns the 1H and 30m as they stood at each of his twenty
+- **`?entries=1`** returns the daily, 4H, 1H and 30m as they stood at each of his twenty
   newest entries, read from the table rather than the request, and only bars
   closed by the minute he clicked: one closed after holds prices he could not
   have seen. It is `scripts/calibrate.mjs`'s input (*Her map of his charts*).
+- **`?replay=N`** returns his six charts as they stood at 08:00 New York, the
+  briefing's hour, N weekdays back, closed bars only, and that session's
+  minute bars to the 17:00 roll — `scripts/replay.mjs`'s input (*Her own
+  calls*). N is clamped to `REPLAY_DAYS` (120) as `?hours=` is clamped, and the
+  door turns it into the instant itself, so all that reaches a broker call is
+  a time it chose; a bad N is refused, since a replay of the wrong day scores
+  the wrong call. A holiday serves no minute bars.
 
 ```sh
 curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?raw=1&hours=72" \
@@ -2177,6 +2186,29 @@ you.
   `/notes` shows it to you. She gives it straight when you ask, losses first, and
   never uses it to talk you into a trade.
 
+**A month of sessions in an afternoon** (`scripts/replay.mjs`). Her record
+grows a session at a time, so a change to how she reads a chart would wait a
+month for a verdict. The replay asks her, under her real system prompt and at
+the briefing's effort, for the call she would have filed on each of the last
+N weekdays, handed her map as it stood at 08:00 New York (the poller's
+`?replay=N`), and puts the answer through `callProblem` and `scoreCall`
+exactly as `make_call` and the pass would. **The technical half only**:
+nothing kept says what the market around gold or the calendar read on a past
+morning, so she is told she has her map and nothing else. **Never a morning
+the model can remember**: it read the world up to June 2026, a call on a day
+it read about is a test with the answer in it, and `CLEAN_FROM` stops the
+walk there. It changes nothing; a change to her chart reading is judged by
+two runs over the same days, before and after.
+
+```sh
+SUPABASE_URL=… DOJI_CRON_SECRET=… ANTHROPIC_API_KEY=… \
+  node --experimental-strip-types scripts/replay.mjs --days 21
+```
+
+Or **Actions → replay → Run workflow**, with the number of days. About $0.12
+to $0.25 a day replayed with her prompt cached, so a month is a few dollars;
+the run states its cost.
+
 Her reads stay what they were — a view on the news, judged by the test she
 stated and never by price. A call is the one thing of hers price judges.
 
@@ -2199,7 +2231,8 @@ rather than searched for, his rules to hold them to, and a meter on each half.
   six channels. Every read she gives is filed with the channel its chain ran
   down.
 - **How a change is proved.** The map's readings by `scripts/calibrate.mjs`,
-  her calls by their record, her reads by theirs, counted per channel, and any
+  her reading of a chart by `scripts/replay.mjs` over the same past mornings
+  before and after, her calls by their record, her reads by theirs, counted per channel, and any
   change to her prompts by the eval, run before and after with `--plant` first
   (*Tests*). Both records count a month, so a month is the shortest span to
   judge a change on. An idea refused goes in `REFACTOR.md`, with the
@@ -3758,7 +3791,7 @@ one `net.http_post` each.
 
 | Function | What a holder of the secret can do |
 |---|---|
-| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`), minute bars (`?bars=raw`), the day's bars for her calls (`?bars=1`), his six charts (`?structure=1`), or his level charts at his newest entries (`?entries=1`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
+| `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`), minute bars (`?bars=raw`), the day's bars for her calls (`?bars=1`), his six charts (`?structure=1`), his charts at his newest entries (`?entries=1`), or a past session as she would have seen it (`?replay=N`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
 | `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code. `?consolidate=1` is the one that does more than spend: it runs the nightly pass, which WRITES memory — notes written and superseded, channel rungs moved, loops closed. `?embed=1` spends at the embedding vendor. `?calendar=1` files the calendar and spends nothing, and a `{trade}` body reaches the trade look |
 | `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
 

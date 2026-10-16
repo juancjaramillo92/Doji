@@ -21,7 +21,7 @@ import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
   lookbackFor, foldHours, balanceTarget,
   fromPipettes, foldSpot, PIPETTES, openPlans, barSpan, bestPrice, foldCandles, stopChanges, sliced,
-  barWindows, BAR_MAX, RANGE_MAX_MS,
+  barWindows, BAR_MAX, RANGE_MAX_MS, replaySession, replayDays, REPLAY_DAYS,
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
@@ -64,11 +64,12 @@ import {
 import {
   turns, biasOf, sweepsOf, poolsOf, shapeOf, foldStructure, READINGS, GRID, CANDLES,
 } from '../supabase/functions/doji-eugenia/structure.ts';
-import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
+import { CHANNELS, CHANNEL_STATES, SYSTEM } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { backup, readAll, TABLES } from '../scripts/backup.mjs';
 import { lastRun, stale } from '../scripts/health.mjs';
 import { score, table, readingsGrid, NEAR } from '../scripts/calibrate.mjs';
+import { replayed, tally, request as replayRequest, CLEAN_FROM } from '../scripts/replay.mjs';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -1098,6 +1099,45 @@ test('the map is said as hers, with every price timed and nothing about what com
   assert.doesNotMatch(out, /\b(will|next|likely|expect|should)\b/i);
   // A map with no bar at all is said as no map.
   assert.match(structureList(foldStructure({}, MAP_NOW), MAP_NOW), /could not be read just now, so you have no map/);
+});
+
+/* THE REPLAY. The poller turns N into a past morning itself, and the script
+   puts her answer through the same refusal and the same score as the live
+   path, so a replayed record and a live one count the same thing. */
+test('a replay is the weekday N back, at the briefing hour, to the roll', () => {
+  const at = (n, now) => { const r = replaySession(n, Date.parse(now)); return [r.at, r.ends].map(t => new Date(t).toISOString()); };
+  assert.deepEqual(at(1, '2026-10-16T14:00:00Z'), ['2026-10-15T12:00:00.000Z', '2026-10-15T21:00:00.000Z'],
+    'a Friday replay of one day is not Thursday 08:00 to 17:00 New York');
+  assert.deepEqual(at(1, '2026-10-19T14:00:00Z'), ['2026-10-16T12:00:00.000Z', '2026-10-16T21:00:00.000Z'],
+    'a Monday replay of one day lands on the weekend');
+  assert.deepEqual(at(5, '2026-11-04T14:00:00Z'), ['2026-10-28T12:00:00.000Z', '2026-10-28T21:00:00.000Z'],
+    'five weekdays back across the clocks changing');
+  assert.deepEqual(at(1, '2026-11-03T14:00:00Z'), ['2026-11-02T13:00:00.000Z', '2026-11-02T22:00:00.000Z'],
+    "08:00 is New York's in winter too");
+  assert.deepEqual(['1', '120', '0', '121', '2.5', 'x', null].map(replayDays), [1, 120, null, null, null, null, null]);
+  assert.equal(REPLAY_DAYS, 120);
+});
+
+test('a replayed answer is refused, scored or no call, as the live path would have it', () => {
+  const served = { at: Date.parse('2026-10-14T12:00:00Z'), charts: MAP_CHARTS, missing: [],
+                   bars: [minute(1, { low: 3999 }), minute(2, { high: 4031 })] };
+  assert.deepEqual(replayed({ call: false, why: 'nothing earns one' }, served), { outcome: 'none', why: 'nothing earns one' });
+  assert.match(replayed({ call: true, direction: 'buy', entry: 4000, stop: 3975, target: 4030, confirm: 'market', why: 'x' }, served).why,
+    /R-02/, 'a call make_call would refuse was scored');
+  const won = replayed({ call: true, direction: 'buy', entry: 4000, stop: 3985, target: 4030, confirm: 'market',
+                         condition: 'at the market', why: 'the quarter held' }, served);
+  assert.deepEqual([won.outcome, won.result, won.call.expires_at], ['won', 30, '2026-10-14T21:00:00.000Z']);
+  const waits = replayed({ call: true, direction: 'buy', entry: 4002, stop: 3985, target: 4032, confirm: 'close',
+                           level: 4000, why: 'x' }, served);
+  assert.equal(waits.outcome, 'untriggered', 'a replayed call waiting on a close was filled on the touch');
+  assert.match(tally([won, waits, { outcome: 'none' }, { outcome: 'refused' }]),
+    /^4 sessions: 1 no call, 1 off his rules, 1 won, 0 lost, 0 scratch, 0 open, 1 untriggered, 0 unread; the 1 that triggered made \+\$30\.00 an ounce\.$/);
+  const asked = replayRequest(served);
+  assert.equal(asked.output_config.effort, 'high', "the replay asks at another effort than the briefing's");
+  assert.ok(asked.system[0].text.startsWith(SYSTEM), 'the replay is not asked under her system prompt');
+  assert.match(asked.messages[0].content, /no news, no calendar[\s\S]*This is YOUR map/,
+    'the replay does not say she has her map and nothing else');
+  assert.ok(CLEAN_FROM >= '2026-07-01', 'the replay walks into months the model may have read about');
 });
 
 /* THE CALIBRATION SCORES A READING BY WHAT IT FOUND OF HIS, NOT BY HOW MUCH IT
