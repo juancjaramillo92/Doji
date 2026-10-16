@@ -1528,6 +1528,13 @@ async function recordRead(reading: unknown, test: unknown, verdict: unknown,
    rule.
    ───────────────────────────────────────────────────────────────────────── */
 export const CALL_SIDES = ['buy', 'sell'] as const;
+/* How the entry goes live. R-07 enters on a confirmation, never on the signal,
+   so a call that waits for one is scored as waiting: 'close' is a 15m candle
+   reaching the level and closing beyond it the call's way, 'market' is a call
+   whose confirmation has already printed. */
+export const CALL_CONFIRMS = ['close', 'market'] as const;
+// The chart his rules read the confirming candle on.
+export const CONFIRM_MS = 900_000;
 // R-08's fourth step, at entry.
 export const RR_MIN = 1.5;
 export const CALL_MAX = 300;
@@ -1541,8 +1548,10 @@ const CALL_TOOL = {
     TARGET_MAX + " from it, the reward at least " + RR_MIN + " times the risk; one call a " +
     "session, living until the next 17:00 New York roll. The condition is what price has " +
     "to do before the entry is live, in his words for it — a retest, a candle closing " +
-    "back above a level — or 'at the market' for now. The entry is the price you would " +
-    "be filled at once it is met, and it is what is scored.",
+    "back above a level — or 'at the market' for now. `confirm` is how it is scored: " +
+    "'close' waits for a fifteen-minute candle that reaches `level` and closes beyond it " +
+    "your way, and only then is the entry live; 'market' is live at once. The entry is " +
+    "the price you would be filled at, and it is what is scored.",
   input_schema: {
     type: "object",
     properties: {
@@ -1551,20 +1560,33 @@ const CALL_TOOL = {
       stop:      { type: "number", description: "Where the idea is wrong." },
       target:    { type: "number", description: "Where you take it." },
       condition: { type: "string", description: `What price has to do first, at most ${CALL_MAX} characters.` },
+      confirm:   { type: "string", enum: CALL_CONFIRMS,
+                   description: "'close' when the entry waits for a 15m close beyond the level, 'market' when it does not." },
+      level:     { type: "number", description: "With 'close': the level the candle reaches and closes beyond." },
     },
-    required: ["direction", "entry", "stop", "target", "condition"],
+    required: ["direction", "entry", "stop", "target", "condition", "confirm"],
     additionalProperties: false,
   },
 } as const;
 
 /* His rules, as a sentence she can act on, or null. Pure, so each is driven
    both ways. */
-export function callProblem(direction: unknown, entry: number, stop: number, target: number): string | null {
+export function callProblem(direction: unknown, entry: number, stop: number, target: number,
+                            confirm: unknown, level: number): string | null {
   if (!(CALL_SIDES as readonly unknown[]).includes(direction)) return `A call is ${CALL_SIDES.join(" or ")}.`;
   if (![entry, stop, target].every(n => Number.isFinite(n) && n > 0)) return "A call needs an entry, a stop and a target, as prices.";
   const buy = direction === 'buy';
   if (buy ? !(stop < entry && entry < target) : !(target < entry && entry < stop)) {
     return `A ${direction} has its stop ${buy ? "below" : "above"} the entry and its target ${buy ? "above" : "below"} it.`;
+  }
+  if (!(CALL_CONFIRMS as readonly unknown[]).includes(confirm)) {
+    return "Say whether the entry waits for a 15m close beyond a level ('close') or is live now ('market').";
+  }
+  // The stop is where the idea is wrong, which is back on the far side of the
+  // level the candle closed beyond.
+  if (confirm === 'close' && !(Number.isFinite(level) && (buy ? stop < level && level <= entry : entry <= level && level < stop))) {
+    return `A ${direction} waiting on a close beyond a level has the level between the stop and the entry, ` +
+      `the entry ${buy ? "at or above" : "at or below"} it.`;
   }
   const risk = Math.abs(entry - stop), reward = Math.abs(target - entry);
   if (risk > FULL_STOP) return `The stop is $${risk.toFixed(2)} away; R-02 allows $${FULL_STOP} at most.`;
@@ -1590,9 +1612,9 @@ export function expiryOf(made: Date): Date {
 /* Never throws, for writeNote's reason. A second call in a session meets the
    unique index and is told so, not stored. */
 async function makeCall(direction: unknown, entry: unknown, stop: unknown, target: unknown,
-                        condition: unknown): Promise<string> {
-  const [e, s, t] = [entry, stop, target].map(Number);
-  const problem = callProblem(direction, e, s, t);
+                        condition: unknown, confirm: unknown, level: unknown): Promise<string> {
+  const [e, s, t, l] = [entry, stop, target, level].map(Number);
+  const problem = callProblem(direction, e, s, t, confirm, l);
   if (problem) return `${problem} Not filed; a call off his rules is not one you make.`;
   const when = String(condition ?? "").trim().slice(0, CALL_MAX);
   if (!when) return "Say what price has to do first, or 'at the market'. Not filed.";
@@ -1602,7 +1624,8 @@ async function makeCall(direction: unknown, entry: unknown, stop: unknown, targe
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_calls`, {
       method: "POST", headers: sbHeaders("return=minimal"),
       body: JSON.stringify([{ made_at: made.toISOString(), expires_at: until.toISOString(),
-                              direction, entry: e, stop: s, target: t, condition: when }]),
+                              direction, entry: e, stop: s, target: t, condition: when,
+                              confirm, level: confirm === 'close' ? l : null }]),
     });
     if (res.status === 409) {
       return "You already made this session's call, and it stands until the 17:00 roll. Say that rather than making another.";
@@ -1621,14 +1644,19 @@ async function makeCall(direction: unknown, entry: unknown, stop: unknown, targe
    doubt goes against her: on the bar that filled her, only the stop counts;
    a bar touching both stop and target is a loss; the stop moves to break-even
    at +$20 as R-04 moves his, reached on a bar after the fill and effective from
-   the bar after that, since a bar's high and low cannot say which came first. The condition is hers to
-   state and is not checked; the entry is what is scored. A call whose session
-   the bars do not reach is `unread`, never a guess.
+   the bar after that, since a bar's high and low cannot say which came first.
+   A call that waits for a close goes live only once a 15m candle opened after
+   it — built from the minute bars on the quarter hour, as his chart draws it —
+   has reached the level and closed beyond it, and fills on the first touch of
+   the entry after that candle closed: a touch before it is the trade R-07
+   forbids. A call filed before `confirm` existed is scored on the touch alone.
+   A call whose session the bars do not reach is `unread`, never a guess.
    ───────────────────────────────────────────────────────────────────────── */
 export const CALL_OUTCOMES = ['won', 'lost', 'scratch', 'open', 'untriggered', 'unread'] as const;
 
 export type Call = { id: number; made_at: string; expires_at: string; direction: string;
                      entry: number; stop: number; target: number; condition: string;
+                     confirm: string | null; level: number | null;
                      outcome: string | null; result: number | null };
 export type Score = { outcome: typeof CALL_OUTCOMES[number]; triggered_at: string | null;
                       closed_at: string | null; closed_price: number | null; result: number | null };
@@ -1642,7 +1670,8 @@ export function scoreCall(c: Call, candles: Candle[], from: number): Score {
   const start = Math.ceil(made / 60_000) * 60_000;
   const bars = candles.filter(b => b.t >= start && b.t + 60_000 <= ends);
   const buy = c.direction === 'buy';
-  const at = bars.findIndex(b => b.low <= c.entry && c.entry <= b.high);
+  const live = c.confirm === 'close' ? confirmedAt(bars, buy, Number(c.level), start) : start;
+  const at = live === null ? -1 : bars.findIndex(b => b.t >= live && b.low <= c.entry && c.entry <= b.high);
   if (at < 0) return { outcome: 'untriggered', ...none };
 
   const gain = (p: number) => Math.round((buy ? p - c.entry : c.entry - p) * 100) / 100;
@@ -1659,6 +1688,24 @@ export function scoreCall(c: Call, candles: Candle[], from: number): Score {
   }
   const last = bars[bars.length - 1];
   return close(last, last.close, 'open');
+}
+
+/* When the first 15m candle opened at or after `from` closed, having reached
+   the level and closed beyond it the call's way, or null. A quarter hour with
+   no minute in the bars is no candle, never a guess at one. */
+function confirmedAt(bars: Candle[], buy: boolean, level: number, from: number): number | null {
+  const quarters = new Map<number, Candle>();
+  for (const b of bars) {
+    const t = Math.floor(b.t / CONFIRM_MS) * CONFIRM_MS;
+    if (t < from) continue;
+    const q = quarters.get(t);
+    quarters.set(t, q ? { ...q, high: Math.max(q.high, b.high), low: Math.min(q.low, b.low), close: b.close }
+                      : { ...b, t });
+  }
+  for (const q of quarters.values()) {
+    if (buy ? q.low <= level && q.close > level : q.high >= level && q.close < level) return q.t + CONFIRM_MS;
+  }
+  return null;
 }
 
 /* Tonight's scoring: every call whose session has ended and is not yet scored,
@@ -1891,7 +1938,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
     case CLOSE_TOOL.name:    return await closeLoop(input.id, input.resolution);
     case CALL_TOOL.name:     return await makeCall(input.direction, input.entry, input.stop, input.target,
-                                               input.condition);
+                                               input.condition, input.confirm, input.level);
     case RECORD_TOOL.name:   return await recordRead(input.reading, input.test, input.verdict, input.evidence,
                                                  input.firmness, input.lesson, input.channel);
     default:

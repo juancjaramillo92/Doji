@@ -2113,7 +2113,11 @@ you.
 - **A call can wait for its setup.** In the morning the setup is usually not
   there yet, so the call says what it waits for — *if price comes back to 4,000
   and a fifteen-minute candle closes above it, buy at 4,002*. The condition is
-  hers to state; the entry is what is scored. *No call today* is a call too.
+  hers to state in his words, and `confirm` is the part of it that is scored:
+  `close` with the level it waits on, or `market` for a confirmation that has
+  already printed. `make_call` refuses a wait whose level is not between the
+  stop and the entry, since the stop is where the idea is wrong beyond it.
+  *No call today* is a call too.
 - **Where.** At most one in the briefing, last, when she has one worth making,
   and in a conversation when you ask. Never unasked while you hold a position,
   never in the trade look, and never anything about what to do with a position
@@ -2122,7 +2126,12 @@ you.
   nightly pass reads anything, `scoreCalls` asks `doji-mcp-sync?bars=1` for the
   last thirty hours of minute bars and scores every call whose session ended:
   whether price reached the entry, then whether the target or the stop came
-  first, the stop moved to break-even at +$20 as your R-04 moves yours. On the
+  first, the stop moved to break-even at +$20 as your R-04 moves yours. **A
+  call that waits for a close is scored as waiting** (R-07: the signal is not
+  an entry): its entry counts only once a 15m candle — built from the minute
+  bars on the quarter hour, and opened after the call — has reached the level
+  and closed beyond it, so a touch of the entry before that candle closes is
+  never a fill. Calls filed before `confirm` existed are scored on the touch. On the
   bar that filled her only the stop counts; a bar touching both is a loss; the
   +$20 that moves the stop must come on a bar after the fill, and the move
   starts on the bar after that, since a bar's high and low cannot say which

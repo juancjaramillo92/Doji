@@ -4459,14 +4459,29 @@ test('her record counts every verdict and names the newest misses, three at most
    His rules, checked in code before a call is filed; the session it lives in;
    and the score, every doubt against her. */
 test('a call off his rules is refused, and one on them is not', () => {
-  assert.equal(callProblem('buy', 4000, 3985, 4030), null, 'a $15 stop and a $30 target is his default trade');
-  assert.equal(callProblem('sell', 4000, 4020, 3970), null, 'the $20 ceiling itself is allowed');
-  assert.match(callProblem('buy', 4000, 3979, 4030), /R-02/, 'a stop past $20 is filed');
-  assert.match(callProblem('buy', 4000, 3990, 4020), /R-01/, 'a $20 target is filed');
-  assert.match(callProblem('buy', 4000, 4010, 4030), /stop below the entry/, 'a stop on the wrong side is filed');
-  assert.match(callProblem('buy', 4000, 3980, 4025), /R-08/,
+  const now = (side, e, s, t) => callProblem(side, e, s, t, 'market', NaN);
+  assert.equal(now('buy', 4000, 3985, 4030), null, 'a $15 stop and a $30 target is his default trade');
+  assert.equal(now('sell', 4000, 4020, 3970), null, 'the $20 ceiling itself is allowed');
+  assert.match(now('buy', 4000, 3979, 4030), /R-02/, 'a stop past $20 is filed');
+  assert.match(now('buy', 4000, 3990, 4020), /R-01/, 'a $20 target is filed');
+  assert.match(now('buy', 4000, 4010, 4030), /stop below the entry/, 'a stop on the wrong side is filed');
+  assert.match(now('buy', 4000, 3980, 4025), /R-08/,
     'a $25 target over a $20 stop is 1:1.25, under the 1:1.5 his sequence asks for at entry');
-  assert.match(callProblem('long', 4000, 3985, 4030), /buy or sell/);
+  assert.match(now('long', 4000, 3985, 4030), /buy or sell/);
+  assert.match(callProblem('buy', 4000, 3985, 4030, undefined, NaN), /'close'[\s\S]*'market'/,
+    'a call that does not say how its entry goes live is filed');
+});
+
+test('a call waiting on a close has its level between the stop and the entry', () => {
+  assert.equal(callProblem('buy', 4002, 3985, 4032, 'close', 4000), null);
+  assert.equal(callProblem('sell', 3998, 4015, 3968, 'close', 4000), null);
+  assert.equal(callProblem('buy', 4000, 3985, 4030, 'close', 4000), null, 'an entry on the level itself is allowed');
+  assert.match(callProblem('buy', 4002, 3985, 4032, 'close', NaN), /level between/, 'a close beyond no level is filed');
+  assert.match(callProblem('buy', 4002, 3985, 4032, 'close', 4010), /level between/,
+    'a buy entered below the level it waits to close above is filed');
+  assert.match(callProblem('buy', 4002, 3985, 4032, 'close', 3980), /level between/,
+    'a stop beyond the level is not where the idea is wrong');
+  assert.match(callProblem('sell', 3998, 4015, 3968, 'close', 3990), /level between/);
 });
 
 test('a call lives until the next 17:00 New York roll on a weekday', () => {
@@ -4508,6 +4523,34 @@ test('a call is scored on price, every doubt against her', () => {
   assert.equal(score([minute(1, { high: 4021 }), minute(2, { low: 3989 })], sell).outcome, 'won');
 });
 
+/* R-07: the signal is not an entry. A call that waits for a 15m close beyond
+   its level is live only after that candle closes, so a touch of the entry
+   before it is the trade his rules forbid, and is never scored as filled. */
+test('a call waiting on a close fills only after a 15m candle closes beyond its level', () => {
+  const waits = { ...CALL, entry: 4002, stop: 3985, target: 4032, confirm: 'close', level: 4000 };
+  const score = (bars) => scoreCall(waits, bars, FROM);
+  // 13:00–13:14 is one quarter, its last minute at 13:14.
+  const reach = minute(3, { low: 3999, high: 4003, close: 4001 });
+  const closes = minute(14, { low: 4001, high: 4006, close: 4005 });
+  assert.equal(score([reach, closes, minute(16, { low: 4010 })]).outcome, 'untriggered',
+    'price never came back to the entry after the candle closed');
+  const won = score([reach, closes, minute(16, { low: 4001.5, high: 4004 }), minute(17, { high: 4033 })]);
+  assert.deepEqual([won.outcome, won.triggered_at], ['won', '2026-10-14T13:16:00.000Z']);
+  assert.equal(score([minute(3, { low: 3999, high: 4003, close: 4001 }), minute(14, { low: 3990, close: 3995 }),
+                      minute(16, { low: 4001 }), minute(17, { high: 4033 })]).outcome, 'untriggered',
+    'a candle that reached the level and closed back below it was read as the confirmation');
+  assert.equal(score([minute(16, { low: 4003, close: 4005 }), minute(17, { low: 4001, high: 4033 })]).outcome,
+    'untriggered', 'a candle that never reached the level was read as the confirmation');
+  const early = score([reach, minute(4, { low: 4001, high: 4002 }), closes, minute(16, { high: 4033, low: 4004 })]);
+  assert.equal(early.outcome, 'untriggered', 'a touch of the entry inside the confirming candle was filled');
+  assert.equal(scoreCall({ ...waits, made_at: '2026-10-14T13:05:00Z' }, [reach, closes, minute(16, { low: 4001 }),
+               minute(17, { high: 4033 })], FROM).outcome, 'untriggered',
+    'a quarter that opened before the call was read as its confirmation');
+  const sell = { ...waits, direction: 'sell', entry: 3998, stop: 4015, target: 3968 };
+  assert.equal(scoreCall(sell, [minute(3, { high: 4001, low: 3997, close: 3999 }), minute(14, { high: 3999, low: 3994, close: 3995 }),
+               minute(16, { high: 3998.5, low: 3996 }), minute(17, { low: 3967 })], FROM).outcome, 'won');
+});
+
 test('a call the bars do not reach is unread, and a weekend is not a gap', () => {
   assert.equal(scoreCall({ ...CALL, made_at: '2026-10-13T13:00:00Z' }, [minute(1, { low: 3999 })], FROM).outcome,
     'unread', 'a call made before the bars begin was scored on half its session');
@@ -4539,17 +4582,18 @@ test('a call is filed once a session, and a call off his rules never reaches the
       posts.push({ url: String(url), body: opts.body });
       return new Response(null, { status: posts.length > 1 ? 409 : 201 });
     };
-    assert.match(await serve('make_call', { direction: 'buy', entry: 4000, stop: 3975, target: 4030, condition: 'now' }),
+    assert.match(await serve('make_call', { direction: 'buy', entry: 4000, stop: 3975, target: 4030, condition: 'now', confirm: 'market' }),
       /R-02[\s\S]*Not filed/);
     assert.equal(posts.length, 0, 'a call off his rules reached the database');
-    assert.match(await serve('make_call', { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market' }),
+    assert.match(await serve('make_call', { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market', confirm: 'market' }),
       /^Filed: buy 4000, stop 3985, target 4030, until 17:00 ET/);
-    assert.match(await serve('make_call', { direction: 'sell', entry: 4000, stop: 4015, target: 3970, condition: 'at the market' }),
+    assert.match(await serve('make_call', { direction: 'sell', entry: 4000, stop: 4015, target: 3970, condition: 'at the market', confirm: 'market' }),
       /already made this session's call/, 'a second call in a session is filed or swallowed');
   });
   const [row] = JSON.parse(posts[0].body);
   assert.equal(Date.parse(row.expires_at), expiryOf(new Date(row.made_at)).getTime(),
     'the call is filed under a session other than the one expiryOf names');
+  assert.deepEqual([row.confirm, row.level], ['market', null], 'a call at the market is filed with a level it does not wait on');
 });
 
 /* A month of New York days, read at the pass: 22:00 on 9 October is already
@@ -5884,7 +5928,7 @@ const TOOL_CALLS = [
   ['close_loop',    { id: 1, resolution: 'answered' }],
   ['record_read',   { reading: 'a read', test: 'the two-year falls', verdict: 'untested', evidence: 'no close',
                       firmness: 'light', channel: 'dollar' }],
-  ['make_call',     { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market' }],
+  ['make_call',     { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market', confirm: 'market' }],
   ['get_releases',  { release: 'Core Inflation Rate MoM', months: 12 }],
 ];
 

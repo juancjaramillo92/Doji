@@ -3,7 +3,7 @@
 -- ───────────────────────────────────────────────────────────────────────────
 -- The schema is applied by hand on purpose, which makes schema.sql a claim
 -- about the database. This tests the claim. It writes nothing: run the
--- whole file after any manual change and read the `ok` column — all 97 checks.
+-- whole file after any manual change and read the `ok` column — all 98 checks.
 --
 -- One statement, because a SQL editor shows only the last statement's result.
 -- The listings that say which object, grant or schedule are diagnose.sql.
@@ -425,6 +425,14 @@ from (values
   ('no policy on eugenia_reads',
    (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_reads')),
    '0'),
+  -- make_call writes both; missing, every call is a 400 she reports as not
+  -- filed, and none is ever scored.
+  ('her calls carry how the entry goes live',
+   (select coalesce(string_agg(column_name, ',' order by column_name), 'none')
+      from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_calls'
+       and column_name in ('confirm', 'level')),
+   'confirm,level'),
   ('RLS on eugenia_calls',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_calls')),
    'true'),

@@ -22,7 +22,7 @@ import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
-         READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_MAX, RR_MIN, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
+         READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_CONFIRMS, CALL_MAX, RR_MIN, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH, REVIEW } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled,
@@ -3588,6 +3588,7 @@ test('a call is filed with the sides, outcomes and condition length the table ac
     ?.split(',').map(v => v.trim().replace(/'/g, ''));
   assert.deepEqual(vocab('direction'), [...CALL_SIDES], 'make_call files a side the table refuses');
   assert.deepEqual(vocab('outcome'), [...CALL_OUTCOMES], 'the scoring writes an outcome the table refuses');
+  assert.deepEqual(vocab('confirm'), [...CALL_CONFIRMS], 'make_call files a confirmation the table refuses');
   const length = SCHEMA_SQL.match(/eugenia_calls_condition_length check \(char_length\(condition\) between 1 and (\d+)\)/);
   assert.equal(CALL_MAX, Number(length?.[1]), 'make_call truncates a condition past what the table accepts');
 });

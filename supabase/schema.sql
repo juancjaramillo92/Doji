@@ -732,8 +732,8 @@ create table if not exists public.eugenia_calls (
   stop         numeric not null,
   target       numeric not null,
 
-  -- What price has to do before the entry is live, in words; the entry is what
-  -- is scored.
+  -- What price has to do before the entry is live, in his words; `confirm`
+  -- below is the part of it the scoring reads.
   condition    text not null
     constraint eugenia_calls_condition_length check (char_length(condition) between 1 and 300),
 
@@ -752,6 +752,13 @@ create table if not exists public.eugenia_calls (
 -- session meets this and is refused. A plain unique index, so the insert's
 -- 409 is the answer.
 create unique index if not exists eugenia_calls_once on public.eugenia_calls (expires_at);
+
+-- How the entry goes live, which is how it is scored: 'close' waits for a 15m
+-- candle that reaches `level` and closes beyond it, 'market' does not wait.
+-- Null on every call filed before them, scored on the touch of the entry.
+alter table public.eugenia_calls add column if not exists confirm text
+  constraint eugenia_calls_confirm_check check (confirm in ('close', 'market'));
+alter table public.eugenia_calls add column if not exists level numeric;
 
 alter table public.eugenia_calls enable row level security;
 
