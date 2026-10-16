@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 780 tests, eight suites
+npm test      # 781 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -370,9 +370,10 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
 - **The functions meet over HTTP, so both halves of a door are held.** Every
   `?flag=value` one function or script sends another is read in the callee, and
   every `tvRead` name is a door `doji-tradingview` opens: a flag the poller does
-  not read falls through to its sync. What each door answers is read by
-  `serve.test.mjs` the way she reads it, the real handlers serving her readers —
-  a fixture typed beside a reader cannot see a key renamed at the door.
+  not read falls through to its sync. What each door but the quote answers is
+  read by `serve.test.mjs` the way she reads it, the real handlers serving her
+  readers — a fixture typed beside a reader cannot see a key renamed at the
+  door.
 - **`CAL_BACK`/`CAL_AHEAD` carry the 08:00 briefing past tomorrow's 10:00**, read
   and write alike; `fold.test.mjs` derives the reach from the source.
 - **The trade event is a close alone** — an open does not call her, and an

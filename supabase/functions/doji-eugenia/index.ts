@@ -1664,7 +1664,7 @@ export function scoreCall(c: Call, candles: Candle[], from: number): Score {
 /* Tonight's scoring: every call whose session has ended and is not yet scored,
    against one read of the bars. The PATCH is filtered on `outcome is null`, so
    a retry never rescores one. Both outcomes are a row; never throws. Exported
-   so the bars it reads are served it by the poller's own door. */
+   so it is driven against the poller's own door. */
 export async function scoreCalls(): Promise<void> {
   try {
     const due = await readRows<Call>('Calls',

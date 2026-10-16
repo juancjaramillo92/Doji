@@ -774,6 +774,26 @@ without a side can reach it.
 **Revisit if:** the live database holds no broker row whose `direction` is
 null.
 
+### R-86 — the setup refusing a 503 its door gives before the key
+**Deferred, not refused.** `setup.c` takes a 503 as a right key at a door short
+of a secret of its own, which Eugenia's charm door answers after the key. Each
+function's boot guard answers 503 before it, so while a required secret is
+missing any key is saved as right. Telling the two apart means the setup reading
+the body, for a function that is down anyway and a key the next exchange would
+refuse.
+**Revisit if:** a key saved at setup is ever found wrong after a function came
+back up.
+
+### R-87 — the keys each door answers, held as a list
+**Why refused:** a list of the keys Eugenia reads off each door, beside the keys
+the door's return literal names, is what the other copies here get. It would see
+neither a nested key, the weeks' `points` or a reserve's `tonnes`, nor a key
+spread in from a fold, and every one of those was renamed green. `serve.test.mjs`
+drives her readers off the real handlers instead, which sees them all and needs
+no declaration. The quote stays held by its two interfaces, which already name
+every field.
+**Revisit if:** a door is added that the driven test cannot stub a vendor for.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

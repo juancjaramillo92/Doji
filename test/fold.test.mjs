@@ -2591,7 +2591,7 @@ test('a refused read throws rather than backing up a blank', async () => {
     'and the job would go green over it');
 });
 
-test('the backup names every table that has no other source', async () => {
+test('the backup holds every table it lists, each paged by its whole key', async () => {
   const asked = [];
   const stub = async (u) => { asked.push(u); return { ok: true, json: async () => [] }; };
   const out = await backup('https://x', 'k', stub);
@@ -2601,11 +2601,9 @@ test('the backup names every table that has no other source', async () => {
     'trade_stops is not paged by its whole key');
   assert.ok(asked.includes('https://x/rest/v1/eugenia_notes?select=*&order=id.asc'),
     'a one-column key is no longer paged the way it was');
-  for (const t of ['trades', 'eugenia_notes', 'eugenia_turns', 'eugenia_channels',
-                   'eugenia_thesis', 'eugenia_portrait', 'eugenia_reads', 'eugenia_loops',
-                   'eugenia_calendar',
-                   'trade_stops']) {
-    assert.ok(t in out.tables, `${t} cannot be rebuilt from anywhere and is not in the backup`);
+  // Which tables those are is agree.test.mjs's, against schema.sql.
+  for (const [t] of TABLES) {
+    assert.ok(t in out.tables, `${t} is listed in the backup and the document does not hold it`);
   }
   // The cost meter is deliberately out: every row is about a model call rather
   // than about him, and it is by far the largest table.
