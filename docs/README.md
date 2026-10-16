@@ -288,10 +288,9 @@ carries a plan yet.
 
 **`trade_stops` keeps every move the plan columns refuse to.** Where the stop
 sat when a print landed is all of R-19, and whether it ever moved away from entry
-is half of R-02, so `stopChanges` writes a row whenever a
-position's stop or target differs from its last row — a pulled side as null, both
-sides pulled together included — and seven hundred polls of an unmoved stop are
-one row. It is a history rather than a column, so it sits outside
+is half of R-02, so `stopChanges` writes a row whenever a position's stop or
+target differs from its last row — a pulled side as null, both sides pulled
+together included — and seven hundred polls of an unmoved stop are one row. It is a history rather than a column, so it sits outside
 `eugenia_trades`, and `check_rules` reads it beside the trades.
 
 **`best_price` is how far the trade ran in his favour, and it reaches

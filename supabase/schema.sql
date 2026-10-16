@@ -1396,11 +1396,12 @@ revoke execute on function public.pace_watch(timestamptz)            from public
 
 -- ═══ Every stop and target a position carried ═══════════════════════════
 
--- R-19 asks where the stop and target sat when a print landed. planned_sl and
--- planned_tp keep the plan as first seen and a closed position reports its
--- final stop, so every move between was lost — and the broker keeps none of
--- it after the close. The poller writes a row only when either side differs
--- from the last one for that position, so `seen_at` is "as first seen".
+-- R-19 asks where the stop and target sat when a print landed, and R-02
+-- whether the stop ever moved away from entry. planned_sl and planned_tp keep
+-- the plan as first seen and a closed position reports its final stop, so
+-- every move between was lost — and the broker keeps none of it after the
+-- close. The poller writes a row only when either side differs from the last
+-- one for that position, so `seen_at` is "as first seen".
 
 create table if not exists public.trade_stops (
   id       text        not null,

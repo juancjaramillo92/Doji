@@ -5527,13 +5527,13 @@ test("the nightly pass files the week, meters both outcomes, and check_rules rea
     'check_rules hands the rules no calendar, so R-19 is unknown on every trade');
   assert.match(body, /stopsQuery\(days\)/, 'check_rules no longer reads the stop history');
   assert.match(body, /\}, stops\)/,
-    'check_rules hands the rules no stop history, so R-19 is unknown on every trade');
+    'check_rules hands the rules no stop history, so R-19 is unknown on every trade and R-02 blind to a widened stop');
 
   /* AND THE POLLER WRITES THE HISTORY, inside the step that already read the
      open positions — a pure stopChanges proves nothing about being called. */
   const poller = source('supabase/functions/doji-mcp-sync/index.ts');
   assert.match(poller, /planned \+= await writePlan\(plan\);\s*stops = await recordStops\(plans\);/,
-    'the poll no longer records stop moves, so trade_stops stops growing and R-19 goes unknown');
+    'the poll no longer records stop moves, so trade_stops stops growing, R-19 goes unknown and R-02 blind to a widened stop');
 });
 
 test('Eugenia reaches a price through the poller and never holds the broker token', () => {
