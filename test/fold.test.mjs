@@ -42,7 +42,7 @@ import {
   VOICE_TROUBLE,
   positionsList, isOpen, healthLine, sweepLine, serve, parseChannel, sayAloud, postSpeak,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock, portraitBlock, NOTES, recordBlock, recordList, recordQuery,
-  callProblem, expiryOf, scoreCall, callsList, effortMessages, BASE_EFFORT,
+  callProblem, expiryOf, scoreCall, callsList, lossesList, effortMessages, BASE_EFFORT,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock,
@@ -4572,7 +4572,43 @@ test('her calls say how they ended, what they made, and which still stands', () 
   assert.match(out, /Standing until the 17:00 roll: buy 4000, stop 3985, target 4030, if a retest of 4,000/,
     'the call still standing is not named, so she would make a second');
   assert.match(out, /The latest lost:\n· 13 Oct: buy 4000/);
+  assert.doesNotMatch(out, /Of the \d+ lost/, 'a count of steps when no loss has been explained');
+  const why = callsList([
+    { ...CALL, id: 2, expires_at: '2026-10-13T21:00:00Z', outcome: 'lost', result: -15, misread: 'level', lesson: 'the quarter had broken' },
+    { ...CALL, id: 1, expires_at: '2026-10-12T21:00:00Z', outcome: 'lost', result: -15, misread: 'none', lesson: null },
+    { ...CALL, id: 0, expires_at: '2026-10-09T21:00:00Z', outcome: 'lost', result: -15 },
+  ], now);
+  assert.match(why, /Of the 3 lost, 0 misread the bias, 1 misread the level, 0 misread the candle, 1 kept every step, 1 not yet explained\./);
+  assert.match(why, /buy 4000, stop 3985, target 4030, if a retest of 4,000 — misread the level: the quarter had broken/);
+  assert.match(why, /— kept every step/);
   assert.equal(callsList([]), '');
+});
+
+test('a lost call is explained by the step it failed on, once', async () => {
+  const sent = [];
+  await stubbed(async () => {
+    globalThis.fetch = async (url, opts = {}) => {
+      sent.push({ url: String(url), body: opts.body });
+      return new Response(JSON.stringify(sent.length > 1 ? [] : [{ id: 7 }]), { status: 200 });
+    };
+    assert.match(await serve('explain_call', { id: 7, step: 'level' }), /filed with what you misread/,
+      'a failed step was filed with no lesson');
+    assert.match(await serve('explain_call', { id: 7, step: 'none', lesson: 'nothing' }), /carries no lesson/);
+    assert.match(await serve('explain_call', { id: 7, step: 'trend', lesson: 'x' }), /not a step/);
+    assert.equal(sent.length, 0, 'an explanation off the vocabulary reached the database');
+    assert.equal(await serve('explain_call', { id: 7, step: 'bias', lesson: 'the 4H had printed a lower high' }), 'Filed.');
+    assert.match(await serve('explain_call', { id: 7, step: 'bias', lesson: 'again' }), /not a lost call waiting/,
+      'a PATCH filtered to nothing was read as filed');
+  });
+  assert.match(sent[0].url, /eugenia_calls\?id=eq\.7&outcome=eq\.lost&misread=is\.null$/,
+    'a call that won, or one already explained, could be explained again');
+  assert.deepEqual(JSON.parse(sent[0].body), { misread: 'bias', lesson: 'the 4H had printed a lower high' });
+});
+
+test('the losses she has not explained come with their number and when they stopped', () => {
+  const out = lossesList([{ ...CALL, id: 9, outcome: 'lost', closed_at: '2026-10-14T15:40:00Z' }]);
+  assert.match(out, /call 9, made 09:00 ET Wednesday: buy 4000, stop 3985, target 4030, if a retest of 4,000; stopped 11:40 ET/);
+  assert.equal(lossesList([]), '');
 });
 
 test('a call is filed once a session, and a call off his rules never reaches the table', async () => {
@@ -5929,6 +5965,7 @@ const TOOL_CALLS = [
   ['record_read',   { reading: 'a read', test: 'the two-year falls', verdict: 'untested', evidence: 'no close',
                       firmness: 'light', channel: 'dollar' }],
   ['make_call',     { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market', confirm: 'market' }],
+  ['explain_call',  { id: 1, step: 'level', lesson: 'the 4,000 quarter had already been traded through twice' }],
   ['get_releases',  { release: 'Core Inflation Rate MoM', months: 12 }],
 ];
 

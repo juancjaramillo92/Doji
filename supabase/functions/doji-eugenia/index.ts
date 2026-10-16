@@ -1657,7 +1657,8 @@ export const CALL_OUTCOMES = ['won', 'lost', 'scratch', 'open', 'untriggered', '
 export type Call = { id: number; made_at: string; expires_at: string; direction: string;
                      entry: number; stop: number; target: number; condition: string;
                      confirm: string | null; level: number | null;
-                     outcome: string | null; result: number | null };
+                     outcome: string | null; result: number | null;
+                     closed_at?: string | null; misread?: string | null; lesson?: string | null };
 export type Score = { outcome: typeof CALL_OUTCOMES[number]; triggered_at: string | null;
                       closed_at: string | null; closed_price: number | null; result: number | null };
 
@@ -1741,6 +1742,64 @@ export async function scoreCalls(): Promise<void> {
   }
 }
 
+/* ─── Why a call lost ──────────────────────────────────────────────────────
+   A loss counted says how often; the step of his sequence it failed on says
+   where her reading of a chart is weak, as a read's misread link does for the
+   news. Filed at the nightly pass, judged by what printed after the call
+   against what she said when she made it. `none` is a call that kept every
+   step and lost anyway: on his rules a stop is sometimes simply reached, and
+   a record that cannot say so blames a step for it. The PATCH is filtered on
+   a lost call not yet explained, so a retry never re-files one.
+   ───────────────────────────────────────────────────────────────────────── */
+export const CALL_STEPS = ['bias', 'level', 'candle', 'none'] as const;
+// The unexplained losses the pass is handed: a night that missed leaves more.
+const LOSSES_MAX = 10;
+
+const EXPLAIN_TOOL = {
+  name: "explain_call",
+  description:
+    "File why one of your lost calls lost, by its number. At the nightly pass and nowhere " +
+    "else. The step of his sequence your reading of the chart got wrong: 'bias' when the " +
+    "bigger trend went the other way, 'level' when price traded through the level and " +
+    "stayed beyond it, 'candle' when the level held and the candle you took as the " +
+    "confirmation was not one, 'none' when every step held and price reached the stop " +
+    "anyway. Judged by what printed after the call against what you said when you made it.",
+  input_schema: {
+    type: "object",
+    properties: {
+      id: { type: "number", description: "The call's number, as the lost calls list it." },
+      step: { type: "string", enum: CALL_STEPS },
+      lesson: { type: "string",
+                description: `Except with 'none': what you misread, in a sentence of at most ${NOTE_MAX} characters — "the 4H had already printed a lower high". Never "be more careful".` },
+    },
+    required: ["id", "step"],
+    additionalProperties: false,
+  },
+} as const;
+
+/* Never throws, for writeNote's reason. */
+async function explainCall(id: unknown, step: unknown, lesson: unknown): Promise<string> {
+  const n = Number(id);
+  if (!Number.isInteger(n) || n <= 0) return "A call is explained by its number.";
+  const s = String(step ?? "");
+  if (!(CALL_STEPS as readonly string[]).includes(s)) return `"${s}" is not a step. They are ${CALL_STEPS.join(", ")}.`;
+  const learnt = String(lesson ?? "").trim().slice(0, NOTE_MAX);
+  if (s !== 'none' && !learnt) return "A step that failed is filed with what you misread.";
+  if (s === 'none' && learnt) return "A call that kept every step carries no lesson. File it without one.";
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/eugenia_calls?id=eq.${n}&outcome=eq.lost&misread=is.null`, {
+      method: "PATCH", headers: sbHeaders("return=representation"),
+      body: JSON.stringify({ misread: s, lesson: learnt || null }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!(await res.json()).length) return `Call ${n} is not a lost call waiting for its reason.`;
+    return "Filed.";
+  } catch (err) {
+    console.error("doji-eugenia: call not explained —", why(err));
+    return UNSAVED;
+  }
+}
+
 /* ─── Claude ───────────────────────────────────────────────────────────────
    Raw fetch rather than the SDK, like every other outbound call here. Web
    search is what makes a briefing possible at all: a briefing invented from
@@ -1798,7 +1857,7 @@ const CHAT_TOOLS = [
   RELEASES_TOOL,
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, PORTRAIT_TOOL, CLOSE_TOOL,
-                           RECORD_TOOL, CHECK_TOOL, STATS_TOOL];
+                           RECORD_TOOL, EXPLAIN_TOOL, CHECK_TOOL, STATS_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
 /* No tools: the gates read a draft and return one. Sharing the briefing's
    array to ride its cache does not work — the array starts the key and the
@@ -1939,6 +1998,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case CLOSE_TOOL.name:    return await closeLoop(input.id, input.resolution);
     case CALL_TOOL.name:     return await makeCall(input.direction, input.entry, input.stop, input.target,
                                                input.condition, input.confirm, input.level);
+    case EXPLAIN_TOOL.name:  return await explainCall(input.id, input.step, input.lesson);
     case RECORD_TOOL.name:   return await recordRead(input.reading, input.test, input.verdict, input.evidence,
                                                  input.firmness, input.lesson, input.channel);
     default:
@@ -2789,13 +2849,39 @@ export function callsList(rows: Call[], now = Date.now(), to = "Your"): string {
   const traded = scored.filter(c => c.result !== null);
   const net = Math.round(traded.reduce((sum, c) => sum + Number(c.result), 0) * 100) / 100;
   const standing = rows.filter(c => !c.outcome && Date.parse(c.expires_at) > now);
-  const lost = scored.filter(c => c.outcome === 'lost').slice(0, RECORD_MISSES);
+  const losses = scored.filter(c => c.outcome === 'lost');
+  const lost = losses.slice(0, RECORD_MISSES);
+  const explained = losses.filter(c => c.misread);
+  const step = (c: Call) => c.misread === 'none' ? " — kept every step"
+    : c.misread ? ` — misread the ${c.misread}: ${c.lesson}` : "";
   return `\n\n${to} calls over the last ${RECORD_DAYS} days, scored on price by his rules: ` +
     `${rows.length} made; ${CALL_OUTCOMES.map(o => `${by(o)} ${o}`).join(", ")}` +
     (rows.length > scored.length + standing.length ? `, ${rows.length - scored.length - standing.length} not yet scored` : "") + `.` +
     (traded.length ? ` The ${traded.length} that triggered made ${net >= 0 ? "+" : "-"}$${Math.abs(net).toFixed(2)} an ounce.` : "") +
     (standing.length ? `\nStanding until the 17:00 roll: ${standing.map(callLine).join("; ")}.` : "") +
-    (lost.length ? `\nThe latest lost:\n${lost.map(c => `· ${civilDay(nyDate(new Date(c.made_at)))}: ${callLine(c)}`).join("\n")}` : "");
+    (explained.length ? `\nOf the ${losses.length} lost, ` + CALL_STEPS.map(x =>
+      `${explained.filter(c => c.misread === x).length} ${x === 'none' ? "kept every step" : `misread the ${x}`}`).join(", ") +
+      (explained.length < losses.length ? `, ${losses.length - explained.length} not yet explained` : "") + "." : "") +
+    (lost.length ? `\nThe latest lost:\n${lost.map(c => `· ${civilDay(nyDate(new Date(c.made_at)))}: ${callLine(c)}${step(c)}`).join("\n")}` : "");
+}
+
+/* The pass's list of lost calls still waiting for a reason, each with the
+   number explain_call takes and when it was stopped. */
+export function lossesList(rows: Call[]): string {
+  if (!rows.length) return "";
+  return `\n\nYour lost calls not yet explained — file each with explain_call:\n` +
+    rows.map(c => `· call ${c.id}, made ${nyTime(c.made_at)} ET ${weekday(nyDate(new Date(c.made_at)))}: ` +
+      `${callLine(c)}; stopped ${c.closed_at ? `${nyTime(c.closed_at)} ET` : "at a time not recorded"}`).join("\n");
+}
+
+export async function lossesBlock(): Promise<string> {
+  try {
+    return lossesList(await readRows<Call>('Calls',
+      `eugenia_calls?select=*&outcome=eq.lost&misread=is.null&order=id.desc&limit=${LOSSES_MAX}`));
+  } catch (err) {
+    console.error("doji-eugenia: losses unavailable —", why(err));
+    return "";
+  }
 }
 
 export async function callsBlock(): Promise<string> {
@@ -4032,15 +4118,18 @@ async function postConsolidation(): Promise<Response> {
   // differently, which most days' transcripts never mention. And the market
   // around gold and the Fed pricing as they closed, which is what a read's
   // stated test is judged against.
-  const [notes, portrait, channels, trades, story, loops, calendar, verdicts, desk, record, calls, around, rates] =
+  // And her map of his charts as the day closed, with the calls that lost,
+  // since a loss is explained by what printed after it.
+  const [notes, portrait, channels, trades, story, loops, calendar, verdicts, desk, record, calls, around, rates,
+         losses, chart] =
     await Promise.all([
       notesBlock(), portraitBlock(), channelsBlock(), tradesBlock(),
       thesisBlock(), loopsBlock(), calendarBlock(), feedbackBlock(), positionsBlock(), recordBlock(),
-      callsBlock(), aroundBlock(), ratesBlock(),
+      callsBlock(), aroundBlock(), ratesBlock(), lossesBlock(), structureBlock(),
     ]);
 
   const asked = CONSOLIDATE + notes + portrait + channels + trades + story + loops + calendar +
-    verdicts + desk + record + around + rates + calls +
+    verdicts + desk + record + around + rates + calls + losses + chart +
     `\n\nThe day, oldest first:\n\n` +
     day.map(t => `${t.role === 'user' ? 'him' : 'you'}: ${t.content}`).join("\n\n");
 

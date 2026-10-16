@@ -760,6 +760,14 @@ alter table public.eugenia_calls add column if not exists confirm text
   constraint eugenia_calls_confirm_check check (confirm in ('close', 'market'));
 alter table public.eugenia_calls add column if not exists level numeric;
 
+-- Why a lost call lost, filed at the nightly pass: the step of his sequence
+-- her reading of the chart got wrong, or `none` for a call that kept every
+-- step, and the sentence saying what she misread. Null until it is filed.
+alter table public.eugenia_calls add column if not exists misread text
+  constraint eugenia_calls_misread_check check (misread in ('bias', 'level', 'candle', 'none'));
+alter table public.eugenia_calls add column if not exists lesson text
+  constraint eugenia_calls_lesson_length check (char_length(lesson) between 1 and 200);
+
 alter table public.eugenia_calls enable row level security;
 
 -- ─── Open threads ──────────────────────────────────────────────────────────

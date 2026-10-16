@@ -22,7 +22,7 @@ import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
-         READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_CONFIRMS, CALL_MAX, RR_MIN, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
+         READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_CONFIRMS, CALL_STEPS, CALL_MAX, RR_MIN, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH, REVIEW } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled,
@@ -3589,6 +3589,9 @@ test('a call is filed with the sides, outcomes and condition length the table ac
   assert.deepEqual(vocab('direction'), [...CALL_SIDES], 'make_call files a side the table refuses');
   assert.deepEqual(vocab('outcome'), [...CALL_OUTCOMES], 'the scoring writes an outcome the table refuses');
   assert.deepEqual(vocab('confirm'), [...CALL_CONFIRMS], 'make_call files a confirmation the table refuses');
+  assert.deepEqual(vocab('misread'), [...CALL_STEPS], 'explain_call files a step the table refuses');
+  const lesson = SCHEMA_SQL.match(/eugenia_calls_lesson_length check \(char_length\(lesson\) between 1 and (\d+)\)/);
+  assert.equal(NOTE_MAX, Number(lesson?.[1]), 'explain_call truncates a lesson past what the table accepts');
   const length = SCHEMA_SQL.match(/eugenia_calls_condition_length check \(char_length\(condition\) between 1 and (\d+)\)/);
   assert.equal(CALL_MAX, Number(length?.[1]), 'make_call truncates a condition past what the table accepts');
 });
@@ -3855,10 +3858,21 @@ test('a call is filed before it is said, kept whole by both gates, and never mad
     assert.doesNotMatch(list(set), /CALL_TOOL/, `${set} offers make_call`);
   }
 
+  // A loss is explained once a day is whole, by the pass alone, which is
+  // handed the losses and the map it judges them against.
+  assert.match(list('CONSOLIDATE_TOOLS'), /EXPLAIN_TOOL/, 'the pass cannot file why a call lost');
+  for (const set of ['CHAT_TOOLS', 'TRADE_TOOLS', 'REVIEW_TOOLS', 'CRITIC_TOOLS']) {
+    assert.doesNotMatch(list(set), /EXPLAIN_TOOL/, `${set} offers explain_call, a judgment made mid-day`);
+  }
+
   const pass = uncomment(bodyOf(EUGENIA_TS, 'async function postConsolidation('));
   assert.ok(pass.indexOf('await scoreCalls()') > -1 &&
             pass.indexOf('await scoreCalls()') < pass.indexOf("ask([{ role: 'user', content: asked }]"),
     'the calls are not scored before the pass reads them, so it judges yesterday');
+  for (const block of ['lossesBlock()', 'structureBlock()']) {
+    assert.ok(pass.includes(block), `the pass is not handed ${block}, so a loss is explained from nothing`);
+  }
+  assert.match(pass, /\+ calls \+ losses \+ chart \+/, 'the losses or the map are read and never sent');
 });
 
 test('a printed level may be named, never beside her read, in the writer and both gates', () => {

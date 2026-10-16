@@ -2139,9 +2139,21 @@ you.
   the roll, marked at the last close), `untriggered`, and `unread` when the bars
   do not reach back to the call. The PATCH is filtered on `outcome is null`, so
   a retry never rescores one, and the run is a `caller: 'calls'` row either way.
+- **Why a call lost is filed at night** (`explain_call`, nightly-only like
+  `record_read`). Every lost call not yet explained is handed to the pass
+  with its number (`lossesBlock`), beside her map of his charts as the day
+  closed, and she files the one step of your sequence her reading got wrong:
+  `bias` when the bigger trend went the other way, `level` when price traded
+  through the level and stayed beyond it, `candle` when the level held and the
+  confirmation was not one — each with the sentence saying what she misread —
+  or `none`, a call that kept every step and reached its stop anyway, since on
+  your rules a trade can do everything right and lose. A count of losses says
+  how often; the step says where her reading of a chart is weak. The PATCH is
+  filtered on a lost call not yet explained, so a retry never re-files one.
 - **Her calls' record** — a month of outcomes, what the triggered ones made an
-  ounce, the newest losses, and any call still standing — goes where her read
-  record goes: the briefing, a reply, the pass and the review, never the trade
+  ounce, the losses counted by the step they failed on, the newest losses with
+  what she misread, and any call still standing — goes where her read record
+  goes: the briefing, a reply, the pass and the review, never the trade
   look.
   `/notes` shows it to you. She gives it straight when you ask, losses first, and
   never uses it to talk you into a trade.
