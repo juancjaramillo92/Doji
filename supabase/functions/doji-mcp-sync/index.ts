@@ -483,11 +483,10 @@ export function bestPrice(bars: Bar[], direction: string, entryMs: number, close
    get_trendbars counts its answer back from toTimestamp: 100 bars unless
    `count` asks for more, never more than 1000, over a window of 30 days at
    most — its own description, kept in test/fixtures/ctrader-get-trendbars.json.
-   Asked without `count`, a window over 100 bars came back as its newest 100
-   and said nothing: every chart of her map on 15 October, and every four-hour
-   chunk of minutes behind best_price and her calls' scores before it. So
-   every read asks for the most, a window is split well inside both limits,
-   and an answer holding the most is a cut page, thrown rather than trusted. */
+   Asked without `count`, a window over 100 bars comes back as its newest 100
+   and says nothing of the rest. So every read asks for the most, a window is
+   split well inside both limits, and an answer holding the most is a cut
+   page, thrown rather than trusted. */
 export const BAR_MAX = 1000;
 export const RANGE_MAX_MS = 30 * 86_400_000;
 const WINDOW_BARS = 900;

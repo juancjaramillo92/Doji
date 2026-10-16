@@ -708,6 +708,25 @@ seed; `verify.sql` asks only that the column is there.
 **Revisit if:** a write path to `eugenia_reads` starts choosing the channel from
 anything but the tool's enum.
 
+### R-78 — the map's grid and candle count interpolated into her words
+**Why refused:** `GRID` and `CANDLES` are said in words by `get_structure`'s
+description and by `SYSTEM`, "the $25 grid" and "the last four closed 15m and
+5m candles". `prompt.ts` imports nothing, and the first import would be a new
+pattern in it for two numbers; the tool's description would read "4" where it
+reads "four", a change to what the model is told made by a refactor. Both
+copies are in the README's Facts list, and `agree.test.mjs` holds them, with
+§4's grid, against `structure.ts`.
+**Revisit if:** a third reading of the map comes to be said in words.
+
+### R-79 — the position case judged by the judge alone
+**Why refused:** its `my read` pattern failed a reply the judge passed, because
+the ban leaves her free to offer a read he can ask for. Dropping the pattern
+would leave the case's one check that costs nothing and cannot drift with the
+judge's model. It now matches a read stated, "my read is" or "my read:", and
+`fold.test.mjs` holds reads it must fail and offers it must pass.
+**Revisit if:** she gives a read in words the pattern does not name, and the
+judge is what catches it.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

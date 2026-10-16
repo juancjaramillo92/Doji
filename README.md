@@ -440,6 +440,7 @@ single-sourced at run time:
 | the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow, the Apps Script and the charm's `charm/main/net.h` |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
 | each function's **gateway setting** | `config.toml`'s stanza and the deploy command's flag |
+| her **map's grid and candle count** | `GRID` and `CANDLES` in `structure.ts`, said in words by `get_structure`'s description and by `SYSTEM`; the grid is §4's, in `strategy.ts` |
 | **what the eval reads** | `scripts/eval.mjs`'s imports and `file()` reads, and the paths `test.yml`'s eval-owed job compares with main |
 
 Copies are the cost; copies that can *disagree* are the risk.
@@ -3563,8 +3564,9 @@ ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs --plant
 ```
 
 Or from GitHub: **Actions → eval → Run workflow**, with `ANTHROPIC_API_KEY` as a
-repository secret; the verdicts and the cost are in the run's log, and a failed
-case fails the run. Nothing runs it unasked, so `test.yml` says when it is owed:
+repository secret; the verdicts and the cost are in the run's log, with what
+she wrote wherever a case or a plant failed and, for a pattern, where in it the
+pattern matched, and a failed case fails the run. Nothing runs it unasked, so `test.yml` says when it is owed:
 a push to a branch whose prompts, cases or eval differ from main's carries the
 warning *The eval is owed*, and a branch is run through it before it is merged.
 `index.ts` is outside that list though the eval reads its model names: a warning

@@ -5,8 +5,8 @@
    where price has turned, the $25 grid, where the two agree, which levels sit
    at the edge of the range and which inside it, a wick through a turn that
    closed back, and the sequence the turns make on the bias charts. In code,
-   because the highest high in a hundred and thirty bars is the arithmetic a
-   model does worst — scoreCall's reason.
+   because the highest high in a week of hourly bars is the arithmetic a model
+   does worst — scoreCall's reason.
 
    Every figure is one price has already printed. A run of higher highs is a
    description of the bars behind it, and nothing here says where price goes.
