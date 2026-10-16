@@ -287,7 +287,8 @@ It looks forward only, so §7's `Evaluable` column is unchanged: almost no row
 carries a plan yet.
 
 **`trade_stops` keeps every move the plan columns refuse to.** Where the stop
-sat when a print landed is all of R-19, so `stopChanges` writes a row whenever a
+sat when a print landed is all of R-19, and whether it ever moved away from entry
+is half of R-02, so `stopChanges` writes a row whenever a
 position's stop or target differs from its last row — a pulled side as null, both
 sides pulled together included — and seven hundred polls of an unmoved stop are
 one row. It is a history rather than a column, so it sits outside
@@ -2508,11 +2509,15 @@ on a $25 target set at entry. A realised 1:1.25 is the rule working on a target
 shortened mid-trade and a breach on a $25 one set at entry, and only a row
 carrying the plan can tell which.
 
-**The stop is a ceiling, not a value**, which makes R-02 one-sided: $20 is the
-most it may ever be, it usually sits tighter off the chart, and it moves only
+**The stop is a ceiling, not a value**, which makes R-02's cap one-sided: $20 is
+the most it may ever be, it usually sits tighter off the chart, and it moves only
 outward to break-even or inward under R-19. A loss further than $20 can only be a
-widened stop; a $10 stop closed $18 out passes. A clean R-02 means no stop went
-past $20, never that stops were respected.
+widened stop; a $10 stop closed $18 out passes the cap, and `trade_stops` says
+which it was. A sighting further from entry than the stop that rested before it
+fails R-02, win or loss; an exit past a stop that never moved is slippage and
+passes; one pulled and never put back is `unknown`. Only a trade the poller
+recorded has that history, so a clean R-02 means no stop went past $20 and none
+was widened where one was watched — never that every stop was respected.
 
 **R-10 and R-11** — one position at a time; the day ends at −4% of the account —
 come out of broker columns alone: overlapping entry-to-fill spans, and cumulative

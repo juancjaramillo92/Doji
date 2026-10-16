@@ -440,8 +440,8 @@ alter table public.eugenia_channels enable row level security;
 
 -- Her meters, her calendar, the running story, her open threads, his taps
 -- under a briefing, the price mark, trigram search over her memory, the
--- trigger that tells her a position opened or closed, and the three tables the
--- app's card may read.
+-- trigger that tells her a position closed, and the three tables the app's
+-- card may read.
 
 -- ─── What each call cost ───────────────────────────────────────────────────
 -- One row per model call, plus rows for a delivered briefing, the gates'
