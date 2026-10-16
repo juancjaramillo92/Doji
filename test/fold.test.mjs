@@ -64,7 +64,7 @@ import {
 import {
   turns, biasOf, sweepsOf, poolsOf, shapeOf, foldStructure, READINGS, GRID, CANDLES,
 } from '../supabase/functions/doji-eugenia/structure.ts';
-import { CHANNELS, CHANNEL_STATES, SYSTEM } from '../supabase/functions/doji-eugenia/prompt.ts';
+import { CHANNELS, CHANNEL_STATES, SYSTEM, CRITIC, TRIM } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { backup, readAll, TABLES } from '../scripts/backup.mjs';
 import { lastRun, stale } from '../scripts/health.mjs';
@@ -6543,6 +6543,19 @@ test('the eval counts what the gates are told to count', () => {
   assert.match(EVAL.counted(c({ emDash: true }), 'The dollar — firm — rose.')[0], /em-dash/);
   const five = 'One. Two. Three. Four. Five.';
   assert.match(EVAL.counted(c({ sentences: 4 }), five)[0], /5 sentences/);
+  // The briefing's hello is not counted, as CRITIC is told; a reply's is.
+  const critic = { path: 'critic', counts: { sentences: 4 } };
+  assert.deepEqual(EVAL.counted(critic, 'Buenos días. One. Two. Three. Four.'), [],
+    'the critic was failed for a hello it is told not to count');
+  assert.match(EVAL.counted(critic, 'Buenos días. One. Two. Three. Four. Five.')[0], /5 sentences/);
+  assert.match(EVAL.counted(critic, 'One. Two.\n\nBuenos días. Three. Four. Five. Six.')[0], /5 sentences/,
+    'a short sentence opening a later paragraph was taken for the hello');
+  assert.match(EVAL.counted(critic, 'Buenos días, the big picture held all week. One. Two. Three. Four.')[0], /5 sentences/,
+    'a hello run into a longer sentence was not counted');
+  assert.match(EVAL.counted({ path: 'trim', counts: { sentences: 4 } }, 'Buenos días. One. Two. Three. Four.')[0], /5 sentences/,
+    'a reply\'s hello was not counted, though TRIM is told nothing of it');
+  assert.match(CRITIC, /Nor is the hello/, 'CRITIC counts the hello now, so the eval no longer may skip it');
+  assert.doesNotMatch(TRIM, /hello/i, 'TRIM is told of a hello now, so the eval must skip it there too');
   assert.deepEqual(EVAL.counted(c({ sentences: 4 }), 'One. Two.\n\nThree. Four.'), []);
   assert.deepEqual(EVAL.counted(c({ sentences: 4 }),
     'One.\n\nToday: 08:30 ET CPI. 10:00 ET claims. 11:00 ET an auction. 13:00 ET a speech. 14:00 ET minutes.\n' +
