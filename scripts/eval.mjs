@@ -194,9 +194,10 @@ export const PLANTS = [
       TRIM: p.TRIM.replace(/YOUR CALL IS THE ONE\s+EXCEPTION:[\s\S]*?never changed\./, 'A call with levels in it comes out whole.'),
     }) },
   /* The map rule restates the hours rule above it for the map, and the critic
-     runs under both, so both go. Its draft names no level off the map: a draft
-     full of levels has the number budget cut them with the rule gone, and the
-     case cannot see it go. */
+     runs under both, so both go. Its draft names no level off the map, and says
+     the map in plain words: with the rule gone, the number budget cuts a level
+     and the plain-words rule a trader's word, a sweep or a flip, and either way
+     the case cannot see the rule go. */
   { why: 'the map of his charts kept out of the briefing\'s prose, gone from the critic and the writer',
     cases: ['critic-keeps-map-out-of-prose'],
     breaks: (p) => ({
