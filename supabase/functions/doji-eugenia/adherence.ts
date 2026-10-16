@@ -238,20 +238,41 @@ function r01(rows: TradeRow[]): RuleResult {
 }
 
 /* ─── R-02 ─────────────────────────────────────────────────────────────────
-   Stop never beyond $20 from entry. §7: no loss with |exit − entry| > 20 — the
-   cap only. Whether the stop was respected needs planned_sl, which almost no
-   row carries yet, so §7 keeps it out.
+   Stop never beyond $20 from entry, and never widened. §7: no loss with
+   |exit − entry| > 20, and no closed trade whose stop in trade_stops moved away
+   from entry. The second half reaches only the trades the poller recorded, so
+   a loss with no history is judged on the cap alone and a win with none is not
+   in the population. An exit past a stop that never moved is slippage, and
+   passes.
+
+   Each sighting is held against the last stop that rested, so a stop pulled
+   and put back further out is caught. One pulled and never put back recorded
+   no distance: unknown.
    ───────────────────────────────────────────────────────────────────────── */
 export const FULL_STOP = 20;
 
-function r02(rows: TradeRow[]): RuleResult {
+function r02(rows: TradeRow[], stops: Map<string, Stop[]>): RuleResult {
   const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
   for (const t of rows) {
-    if (!isBroker(t) || !closed(t) || (t.pnl as number) >= 0) continue;
-    if (!priced(t)) { unknown.push(t.id); continue; }
-    if (gap(t) > FULL_STOP + CENT) fail.push(t.id); else pass.push(t.id);
+    if (!isBroker(t) || !closed(t)) continue;
+    const loss = (t.pnl as number) < 0;
+    const seen = [...(stops.get(t.id) ?? [])]
+      .sort((a, b) => +new Date(a.seen_at) - +new Date(b.seen_at))
+      .map(s => s.sl == null ? null : Number(s.sl));
+    if (!loss && !seen.length) continue;
+
+    const rested = seen.filter((sl): sl is number => sl !== null);
+    const sided = t.direction === 'BUY' || t.direction === 'SELL';
+    const wider = sided && rested.some((sl, i) =>
+      i > 0 && (t.direction === 'BUY' ? sl < rested[i - 1] - CENT : sl > rested[i - 1] + CENT));
+    const pulled = rested.length > 0 && seen[seen.length - 1] === null;
+    const moved = rested.some(sl => Math.abs(sl - rested[0]) > CENT);
+
+    if ((loss && priced(t) && gap(t) > FULL_STOP + CENT) || wider) fail.push(t.id);
+    else if ((loss && !priced(t)) || pulled || (!sided && moved)) unknown.push(t.id);
+    else pass.push(t.id);
   }
-  return result('R-02', `losses further than $${FULL_STOP} from entry — the cap only, never whether it was respected`,
+  return result('R-02', `losses further than $${FULL_STOP} from entry, and stops moved away from entry where the poller recorded them`,
                 pass, fail, unknown);
 }
 
@@ -642,7 +663,7 @@ function byDay(rows: TradeRow[]): Map<string, TradeRow[]> {
 export function checkRules(rows: TradeRow[], now = Date.now(),
                            cal: Calendar = { releases: [], weeks: new Set() },
                            stops: Map<string, Stop[]> = new Map()): RuleResult[] {
-  return [r01(rows), r02(rows), r03(rows), r04(rows), r10(rows, now), r11(rows),
+  return [r01(rows), r02(rows, stops), r03(rows), r04(rows), r10(rows, now), r11(rows),
           r12(rows), r13(rows), r15(rows), r16(rows), r18(rows, now),
           r19(rows, cal, stops)];
 }

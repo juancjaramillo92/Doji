@@ -19,7 +19,7 @@
    interpolates it — the copy here was the unreachable one. */
 import { PITCH } from "./prompt.ts";
 
-export const VERSION = "v1.27";
+export const VERSION = "v1.28";
 
 /* The whole strategy said once, interpolated into ALWAYS and §0. */
 const SUMMARY = `XAUUSD only, intraday to multi-session, positions held for the move they were
@@ -84,7 +84,7 @@ counts as kept just because nothing contradicted it.
 | ID | Rule | Scope | Marker | Evaluable | Predicate / Probe | § | Introduced |
 |---|---|---|---|---|---|---|---|
 | R-01 | Take profit $30 from entry price, or $25 where the level looks hard to reach | trade | \`followed_tp\` | journal | no win with \`abs(exit_price − entry_price) < 25\`, except a Friday close-out, which is \`unknown\` | §5 | v1.0 |
-| R-02 | Stop never beyond $20 from entry price | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\` — the CAP only, see §7 | §5 | v1.0 |
+| R-02 | Stop never beyond $20 from entry price, and never widened | trade | \`followed_sl\` | journal | no loss with \`abs(exit_price − entry_price) > 20\`, and no closed trade whose stop in \`trade_stops\` moved away from entry — see §7 | §5 | v1.0 |
 | R-03 | No entry after a full-stop loss on the same day — a sweep re-entry follows only a stop tighter than $20 | day | \`followed_rules\` | journal | within an \`open_day\`, no \`entry_time\` later than the \`fill_time\` of a loss with \`abs(exit − entry) ≥ 20\` | §5 | v1.0 |
 | R-04 | Stop to break-even once price reaches +$20 | trade | \`followed_sl\` | journal | no loss beyond the ±$3 scratch band on a trade whose \`best_price\` was $20 or more in his favour; \`unknown\` where \`best_price\` is null | §6 | v1.0 |
 | R-05 | Break & Retest at interior levels only — marked by the grid or by a previous price reaction — never at an extreme | trade | \`followed_rules\` | judgment | *"Was this at an extreme or in the interior?"* | §4.1 | v1.0 |
@@ -110,7 +110,7 @@ export const SECTIONS: Record<string, string> = {
 
   "0": `## 0 · Header
 
-**Version** ${VERSION} · **Supersedes** v1.26
+**Version** ${VERSION} · **Supersedes** v1.27
 
 ### Summary
 
@@ -1527,16 +1527,18 @@ question, not a finding.
 Break-evens are not caught by this and must not be: an exit within $3 of entry is a
 scratch by result, so R-04 firing never reads as a target missed.
 
-**R-02 CHECKS THE CAP, NOT THE RESPECT, AND THE BLIND SPOT WIDENS AS THE STOP
-TIGHTENS.** The predicate compares against 20 flat. Since the stop is a ceiling and
-is usually tighter (§5), a trade whose stop sat at $10 and closed $18 from entry had
-its stop widened by eight dollars, and this passes it silently.
+**R-02 CHECKS THE CAP ON EVERY LOSS, AND THE RESPECT WHERE THE POLLER WATCHED.**
+The cap compares against 20 flat. Since the stop is a ceiling and is usually tighter
+(§5), a $10 stop that closed $18 from entry is a stop widened by eight dollars or
+slippage on a gap, and the cap passes both. \`trade_stops\` tells them apart: a
+sighting further from entry than the stop that rested before it is a widening, on a
+win as much as a loss, and an exit past a stop that never moved is slippage, which
+passes. A stop pulled and never put back recorded no distance, and is \`unknown\`.
 
-The version that would catch it compares against the trade's own stop. That is on a
-row only as first seen, on the trades since the poller began recording it (§8), and
-even there an exit past it is a widened stop or ordinary slippage on a gap, which
-the row cannot tell apart. **Known, deliberate, one-sided.** Never
-read a clean R-02 run as stops respected — read it as no stop having gone past $20.
+**It reaches only the trades the poller recorded** — none before \`trade_stops\`
+existed (v1.19), and a move and a close inside the same two minutes is never seen.
+So a clean R-02 run is no stop past $20 anywhere and no widening on the trades with
+a history. Never read it as stops respected on the rest.
 
 Expect occasional false positives from the spread: a broker stop fills against bid
 or ask, so a $20 stop can close a dollar further out (§0).
@@ -1719,9 +1721,9 @@ computed over it is a rate over the trades since — never over his record.
 step 4 of R-08 — \`(planned_tp − entry) ÷ (entry − planned_sl)\` on a buy, inverted on
 a sell. That is a number rather than a probe, on any row carrying both.
 
-**What it does NOT settle.** R-02's respect half stays open: an exit past the planned
-stop is a widened stop or ordinary slippage on a gap, and the row cannot tell those
-apart — so no rule verdict is computed from it. Whether a win at $25 was a
+**What it does NOT settle alone.** An exit past the planned stop is a widened stop or
+ordinary slippage on a gap, and the row cannot tell those apart — \`trade_stops\`
+can, and R-02's respect half is judged there (§7). Whether a win at $25 was a
 shortened target or an early close is unchanged.
 
 The Evaluable column in §7 is therefore unchanged too. A rule is \`journal\` when a
@@ -2180,6 +2182,7 @@ it stays as written, because correcting the record would falsify it.
 
 | Version | Change | From lesson |
 |---|---|---|
+| v1.28 | **R-02's respect half made checkable.** §7 kept it open because an exit past the stop is a widened stop or slippage and the row cannot tell which; \`trade_stops\` can, and since v1.19 had been read for R-19 alone. R-02 now also fails a closed trade, win or loss, whose recorded stop moved away from entry — each sighting held against the last stop that rested — and passes an exit past a stop that never moved as slippage. A stop pulled and never put back is \`unknown\`. It reaches only the trades the poller recorded, so a clean run is never stops respected on the rest. | Eugenia's suggestion, after an $8 stop closed $18 out, and his go-ahead |
 | v1.27 | **The two flows are handed to her.** The central banks' gold reserves — China, Poland, India, Turkey, the Czech Republic — in tonnes, and GLD's and IAU's assets and money in or out, read from TradingView and handed to the Sunday briefing and a conversation. Each channel's *Where to read it* says so, and the central banks' gives the year to June 2026 as it read on 15 October. Reference material only; no rule changed. | A probe of what TradingView serves |
 | v1.26 | **A sixth channel: what investors are buying.** Gold funds and futures funds — the flow that turns fastest, where haven buying arrives, and where the rates channel actually lands, on the investors who care what a bond pays. Their holdings fell through 2022 and 2023 while central banks held the price up, and turned back to buying as the rally ran. The CFTC's weekly count is handed to her; the funds' holdings are read off the World Gold Council's and SPDR's pages, dated and sourced. A new rung on her map, starting \`unseen\`. Reference material only; no rule changed. | The 2022–2025 market, which five channels could not tell |
 | v1.25 | **§2 says the real-yield link broke in 2022.** The first channel was called dominant on a −0.82 correlation measured before 2022; since then real yields rose to fifteen-year highs and gold rose to records, carried by central-bank buying the yield does not price. The channel now says so, with the figures dated, and that the referee test — gold moving with real yields or against them — decides which channel is in control on the day. §3's part 7 says the comparison is the mechanism and not the whole price. Reference material only; no rule changed. | Reading her framework against the market since 2022 |

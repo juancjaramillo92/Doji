@@ -3706,16 +3706,54 @@ test('R-01 flags a win that closed under $25, and spares the Friday close-out', 
     'fail');
 });
 
-test('R-02 checks the cap and nothing else', () => {
-  const loss = (exit) => trade({ pnl: -80, entry_price: 4000, exit_price: exit, open_day: '2026-01-06' });
+test('R-02 checks the cap on every loss, and the stop history wherever the poller kept one', () => {
+  const loss = (exit, o) => trade({ pnl: -80, entry_price: 4000, exit_price: exit, open_day: '2026-01-06', ...o });
+  const win = (o) => trade({ pnl: 120, entry_price: 4000, exit_price: 4030, open_day: '2026-01-06', ...o });
+  const at = (sl, minute = 0, tp = 4030) => ({ seen_at: `2026-01-06T15:${String(minute).padStart(2, '0')}:00Z`, sl, tp });
+  const r = (t, history) =>
+    checkRules([t], Date.parse('2026-01-10T00:00:00Z'), undefined, new Map(history ? [[t.id, history]] : []))
+      .find(x => x.rule === 'R-02');
+
   // $20.00 exactly is the cap being honoured, and the tolerance is what stops a
   // float landing at 20.000000001 reporting a breach of a rule kept exactly.
-  assert.equal(verdictOf([loss(3980)], 'R-02').verdict, 'pass');
-  assert.equal(verdictOf([loss(3979)], 'R-02').verdict, 'fail');
-  // A win is not R-02's population however far it travelled.
-  assert.equal(
-    verdictOf([trade({ pnl: 500, entry_price: 4000, exit_price: 4100, open_day: '2026-01-06' })], 'R-02').verdict,
-    'unknown', 'R-02 has no losses to look at, which is unknown rather than clean');
+  assert.equal(r(loss(3980)).verdict, 'pass');
+  assert.equal(r(loss(3979)).verdict, 'fail');
+  assert.equal(r(loss(null)).verdict, 'unknown', 'an unpriced loss might be past the cap');
+  // A win with no history is not in the population however far it travelled.
+  assert.equal(r(win({ exit_price: 4100, pnl: 500 })).verdict, 'unknown',
+    'R-02 has nothing to look at, which is unknown rather than clean');
+
+  /* §7'S OWN CASE: a $10 stop closed $18 out. Under the cap, so the cap alone
+     passes it; the history says which of the two it was. */
+  const eighteen = loss(3982, { pnl: -72 });
+  assert.equal(r(eighteen, [at(3990)]).verdict, 'pass', 'a stop that never moved is slippage');
+  const widened = r(eighteen, [at(3990), at(3982, 20)]);
+  assert.deepEqual([widened.verdict, widened.failed, widened.ids], ['fail', 1, ['PID1']],
+    'a stop moved from $10 to $18 passed because it stayed inside $20');
+
+  // A win is held to it too: the widening is the breach, not the outcome.
+  assert.equal(r(win(), [at(3990), at(3985, 5)]).verdict, 'fail', 'a widened stop on a win passed');
+  // Toward entry is R-04 or R-19, never a widening — and back out again is.
+  assert.equal(r(win(), [at(3990), at(4000, 5)]).verdict, 'pass');
+  assert.equal(r(win(), [at(3990), at(4000, 5), at(3990, 9)]).verdict, 'fail',
+    'a break-even stop put back where it started passed');
+  // A target moving is R-01's and R-19's, not this rule's.
+  assert.equal(r(win(), [at(3990), at(3990, 5, 4025)]).verdict, 'pass');
+
+  /* PULLED. Put back further out is caught against the stop that last rested;
+     never put back recorded no distance at all. */
+  assert.equal(r(win(), [at(3990), at(null, 5, null), at(3985, 9)]).verdict, 'fail',
+    'a stop pulled and replaced wider was read against nothing');
+  assert.equal(r(win(), [at(3990), at(null, 5, null)]).verdict, 'unknown');
+  // A position first seen bare and given its stop after is no widening.
+  assert.equal(r(win(), [at(null, 0, null), at(3990, 1)]).verdict, 'pass');
+
+  // A short is the mirror, and a row with no side cannot say which way is out.
+  const short = win({ direction: 'SELL', exit_price: 3970 });
+  assert.equal(r(short, [at(4010), at(4000, 5)]).verdict, 'pass');
+  assert.equal(r(short, [at(4010), at(4015, 5)]).verdict, 'fail');
+  assert.equal(r(win({ direction: null }), [at(3990), at(3985, 5)]).verdict, 'unknown');
+  assert.equal(r(win({ direction: null }), [at(3990)]).verdict, 'pass');
 });
 
 test('R-03 allows no entry after a $20 stop, and a tighter loss is not one', () => {
