@@ -1065,6 +1065,9 @@ test('the calibration scores her map by the levels he traded, against chance', (
   // A Break & Retest belongs inside the range: 4023 agrees, 4049 at its top does not.
   assert.deepEqual([got.agreed, got.judged], [1, 2]);
   assert.equal(score(entries, { PID2: 'Support & Resistance' }, today).agreed, 1);
+  // A median of two distances is in cents: 0.1 and 0.2 halve to 0.15, not
+  // 0.15000000000000002.
+  assert.equal(score([entry('PID5', 4023.1), entry('PID6', 4049.2)], {}, today).median, 0.15);
   // An entry the map draws nothing for is a miss, and chance is not paid for it.
   const blind = score([{ ...entry('PID4', 4024), charts: {} }], {}, today);
   assert.deepEqual([blind.hits, blind.chance, blind.lift, blind.median], [0, 0, 0, null]);
