@@ -23,7 +23,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 import {
-  env, secretMatches, json, marketOpen, nyDate, sbHeaders, heartbeat, mcpInit, parseSse,
+  env, secretMatches, json, marketOpen, nyClock, nyDate, sbHeaders, heartbeat, mcpInit, parseSse,
   SB_URL, SB_KEY, why, CHARTS, type Candle
 } from "../_shared/edge.ts";
 
@@ -566,11 +566,12 @@ async function readCharts(session: Record<string, string>, to: number, charts: r
    For scripts/calibrate.mjs, which folds her map at the minute of each of his
    newest entries and asks whether it had the level he traded. The trades come
    from the table, never the request, so the door still puts nothing a caller
-   sends into a broker call. The two level charts only, and only bars closed by
-   the minute he clicked: one that closed after it holds prices he could not
-   have seen, and a map drawn from it would find his level by looking ahead. */
+   sends into a broker call. The two level charts and the two bigger ones the
+   map reads highs and lows off, and only bars closed by the minute he clicked:
+   one that closed after it holds prices he could not have seen, and a map
+   drawn from it would find his level by looking ahead. */
 const ENTRIES = 20;
-const LEVEL_CHARTS = CHARTS.filter(c => c.period === "H_1" || c.period === "M_30");
+const ENTRY_CHARTS = CHARTS.filter(c => ["D_1", "H_4", "H_1", "M_30"].includes(c.period));
 
 async function readEntries(session: Record<string, string>) {
   const res = await fetch(
@@ -582,11 +583,47 @@ async function readEntries(session: Record<string, string>) {
   const out = [];
   for (const t of await res.json() as { id: string; direction: string; entry_time: string; entry_price: number }[]) {
     const at = Math.floor(Date.parse(t.entry_time) / MINUTE) * MINUTE;
-    const { charts, missing } = await readCharts(session, at, LEVEL_CHARTS);
-    for (const c of LEVEL_CHARTS) charts[c.period] = charts[c.period]?.filter(b => b.t + c.ms <= at);
+    const { charts, missing } = await readCharts(session, at, ENTRY_CHARTS);
+    for (const c of ENTRY_CHARTS) charts[c.period] = charts[c.period]?.filter(b => b.t + c.ms <= at);
     out.push({ ...t, at, charts, missing });
   }
   return out;
+}
+
+/* ─── A past session, as she would have seen it ────────────────────────────
+   For scripts/replay.mjs, which asks her for the call she would have made on a
+   past morning and scores it as the nightly pass does. `?replay=N` is the
+   weekday N back, clamped to REPLAY_DAYS as `?hours=` is clamped: the door
+   turns it into that day's 08:00 New York, the briefing's hour, so all it puts
+   into a broker call is an instant it chose itself. His six charts as they
+   stood then, only bars closed by it — one closed after holds prices she could
+   not have seen — and the minute bars from then to the 17:00 roll, which the
+   call is scored against. Weekdays, not sessions: a holiday serves no bars.
+   ───────────────────────────────────────────────────────────────────────── */
+export const REPLAY_DAYS = 120;
+const REPLAY_FROM = 8, REPLAY_ROLL = 17;
+
+export function replayDays(raw: string | null): number | null {
+  const n = Number(raw);
+  return raw !== null && Number.isInteger(n) && n >= 1 && n <= REPLAY_DAYS ? n : null;
+}
+
+/* Midday New York in either season is 16:00 UTC, and eight hours either side
+   holds both hours of that civil day once each. */
+export function replaySession(n: number, now: number): { at: number; ends: number } {
+  const [y, m, d] = nyDate(new Date(now)).split("-").map(Number);
+  let noon = Date.UTC(y, m - 1, d, 16);
+  for (let left = n; left > 0;) {
+    noon -= 86_400_000;
+    if (new Date(noon).getUTCDay() % 6) left--;
+  }
+  const hour = (h: number) => {
+    for (let t = noon - 8 * 3600_000; t <= noon + 8 * 3600_000; t += 3600_000) {
+      if (nyClock(new Date(t)).hour === h) return t;
+    }
+    throw new Error(`no ${h}:00 New York on ${nyDate(new Date(noon))}`);
+  };
+  return { at: hour(REPLAY_FROM), ends: hour(REPLAY_ROLL) };
 }
 
 /* The newest closed trades still missing a figure, a few a poll — one path for
@@ -651,9 +688,10 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     const day       = url.searchParams.get("bars") === "1";
     const structure = url.searchParams.get("structure") === "1";
     const entries   = url.searchParams.get("entries") === "1";
+    const replay    = url.searchParams.has("replay");
     // The read-only probes answer over the weekend, when rows get looked at.
     if (!force && !raw && !tools && !posns && !market && !marketRaw && !bars && !day && !structure &&
-        !entries && !marketOpen()) {
+        !entries && !replay && !marketOpen()) {
       // A skip is a completed run: unmarked, the heartbeat freezes over the
       // weekend close and reads as a dead sync every Sunday evening.
       await heartbeat("poller");
@@ -734,6 +772,20 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
        scripts/calibrate.mjs. */
     if (entries) {
       return json({ ok: true, symbol: SYMBOL_IDS[0], entries: await readEntries(session) });
+    }
+
+    /* ?replay=N — his six charts at 08:00 New York N weekdays back, and that
+       session's minute bars, for scripts/replay.mjs. A bad N is refused rather
+       than read as a default: a replay of the wrong day scores the wrong call. */
+    if (replay) {
+      const n = replayDays(url.searchParams.get("replay"));
+      if (n === null) return json({ ok: false, error: `replay is a whole number of weekdays, 1 to ${REPLAY_DAYS}` }, 400);
+      const { at, ends } = replaySession(n, to);
+      const { charts, missing } = await readCharts(session, at);
+      for (const c of CHARTS) charts[c.period] = charts[c.period]?.filter(b => b.t + c.ms <= at);
+      const candles = foldCandles(await readTrendbars(session, "M_1", MINUTE, at, ends));
+      if (!candles) throw new Error("get_trendbars returned a bar that will not read");
+      return json({ ok: true, symbol: SYMBOL_IDS[0], at, ends, charts, missing, bars: candles });
     }
 
     /* ?bars=raw — minute bars at six ages, raw: their shape, their scale, and

@@ -22,7 +22,7 @@ import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
-         READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_MAX, RR_MIN, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
+         READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_CONFIRMS, CALL_STEPS, CALL_MAX, RR_MIN, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH, REVIEW } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled,
@@ -2975,6 +2975,9 @@ const UNMARKED = {
     'and nothing the mark could truthfully say',
   'unauthorized':
     'a caller without the cron secret — a knock at the door rather than a run',
+  'replay is a whole number':
+    'a replay asked for a day the door does not serve — a knock at the door, ' +
+    'answered before the broker is reached',
   'symbol: SYMBOL_IDS[0]':
     'the quote door, which is a different job on the same function: marking it ' +
     'would let her price reads hold last_ok open over a dead poll',
@@ -3588,6 +3591,10 @@ test('a call is filed with the sides, outcomes and condition length the table ac
     ?.split(',').map(v => v.trim().replace(/'/g, ''));
   assert.deepEqual(vocab('direction'), [...CALL_SIDES], 'make_call files a side the table refuses');
   assert.deepEqual(vocab('outcome'), [...CALL_OUTCOMES], 'the scoring writes an outcome the table refuses');
+  assert.deepEqual(vocab('confirm'), [...CALL_CONFIRMS], 'make_call files a confirmation the table refuses');
+  assert.deepEqual(vocab('misread'), [...CALL_STEPS], 'explain_call files a step the table refuses');
+  const lesson = SCHEMA_SQL.match(/eugenia_calls_lesson_length check \(char_length\(lesson\) between 1 and (\d+)\)/);
+  assert.equal(NOTE_MAX, Number(lesson?.[1]), 'explain_call truncates a lesson past what the table accepts');
   const length = SCHEMA_SQL.match(/eugenia_calls_condition_length check \(char_length\(condition\) between 1 and (\d+)\)/);
   assert.equal(CALL_MAX, Number(length?.[1]), 'make_call truncates a condition past what the table accepts');
 });
@@ -3854,10 +3861,38 @@ test('a call is filed before it is said, kept whole by both gates, and never mad
     assert.doesNotMatch(list(set), /CALL_TOOL/, `${set} offers make_call`);
   }
 
+  // A loss is explained once a day is whole, by the pass alone, which is
+  // handed the losses and the map it judges them against.
+  assert.match(list('CONSOLIDATE_TOOLS'), /EXPLAIN_TOOL/, 'the pass cannot file why a call lost');
+  for (const set of ['CHAT_TOOLS', 'TRADE_TOOLS', 'REVIEW_TOOLS', 'CRITIC_TOOLS']) {
+    assert.doesNotMatch(list(set), /EXPLAIN_TOOL/, `${set} offers explain_call, a judgment made mid-day`);
+  }
+
   const pass = uncomment(bodyOf(EUGENIA_TS, 'async function postConsolidation('));
   assert.ok(pass.indexOf('await scoreCalls()') > -1 &&
             pass.indexOf('await scoreCalls()') < pass.indexOf("ask([{ role: 'user', content: asked }]"),
     'the calls are not scored before the pass reads them, so it judges yesterday');
+  assert.ok(pass.indexOf('await fileReactions()') > -1 &&
+            pass.indexOf('await fileReactions()') < pass.indexOf("ask([{ role: 'user', content: asked }]"),
+    'the night no longer files what gold did on the day\'s prints');
+  for (const block of ['lossesBlock()', 'structureBlock()']) {
+    assert.ok(pass.includes(block), `the pass is not handed ${block}, so a loss is explained from nothing`);
+  }
+  assert.match(pass, /\+ calls \+ losses \+ chart \+/, 'the losses or the map are read and never sent');
+});
+
+/* What the briefing was asked is kept before the writer runs, so a failed or
+   timed-out briefing still leaves the morning it failed on — and it is the
+   augmented message, the one the turn table never holds. */
+test('the briefing keeps the message it was asked, before it is written', () => {
+  const brief = uncomment(bodyOf(EUGENIA_TS, 'async function postBriefing('));
+  const kept = brief.indexOf('await keepInput(`${due} briefing`, asked);');
+  assert.ok(kept > -1, 'the briefing no longer keeps what it was asked');
+  assert.ok(kept < brief.indexOf("content: asked }]"), 'the input is kept only once the writer has answered');
+  const keep = bodyOf(EUGENIA_TS, 'async function keepInput(');
+  assert.match(keep, /rest\/v1\/eugenia_inputs/);
+  assert.match(keep, /catch \(err\)/, 'a failed keep can throw into the briefing it describes');
+  assert.doesNotMatch(uncomment(EUGENIA_TS), /eugenia_inputs\?select/, 'something reads the inputs back to her');
 });
 
 test('a printed level may be named, never beside her read, in the writer and both gates', () => {
@@ -5282,7 +5317,7 @@ test('the entries door serves only bars closed by the minute he clicked, for tra
   const body = bodyOf(src, 'async function readEntries(', 'doji-mcp-sync no longer has readEntries()');
   assert.match(body, /const at = Math\.floor\(Date\.parse\(t\.entry_time\) \/ MINUTE\) \* MINUTE;/,
     'the door no longer reads each chart to the minute of the entry');
-  assert.match(body, /readCharts\(session, at, LEVEL_CHARTS\)/, 'the door no longer reads the charts to the entry');
+  assert.match(body, /readCharts\(session, at, ENTRY_CHARTS\)/, 'the door no longer reads the charts to the entry');
   assert.match(body, /\?\.filter\(b => b\.t \+ c\.ms <= at\)/,
     'the door serves bars that closed after he clicked, so the calibration looks ahead');
   assert.match(body, /&order=entry_time\.desc&limit=\$\{ENTRIES\}/, 'the door no longer reads the newest entries, bounded');
@@ -5701,6 +5736,20 @@ test('every flag a function or a script calls another with is a flag that functi
   }
 });
 
+// The probes are what every reader was written after, and the README's table
+// is how a person knows which to run: one list, written twice.
+test('every probe doji-tradingview answers is a row of the README\'s probe table, and no row is gone', () => {
+  const tv = source('supabase/functions/doji-tradingview/index.ts');
+  const set = tv.match(/const PROBES: Record<string, \(\) => Call\[\]> = \{([\s\S]*?)\n\};/);
+  assert.ok(set, 'doji-tradingview no longer declares PROBES as this test reads it');
+  const probes = [...set[1].matchAll(/^  (\w+): \(\) =>/gm)].map(m => m[1]);
+  assert.ok(probes.length >= 8, `only ${probes.length} probes read — the reader has gone blind`);
+  const table = source('docs/README.md').match(/\| `\?probe=` \| what it asks \|\n\|---\|---\|\n((?:\|.*\n)+)/);
+  assert.ok(table, 'the README no longer carries the probe table');
+  assert.deepEqual([...table[1].matchAll(/^\| `(\w+)` \|/gm)].map(m => m[1]).sort(), [...probes].sort(),
+    'the probes doji-tradingview answers and the README\'s table have parted');
+});
+
 test('every door Eugenia reads TradingView through is a door doji-tradingview opens', () => {
   const tv = source('supabase/functions/doji-tradingview/index.ts');
   // tvRead builds the flag from a name: `?${door}=1`.
@@ -5847,7 +5896,7 @@ test('the map is hers, printed, built into her call, and kept out of the briefin
      'the map\'s levels are not held to the printed-level rule'],
     [/nothing setup-flavoured comes off it in a message you start while he is in a position/,
      'the map can put a level beside his open position'],
-    [/YOUR CALL IS BUILT ON THE MAP\. Its level is a turn or a quarter on it/,
+    [/YOUR CALL IS BUILT ON THE MAP\. Its level is a turn, a quarter or a high or low off the bigger charts on it/,
      'her call is no longer built on his charts'],
     [/Break & Retest inside the range, Support & Resistance at its edge/,
      'her call no longer takes the setup his rules name for where the level sits'],
@@ -6045,10 +6094,14 @@ test('the long doors answer inside READ_MS', () => {
   for (const fn of ['readMarket', 'readTrend', 'readRates', 'readFlows']) {
     const body = bodyOf(tv, `export async function ${fn}(`);
     assert.match(body, /const signal = AbortSignal\.timeout\(DOOR_MS\)/, `${fn} carries no deadline`);
-    const calls = [...uncomment(body).matchAll(/tvCall\(session,[\s\S]*?\)\)/g)].map(m => m[0]);
+    // Each call read up to the deadline it carries: one that carries none runs
+    // on into the next call, and two calls in one match is the failure.
+    const calls = [...uncomment(body).matchAll(/tvCall\(session,[\s\S]*?, signal\)/g)].map(m => m[0]);
+    assert.equal(calls.length, (uncomment(body).match(/tvCall\(/g) ?? []).length,
+      `a tvCall in ${fn} carries no deadline`);
     assert.ok(calls.length >= 1, `read no tvCall in ${fn} — the reader has gone blind`);
     for (const call of calls) {
-      assert.match(call, /, signal\)\)$/, `${call.slice(0, 60)}… in ${fn} is outside the deadline`);
+      assert.equal(call.match(/tvCall\(/g).length, 1, `${call.slice(0, 60)}… in ${fn} is outside the deadline`);
     }
   }
 });

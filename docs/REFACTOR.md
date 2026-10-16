@@ -662,14 +662,21 @@ one written before its probe. She reads both off their pages with `web_fetch`,
 dated and sourced.
 **Revisit if:** a capture of either is saved as a fixture, or a central bank
 outside the five starts moving the story.
+**China's premium is the same case, decided October 2026.** The fastest live
+read of central-bank and Chinese buying is the Shanghai premium — Shanghai's
+gold in dollars an ounce less London's — with the yuan beside it.
+`doji-tradingview?probe=china` asks for the names and a daily bar of each, raw;
+the reader is written against its capture, saved as a fixture, and not before.
 
 ### R-72 — gold's reaction to each print, filed beside it
-**Deferred, not refused.** `get_releases` says how a release ran against its
-consensus, not what gold did on it, and "the reaction is the more interesting
-fact" has no base rate. Filing it means a second writer to `eugenia_calendar`,
-which `agree.test.mjs` refuses on purpose, and the poller's minute bars read
-for every print at night.
-**Revisit if:** her reads keep leaning on how gold usually takes a release.
+**Built, October 2026, his decision, without either cost named here.** A table
+of its own keyed on the calendar row, so the calendar keeps its one writer;
+filed off the thirty hours of minute bars the nightly pass already reads, so
+no print's bars are read twice. What it does not have is the history before
+it: the record starts the night it shipped.
+**Revisit if:** a base rate is wanted before a year of prints has been filed —
+the poller's `?replay=N` door reaches the 08:30, 10:00 and 14:00 prints of the
+last 120 weekdays.
 
 ### R-73 — reading the weeks with the market every quarter hour
 **Why refused:** a daily close moves once a day, and sixteen more charts on
@@ -683,6 +690,10 @@ day and carries what a pass misses.
 stripped. She reads two dated levels and says the window. A fund's money in or
 out is the one figure over a window, and the screener names the window.
 **Revisit if:** she is seen getting the arithmetic between two levels wrong.
+**Not a change over a window:** a correlation of gold's daily changes with the
+real yield's and the dollar's (`fitOf`, October 2026, his decision) is a
+figure two levels cannot give, stated with its sessions and its dates, so
+this refusal stands beside it.
 
 ### R-75 — a scoreboard of the channels, kept by the nightly pass
 **Deferred, not refused.** Which force moved over a week or a month is now

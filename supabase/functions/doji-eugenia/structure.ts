@@ -47,7 +47,10 @@ export const ADR_SESSIONS = 14;
 const DAY = 86_400_000;
 
 export interface Turn { price: number; at: number; kind: 'high' | 'low' }
-export interface Bias { period: Period; trend: 'up' | 'down' | 'mixed' | null; highs: Turn[]; lows: Turn[]; close: number }
+export interface Bias {
+  period: Period; trend: 'up' | 'down' | 'mixed' | null; highs: Turn[]; lows: Turn[]; close: number;
+  broken: boolean;
+}
 export interface Level {
   price: number; sides: 'high' | 'low' | 'both'; periods: Period[]; at: number;
   quarter: number | null; edge: 'top' | 'bottom' | null;
@@ -56,16 +59,21 @@ export interface Quarter { price: number; round: boolean; turned: boolean }
 export interface Sweep { period: Period; at: number; level: number; kind: 'high' | 'low'; wick: number; close: number }
 export interface Pool { price: number; kind: 'high' | 'low'; periods: Period[]; touches: number[] }
 export interface Session { name: string; from: number; to: number; high: number; low: number }
+/* `daily` marks one read off a daily bar, timed by the session it closed:
+   a daily bar knows its high, not when it printed. */
+export interface Mark { price: number; from: { what: string; at: number; daily: boolean }[] }
+export interface Shape { body: number; upper: number; lower: number; through: { price: number; closed: 'above' | 'below' | 'on' }[] }
 export interface Structure {
   last: Candle | null;
   bias: Bias[];
   range: { high: Turn; low: Turn } | null;
   levels: Level[];
+  higher: Mark[];
   pools: Pool[];
   grid: Quarter[];
   sweeps: Sweep[];
   sessions: Session[];
-  candles: { period: Period; bars: Candle[] }[];
+  candles: { period: Period; bars: Candle[]; shapes: Shape[] }[];
   adr: number | null;
   today: number | null;
   missing: Period[];
@@ -96,7 +104,10 @@ export function turns(bars: Candle[], turn = READINGS.TURN): Turn[] {
 }
 
 /* The two newest turns of each kind, and the sequence they make. Fewer than two
-   of either is no sequence, never a guess at one. */
+   of either is no sequence, never a guess at one. A sequence is named off
+   turns, and the newest TURN bars can never be one, so a close back beyond
+   the newest turn that held it — under the higher low, over the lower high —
+   is the sequence broken before any turn can say so. */
 export function biasOf(period: Period, bars: Candle[], turn = READINGS.TURN): Bias {
   const all = turns(bars, turn);
   const highs = all.filter(t => t.kind === 'high').slice(-2);
@@ -105,7 +116,9 @@ export function biasOf(period: Period, bars: Candle[], turn = READINGS.TURN): Bi
     : highs[1].price > highs[0].price && lows[1].price > lows[0].price ? 'up'
     : highs[1].price < highs[0].price && lows[1].price < lows[0].price ? 'down'
     : 'mixed';
-  return { period, trend, highs, lows, close: bars[bars.length - 1].close };
+  const close = bars[bars.length - 1].close;
+  const broken = trend === 'up' ? close < lows[1].price : trend === 'down' ? close > highs[1].price : false;
+  return { period, trend, highs, lows, close, broken };
 }
 
 /* A wick beyond a turn that closed back on the side it came from, while the
@@ -187,6 +200,45 @@ function levelsOf(charts: Partial<Record<Period, Candle[]>>, now: number, price:
   return levels.sort((a, b) => b.price - a.price);
 }
 
+/* §4.2's "previous high or low" off the bigger charts: the last closed day's
+   high and low, the last whole week's, and the turns on the daily and 4H,
+   within REACH and merged within ON_GRID. Kept apart from `levels`, which is
+   §4's 1H and 30m marking and what the calibration scores, so a run can say
+   whether these find his entries before they join it. A daily bar opens at the
+   17:00 New York roll and closes on its session's date, which is also that
+   instant's UTC date, so its week needs no time zone. */
+function higherOf(charts: Partial<Record<Period, Candle[]>>, now: number, price: number, r: Readings): Mark[] {
+  const daily = closed(charts.D_1 ?? [], 'D_1', now);
+  const found: { price: number; what: string; at: number; daily: boolean }[] = [];
+  const on = (b: Candle, price: number, what: string) => ({ price, what, at: b.t + DAY, daily: true });
+  const day = daily.at(-1);
+  if (day) found.push(on(day, day.high, "the previous day's high"), on(day, day.low, "the previous day's low"));
+  const monday = (b: Candle) => {
+    const d = new Date(b.t + DAY);
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - ((d.getUTCDay() + 6) % 7) * DAY;
+  };
+  const forming = charts.D_1?.at(-1);
+  const current = forming ? monday(forming) : null;
+  const before = daily.filter(b => monday(b) !== current);
+  const week = before.length ? before.filter(b => monday(b) === monday(before.at(-1)!)) : [];
+  if (week.length) {
+    const top = week.reduce((m, b) => b.high > m.high ? b : m), bottom = week.reduce((m, b) => b.low < m.low ? b : m);
+    found.push(on(top, top.high, "the previous week's high"), on(bottom, bottom.low, "the previous week's low"));
+  }
+  for (const t of turns(daily, r.TURN)) found.push({ price: t.price, what: `a daily ${t.kind}`, at: t.at + DAY, daily: true });
+  for (const t of turns(closed(charts.H_4 ?? [], 'H_4', now), r.TURN)) {
+    found.push({ price: t.price, what: `a 4H ${t.kind}`, at: t.at, daily: false });
+  }
+  const marks: Mark[] = [];
+  for (const f of found.filter(f => Math.abs(f.price - price) <= r.REACH)) {
+    const same = marks.find(m => Math.abs(m.price - f.price) <= r.ON_GRID);
+    const from = { what: f.what, at: f.at, daily: f.daily };
+    if (same) { if (!same.from.some(x => x.what === f.what)) same.from.push(from); continue; }
+    marks.push({ price: f.price, from: [from] });
+  }
+  return marks.sort((a, b) => b.price - a.price);
+}
+
 /* Contiguous runs of one session name over the last day, the bar still
    forming included: a session's range so far is what has printed. */
 function sessionsOf(bars: Candle[], p: Period, since: number): Session[] {
@@ -203,6 +255,20 @@ function sessionsOf(bars: Candle[], p: Period, since: number): Session[] {
     }
   }
   return out;
+}
+
+/* Step 3 in numbers: a candle's body and both wicks, and every mark on the map
+   its range traded through with the side it closed on. A wick and a body are
+   subtraction a model gets wrong across four candles at once, and a candle
+   reaching a level and closing back is his signal, so it is said, not left to
+   be found. Nothing here names a pattern. */
+export function shapeOf(b: Candle, marks: number[]): Shape {
+  const top = Math.max(b.open, b.close), bottom = Math.min(b.open, b.close);
+  return {
+    body: round2(b.close - b.open), upper: round2(b.high - top), lower: round2(bottom - b.low),
+    through: marks.filter(m => b.low <= m && m <= b.high).sort((x, y) => x - y)
+      .map(price => ({ price, closed: b.close > price ? 'above' : b.close < price ? 'below' : 'on' })),
+  };
 }
 
 export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: number,
@@ -224,6 +290,7 @@ export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: nu
   } : null;
 
   const levels = last ? levelsOf(charts, now, last.close, range, r) : [];
+  const higher = last ? higherOf(charts, now, last.close, r) : [];
   // One line for a pool both level charts show.
   const pools: Pool[] = [];
   for (const p of (['H_1', 'M_30'] as const).flatMap(p => poolsOf(p, read(p), r))) {
@@ -241,6 +308,8 @@ export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: nu
     }
   }
 
+  // Every price the map marks, which a candle is read against.
+  const marks = [...new Set([...levels, ...higher, ...pools, ...grid].map(m => m.price))];
   const since = now - DAY;
   const daily = read('D_1');
   const forming = charts.D_1?.at(-1);
@@ -250,13 +319,16 @@ export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: nu
       .filter(([, bars]) => bars.length).map(([p, bars]) => biasOf(p, bars, r.TURN)),
     range,
     levels,
+    higher,
     pools,
     grid,
     sweeps: (['H_1', 'M_15'] as const).flatMap(p => sweepsOf(p, read(p), since, r.TURN))
       .sort((a, b) => b.at - a.at).slice(0, SWEEPS),
     sessions: sessionsOf(charts.M_15 ?? [], 'M_15', since),
-    candles: (['M_15', 'M_5'] as const).map(p => ({ period: p, bars: read(p).slice(-CANDLES) }))
-      .filter(c => c.bars.length),
+    candles: (['M_15', 'M_5'] as const).map(p => {
+      const bars = read(p).slice(-CANDLES);
+      return { period: p, bars, shapes: bars.map(b => shapeOf(b, marks)) };
+    }).filter(c => c.bars.length),
     adr: daily.length
       ? round2(daily.slice(-ADR_SESSIONS).reduce((s, b) => s + b.high - b.low, 0) / Math.min(daily.length, ADR_SESSIONS))
       : null,

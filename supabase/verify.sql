@@ -3,7 +3,7 @@
 -- ───────────────────────────────────────────────────────────────────────────
 -- The schema is applied by hand on purpose, which makes schema.sql a claim
 -- about the database. This tests the claim. It writes nothing: run the
--- whole file after any manual change and read the `ok` column — all 97 checks.
+-- whole file after any manual change and read the `ok` column — all 102 checks.
 --
 -- One statement, because a SQL editor shows only the last statement's result.
 -- The listings that say which object, grant or schedule are diagnose.sql.
@@ -33,8 +33,8 @@ from (values
        and table_name in ('eugenia_runs','eugenia_calendar','eugenia_thesis',
                           'eugenia_loops','eugenia_feedback','eugenia_portrait',
                           'eugenia_reads','eugenia_market','eugenia_rewrites',
-                          'eugenia_calls')),
-   '10'),
+                          'eugenia_calls','eugenia_inputs','eugenia_reactions')),
+   '12'),
 
   -- The thesis is PATCHed by primary key, so a missing seed row is a 200 that
   -- lands nowhere: every rewrite dropped, silently.
@@ -425,11 +425,32 @@ from (values
   ('no policy on eugenia_reads',
    (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_reads')),
    '0'),
+  -- make_call writes the first two and explain_call the last two; missing,
+  -- every call is a 400 she reports as not filed, or every loss goes
+  -- unexplained.
+  ('her calls carry how the entry goes live and why a loss lost',
+   (select coalesce(string_agg(column_name, ',' order by column_name), 'none')
+      from information_schema.columns
+     where table_schema = 'public' and table_name = 'eugenia_calls'
+       and column_name in ('confirm', 'level', 'lesson', 'misread')),
+   'confirm,lesson,level,misread'),
   ('RLS on eugenia_calls',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_calls')),
    'true'),
   ('no policy on eugenia_calls',
    (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_calls')),
+   '0'),
+  ('RLS on eugenia_reactions',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_reactions')),
+   'true'),
+  ('no policy on eugenia_reactions',
+   (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_reactions')),
+   '0'),
+  ('RLS on eugenia_inputs',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_inputs')),
+   'true'),
+  ('no policy on eugenia_inputs',
+   (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_inputs')),
    '0'),
   ('RLS on eugenia_rewrites',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_rewrites')),

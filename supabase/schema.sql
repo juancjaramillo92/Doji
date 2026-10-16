@@ -732,8 +732,8 @@ create table if not exists public.eugenia_calls (
   stop         numeric not null,
   target       numeric not null,
 
-  -- What price has to do before the entry is live, in words; the entry is what
-  -- is scored.
+  -- What price has to do before the entry is live, in his words; `confirm`
+  -- below is the part of it the scoring reads.
   condition    text not null
     constraint eugenia_calls_condition_length check (char_length(condition) between 1 and 300),
 
@@ -753,7 +753,56 @@ create table if not exists public.eugenia_calls (
 -- 409 is the answer.
 create unique index if not exists eugenia_calls_once on public.eugenia_calls (expires_at);
 
+-- How the entry goes live, which is how it is scored: 'close' waits for a 15m
+-- candle that reaches `level` and closes beyond it, 'market' does not wait.
+-- Null on every call filed before them, scored on the touch of the entry.
+alter table public.eugenia_calls add column if not exists confirm text
+  constraint eugenia_calls_confirm_check check (confirm in ('close', 'market'));
+alter table public.eugenia_calls add column if not exists level numeric;
+
+-- Why a lost call lost, filed at the nightly pass: the step of his sequence
+-- her reading of the chart got wrong, or `none` for a call that kept every
+-- step, and the sentence saying what she misread. Null until it is filed.
+alter table public.eugenia_calls add column if not exists misread text
+  constraint eugenia_calls_misread_check check (misread in ('bias', 'level', 'candle', 'none'));
+alter table public.eugenia_calls add column if not exists lesson text
+  constraint eugenia_calls_lesson_length check (char_length(lesson) between 1 and 200);
+
 alter table public.eugenia_calls enable row level security;
+
+-- ─── What gold did on each print ───────────────────────────────────────────
+-- Gold at the open of a print's minute and at the close fifteen and sixty
+-- minutes on, filed each night from the minute bars the pass reads anyway, for
+-- the high-rated home prints in their window. Keyed on the calendar row and in
+-- a table of its own, so the calendar keeps its one writer; get_releases hands
+-- the moves to her beside each print. A minute the bars lack is a null.
+create table if not exists public.eugenia_reactions (
+  release  bigint primary key references public.eugenia_calendar (id),
+  at       timestamptz not null,
+  before   numeric not null,
+  after_15 numeric,
+  after_60 numeric
+);
+
+alter table public.eugenia_reactions enable row level security;
+
+-- ─── What each briefing was handed ─────────────────────────────────────────
+-- The briefing is written from a dozen reads of things that are only ever
+-- current — the market, the calendar, her map, the odds — and the turn stored
+-- is a marker, never the augmented prompt. So nothing could say what a past
+-- morning looked like to her, and a change to her prompts could be tried only
+-- on mornings yet to come. This keeps the whole message she was asked, once a
+-- briefing, for a person to replay against a changed prompt. Never handed to
+-- her, and never read by the function.
+create table if not exists public.eugenia_inputs (
+  id     bigserial primary key,
+  at     timestamptz not null default now(),
+  -- Which briefing: the caller's label, as eugenia_runs carries it.
+  caller text not null,
+  asked  text not null
+);
+
+alter table public.eugenia_inputs enable row level security;
 
 -- ─── Open threads ──────────────────────────────────────────────────────────
 -- An odd thing she flagged (`watch`) or a question she asked him in a

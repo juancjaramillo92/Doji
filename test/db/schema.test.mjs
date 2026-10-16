@@ -47,9 +47,10 @@ const SECRETS = `insert into vault.decrypted_secrets values
   ('doji_cron_secret', 'cron'), ('eugenia_bot_token', 'bot'), ('telegram_chat_id', '1')
   on conflict (name) do update set decrypted_secret = excluded.decrypted_secret;`;
 
-// Each behaviour starts from no trades, no runs and nothing sent.
+// Each behaviour starts from no trades, no runs and nothing sent. The
+// reactions go with the calendar they reference, or the truncate is refused.
 const RESET = `truncate public.trades, public.dispatch, public.eugenia_runs, public.eugenia_notes,
-  public.eugenia_calendar, net.sent, net._http_response;
+  public.eugenia_calendar, public.eugenia_reactions, net.sent, net._http_response;
   alter sequence net.request_id restart;
   ${SECRETS}`;
 

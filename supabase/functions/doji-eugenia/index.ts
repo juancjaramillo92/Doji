@@ -41,7 +41,7 @@ import {
   type TradeRow, type Standing, type Stop, type RuleResult,
 } from "./adherence.ts";
 import { journalStats, statsList } from "./journal.ts";
-import { foldStructure, READINGS, GRID, ADR_SESSIONS, type Structure, type Turn } from "./structure.ts";
+import { foldStructure, READINGS, GRID, ADR_SESSIONS, type Structure, type Turn, type Shape } from "./structure.ts";
 import {
   env, secretMatches, json, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY, why, marketOpen, CHARTS,
   type Candle, type Period,
@@ -1014,7 +1014,8 @@ const RELEASES_TOOL = {
   description:
     `Past prints of one release from the calendar on file — the newest ${RELEASE_PRINTS} ` +
     "inside the months asked, oldest first, each with its actual against the consensus " +
-    "and the prior — and a count of how many came in above, below or on the consensus. " +
+    "and the prior, and what gold did fifteen and sixty minutes on where that is on file — " +
+    "and a count of how many came in above, below or on the consensus. " +
     "Name the release as the calendar lists it, without the period in brackets: " +
     "'Core Inflation Rate MoM', 'Non Farm Payrolls', 'Fed Interest Rate Decision'. One " +
     "from abroad starts with its country's code: 'EU Inflation Rate YoY Flash'. Use it " +
@@ -1049,7 +1050,7 @@ const yearDay = (iso: string) => new Intl.DateTimeFormat('en-GB', {
 }).format(new Date(iso));
 
 // Newest first as read, so the limit keeps the latest; told oldest first.
-export function printsList(rows: Release[], release: string): string {
+export function printsList(rows: Release[], release: string, moves: Reaction[] = []): string {
   // A figure as TradingView writes it — `0.3%`, `254K`, `-1.2B` — split into
   // its number and its unit, or null for anything else.
   const figureOf = (v: string | null) => {
@@ -1058,14 +1059,23 @@ export function printsList(rows: Release[], release: string): string {
   };
   const told = [...rows].reverse();
   const tally = { above: 0, below: 0, on: 0, apart: 0 };
+  const byRelease = new Map(moves.map(m => [m.release, m]));
+  const signed = (v: number) => `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`;
+  const hour = { above: [0, 0], below: [0, 0] };
   const lines = told.map(r => {
     const a = figureOf(r.actual), c = figureOf(r.consensus);
-    if (a && c && a.unit === c.unit) tally[a.n > c.n ? 'above' : a.n < c.n ? 'below' : 'on']++;
-    else tally.apart++;
+    const side = a && c && a.unit === c.unit ? (a.n > c.n ? 'above' : a.n < c.n ? 'below' : 'on') : 'apart';
+    tally[side]++;
+    const m = byRelease.get(r.id);
+    if (m?.after_60 != null && (side === 'above' || side === 'below')) hour[side][m.after_60 > m.before ? 0 : 1]++;
     return `· ${yearDay(r.at)}, ${r.name}: ${r.actual}` +
            (r.consensus ? ` against ${r.consensus} expected` : ", no consensus on file") +
-           (r.prior ? `, after ${r.prior}` : "");
+           (r.prior ? `, after ${r.prior}` : "") +
+           (m ? `; gold ${m.before} at the print` +
+                (m.after_15 != null ? `, ${signed(m.after_15 - m.before)} fifteen minutes on` : "") +
+                (m.after_60 != null ? `, ${signed(m.after_60 - m.before)} an hour on` : "") : "");
   });
+  const onFile = hour.above[0] + hour.above[1] + hour.below[0] + hour.below[1];
   const reach = rows.length === RELEASE_PRINTS
     ? `\nThe read stops at its ${RELEASE_PRINTS} newest prints, so it reaches back only to ` +
       `${yearDay(told[0].at)}.`
@@ -1073,7 +1083,10 @@ export function printsList(rows: Release[], release: string): string {
   return `How "${release}" has printed against the consensus, oldest first, from the calendar on file:\n` +
     `${lines.join("\n")}\nAgainst the consensus: ${tally.above} above, ${tally.below} below, ` +
     `${tally.on} on it` + (tally.apart ? `; ${tally.apart} with no consensus or no comparable figure` : "") +
-    `. Above and below are arithmetic, not good or bad news.` + reach;
+    `. Above and below are arithmetic, not good or bad news.` +
+    (onFile ? `\nGold an hour on, where it is on file: after a print above the consensus, ${hour.above[0]} higher ` +
+      `and ${hour.above[1]} not; after one below, ${hour.below[0]} higher and ${hour.below[1]} not. That is ` +
+      `what these prints did, never a rule for the next one.` : "") + reach;
 }
 
 async function readPrints(release: unknown, months: unknown): Promise<string> {
@@ -1081,8 +1094,10 @@ async function readPrints(release: unknown, months: unknown): Promise<string> {
   if (!name) return "Name the release as the calendar lists it, without its period.";
   try {
     const rows = await readRows<Release>('Prints', printsQuery(name, months));
+    const moves = rows.length ? await readRows<Reaction>('Reactions',
+      `eugenia_reactions?select=*&release=in.(${rows.map(r => r.id).join(",")})&order=at.desc&limit=${RELEASE_PRINTS}`) : [];
     return rows.length
-      ? printsList(rows, name)
+      ? printsList(rows, name, moves)
       : "Nothing on file starts with that name and carries a figure in that window. Check the " +
         "name against the calendar, and say you have no record rather than that it never printed: " +
         "the calendar holds only what was filed.";
@@ -1147,11 +1162,13 @@ const STRUCTURE_TOOL = {
   name: "get_structure",
   description:
     "His six charts, read off his own broker's bars every quarter hour: the turns on the daily, " +
-    "4H and 1H and the sequence they make; where price has turned on the 1H and 30m, with the $25 " +
-    "grid beside them and where the two agree; which of those sit at the edge of the week's hourly " +
+    "4H and 1H, the sequence they make and whether the last close has broken it; where price has turned on the 1H and 30m, with the $25 " +
+    "grid beside them and where the two agree; the previous day's and week's highs and lows and " +
+    "the daily and 4H turns near price; which of those sit at the edge of the week's hourly " +
     "range and which inside it; equal highs and lows still resting, the liquidity pools of his " +
     "step 2; wicks through a turn that closed back; the sessions' ranges; the average daily range; " +
-    "and the last four closed 15m and 5m candles. Use it before judging his bias or " +
+    "and the last four closed 15m and 5m candles, each with its body, its wicks and the marks it " +
+    "traded through with the side it closed on. Use it before judging his bias or " +
     "his level when he has sent no chart, and before filing a call, whose levels come off it. It is " +
     "your map, computed the same way every time, and not his. Every figure in it has already " +
     "printed; like get_market, it says nothing about where price goes next.",
@@ -1528,6 +1545,13 @@ async function recordRead(reading: unknown, test: unknown, verdict: unknown,
    rule.
    ───────────────────────────────────────────────────────────────────────── */
 export const CALL_SIDES = ['buy', 'sell'] as const;
+/* How the entry goes live. R-07 enters on a confirmation, never on the signal,
+   so a call that waits for one is scored as waiting: 'close' is a 15m candle
+   reaching the level and closing beyond it the call's way, 'market' is a call
+   whose confirmation has already printed. */
+export const CALL_CONFIRMS = ['close', 'market'] as const;
+// The chart his rules read the confirming candle on.
+export const CONFIRM_MS = 900_000;
 // R-08's fourth step, at entry.
 export const RR_MIN = 1.5;
 export const CALL_MAX = 300;
@@ -1541,8 +1565,10 @@ const CALL_TOOL = {
     TARGET_MAX + " from it, the reward at least " + RR_MIN + " times the risk; one call a " +
     "session, living until the next 17:00 New York roll. The condition is what price has " +
     "to do before the entry is live, in his words for it — a retest, a candle closing " +
-    "back above a level — or 'at the market' for now. The entry is the price you would " +
-    "be filled at once it is met, and it is what is scored.",
+    "back above a level — or 'at the market' for now. `confirm` is how it is scored: " +
+    "'close' waits for a fifteen-minute candle that reaches `level` and closes beyond it " +
+    "your way, and only then is the entry live; 'market' is live at once. The entry is " +
+    "the price you would be filled at, and it is what is scored.",
   input_schema: {
     type: "object",
     properties: {
@@ -1551,20 +1577,33 @@ const CALL_TOOL = {
       stop:      { type: "number", description: "Where the idea is wrong." },
       target:    { type: "number", description: "Where you take it." },
       condition: { type: "string", description: `What price has to do first, at most ${CALL_MAX} characters.` },
+      confirm:   { type: "string", enum: CALL_CONFIRMS,
+                   description: "'close' when the entry waits for a 15m close beyond the level, 'market' when it does not." },
+      level:     { type: "number", description: "With 'close': the level the candle reaches and closes beyond." },
     },
-    required: ["direction", "entry", "stop", "target", "condition"],
+    required: ["direction", "entry", "stop", "target", "condition", "confirm"],
     additionalProperties: false,
   },
 } as const;
 
 /* His rules, as a sentence she can act on, or null. Pure, so each is driven
    both ways. */
-export function callProblem(direction: unknown, entry: number, stop: number, target: number): string | null {
+export function callProblem(direction: unknown, entry: number, stop: number, target: number,
+                            confirm: unknown, level: number): string | null {
   if (!(CALL_SIDES as readonly unknown[]).includes(direction)) return `A call is ${CALL_SIDES.join(" or ")}.`;
   if (![entry, stop, target].every(n => Number.isFinite(n) && n > 0)) return "A call needs an entry, a stop and a target, as prices.";
   const buy = direction === 'buy';
   if (buy ? !(stop < entry && entry < target) : !(target < entry && entry < stop)) {
     return `A ${direction} has its stop ${buy ? "below" : "above"} the entry and its target ${buy ? "above" : "below"} it.`;
+  }
+  if (!(CALL_CONFIRMS as readonly unknown[]).includes(confirm)) {
+    return "Say whether the entry waits for a 15m close beyond a level ('close') or is live now ('market').";
+  }
+  // The stop is where the idea is wrong, which is back on the far side of the
+  // level the candle closed beyond.
+  if (confirm === 'close' && !(Number.isFinite(level) && (buy ? stop < level && level <= entry : entry <= level && level < stop))) {
+    return `A ${direction} waiting on a close beyond a level has the level between the stop and the entry, ` +
+      `the entry ${buy ? "at or above" : "at or below"} it.`;
   }
   const risk = Math.abs(entry - stop), reward = Math.abs(target - entry);
   if (risk > FULL_STOP) return `The stop is $${risk.toFixed(2)} away; R-02 allows $${FULL_STOP} at most.`;
@@ -1590,9 +1629,9 @@ export function expiryOf(made: Date): Date {
 /* Never throws, for writeNote's reason. A second call in a session meets the
    unique index and is told so, not stored. */
 async function makeCall(direction: unknown, entry: unknown, stop: unknown, target: unknown,
-                        condition: unknown): Promise<string> {
-  const [e, s, t] = [entry, stop, target].map(Number);
-  const problem = callProblem(direction, e, s, t);
+                        condition: unknown, confirm: unknown, level: unknown): Promise<string> {
+  const [e, s, t, l] = [entry, stop, target, level].map(Number);
+  const problem = callProblem(direction, e, s, t, confirm, l);
   if (problem) return `${problem} Not filed; a call off his rules is not one you make.`;
   const when = String(condition ?? "").trim().slice(0, CALL_MAX);
   if (!when) return "Say what price has to do first, or 'at the market'. Not filed.";
@@ -1602,7 +1641,8 @@ async function makeCall(direction: unknown, entry: unknown, stop: unknown, targe
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_calls`, {
       method: "POST", headers: sbHeaders("return=minimal"),
       body: JSON.stringify([{ made_at: made.toISOString(), expires_at: until.toISOString(),
-                              direction, entry: e, stop: s, target: t, condition: when }]),
+                              direction, entry: e, stop: s, target: t, condition: when,
+                              confirm, level: confirm === 'close' ? l : null }]),
     });
     if (res.status === 409) {
       return "You already made this session's call, and it stands until the 17:00 roll. Say that rather than making another.";
@@ -1621,15 +1661,21 @@ async function makeCall(direction: unknown, entry: unknown, stop: unknown, targe
    doubt goes against her: on the bar that filled her, only the stop counts;
    a bar touching both stop and target is a loss; the stop moves to break-even
    at +$20 as R-04 moves his, reached on a bar after the fill and effective from
-   the bar after that, since a bar's high and low cannot say which came first. The condition is hers to
-   state and is not checked; the entry is what is scored. A call whose session
-   the bars do not reach is `unread`, never a guess.
+   the bar after that, since a bar's high and low cannot say which came first.
+   A call that waits for a close goes live only once a 15m candle opened after
+   it — built from the minute bars on the quarter hour, as his chart draws it —
+   has reached the level and closed beyond it, and fills on the first touch of
+   the entry after that candle closed: a touch before it is the trade R-07
+   forbids. A call filed before `confirm` existed is scored on the touch alone.
+   A call whose session the bars do not reach is `unread`, never a guess.
    ───────────────────────────────────────────────────────────────────────── */
 export const CALL_OUTCOMES = ['won', 'lost', 'scratch', 'open', 'untriggered', 'unread'] as const;
 
 export type Call = { id: number; made_at: string; expires_at: string; direction: string;
                      entry: number; stop: number; target: number; condition: string;
-                     outcome: string | null; result: number | null };
+                     confirm: string | null; level: number | null;
+                     outcome: string | null; result: number | null;
+                     closed_at?: string | null; misread?: string | null; lesson?: string | null };
 export type Score = { outcome: typeof CALL_OUTCOMES[number]; triggered_at: string | null;
                       closed_at: string | null; closed_price: number | null; result: number | null };
 
@@ -1642,7 +1688,8 @@ export function scoreCall(c: Call, candles: Candle[], from: number): Score {
   const start = Math.ceil(made / 60_000) * 60_000;
   const bars = candles.filter(b => b.t >= start && b.t + 60_000 <= ends);
   const buy = c.direction === 'buy';
-  const at = bars.findIndex(b => b.low <= c.entry && c.entry <= b.high);
+  const live = c.confirm === 'close' ? confirmedAt(bars, buy, Number(c.level), start) : start;
+  const at = live === null ? -1 : bars.findIndex(b => b.t >= live && b.low <= c.entry && c.entry <= b.high);
   if (at < 0) return { outcome: 'untriggered', ...none };
 
   const gain = (p: number) => Math.round((buy ? p - c.entry : c.entry - p) * 100) / 100;
@@ -1661,6 +1708,36 @@ export function scoreCall(c: Call, candles: Candle[], from: number): Score {
   return close(last, last.close, 'open');
 }
 
+/* When the first 15m candle opened at or after `from` closed, having reached
+   the level and closed beyond it the call's way, or null. A quarter hour with
+   no minute in the bars is no candle, never a guess at one. */
+function confirmedAt(bars: Candle[], buy: boolean, level: number, from: number): number | null {
+  const quarters = new Map<number, Candle>();
+  for (const b of bars) {
+    const t = Math.floor(b.t / CONFIRM_MS) * CONFIRM_MS;
+    if (t < from) continue;
+    const q = quarters.get(t);
+    quarters.set(t, q ? { ...q, high: Math.max(q.high, b.high), low: Math.min(q.low, b.low), close: b.close }
+                      : { ...b, t });
+  }
+  for (const q of quarters.values()) {
+    if (buy ? q.low <= level && q.close > level : q.high >= level && q.close < level) return q.t + CONFIRM_MS;
+  }
+  return null;
+}
+
+/* The poller's last thirty hours of minute bars, and where they begin.
+   Throws, for its callers to record. */
+async function readNightBars(): Promise<{ from: number; bars: Candle[] }> {
+  const res = await fetch(`${SB_URL}/functions/v1/doji-mcp-sync?bars=1`, {
+    headers: { "x-doji-key": CRON_SECRET }, signal: AbortSignal.timeout(READ_MS),
+  });
+  if (!res.ok) throw new Error(`bars: HTTP ${res.status}`);
+  const served = await res.json();
+  if (!served?.ok || !Array.isArray(served.bars)) throw new Error("bars: no readable answer");
+  return served;
+}
+
 /* Tonight's scoring: every call whose session has ended and is not yet scored,
    against one read of the bars. The PATCH is filtered on `outcome is null`, so
    a retry never rescores one. Both outcomes are a row; never throws. Exported
@@ -1671,12 +1748,7 @@ export async function scoreCalls(): Promise<void> {
       `eugenia_calls?select=*&outcome=is.null&expires_at=lte.${new Date().toISOString()}` +
       `&order=id.desc&limit=10`);
     if (!due.length) return;
-    const res = await fetch(`${SB_URL}/functions/v1/doji-mcp-sync?bars=1`, {
-      headers: { "x-doji-key": CRON_SECRET }, signal: AbortSignal.timeout(READ_MS),
-    });
-    if (!res.ok) throw new Error(`bars: HTTP ${res.status}`);
-    const served = await res.json();
-    if (!served?.ok || !Array.isArray(served.bars)) throw new Error("bars: no readable answer");
+    const served = await readNightBars();
     const scored: string[] = [];
     for (const c of due) {
       const score = scoreCall(c, served.bars, served.from);
@@ -1691,6 +1763,115 @@ export async function scoreCalls(): Promise<void> {
     const reason = why(err);
     console.error("doji-eugenia: calls not scored —", reason);
     await recordRun({ caller: 'calls', ok: false, detail: reason.slice(0, 500) });
+  }
+}
+
+/* ─── What gold did on each print ──────────────────────────────────────────
+   get_releases said how a release ran against its consensus and nothing of
+   what gold did on it, so how gold usually takes one was hers to guess. Filed
+   each night from the minute bars the pass reads anyway: gold at the open of
+   the print's minute and at the close fifteen and sixty minutes on, for every
+   high-rated home print with an actual inside the bars' window and an hour
+   behind it. Its own table keyed on the calendar row, so the calendar keeps
+   its one writer, and duplicates ignored, so a retry files nothing twice. The
+   record grows a night at a time; nothing reads further back than the bars.
+   ───────────────────────────────────────────────────────────────────────── */
+export type Reaction = { release: number; at: string; before: number; after_15: number | null; after_60: number | null };
+
+/* Null when the print's own minute is not in the bars; a later minute that is
+   missing is a null figure, never the nearest one. */
+export function reactionOf(at: number, bars: Candle[]): Omit<Reaction, 'release' | 'at'> | null {
+  const t = Math.floor(at / 60_000) * 60_000;
+  const by = new Map(bars.map(b => [b.t, b]));
+  const close = (minutes: number) => by.get(t + (minutes - 1) * 60_000)?.close ?? null;
+  const first = by.get(t);
+  return first ? { before: first.open, after_15: close(15), after_60: close(60) } : null;
+}
+
+/* Never throws; both outcomes are a row, counted on what the insert returned. */
+export async function fileReactions(): Promise<void> {
+  try {
+    const served = await readNightBars();
+    const settled = new Date(Date.now() - 3_600_000).toISOString();
+    const prints = await readRows<{ id: number; at: string }>('Prints',
+      `eugenia_calendar?select=id,at&importance=eq.${HIGH}&country=eq.${HOME}&actual=not.is.null` +
+      `&at=gte.${new Date(served.from).toISOString()}&at=lte.${settled}&order=at.desc&limit=20`);
+    const rows = prints.flatMap(p => {
+      const moved = reactionOf(Date.parse(p.at), served.bars);
+      return moved ? [{ release: p.id, at: p.at, ...moved }] : [];
+    });
+    let filed = 0;
+    if (rows.length) {
+      const res = await fetch(`${SB_URL}/rest/v1/eugenia_reactions?on_conflict=release`, {
+        method: "POST", headers: sbHeaders("resolution=ignore-duplicates,return=representation"),
+        body: JSON.stringify(rows),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      filed = (await res.json()).length;
+    }
+    await recordRun({ caller: 'reactions', ok: true, detail: `filed ${filed} of ${prints.length} prints` });
+  } catch (err) {
+    const reason = why(err);
+    console.error("doji-eugenia: reactions not filed —", reason);
+    await recordRun({ caller: 'reactions', ok: false, detail: reason.slice(0, 500) });
+  }
+}
+
+/* ─── Why a call lost ──────────────────────────────────────────────────────
+   A loss counted says how often; the step of his sequence it failed on says
+   where her reading of a chart is weak, as a read's misread link does for the
+   news. Filed at the nightly pass, judged by what printed after the call
+   against what she said when she made it. `none` is a call that kept every
+   step and lost anyway: on his rules a stop is sometimes simply reached, and
+   a record that cannot say so blames a step for it. The PATCH is filtered on
+   a lost call not yet explained, so a retry never re-files one.
+   ───────────────────────────────────────────────────────────────────────── */
+export const CALL_STEPS = ['bias', 'level', 'candle', 'none'] as const;
+// The unexplained losses the pass is handed: a night that missed leaves more.
+const LOSSES_MAX = 10;
+
+const EXPLAIN_TOOL = {
+  name: "explain_call",
+  description:
+    "File why one of your lost calls lost, by its number. At the nightly pass and nowhere " +
+    "else. The step of his sequence your reading of the chart got wrong: 'bias' when the " +
+    "bigger trend went the other way, 'level' when price traded through the level and " +
+    "stayed beyond it, 'candle' when the level held and the candle you took as the " +
+    "confirmation was not one, 'none' when every step held and price reached the stop " +
+    "anyway. Judged by what printed after the call against what you said when you made it.",
+  input_schema: {
+    type: "object",
+    properties: {
+      id: { type: "number", description: "The call's number, as the lost calls list it." },
+      step: { type: "string", enum: CALL_STEPS },
+      lesson: { type: "string",
+                description: `Except with 'none': what you misread, in a sentence of at most ${NOTE_MAX} characters — "the 4H had already printed a lower high". Never "be more careful".` },
+    },
+    required: ["id", "step"],
+    additionalProperties: false,
+  },
+} as const;
+
+/* Never throws, for writeNote's reason. */
+async function explainCall(id: unknown, step: unknown, lesson: unknown): Promise<string> {
+  const n = Number(id);
+  if (!Number.isInteger(n) || n <= 0) return "A call is explained by its number.";
+  const s = String(step ?? "");
+  if (!(CALL_STEPS as readonly string[]).includes(s)) return `"${s}" is not a step. They are ${CALL_STEPS.join(", ")}.`;
+  const learnt = String(lesson ?? "").trim().slice(0, NOTE_MAX);
+  if (s !== 'none' && !learnt) return "A step that failed is filed with what you misread.";
+  if (s === 'none' && learnt) return "A call that kept every step carries no lesson. File it without one.";
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/eugenia_calls?id=eq.${n}&outcome=eq.lost&misread=is.null`, {
+      method: "PATCH", headers: sbHeaders("return=representation"),
+      body: JSON.stringify({ misread: s, lesson: learnt || null }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!(await res.json()).length) return `Call ${n} is not a lost call waiting for its reason.`;
+    return "Filed.";
+  } catch (err) {
+    console.error("doji-eugenia: call not explained —", why(err));
+    return UNSAVED;
   }
 }
 
@@ -1751,7 +1932,7 @@ const CHAT_TOOLS = [
   RELEASES_TOOL,
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, PORTRAIT_TOOL, CLOSE_TOOL,
-                           RECORD_TOOL, CHECK_TOOL, STATS_TOOL];
+                           RECORD_TOOL, EXPLAIN_TOOL, CHECK_TOOL, STATS_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
 /* No tools: the gates read a draft and return one. Sharing the briefing's
    array to ride its cache does not work — the array starts the key and the
@@ -1891,7 +2072,8 @@ export async function serve(name: string, input: any): Promise<string> {
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
     case CLOSE_TOOL.name:    return await closeLoop(input.id, input.resolution);
     case CALL_TOOL.name:     return await makeCall(input.direction, input.entry, input.stop, input.target,
-                                               input.condition);
+                                               input.condition, input.confirm, input.level);
+    case EXPLAIN_TOOL.name:  return await explainCall(input.id, input.step, input.lesson);
     case RECORD_TOOL.name:   return await recordRead(input.reading, input.test, input.verdict, input.evidence,
                                                  input.firmness, input.lesson, input.channel);
     default:
@@ -2742,13 +2924,39 @@ export function callsList(rows: Call[], now = Date.now(), to = "Your"): string {
   const traded = scored.filter(c => c.result !== null);
   const net = Math.round(traded.reduce((sum, c) => sum + Number(c.result), 0) * 100) / 100;
   const standing = rows.filter(c => !c.outcome && Date.parse(c.expires_at) > now);
-  const lost = scored.filter(c => c.outcome === 'lost').slice(0, RECORD_MISSES);
+  const losses = scored.filter(c => c.outcome === 'lost');
+  const lost = losses.slice(0, RECORD_MISSES);
+  const explained = losses.filter(c => c.misread);
+  const step = (c: Call) => c.misread === 'none' ? " — kept every step"
+    : c.misread ? ` — misread the ${c.misread}: ${c.lesson}` : "";
   return `\n\n${to} calls over the last ${RECORD_DAYS} days, scored on price by his rules: ` +
     `${rows.length} made; ${CALL_OUTCOMES.map(o => `${by(o)} ${o}`).join(", ")}` +
     (rows.length > scored.length + standing.length ? `, ${rows.length - scored.length - standing.length} not yet scored` : "") + `.` +
     (traded.length ? ` The ${traded.length} that triggered made ${net >= 0 ? "+" : "-"}$${Math.abs(net).toFixed(2)} an ounce.` : "") +
     (standing.length ? `\nStanding until the 17:00 roll: ${standing.map(callLine).join("; ")}.` : "") +
-    (lost.length ? `\nThe latest lost:\n${lost.map(c => `· ${civilDay(nyDate(new Date(c.made_at)))}: ${callLine(c)}`).join("\n")}` : "");
+    (explained.length ? `\nOf the ${losses.length} lost, ` + CALL_STEPS.map(x =>
+      `${explained.filter(c => c.misread === x).length} ${x === 'none' ? "kept every step" : `misread the ${x}`}`).join(", ") +
+      (explained.length < losses.length ? `, ${losses.length - explained.length} not yet explained` : "") + "." : "") +
+    (lost.length ? `\nThe latest lost:\n${lost.map(c => `· ${civilDay(nyDate(new Date(c.made_at)))}: ${callLine(c)}${step(c)}`).join("\n")}` : "");
+}
+
+/* The pass's list of lost calls still waiting for a reason, each with the
+   number explain_call takes and when it was stopped. */
+export function lossesList(rows: Call[]): string {
+  if (!rows.length) return "";
+  return `\n\nYour lost calls not yet explained — file each with explain_call:\n` +
+    rows.map(c => `· call ${c.id}, made ${nyTime(c.made_at)} ET ${weekday(nyDate(new Date(c.made_at)))}: ` +
+      `${callLine(c)}; stopped ${c.closed_at ? `${nyTime(c.closed_at)} ET` : "at a time not recorded"}`).join("\n");
+}
+
+export async function lossesBlock(): Promise<string> {
+  try {
+    return lossesList(await readRows<Call>('Calls',
+      `eugenia_calls?select=*&outcome=eq.lost&misread=is.null&order=id.desc&limit=${LOSSES_MAX}`));
+  } catch (err) {
+    console.error("doji-eugenia: losses unavailable —", why(err));
+    return "";
+  }
 }
 
 export async function callsBlock(): Promise<string> {
@@ -3121,13 +3329,21 @@ export async function aroundBlock(): Promise<string> {
    gets the weeks behind it; never throws.
    ───────────────────────────────────────────────────────────────────────── */
 type Trend = { symbol: string; name: string; unit: string; points: { close: number; at: string }[] };
+type Fit = { symbol: string; name: string; sessions: number; r: number; from: string; to: string };
 
-export function trendList(answer: { market: Trend[]; missing: { name: string }[] }): string {
+/* `fits` is absent from a copy stored before the door computed them, which
+   the next daily read replaces. */
+export function trendList(answer: { market: Trend[]; missing: { name: string }[]; fits?: Fit[] }): string {
   const lines = answer.market.map(m =>
     `· ${m.name} ${m.points.map(p => `${figure(p.close, m.unit)} on ${civilDay(p.at.slice(0, 10))}`).join(", ")}`);
   if (answer.missing.length) lines.push(`· Not read just now: ${answer.missing.map(m => m.name).join(", ")}.`);
+  const fits = answer.fits ?? [];
   return `\n\nThe weeks behind it, from TradingView's daily closes a week, a month and three months ` +
-    `back:\n${lines.join("\n")}`;
+    `back:\n${lines.join("\n")}` +
+    (fits.length ? `\nHow closely gold's daily moves have tracked each, from -1 (opposite ways, day by day) ` +
+      `to +1 (together), a description of those sessions and never a cause:\n` +
+      fits.map(f => `· ${f.name}: ${f.r} over the last ${f.sessions} sessions, ${civilDay(f.from)} to ${civilDay(f.to)}`)
+        .join("\n") : "");
 }
 
 export async function trendBlock(): Promise<string> {
@@ -3179,7 +3395,9 @@ export function structureList(s: Structure, now = Date.now()): string {
     `TradingView. Every figure on it has already printed.`,
     `The turns on the bias charts, the newest two of each:`,
     ...s.bias.map(b => `· ${name(b.period)}: ${pair(b.highs, "highs")}; ${pair(b.lows, "lows")} — ` +
-      (b.trend ? SEQUENCE[b.trend] : "too few turns for a sequence") + `. Last close ${b.close}.`),
+      (b.trend ? SEQUENCE[b.trend] : "too few turns for a sequence") + `. Last close ${b.close}` +
+      (b.broken ? `, ${b.trend === 'up' ? `under the newest low, ${b.lows[1].price}` : `over the newest high, ${b.highs[1].price}`}` +
+        `: the sequence has broken and no turn says so yet.` : `.`)),
   ];
   if (s.range) {
     lines.push(`The week of hourly bars runs from ${turn(s.range.low)} to ${turn(s.range.high)}. A level ` +
@@ -3191,6 +3409,11 @@ export function structureList(s: Structure, now = Date.now()): string {
       `, on the ${l.periods.map(name).join(" and ")}, newest ${when(l.at)}` +
       (l.quarter === null ? "" : `; on the ${l.quarter} ${l.quarter % (2 * GRID) === 0 ? "round number" : "quarter"}`) +
       (l.edge ? `; at the ${l.edge} of the week's range` : s.range ? "; inside the range" : "")) : ["· none"]),
+    ...(s.higher.length
+      ? [`On the bigger charts, within $${READINGS.REACH}: the highs and lows §4.2 calls important levels:`,
+         ...s.higher.map(m => `· ${m.price} — ` + m.from.map(f =>
+           `${f.what}, ${f.daily ? `the session closing ${when(f.at)}` : when(f.at)}`).join("; "))]
+      : [`No previous day's, previous week's or daily and 4H high or low within $${READINGS.REACH}.`]),
     ...(s.pools.length
       ? ["Where highs or lows have printed level and still rest, the stops beyond them not yet taken:",
          ...s.pools.map(p => `· ${p.price} — equal ${p.kind}s, on the ${p.periods.map(name).join(" and ")}, ` +
@@ -3212,8 +3435,13 @@ export function structureList(s: Structure, now = Date.now()): string {
     lines.push(`The daily range has averaged $${s.adr} over the last ${ADR_SESSIONS} sessions` +
       (s.today === null ? "." : `; this session has covered $${s.today} so far.`));
   }
+  const dollars = (v: number) => `$${Math.abs(v).toFixed(2)}`;
+  const shape = (x: Shape) => (x.body ? `${x.body > 0 ? "up" : "down"} ${dollars(x.body)}` : "closed where it opened") +
+    `, wicks ${dollars(x.upper)} above and ${dollars(x.lower)} below` +
+    (x.through.length ? `; through ${x.through.map(t => `${t.price}, closed ${t.closed} it`).join(", and ")}` : "");
   lines.push(...s.candles.map(c => `The last closed ${name(c.period)} candles, oldest first: ` +
-    c.bars.map(b => `${when(b.t)} open ${b.open}, high ${b.high}, low ${b.low}, close ${b.close}`).join("; ") + "."));
+    c.bars.map((b, i) => `${when(b.t)} open ${b.open}, high ${b.high}, low ${b.low}, close ${b.close} ` +
+      `(${shape(c.shapes[i])})`).join("; ") + "."));
   if (s.missing.length) {
     lines.push(`Not read just now: the ${s.missing.map(name).join(", ")}. Say so rather than judging a ` +
       `step off a chart you do not have.`);
@@ -3797,6 +4025,7 @@ async function postBriefing(due: Brief): Promise<Response> {
     + health + price + chart + around + rates + crowd + held + traded + notes + portrait + channels + trades + breaches
     + story + loops + calendar + desk + record + calls;
 
+  await keepInput(`${due} briefing`, asked);
   const left = () => Math.max(0, opened + WRITER_MS - Date.now());
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`, CHAT_TOOLS, Math.min(TURN_MS, left()));
@@ -3842,6 +4071,20 @@ async function postBriefing(due: Brief): Promise<Response> {
           + `(${handed}), ${heard ? "spoken" : "sent as text"} in ${Math.round((spoken - stored) / 1000)}s`,
   });
   return json({ ok: true, brief: due, chars: brief.length });
+}
+
+/* What a briefing was handed, kept whole for a person to replay a changed
+   prompt against: nothing else says what a past morning looked like to her.
+   Never throws — a failed keep must never cost the briefing it describes. */
+async function keepInput(caller: string, asked: string): Promise<void> {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/eugenia_inputs`, {
+      method: "POST", headers: sbHeaders("return=minimal"), body: JSON.stringify([{ caller, asked }]),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (err) {
+    console.error("doji-eugenia: input not kept —", why(err));
+  }
 }
 
 /* Today's stored briefing, found by its marker and paired with its text by the
@@ -3971,8 +4214,10 @@ export async function feedbackBlock(): Promise<string> {
 }
 
 async function postConsolidation(): Promise<Response> {
-  // Scored first, so the pass reads tonight's outcomes; never throws.
+  // Scored first, so the pass reads tonight's outcomes; never throws. And
+  // what gold did on the day's prints, off the same window of bars.
   await scoreCalls();
+  await fileReactions();
   const day = await turnsSince(CONSOLIDATE_HOURS);
 
   /* A silent day skips the model call but still leaves a row, or 23:00 runs it
@@ -3985,15 +4230,18 @@ async function postConsolidation(): Promise<Response> {
   // differently, which most days' transcripts never mention. And the market
   // around gold and the Fed pricing as they closed, which is what a read's
   // stated test is judged against.
-  const [notes, portrait, channels, trades, story, loops, calendar, verdicts, desk, record, calls, around, rates] =
+  // And her map of his charts as the day closed, with the calls that lost,
+  // since a loss is explained by what printed after it.
+  const [notes, portrait, channels, trades, story, loops, calendar, verdicts, desk, record, calls, around, rates,
+         losses, chart] =
     await Promise.all([
       notesBlock(), portraitBlock(), channelsBlock(), tradesBlock(),
       thesisBlock(), loopsBlock(), calendarBlock(), feedbackBlock(), positionsBlock(), recordBlock(),
-      callsBlock(), aroundBlock(), ratesBlock(),
+      callsBlock(), aroundBlock(), ratesBlock(), lossesBlock(), structureBlock(),
     ]);
 
   const asked = CONSOLIDATE + notes + portrait + channels + trades + story + loops + calendar +
-    verdicts + desk + record + around + rates + calls +
+    verdicts + desk + record + around + rates + calls + losses + chart +
     `\n\nThe day, oldest first:\n\n` +
     day.map(t => `${t.role === 'user' ? 'him' : 'you'}: ${t.content}`).join("\n\n");
 

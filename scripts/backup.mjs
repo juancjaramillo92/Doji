@@ -41,6 +41,11 @@ export const TABLES = [
   // rebuilt from anything else.
   ['eugenia_calls',    'id'],
   ['eugenia_rewrites', 'id'],
+  // What each briefing was handed: the only record of what a past morning
+  // looked like to her.
+  ['eugenia_inputs',   'id'],
+  // What gold did on each print, which the bars it came from no longer reach.
+  ['eugenia_reactions', 'release'],
   // The stop history R-19 is judged on; the broker keeps only the final stop.
   ['trade_stops',      ['id', 'seen_at']],
 ];

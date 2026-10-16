@@ -1,7 +1,7 @@
-# Whether her map of his charts finds the levels he traded, run by hand from
-# the Actions tab: scripts/calibrate.mjs, which changes nothing. Here rather
-# than on his computer, so running it is a button. The table is in the run's
-# log.
+# Whether her map of his charts finds the levels he traded, and whether its
+# marks hold, run by hand from the Actions tab: scripts/calibrate.mjs, which
+# changes nothing. Here rather than on his computer, so running it is a
+# button. Both tables are in the run's log.
 name: calibrate
 
 on:
@@ -24,8 +24,8 @@ jobs:
           node-version-file: package.json
 
       # No install step: the script and the fold it imports use nothing but
-      # fetch. The cron secret opens the poller's ?entries=1 door.
-      - name: Fold her map at his newest entries under every set of readings
+      # fetch. The cron secret opens the poller's ?entries=1 and ?replay=N doors.
+      - name: Fold her map at his newest entries and over past sessions
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SB_SECRET_KEY: ${{ secrets.SB_SECRET_KEY }}

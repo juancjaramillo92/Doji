@@ -21,14 +21,14 @@ import {
   foldPosition, nyDay, ozFromVolume, usdFromCents,
   lookbackFor, foldHours, balanceTarget,
   fromPipettes, foldSpot, PIPETTES, openPlans, barSpan, bestPrice, foldCandles, stopChanges, sliced,
-  barWindows, BAR_MAX, RANGE_MAX_MS,
+  barWindows, BAR_MAX, RANGE_MAX_MS, replaySession, replayDays, REPLAY_DAYS,
 } from '../supabase/functions/doji-mcp-sync/index.ts';
 
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, unwrap, foldCalendar,
   calendarWindow, foldBars, foldHeadlines, FOMC, contractMonths, foldRates, oddsOf, unlisted, zq, foldSessions,
-  readMarket, readRates, foldTrend, BACK, foldReserves, foldFunds, FUNDS, readFlows, RESERVES,
+  readMarket, readRates, foldTrend, BACK, FITS, fitOf, foldReserves, foldFunds, FUNDS, readFlows, RESERVES,
 } from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
@@ -42,7 +42,7 @@ import {
   VOICE_TROUBLE,
   positionsList, isOpen, healthLine, sweepLine, serve, parseChannel, sayAloud, postSpeak,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock, portraitBlock, NOTES, recordBlock, recordList, recordQuery,
-  callProblem, expiryOf, scoreCall, callsList, effortMessages, BASE_EFFORT,
+  callProblem, expiryOf, scoreCall, callsList, lossesList, reactionOf, fileReactions, effortMessages, BASE_EFFORT,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock,
@@ -62,13 +62,14 @@ import {
   SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, HIGH, HOME, weekOf, STOP_GRACE_MIN,
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import {
-  turns, biasOf, sweepsOf, poolsOf, foldStructure, READINGS, GRID, CANDLES,
+  turns, biasOf, sweepsOf, poolsOf, shapeOf, foldStructure, READINGS, GRID, CANDLES,
 } from '../supabase/functions/doji-eugenia/structure.ts';
-import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
+import { CHANNELS, CHANNEL_STATES, SYSTEM } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { backup, readAll, TABLES } from '../scripts/backup.mjs';
 import { lastRun, stale } from '../scripts/health.mjs';
-import { score, table, readingsGrid, NEAR } from '../scripts/calibrate.mjs';
+import { score, table, readingsGrid, NEAR, HOLD, holdOf, holds, holdTable } from '../scripts/calibrate.mjs';
+import { replayed, tally, request as replayRequest, CLEAN_FROM } from '../scripts/replay.mjs';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -888,6 +889,17 @@ test('the sequence of turns is named only when both sides agree, and two of each
   assert.deepEqual(turns(rising).map(t => [t.kind, t.price]),
     [['high', 20], ['low', 0.5], ['high', 25], ['low', 1]]);
   assert.equal(biasOf('H_1', rising).trend, 'up');
+  assert.equal(biasOf('H_1', rising).broken, false);
+  // Rising, then a close under the newest low at 1, among the bars too new to
+  // be a turn: the sequence still reads up off its turns, and has broken.
+  const broke = bars([5, 6, 7, 20, 7, 6, 5, 6, 7, 25, 7, 6, 5, 0.8],
+                     [3, 2, 1, 0.5, 2, 3, 4, 3, 2, 1, 2, 3, 4, 0.2]);
+  assert.deepEqual([biasOf('H_1', broke).trend, biasOf('H_1', broke).broken], ['up', true],
+    'a close under the higher low was read as the sequence holding');
+  const fell = bars([5, 6, 7, 25, 7, 6, 5, 6, 7, 20, 7, 6, 5, 24],
+                    [3, 2, 1.5, 1, 2, 3, 4, 3, 2, 0.5, 2, 3, 4, 21]);
+  assert.deepEqual([biasOf('H_1', fell).trend, biasOf('H_1', fell).broken], ['down', true]);
+  assert.equal(biasOf('H_1', wide).broken, false, 'a mixed sequence has nothing to break');
   const falling = bars([5, 6, 7, 25, 7, 6, 5, 6, 7, 20, 7, 6, 5, 4],
                        [3, 2, 1.5, 1, 2, 3, 4, 3, 2, 0.5, 2, 3, 4, 5]);
   assert.equal(biasOf('H_1', falling).trend, 'down');
@@ -1020,19 +1032,65 @@ test('the map reads his level charts in his words, off printed bars only', () =>
   assert.ok(READINGS.ON_GRID >= 2 && READINGS.EDGE >= 1, 'the fixture is drawn for a level two dollars off its quarter');
 });
 
+/* STEP 3 IN NUMBERS. His signal is a candle reaching a level and rejecting it,
+   so the map says what each entry candle traded through and which side it
+   closed on, with its body and wicks worked out rather than left to her. */
+test('a candle is said by its body, its wicks and the marks it closed beyond', () => {
+  const down = shapeOf({ t: 0, open: 4030, high: 4031, low: 4019, close: 4026 }, [4050, 4025, 4020, 4000]);
+  assert.deepEqual(down, { body: -4, upper: 1, lower: 7,
+    through: [{ price: 4020, closed: 'above' }, { price: 4025, closed: 'above' }] },
+    'a wick through a mark and a close back above it was not read as one');
+  assert.deepEqual(shapeOf({ t: 0, open: 4020, high: 4026, low: 4019.5, close: 4024 }, [4025]).through,
+    [{ price: 4025, closed: 'below' }], 'a high through the quarter and a close under it is a rejection from above');
+  assert.deepEqual(shapeOf({ t: 0, open: 4010, high: 4012, low: 4008, close: 4011 }, [4025]).through, [],
+    'a mark the candle never reached was read as traded through');
+  const map = foldStructure(MAP_CHARTS, MAP_NOW);
+  assert.deepEqual(map.candles.find(c => c.period === 'M_5').shapes[0].through.map(t => t.price), [4023, 4025],
+    "the fold reads a candle against fewer marks than the map draws: the 4023 level and pool, and the 4025 quarter");
+});
+
+/* §4.2's "previous high or low" off the bigger charts. On the fixture the
+   15th is forming, so the 14th is the previous day, and no week has closed. */
+test('the bigger charts give the previous day, the previous week and their turns', () => {
+  const map = foldStructure(MAP_CHARTS, MAP_NOW);
+  assert.deepEqual(map.higher.map(m => [m.price, m.from.map(f => f.what)]), [
+    [4060, ["the previous day's high"]], [4000, ["the previous day's low"]]]);
+  assert.equal(map.higher[0].from[0].at, Date.UTC(2026, 9, 14, 21), 'the previous day is not timed by the session it closed');
+  // Two weeks of daily bars, Sunday's 21:00 open a Monday session: the week
+  // before the one forming runs 5 to 9 October.
+  const D = 86_400_000, open = Date.UTC(2026, 9, 4, 21);
+  const daily = [4010, 4015, 4020, 4058, 4012, 4030, 4031, 4033, 4032]
+    .map((h, i) => candle(open + i * D + (i >= 5 ? 2 * D : 0), h, h - 30));
+  const weeks = foldStructure({ D_1: daily, M_5: [candle(MAP_NOW, 4030, 4025, 4027)] }, MAP_NOW);
+  const said = (what) => weeks.higher.find(m => m.from.some(f => f.what === what))?.price;
+  assert.equal(said("the previous week's high"), 4058, 'the week before the forming one was not read whole');
+  assert.equal(said("the previous week's low"), 3980);
+  assert.equal(said("the previous day's high"), 4033, 'the last closed day is not the previous day');
+  assert.ok(weeks.higher.find(m => m.price === 4058).from.some(f => f.what === 'a daily high'),
+    "a daily turn on the previous week's high is not merged into its line");
+  assert.ok(!weeks.higher.some(m => Math.abs(m.price - 4027) > READINGS.REACH),
+    `a mark more than $${READINGS.REACH} away is on the map`);
+});
+
 test('the map is said as hers, with every price timed and nothing about what comes next', () => {
   const out = structureList(foldStructure(MAP_CHARTS, MAP_NOW), MAP_NOW);
   assert.match(out, /This is YOUR map, computed from the bars; his is drawn in TradingView/);
   assert.match(out, /The newest bar read opened at 10:05 ET and last traded 4026\./);
   assert.match(out, /· daily: no highs yet; no lows yet — too few turns for a sequence\. Last close 4030\./);
+  const lows = (rows) => rows.map(p => ({ price: p, at: MAP_HOUR, kind: 'low' }));
+  const highs = (rows) => rows.map(p => ({ price: p, at: MAP_HOUR, kind: 'high' }));
+  assert.match(structureList({ ...foldStructure(MAP_CHARTS, MAP_NOW), bias: [{ period: 'H_4', trend: 'up',
+    highs: highs([4040, 4050]), lows: lows([4000, 4010]), close: 4005, broken: true }] }, MAP_NOW),
+    /· 4H: highs[^\n]*— higher highs and higher lows\. Last close 4005, under the newest low, 4010: the sequence has broken and no turn says so yet\./);
   assert.match(out, /The week of hourly bars runs from 3980 \(02:00 ET\) to 4049 \(23:00 ET Wednesday 14 Oct\)/);
   assert.match(out, /· 4049 — a high, on the 1H, newest 23:00 ET Wednesday 14 Oct; on the 4050 round number; at the top of the week's range/);
   assert.match(out, /· 4023 — turned both ways, a level that has flipped, on the 30m and 1H, newest 07:30 ET; on the 4025 quarter; inside the range/);
   assert.match(out, /4050 \(round, a turn sits on it\)/);
+  assert.match(out, /On the bigger charts, within \$60[^\n]*\n· 4060 — the previous day's high, the session closing 17:00 ET Wednesday 14 Oct\n· 4000 — the previous day's low/);
   assert.match(out, /No wick through a turn closed back in the last day\./);
   assert.match(out, /09:00 ET to 10:15 so far, 4020 to 4031/);
   assert.match(out, /averaged \$50 over the last 14 sessions; this session has covered \$30 so far\./);
-  assert.match(out, /The last closed 5m candles, oldest first: 09:55 ET open 4025, high 4027, low 4023, close 4025; 10:00 ET open 4026, high 4028, low 4024, close 4026\./);
+  assert.match(out, /The last closed 5m candles, oldest first: 09:55 ET open 4025, high 4027, low 4023, close 4025 \(closed where it opened, wicks \$2\.00 above and \$2\.00 below; through 4023, closed above it, and 4025, closed on it\); 10:00 ET open 4026, high 4028, low 4024, close 4026 \(closed where it opened, wicks \$2\.00 above and \$2\.00 below; through 4025, closed above it\)\./);
   assert.match(out, /The last closed 15m candles, oldest first: 09:00 ET open 4026/);
   assert.match(out, /· 4023 — equal lows, on the 30m, touched 05:00 ET, 07:30 ET/);
   assert.match(structureList({ ...foldStructure(MAP_CHARTS, MAP_NOW), pools: [] }, MAP_NOW),
@@ -1041,6 +1099,74 @@ test('the map is said as hers, with every price timed and nothing about what com
   assert.doesNotMatch(out, /\b(will|next|likely|expect|should)\b/i);
   // A map with no bar at all is said as no map.
   assert.match(structureList(foldStructure({}, MAP_NOW), MAP_NOW), /could not be read just now, so you have no map/);
+});
+
+/* THE REPLAY. The poller turns N into a past morning itself, and the script
+   puts her answer through the same refusal and the same score as the live
+   path, so a replayed record and a live one count the same thing. */
+test('a replay is the weekday N back, at the briefing hour, to the roll', () => {
+  const at = (n, now) => { const r = replaySession(n, Date.parse(now)); return [r.at, r.ends].map(t => new Date(t).toISOString()); };
+  assert.deepEqual(at(1, '2026-10-16T14:00:00Z'), ['2026-10-15T12:00:00.000Z', '2026-10-15T21:00:00.000Z'],
+    'a Friday replay of one day is not Thursday 08:00 to 17:00 New York');
+  assert.deepEqual(at(1, '2026-10-19T14:00:00Z'), ['2026-10-16T12:00:00.000Z', '2026-10-16T21:00:00.000Z'],
+    'a Monday replay of one day lands on the weekend');
+  assert.deepEqual(at(5, '2026-11-04T14:00:00Z'), ['2026-10-28T12:00:00.000Z', '2026-10-28T21:00:00.000Z'],
+    'five weekdays back across the clocks changing');
+  assert.deepEqual(at(1, '2026-11-03T14:00:00Z'), ['2026-11-02T13:00:00.000Z', '2026-11-02T22:00:00.000Z'],
+    "08:00 is New York's in winter too");
+  assert.deepEqual(['1', '120', '0', '121', '2.5', 'x', null].map(replayDays), [1, 120, null, null, null, null, null]);
+  assert.equal(REPLAY_DAYS, 120);
+});
+
+test('a replayed answer is refused, scored or no call, as the live path would have it', () => {
+  const served = { at: Date.parse('2026-10-14T12:00:00Z'), charts: MAP_CHARTS, missing: [],
+                   bars: [minute(1, { low: 3999 }), minute(2, { high: 4031 })] };
+  assert.deepEqual(replayed({ call: false, why: 'nothing earns one' }, served), { outcome: 'none', why: 'nothing earns one' });
+  assert.match(replayed({ call: true, direction: 'buy', entry: 4000, stop: 3975, target: 4030, confirm: 'market', why: 'x' }, served).why,
+    /R-02/, 'a call make_call would refuse was scored');
+  const won = replayed({ call: true, direction: 'buy', entry: 4000, stop: 3985, target: 4030, confirm: 'market',
+                         condition: 'at the market', why: 'the quarter held' }, served);
+  assert.deepEqual([won.outcome, won.result, won.call.expires_at], ['won', 30, '2026-10-14T21:00:00.000Z']);
+  const waits = replayed({ call: true, direction: 'buy', entry: 4002, stop: 3985, target: 4032, confirm: 'close',
+                           level: 4000, why: 'x' }, served);
+  assert.equal(waits.outcome, 'untriggered', 'a replayed call waiting on a close was filled on the touch');
+  assert.match(tally([won, waits, { outcome: 'none' }, { outcome: 'refused' }]),
+    /^4 sessions: 1 no call, 1 off his rules, 1 won, 0 lost, 0 scratch, 0 open, 1 untriggered, 0 unread; the 1 that triggered made \+\$30\.00 an ounce\.$/);
+  const asked = replayRequest(served);
+  assert.equal(asked.output_config.effort, 'high', "the replay asks at another effort than the briefing's");
+  assert.ok(asked.system[0].text.startsWith(SYSTEM), 'the replay is not asked under her system prompt');
+  assert.match(asked.messages[0].content, /no news, no calendar[\s\S]*This is YOUR map/,
+    'the replay does not say she has her map and nothing else');
+  assert.ok(CLEAN_FROM >= '2026-07-01', 'the replay walks into months the model may have read about');
+});
+
+/* WHETHER A MARK HOLDS, every doubt against the map, and the chance it is
+   measured against: the whole dollars nobody marked. */
+test('a mark holds when price goes back from it before going through, against chance', () => {
+  assert.equal(HOLD, 10);
+  const m = (n, high, low) => ({ t: n * 60_000, open: (high + low) / 2, high, low, close: (high + low) / 2 });
+  // Resistance at 4040, price at 4026: reached, then $10 back down.
+  assert.equal(holdOf(4040, 4026, [m(0, 4030, 4025), m(1, 4041, 4035), m(2, 4032, 4029)]), 'held');
+  assert.equal(holdOf(4040, 4026, [m(1, 4041, 4035), m(2, 4051, 4040)]), 'broken');
+  assert.equal(holdOf(4040, 4026, [m(1, 4041, 4035), m(2, 4050, 4030)]), 'broken', 'a bar doing both was read as held');
+  assert.equal(holdOf(4040, 4026, [m(1, 4041, 4035), m(2, 4045, 4033)]), null, 'a session that settled neither was settled');
+  assert.equal(holdOf(4040, 4026, [m(1, 4035, 4030)]), null, 'a mark price never reached was settled');
+  // Support at 4010, mirrored.
+  assert.equal(holdOf(4010, 4026, [m(1, 4015, 4009), m(2, 4021, 4012)]), 'held');
+  const served = { at: MAP_NOW, charts: MAP_CHARTS, bars: [m(0, 4030, 4021), m(1, 4050, 4045), m(2, 4061, 4055)] };
+  const got = holds(served);
+  // 4023 under price was reached first and price went $10 above it: held. 4049
+  // (the week's top) and 4050 (round) were run through; the 4060 previous-day
+  // high, reached at the end, settles nothing.
+  assert.deepEqual([got.levels, got.round, got.higher], [{ held: 1, broken: 1 }, { held: 0, broken: 1 }, { held: 0, broken: 0 }]);
+  assert.ok(got.chance.held + got.chance.broken > 0, 'no unmarked dollar was tested, so there is no chance to measure against');
+  assert.equal(holds({ ...served, bars: [] }), null);
+  const out = holdTable([got, got]);
+  assert.match(out, /^2 sessions; a mark holds when price goes \$10 back before \$10 through/);
+  assert.match(out, /levels {3}held 2 of 4 \(50%\)/);
+  const zero = { held: 0, broken: 0 };
+  assert.match(holdTable([{ levels: { held: 3, broken: 1 }, higher: zero, pools: zero, quarter: zero, round: zero,
+                            chance: { held: 1, broken: 1 } }]), /levels {3}held 3 of 4 \(75%\) {2}against chance 1\.50×/);
 });
 
 /* THE CALIBRATION SCORES A READING BY WHAT IT FOUND OF HIS, NOT BY HOW MUCH IT
@@ -1074,6 +1200,13 @@ test('the calibration scores her map by the levels he traded, against chance', (
   const out = table([got]);
   assert.match(out, /^3 entries, within \$3 of a level/);
   assert.match(out, /\* TURN 3  ON_GRID 3  EDGE 5  at a level 67% \(chance 15%, lift 4\.44\)  median \$2  setup agrees 1\/2/);
+  // With the daily bars, the previous day's low at 4000 finds the third entry,
+  // and its high at 4060 adds to chance without finding one: five marks, 25%.
+  const bigger = score(entries.map(e => ({ ...e, charts: { ...charts, D_1: MAP_CHARTS.D_1 } })), setups, today);
+  assert.deepEqual([bigger.hits, bigger.chance], [got.hits, got.chance], 'the bigger charts moved the levels the map is scored on');
+  assert.deepEqual([bigger.wider, bigger.widerChance, bigger.widerLift], [1, 0.25, 4],
+    "the bigger charts' highs and lows are not scored as the levels they would add");
+  assert.match(table([bigger]), /with the bigger charts 100% \(chance 25%, lift 4\.00\)/);
 });
 
 /* EVERY READ STAYS INSIDE WHAT ONE ANSWER CAN CARRY, as the broker's own
@@ -1177,6 +1310,31 @@ test('daily bars fold to the closes a week, a month and three months of sessions
   assert.throws(() => foldTrend({ success: true }), /no bars/);
 });
 
+/* What gold has been trading on: gold's daily changes against another's,
+   paired by the date each bar's session closes, whatever hour a vendor stamps
+   it with. Gold opens at the 17:00 roll, 21:00 UTC the day before; FRED's
+   series at midnight UTC on its date. */
+test('gold\'s daily changes are correlated with another series over sessions paired by date', () => {
+  assert.deepEqual(FITS, [20, 60]);
+  const at = (i, hour) => Date.UTC(2026, 6, 15 + i, hour) / 1000;
+  const steps = [1, -2, 3, -1, 2, -3, 1, 2, -2, 1, 3, -1, -2, 2, 1, -3, 2, 1, -1, 2, 3, -2];
+  let g = 4000, o = 2;
+  const gold = [], real = [], dollar = [];
+  steps.forEach((d, i) => {
+    g += d * 10; o -= d / 100;
+    gold.push({ t: at(i, -3), c: g });                      // 21:00 UTC the day before
+    real.push({ t: at(i, 0), c: o });                       // midnight UTC on the date
+    dollar.push({ t: at(i, 0), c: 100 + (i % 2 ? d : -d) }); // nothing to do with gold
+  });
+  const fit = fitOf(gold, real, 20);
+  assert.deepEqual([fit.r, fit.sessions, fit.from, fit.to], [-1, 20, '2026-07-16', '2026-08-05'],
+    'series that move exactly opposite, a day apart in their stamps, were not paired by their session\'s date');
+  assert.ok(Math.abs(fitOf(gold, dollar, 20).r) < 0.5, 'an unrelated series read as gold\'s driver');
+  assert.equal(fitOf(gold, real, 60), null, 'a window longer than the pairs was given a figure');
+  assert.equal(fitOf(gold, real.filter((_, i) => i % 5), 20), null, 'dates one series lacks were filled');
+  assert.equal(fitOf(gold, gold.map(b => ({ ...b, c: 1 })), 20), null, 'a flat series was given a correlation');
+});
+
 const TREND = { ok: true, market: [
   { symbol: 'TVC:DXY', name: 'Dollar index', unit: '', points: [
     { close: 101.2, at: '2026-10-08T00:00:00.000Z' }, { close: 99.5, at: '2026-09-16T00:00:00.000Z' },
@@ -1192,6 +1350,10 @@ test('the weeks behind the market are levels on stated days, and no change is co
   assert.match(out, /· Ten-year breakeven inflation 2\.41% on 7 Oct/);
   assert.match(out, /Not read just now: Gold volatility index \(GVZ\)\./);
   assert.doesNotMatch(out, /\b(up|down|rose|fell|higher|lower)\b/);
+  assert.doesNotMatch(out, /tracked/, 'a copy stored before the fits says something about them');
+  const fitted = trendList({ ...TREND, fits: [
+    { symbol: 'FRED:DFII10', name: 'Ten-year real yield (TIPS)', sessions: 20, r: -0.62, from: '2026-09-15', to: '2026-10-13' }] });
+  assert.match(fitted, /How closely gold's daily moves have tracked each, from -1 \(opposite ways, day by day\) to \+1 \(together\), a description of those sessions and never a cause:\n· Ten-year real yield \(TIPS\): -0\.62 over the last 20 sessions, 15 Sept? to 13 Oct/);
 });
 
 /* ─── What central banks and the gold funds hold ─────────────────────────────
@@ -4459,14 +4621,29 @@ test('her record counts every verdict and names the newest misses, three at most
    His rules, checked in code before a call is filed; the session it lives in;
    and the score, every doubt against her. */
 test('a call off his rules is refused, and one on them is not', () => {
-  assert.equal(callProblem('buy', 4000, 3985, 4030), null, 'a $15 stop and a $30 target is his default trade');
-  assert.equal(callProblem('sell', 4000, 4020, 3970), null, 'the $20 ceiling itself is allowed');
-  assert.match(callProblem('buy', 4000, 3979, 4030), /R-02/, 'a stop past $20 is filed');
-  assert.match(callProblem('buy', 4000, 3990, 4020), /R-01/, 'a $20 target is filed');
-  assert.match(callProblem('buy', 4000, 4010, 4030), /stop below the entry/, 'a stop on the wrong side is filed');
-  assert.match(callProblem('buy', 4000, 3980, 4025), /R-08/,
+  const now = (side, e, s, t) => callProblem(side, e, s, t, 'market', NaN);
+  assert.equal(now('buy', 4000, 3985, 4030), null, 'a $15 stop and a $30 target is his default trade');
+  assert.equal(now('sell', 4000, 4020, 3970), null, 'the $20 ceiling itself is allowed');
+  assert.match(now('buy', 4000, 3979, 4030), /R-02/, 'a stop past $20 is filed');
+  assert.match(now('buy', 4000, 3990, 4020), /R-01/, 'a $20 target is filed');
+  assert.match(now('buy', 4000, 4010, 4030), /stop below the entry/, 'a stop on the wrong side is filed');
+  assert.match(now('buy', 4000, 3980, 4025), /R-08/,
     'a $25 target over a $20 stop is 1:1.25, under the 1:1.5 his sequence asks for at entry');
-  assert.match(callProblem('long', 4000, 3985, 4030), /buy or sell/);
+  assert.match(now('long', 4000, 3985, 4030), /buy or sell/);
+  assert.match(callProblem('buy', 4000, 3985, 4030, undefined, NaN), /'close'[\s\S]*'market'/,
+    'a call that does not say how its entry goes live is filed');
+});
+
+test('a call waiting on a close has its level between the stop and the entry', () => {
+  assert.equal(callProblem('buy', 4002, 3985, 4032, 'close', 4000), null);
+  assert.equal(callProblem('sell', 3998, 4015, 3968, 'close', 4000), null);
+  assert.equal(callProblem('buy', 4000, 3985, 4030, 'close', 4000), null, 'an entry on the level itself is allowed');
+  assert.match(callProblem('buy', 4002, 3985, 4032, 'close', NaN), /level between/, 'a close beyond no level is filed');
+  assert.match(callProblem('buy', 4002, 3985, 4032, 'close', 4010), /level between/,
+    'a buy entered below the level it waits to close above is filed');
+  assert.match(callProblem('buy', 4002, 3985, 4032, 'close', 3980), /level between/,
+    'a stop beyond the level is not where the idea is wrong');
+  assert.match(callProblem('sell', 3998, 4015, 3968, 'close', 3990), /level between/);
 });
 
 test('a call lives until the next 17:00 New York roll on a weekday', () => {
@@ -4508,6 +4685,34 @@ test('a call is scored on price, every doubt against her', () => {
   assert.equal(score([minute(1, { high: 4021 }), minute(2, { low: 3989 })], sell).outcome, 'won');
 });
 
+/* R-07: the signal is not an entry. A call that waits for a 15m close beyond
+   its level is live only after that candle closes, so a touch of the entry
+   before it is the trade his rules forbid, and is never scored as filled. */
+test('a call waiting on a close fills only after a 15m candle closes beyond its level', () => {
+  const waits = { ...CALL, entry: 4002, stop: 3985, target: 4032, confirm: 'close', level: 4000 };
+  const score = (bars) => scoreCall(waits, bars, FROM);
+  // 13:00–13:14 is one quarter, its last minute at 13:14.
+  const reach = minute(3, { low: 3999, high: 4003, close: 4001 });
+  const closes = minute(14, { low: 4001, high: 4006, close: 4005 });
+  assert.equal(score([reach, closes, minute(16, { low: 4010 })]).outcome, 'untriggered',
+    'price never came back to the entry after the candle closed');
+  const won = score([reach, closes, minute(16, { low: 4001.5, high: 4004 }), minute(17, { high: 4033 })]);
+  assert.deepEqual([won.outcome, won.triggered_at], ['won', '2026-10-14T13:16:00.000Z']);
+  assert.equal(score([minute(3, { low: 3999, high: 4003, close: 4001 }), minute(14, { low: 3990, close: 3995 }),
+                      minute(16, { low: 4001 }), minute(17, { high: 4033 })]).outcome, 'untriggered',
+    'a candle that reached the level and closed back below it was read as the confirmation');
+  assert.equal(score([minute(16, { low: 4003, close: 4005 }), minute(17, { low: 4001, high: 4033 })]).outcome,
+    'untriggered', 'a candle that never reached the level was read as the confirmation');
+  const early = score([reach, minute(4, { low: 4001, high: 4002 }), closes, minute(16, { high: 4033, low: 4004 })]);
+  assert.equal(early.outcome, 'untriggered', 'a touch of the entry inside the confirming candle was filled');
+  assert.equal(scoreCall({ ...waits, made_at: '2026-10-14T13:05:00Z' }, [reach, closes, minute(16, { low: 4001 }),
+               minute(17, { high: 4033 })], FROM).outcome, 'untriggered',
+    'a quarter that opened before the call was read as its confirmation');
+  const sell = { ...waits, direction: 'sell', entry: 3998, stop: 4015, target: 3968 };
+  assert.equal(scoreCall(sell, [minute(3, { high: 4001, low: 3997, close: 3999 }), minute(14, { high: 3999, low: 3994, close: 3995 }),
+               minute(16, { high: 3998.5, low: 3996 }), minute(17, { low: 3967 })], FROM).outcome, 'won');
+});
+
 test('a call the bars do not reach is unread, and a weekend is not a gap', () => {
   assert.equal(scoreCall({ ...CALL, made_at: '2026-10-13T13:00:00Z' }, [minute(1, { low: 3999 })], FROM).outcome,
     'unread', 'a call made before the bars begin was scored on half its session');
@@ -4529,7 +4734,43 @@ test('her calls say how they ended, what they made, and which still stands', () 
   assert.match(out, /Standing until the 17:00 roll: buy 4000, stop 3985, target 4030, if a retest of 4,000/,
     'the call still standing is not named, so she would make a second');
   assert.match(out, /The latest lost:\n· 13 Oct: buy 4000/);
+  assert.doesNotMatch(out, /Of the \d+ lost/, 'a count of steps when no loss has been explained');
+  const why = callsList([
+    { ...CALL, id: 2, expires_at: '2026-10-13T21:00:00Z', outcome: 'lost', result: -15, misread: 'level', lesson: 'the quarter had broken' },
+    { ...CALL, id: 1, expires_at: '2026-10-12T21:00:00Z', outcome: 'lost', result: -15, misread: 'none', lesson: null },
+    { ...CALL, id: 0, expires_at: '2026-10-09T21:00:00Z', outcome: 'lost', result: -15 },
+  ], now);
+  assert.match(why, /Of the 3 lost, 0 misread the bias, 1 misread the level, 0 misread the candle, 1 kept every step, 1 not yet explained\./);
+  assert.match(why, /buy 4000, stop 3985, target 4030, if a retest of 4,000 — misread the level: the quarter had broken/);
+  assert.match(why, /— kept every step/);
   assert.equal(callsList([]), '');
+});
+
+test('a lost call is explained by the step it failed on, once', async () => {
+  const sent = [];
+  await stubbed(async () => {
+    globalThis.fetch = async (url, opts = {}) => {
+      sent.push({ url: String(url), body: opts.body });
+      return new Response(JSON.stringify(sent.length > 1 ? [] : [{ id: 7 }]), { status: 200 });
+    };
+    assert.match(await serve('explain_call', { id: 7, step: 'level' }), /filed with what you misread/,
+      'a failed step was filed with no lesson');
+    assert.match(await serve('explain_call', { id: 7, step: 'none', lesson: 'nothing' }), /carries no lesson/);
+    assert.match(await serve('explain_call', { id: 7, step: 'trend', lesson: 'x' }), /not a step/);
+    assert.equal(sent.length, 0, 'an explanation off the vocabulary reached the database');
+    assert.equal(await serve('explain_call', { id: 7, step: 'bias', lesson: 'the 4H had printed a lower high' }), 'Filed.');
+    assert.match(await serve('explain_call', { id: 7, step: 'bias', lesson: 'again' }), /not a lost call waiting/,
+      'a PATCH filtered to nothing was read as filed');
+  });
+  assert.match(sent[0].url, /eugenia_calls\?id=eq\.7&outcome=eq\.lost&misread=is\.null$/,
+    'a call that won, or one already explained, could be explained again');
+  assert.deepEqual(JSON.parse(sent[0].body), { misread: 'bias', lesson: 'the 4H had printed a lower high' });
+});
+
+test('the losses she has not explained come with their number and when they stopped', () => {
+  const out = lossesList([{ ...CALL, id: 9, outcome: 'lost', closed_at: '2026-10-14T15:40:00Z' }]);
+  assert.match(out, /call 9, made 09:00 ET Wednesday: buy 4000, stop 3985, target 4030, if a retest of 4,000; stopped 11:40 ET/);
+  assert.equal(lossesList([]), '');
 });
 
 test('a call is filed once a session, and a call off his rules never reaches the table', async () => {
@@ -4539,17 +4780,18 @@ test('a call is filed once a session, and a call off his rules never reaches the
       posts.push({ url: String(url), body: opts.body });
       return new Response(null, { status: posts.length > 1 ? 409 : 201 });
     };
-    assert.match(await serve('make_call', { direction: 'buy', entry: 4000, stop: 3975, target: 4030, condition: 'now' }),
+    assert.match(await serve('make_call', { direction: 'buy', entry: 4000, stop: 3975, target: 4030, condition: 'now', confirm: 'market' }),
       /R-02[\s\S]*Not filed/);
     assert.equal(posts.length, 0, 'a call off his rules reached the database');
-    assert.match(await serve('make_call', { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market' }),
+    assert.match(await serve('make_call', { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market', confirm: 'market' }),
       /^Filed: buy 4000, stop 3985, target 4030, until 17:00 ET/);
-    assert.match(await serve('make_call', { direction: 'sell', entry: 4000, stop: 4015, target: 3970, condition: 'at the market' }),
+    assert.match(await serve('make_call', { direction: 'sell', entry: 4000, stop: 4015, target: 3970, condition: 'at the market', confirm: 'market' }),
       /already made this session's call/, 'a second call in a session is filed or swallowed');
   });
   const [row] = JSON.parse(posts[0].body);
   assert.equal(Date.parse(row.expires_at), expiryOf(new Date(row.made_at)).getTime(),
     'the call is filed under a session other than the one expiryOf names');
+  assert.deepEqual([row.confirm, row.level], ['market', null], 'a call at the market is filed with a level it does not wait on');
 });
 
 /* A month of New York days, read at the pass: 22:00 on 9 October is already
@@ -4618,6 +4860,63 @@ test('a release\'s prints are told oldest first, and the tally against the conse
     print(new Date(Date.UTC(2026, 9, 1) - i * 30 * 86_400_000).toISOString(), `NFP (${i})`, '200K', '180K'));
   assert.match(printsList(full, 'NFP'), new RegExp(`${RELEASE_PRINTS} above, 0 below, 0 on it\\.[\\s\\S]*` +
     `stops at its ${RELEASE_PRINTS} newest prints, so it reaches back only to \\d+ \\w+ 2024\\.`));
+});
+
+/* WHAT GOLD DID ON A PRINT, read off the minute bars: the open of the print's
+   minute and the close fifteen and sixty minutes on, a missing minute a null. */
+test('gold\'s move on a print is read off the minute it landed and the minutes after', () => {
+  const at = Date.parse('2026-10-14T12:30:00Z');
+  const bar = (n, close) => ({ t: at + n * 60_000, open: 4000 + n, high: 4100, low: 3900, close });
+  const bars = [bar(-1, 3999), bar(0, 4003), bar(14, 4012.5), bar(59, 3990)];
+  assert.deepEqual(reactionOf(at, bars), { before: 4000, after_15: 4012.5, after_60: 3990 });
+  assert.deepEqual(reactionOf(at + 20_000, bars), { before: 4000, after_15: 4012.5, after_60: 3990 },
+    'a print stamped inside its minute was read off another one');
+  assert.deepEqual(reactionOf(at, bars.filter(b => b.t !== at + 59 * 60_000)).after_60, null,
+    'a missing minute was filled from the nearest one');
+  assert.equal(reactionOf(at, bars.slice(2)), null, 'a print whose minute the bars lack was given a move');
+});
+
+test('gold\'s moves sit beside each print, and how they ran is counted, never forecast', () => {
+  const rows = PRINTS.map((p, i) => ({ ...p, id: i + 1 }));
+  const out = printsList(rows, 'Core Inflation Rate MoM', [
+    { release: 1, at: rows[0].at, before: 4000, after_15: 4012.5, after_60: 3990 },
+    { release: 3, at: rows[2].at, before: 3900, after_15: null, after_60: 3910 },
+  ]);
+  assert.match(out, /\(Sep\): 0\.4% against 0\.3% expected, after 0\.3%; gold 4000 at the print, \+\$12\.50 fifteen minutes on, -\$10\.00 an hour on/);
+  assert.match(out, /\(Jul\): 0\.2% against 0\.3% expected; gold 3900 at the print, \+\$10\.00 an hour on/);
+  assert.match(out, /after a print above the consensus, 0 higher and 1 not; after one below, 1 higher and 0 not\. That is what these prints did, never a rule for the next one\./);
+  assert.doesNotMatch(printsList(rows, 'Core Inflation Rate MoM'), /an hour on/, 'moves were said where none are on file');
+});
+
+test('the night files gold\'s move on the day\'s home prints, once, and says how many', async () => {
+  const sent = [];
+  const at = Date.now() - 3 * 3_600_000;
+  const minute = Math.floor(at / 60_000) * 60_000;
+  await stubbed(async () => {
+    globalThis.fetch = async (url, opts = {}) => {
+      sent.push({ url: String(url), method: opts.method ?? 'GET', body: opts.body });
+      if (String(url).includes('doji-mcp-sync?bars=1')) {
+        return new Response(JSON.stringify({ ok: true, from: at - 3_600_000, bars: [
+          { t: minute, open: 4000, high: 4001, low: 3999, close: 4000.5 },
+          { t: minute + 59 * 60_000, open: 4010, high: 4011, low: 4009, close: 4010 }] }));
+      }
+      if (String(url).includes('eugenia_calendar')) {
+        return new Response(JSON.stringify([{ id: 7, at: new Date(at).toISOString() }, { id: 8, at: new Date(at - 7_200_000).toISOString() }]));
+      }
+      if (String(url).includes('eugenia_reactions')) return new Response(JSON.stringify([{ release: 7 }]), { status: 201 });
+      return new Response('[]', { status: 201 });
+    };
+    await fileReactions();
+  });
+  const read = sent.find(r => r.url.includes('eugenia_calendar'));
+  assert.match(read.url, /importance=eq\.high&country=eq\.US&actual=not\.is\.null&at=gte\.[^&]+&at=lte\.[^&]+&order=at\.desc&limit=20/,
+    'the prints read is not the bounded, newest-first read of home prints with an actual');
+  const post = sent.find(r => r.url.includes('eugenia_reactions'));
+  assert.match(post.url, /on_conflict=release$/);
+  assert.deepEqual(JSON.parse(post.body), [{ release: 7, at: new Date(at).toISOString(), before: 4000, after_15: null, after_60: 4010 }],
+    'a print the bars do not reach was filed, or one they do was not');
+  const run = JSON.parse(sent.find(r => r.url.includes('eugenia_runs')).body);
+  assert.deepEqual([run[0].caller, run[0].ok, run[0].detail], ['reactions', true, 'filed 1 of 2 prints']);
 });
 
 test('the prints read is bounded, newest first, and takes what she named as a value, never a pattern', () => {
@@ -5884,7 +6183,8 @@ const TOOL_CALLS = [
   ['close_loop',    { id: 1, resolution: 'answered' }],
   ['record_read',   { reading: 'a read', test: 'the two-year falls', verdict: 'untested', evidence: 'no close',
                       firmness: 'light', channel: 'dollar' }],
-  ['make_call',     { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market' }],
+  ['make_call',     { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market', confirm: 'market' }],
+  ['explain_call',  { id: 1, step: 'level', lesson: 'the 4,000 quarter had already been traded through twice' }],
   ['get_releases',  { release: 'Core Inflation Rate MoM', months: 12 }],
 ];
 
@@ -6224,6 +6524,17 @@ test('every eval case names a path, carries what that path needs, and checks som
     assert.ok(Object.keys(c.counts ?? {}).length || c.must || c.mustNot || c.equals || c.judge?.length,
       `${c.id} checks nothing, so it passes whatever she writes`);
   }
+});
+
+/* The map cases hand her the map as structureList says it, folded from a
+   fixture of bars; held here, so a change to the map's wording is a change to
+   what those cases ask, never a case quietly testing words she no longer gets. */
+test('the eval\'s map cases hand her the map structureList says today', () => {
+  const { now, charts } = JSON.parse(readFileSync(new URL('./fixtures/eval-map.json', import.meta.url), 'utf8'));
+  const said = structureList(foldStructure(charts, now), now);
+  const cases = EVAL.CASES.filter(c => c.id.startsWith('map-'));
+  assert.ok(cases.length >= 3, `only ${cases.length} map cases`);
+  for (const c of cases) assert.ok(c.context.endsWith(said), `${c.id} hands her a map structureList no longer says`);
 });
 
 test('the eval counts what the gates are told to count', () => {

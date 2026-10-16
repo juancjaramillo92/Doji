@@ -212,7 +212,7 @@ export const PLANTS = [
 /* ─── The run ────────────────────────────────────────────────────────────── */
 const KEY = process.env.ANTHROPIC_API_KEY;
 
-async function claude(body) {
+export async function claude(body) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
@@ -243,6 +243,12 @@ const RATE = {
   [MODEL.opus]:   { in: 4, out: 20, read: 0.2, write: 5 },
   [MODEL.sonnet]: { in: 2, out: 10, read: 0.2, write: 2.5 },
 };
+
+// What a run's calls cost, in dollars, off the usage each answer reports.
+export const costOf = (usage) => usage.reduce((sum, u) => sum +
+  ((u.input_tokens ?? 0) * RATE[u.model].in + (u.output_tokens ?? 0) * RATE[u.model].out +
+   (u.cache_read_input_tokens ?? 0) * RATE[u.model].read +
+   (u.cache_creation_input_tokens ?? 0) * RATE[u.model].write) / 1e6, 0);
 
 async function main(argv) {
   if (!KEY) throw new Error('ANTHROPIC_API_KEY is not set; this eval calls the model and costs money');
@@ -278,11 +284,7 @@ async function main(argv) {
     for (const f of result.failed) console.log(`      · ${f}`);
     if (result.failed.length) console.log(`      she wrote: ${result.text.replace(/\s+/g, ' ').slice(0, 400)}`);
   }
-  const cost = usage.reduce((sum, u) => sum +
-    ((u.input_tokens ?? 0) * RATE[u.model].in + (u.output_tokens ?? 0) * RATE[u.model].out +
-     (u.cache_read_input_tokens ?? 0) * RATE[u.model].read +
-     (u.cache_creation_input_tokens ?? 0) * RATE[u.model].write) / 1e6, 0);
-  console.log(`\n${red} of ${CASES.length} failed; this run cost about $${cost.toFixed(2)}`);
+  console.log(`\n${red} of ${CASES.length} failed; this run cost about $${costOf(usage).toFixed(2)}`);
   process.exitCode = red ? 1 : 0;
 }
 
