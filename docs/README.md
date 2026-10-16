@@ -2667,7 +2667,7 @@ writes the `<job> job` row and then apologises, in that order.
 rounds, effort, tokens in and out, cache reads and both cache writes, web
 searches and fetches, milliseconds — and a **failed turn is a row too**, since a
 briefing that dies costs the same searches as one that lands. A successful turn's
-`detail` is its client-tool tally. Nothing else can see any of it: the spend cap
+`detail` is its client-tool tally. Nothing else can see any of it: the spend limit
 is a ceiling rather than a meter, search bills separately, and the briefing's
 length target lives on the far side of a model call.
 
@@ -3503,9 +3503,11 @@ the jobs, and `agree.test.mjs` holds that count against `schema.sql`.
    `EUGENIA_WEBHOOK_SECRET` and `ANTHROPIC_API_KEY`. Point Telegram at
    `/functions/v1/doji-eugenia` with that secret and `allowed_updates=["message",
    "callback_query"]` — both, or the taps under a briefing are never delivered.
-   **Set a spend cap on the API key**: it is the only enforceable bound on what
-   she can cost. Store `eugenia_bot_token` and `telegram_chat_id` in Vault too,
-   lower-case — the watchers post to Telegram themselves.
+   **Set a spend limit on the key's workspace** (Console → Workspaces → Spend
+   limits; a key has none of its own): it is the only enforceable bound on what
+   she can cost, and every key in that workspace spends against it. Store
+   `eugenia_bot_token` and `telegram_chat_id` in Vault too, lower-case — the
+   watchers post to Telegram themselves.
 7. Run `supabase/schema.sql` in the SQL editor — last, because its triggers and
    schedules call the functions and secrets above from the moment it lands.
    Connect TradingView (see **TradingView**), then walk the history door once
@@ -3698,9 +3700,9 @@ one `net.http_post` each.
 
 Neither of the last two can reach a column. The value sits in Vault and in
 function secrets and crosses no untrusted channel; the one enforceable bound is
-the spend cap on the Anthropic key. `DOJI_EMAIL_SECRET` is deliberately a
-different secret: it lives in Google's infrastructure and opens five columns of
-one table.
+the spend limit on the Anthropic key's workspace. `DOJI_EMAIL_SECRET` is
+deliberately a different secret: it lives in Google's infrastructure and opens
+five columns of one table.
 
 **One value, two stores, two spellings**: the functions read `DOJI_CRON_SECRET`,
 the database reads `doji_cron_secret` from Vault — the four calling jobs and the

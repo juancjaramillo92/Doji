@@ -272,7 +272,7 @@ a double reply.
 in Edge secrets and in the cron jobs. Every new name is another pair spelled in
 two places that fails quietly when one is wrong — the failure `CLAUDE.md` lists
 under *Two names that are one value*. What a leak would spend is bounded by the
-cap on the Anthropic key.
+spend limit on the Anthropic key's workspace.
 **Revisit if:** anyone but him ever holds a credential here.
 
 ### R-23 — holding the function deploy until `test:db` passes

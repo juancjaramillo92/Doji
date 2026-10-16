@@ -18,8 +18,8 @@
 // runs hourly and dueNow answers against New York's own clock.
 //
 // Her cron secret is not harmless: here `?force=1` spends money, a briefing at
-// a time. The bound is the spend cap on the Anthropic key, the one place one
-// can be enforced.
+// a time. The bound is the spend limit on the Anthropic key's workspace, the
+// one place one can be enforced.
 //
 // Deploy:   supabase functions deploy doji-eugenia --no-verify-jwt
 // Register: setWebhook with secret_token = EUGENIA_WEBHOOK_SECRET and
