@@ -161,6 +161,17 @@ test('a close reaches Eugenia once, however often the poller re-upserts it', () 
   assert.equal(sql(`select string_agg(job, ',' order by job) from public.dispatch`), 'trade-event');
   sql(`truncate net.sent; update public.trades set fill_time = now() + interval '1 second' where id = 'PID4';`);
   assert.equal(sent(), '', 'a second write to a closed row tells her it closed again');
+
+  // Closed inside one poll gap, the email mints the row: no entry, its close
+  // already there. She is told when the poller adds the entry, and once.
+  sql(RESET + `insert into public.trades (id, user_id, direction, fill_time)
+               values ('PID9', '${U}', 'BUY', now());`);
+  assert.equal(sent(), '', 'a row minted by the email reaches someone before it has an entry');
+  sql(`update public.trades set entry_time = now() - interval '1 minute', entry_price = 2400 where id = 'PID9';`);
+  assert.equal(sql(`select string_agg(body->>'event', ',') from net.sent`), 'closed',
+    'a trade the email minted closed never reaches her');
+  sql(`truncate net.sent; update public.trades set entry_price = 2401 where id = 'PID9';`);
+  assert.equal(sent(), '', 'a re-upsert of a completed row tells her it closed again');
 });
 
 test('a missing secret costs the message, never the write', () => {

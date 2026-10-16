@@ -12,6 +12,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { briefDue, retryDue, charmFrame, FRAME } from '../supabase/functions/doji-eugenia/index.ts';
+import { nyDate } from '../supabase/functions/_shared/edge.ts';
 
 const MAIN = 'charm/main';
 
@@ -43,6 +44,7 @@ int main(int argc, char **argv) {
     while (scanf("%15s", op) == 1) {
         if (!strcmp(op, "due") && scanf("%lld", &t) == 1) printf("%d\\n", briefing_due((time_t)t));
         if (!strcmp(op, "announce") && scanf("%lld", &t) == 1) { briefing_announced((time_t)t); printf("ok\\n"); }
+        if (!strcmp(op, "today") && scanf("%lld", &t) == 1) printf("%d\\n", briefing_today((time_t)t));
         if (!strcmp(op, "lift") && scanf("%f %f %f %f %f %f", a, a + 1, a + 2, b, b + 1, b + 2) == 6)
             printf("%d\\n", lift_seen(a, b));
         if (!strcmp(op, "hold") && scanf("%f %f %f %f %f %f", a, a + 1, a + 2, b, b + 1, b + 2) == 6)
@@ -130,6 +132,22 @@ test('once she has announced the briefing she asks no more that day, and asks ag
   const thursday = epoch(new Date(Date.UTC(2026, 7, 20, 12, 5)));
   assert.deepEqual(charm([`due ${wednesday(9, 0)}`, `announce ${wednesday(8, 15)}`, `due ${wednesday(9, 0)}`, `due ${thursday}`]),
     ['1', 'ok', '0', '1']);
+});
+
+/* Her door serves today's briefing alone, so the dot that says one waits is
+   today's too: at midnight in New York it goes, as the server's day does. */
+test('the briefing she announced waits until midnight in New York, and no longer', () => {
+  // Announced at noon before each change of the clocks, then asked every half
+  // hour for two days, against the server's own day.
+  for (const noon of [Date.UTC(2026, 2, 7, 17), Date.UTC(2026, 9, 31, 16)]) {
+    const moments = Array.from({ length: 96 }, (_, i) => new Date(noon + i * 1_800_000));
+    const answers = charm([`announce ${epoch(new Date(noon))}`, ...moments.map(m => `today ${epoch(m)}`)]);
+    const wrong = moments.filter((m, i) => (answers[i + 1] === '1') !== (nyDate(m) === nyDate(new Date(noon))));
+    assert.deepEqual(wrong.map(m => m.toISOString()), [],
+      'the charm keeps a briefing waiting on a day her door no longer serves it, or drops it on its own day');
+  }
+  assert.deepEqual(charm([`today ${epoch(new Date(Date.UTC(2026, 9, 16, 16)))}`]), ['0'],
+    'a briefing waits that was never announced');
 });
 
 test('she never asks before the internet has set her clock', () => {

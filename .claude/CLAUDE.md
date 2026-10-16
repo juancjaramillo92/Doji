@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 771 tests, eight suites
+npm test      # 780 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -366,6 +366,12 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   figure printed, and in the briefing it is for the call alone — `SYSTEM` and
   `CRITIC` each hold that, and `agree.test.mjs` reads both. The market reads are
   derived from the URL constants, so a fourth door is held the day it arrives.
+- **The functions meet over HTTP, so both halves of a door are held.** Every
+  `?flag=value` one function or script sends another is read in the callee, and
+  every `tvRead` name is a door `doji-tradingview` opens: a flag the poller does
+  not read falls through to its sync. What each door answers is read by
+  `serve.test.mjs` the way she reads it, the real handlers serving her readers —
+  a fixture typed beside a reader cannot see a key renamed at the door.
 - **`CAL_BACK`/`CAL_AHEAD` carry the 08:00 briefing past tomorrow's 10:00**, read
   and write alike; `fold.test.mjs` derives the reach from the source.
 - **The trade event is a close alone** — an open does not call her, and an
@@ -406,9 +412,10 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   returns, each window bounded at the previous `return`. `keepDraft` is relative to
   the draft, with `TRIM_MOST` as `TRIM`'s ceiling.
 - **`SENDS` in `agree.test.mjs` is the census of paths that send**, derived from
-  source and compared with a declaration; the same shape covers growing reads,
-  flags, poller returns and tools. **Ask of any check whether it would notice a new
-  sibling arriving beside its subject.** The declarations live in
+  source — speaking, a turn of conversation or text through `say` — and compared
+  with a declaration that sets the apology apart; the same shape covers growing
+  reads, flags, poller returns and tools. **Ask of any check whether it would
+  notice a new sibling arriving beside its subject.** The declarations live in
   `agree.test.mjs`, the one file the symbol check cannot read.
 - **The trade event is exempt from `TRIM`**: it rewrites, and a paraphrased rule
   citation reaching him at the day's limit is how a sentence becomes an order.

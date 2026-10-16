@@ -14,7 +14,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 import { test, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 const ENV = {
@@ -519,4 +519,100 @@ test('doji-gladys: the charm cannot write anything but an answer, and is shut wi
   calls.length = 0;
   assert.equal((await shut(gladysCharm())).status, 401, 'the charm door opened with its secret unset');
   assert.deepEqual(calls, [], 'a shut charm door made a request');
+});
+
+/* ─── Between the functions, read as served ───────────────────────────────
+   Eugenia reads the poller and doji-tradingview over HTTP, and each side's
+   own tests hand the other a fixture typed beside it — a rename of a key on
+   one side passes both. So here her readers are served by the real handlers,
+   each answering from its vendor stubbed below, and what she makes of every
+   answer is asked: a key she reads that the door no longer serves is a
+   sentence that it could not be read, a meter row, or a call scored on bars
+   it never had. */
+const NOW_S = () => Math.floor(Date.now() / 1000);
+// Bars ending now, `every` seconds apart, at `price`.
+const tvBars = (count, every, price) => ({ success: true, bars: Array.from({ length: count }, (_, i) => {
+  const c = price + i / 100;
+  return { t: NOW_S() - (count - i) * every, o: c, h: c + 1, l: c - 1, c, v: 1000 + i };
+}) });
+const sse = (result) => new Response(`data: ${JSON.stringify({ jsonrpc: '2.0', id: 2, result })}\n\n`);
+
+function tradingViewAnswer(name, args) {
+  if (name === 'mcp-tv-get-ohlcv') {
+    if (args.symbol === 'COMEX:GC1!') return tvBars(args.count, 86_400, 4000);
+    if (args.symbol.startsWith('CBOT:ZQ')) return tvBars(args.count, 86_400, 96.1);
+    return tvBars(args.count, args.interval === '1D' ? 86_400 : 3600, 100);
+  }
+  if (name === 'mcp-tv-get-news') {
+    return { success: true, data: { headlines: [{ id: `${args.symbol}:1`, published: NOW_S() - 3600,
+      title: `A headline on ${args.symbol}`, provider: { name: 'Reuters' }, paywall: true }] } };
+  }
+  if (name === 'mcp-tv-get-symbol-data-batch') {
+    return { data: { 'AMEX:GLD': { description: 'SPDR Gold Shares', aum: 141.3e9, 'fund_flows.1M': 2.1e9 },
+                     'AMEX:IAU': { description: 'iShares Gold Trust', aum: 60e9 } }, missing: [] };
+  }
+  if (name === 'mcp-tv-get-economic-data') return RESERVES.CN;
+  return null;
+}
+
+// The poller's broker: every chart's bars are the captured minutes.
+const TRENDBARS = readFileSync(new URL('./fixtures/ctrader-get-trendbars.txt', import.meta.url), 'utf8');
+const RESERVES = JSON.parse(readFileSync(new URL('./fixtures/tradingview-reserves.json', import.meta.url), 'utf8'));
+
+test('every answer the poller and doji-tradingview serve Eugenia is one she reads', async () => {
+  const poller = await serving('doji-mcp-sync');
+  const tv = await serving('doji-tradingview');
+  const eugenia = await import(`../supabase/functions/doji-eugenia/index.ts?wire=${n++}`);
+  const stored = new Map(), runs = [], scored = [];
+  const made = new Date(Date.now() - 100 * 3600_000).toISOString();
+  respond = async (url, init) => {
+    const door = url.match(/^https:\/\/db\.test\/functions\/v1\/(doji-mcp-sync|doji-tradingview)\?/);
+    if (door) return (door[1] === 'doji-mcp-sync' ? poller : tv)(new Request(url, { headers: init.headers }));
+    if (url.startsWith('https://mcp.ctrader.com/') || url.startsWith('https://mcp.tradingview.com/')) {
+      const body = JSON.parse(init.body);
+      if (body.method === 'initialize') return new Response('{}', { headers: { 'mcp-session-id': 's' } });
+      if (body.method !== 'tools/call') return new Response('', { status: 202 });
+      if (url.includes('ctrader')) return new Response(TRENDBARS);
+      const served = tradingViewAnswer(body.params.name, body.params.arguments);
+      return sse(served ? { structuredContent: served } : { isError: true, content: [{ type: 'text', text: '{}' }] });
+    }
+    if (url.includes('/rest/v1/tradingview_auth')) {
+      return ok([{ id: 'current', access_token: 'A', expires_at: new Date(Date.now() + 3600_000).toISOString() }]);
+    }
+    if (url.includes('/rest/v1/eugenia_market')) {
+      if (init.method === 'POST') { const row = JSON.parse(init.body); stored.set(row.door, row); return ok({}, 201); }
+      const at = stored.get(url.match(/door=eq\.(\w+)/)[1]);
+      return ok(at ? [at] : []);
+    }
+    if (url.includes('/rest/v1/eugenia_runs')) { runs.push(...JSON.parse(init.body)); return ok({}, 201); }
+    // A call made long before the poller's window of bars reaches back.
+    if (url.includes('/rest/v1/eugenia_calls')) {
+      if (init.method === 'PATCH') { scored.push(JSON.parse(init.body)); return ok([{}]); }
+      return ok([{ id: 1, made_at: made, expires_at: new Date(Date.now() - 3600_000).toISOString(),
+                   direction: 'buy', entry: 4370, stop: 4360, target: 4390, condition: 'a retest' }]);
+    }
+    return ok([]);
+  };
+
+  await Promise.all([eugenia.storeMarket(), eugenia.storeTrend(), eugenia.storeRates(), eugenia.storeStructure()]);
+  assert.deepEqual([...stored.keys()].sort(), ['market', 'rates', 'structure', 'trend'],
+    'a door answered and nothing she could keep came of it');
+  const blocks = {
+    around: await eugenia.aroundBlock(), rates: await eugenia.ratesBlock(), news: await eugenia.headlinesBlock(),
+    volume: await eugenia.volumeBlock(), flows: await eugenia.flowsBlock(), structure: await eugenia.structureBlock(),
+  };
+  for (const [name, text] of Object.entries(blocks)) {
+    assert.doesNotMatch(text, /could not be read/, `the ${name} door answered and she says it could not be read`);
+  }
+  assert.match(blocks.around, /Dollar index[\s\S]*The weeks behind it/);
+  assert.match(blocks.news, /A headline on TVC:GOLD/);
+  assert.match(blocks.volume, /contracts/);
+  assert.match(blocks.flows, /China: \d+ t in/);
+  assert.match(blocks.flows, /SPDR Gold Shares/);
+
+  // The bars reach back thirty hours; a call made a hundred ago cannot be scored on them.
+  await eugenia.scoreCalls();
+  assert.deepEqual(scored.map(s => s.outcome), ['unread'],
+    'a call made before the bars the poller served is scored as though they reached it');
+  assert.deepEqual(runs.filter(r => !r.ok).map(r => r.detail), [], 'a read between the functions failed');
 });

@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // EUGENIA — market briefing and conversation  ·  Supabase Edge Function (Deno)
 // ───────────────────────────────────────────────────────────────────────────
-// The second bot: Gladys collects the journal, Eugenia does macro. Two
+// The second bot: Gladys collects the journal, Eugenia does macro. Three
 // callers, told apart by the secret they present:
 //
 //   x-doji-key                        the scheduled jobs and the trades
@@ -9,6 +9,8 @@
 //                                     speaking worker — postScheduled reads
 //                                     which.
 //   x-telegram-bot-api-secret-token   Telegram — he replied, answer him.
+//   x-charm-key                       her charm — he spoke to it, or it asks
+//                                     after the briefing.
 //
 // She owns no column of `trades` and has no write path to it: she reads the
 // journal through eugenia_trades, granted SELECT alone, and writes only her
@@ -26,7 +28,9 @@
 //           allowed_updates = ["message", "callback_query"] — without the
 //           second, the taps under a briefing are never delivered.
 // Secrets:  EUGENIA_BOT_TOKEN, EUGENIA_WEBHOOK_SECRET, TELEGRAM_CHAT_ID,
-//           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY
+//           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY; optional —
+//           each guarded where it is used — STT_URL, STT_KEY, TTS_KEY,
+//           EMBED_KEY and EUGENIA_CHARM_SECRET, unset, the charm's door is shut
 // ═══════════════════════════════════════════════════════════════════════════
 import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, TRADE_EVENT, REVIEW, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
@@ -1659,8 +1663,9 @@ export function scoreCall(c: Call, candles: Candle[], from: number): Score {
 
 /* Tonight's scoring: every call whose session has ended and is not yet scored,
    against one read of the bars. The PATCH is filtered on `outcome is null`, so
-   a retry never rescores one. Both outcomes are a row; never throws. */
-async function scoreCalls(): Promise<void> {
+   a retry never rescores one. Both outcomes are a row; never throws. Exported
+   so the bars it reads are served it by the poller's own door. */
+export async function scoreCalls(): Promise<void> {
   try {
     const due = await readRows<Call>('Calls',
       `eugenia_calls?select=*&outcome=is.null&expires_at=lte.${new Date().toISOString()}` +
@@ -4484,7 +4489,9 @@ export function charmFrame(kind: number, bytes: Uint8Array): Uint8Array {
   return out;
 }
 
-const BEAT = charmFrame(FRAME.voice, new Uint8Array(4_800));
+// The vendor's `pcm`, in samples a second: the rate the charm plays her voice at.
+const PCM_RATE = 24_000;
+const BEAT = charmFrame(FRAME.voice, new Uint8Array(PCM_RATE / 10 * 2));
 const BEAT_MS = 15_000;
 
 // Said at the end of an answer when the charm asks, once a charge: its battery is low.

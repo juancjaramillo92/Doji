@@ -298,6 +298,76 @@ test('the charm waits out her silence, records what her door takes, and asks the
   assert.deepEqual(asked, door.slice(1).sort(), 'the charm asks ?briefing= for a word her door does not answer, or misses one');
 });
 
+/* The rest of what the charm reads off her door is not a name but a value:
+   two headers she compares with one, and the rate her voice is played at,
+   which only the vendor's `pcm` fixes. */
+test('the charm sends the values her door compares, and plays her voice at its rate', () => {
+  const talk = source('charm/main/talk.c');
+  const compared = [...EUGENIA_TS.matchAll(/\.get\('(x-charm-[\w-]+)'\) === '([^']*)'/g)];
+  assert.ok(compared.length >= 2, `only ${compared.length} header values read out of doji-eugenia — the reader has gone blind`);
+  for (const [, name, value] of compared) {
+    assert.match(talk, new RegExp(`esp_http_client_set_header\\(h, "${name}", (?:[^;]*\\? )?"${value}"`),
+      `her door reads ${name} as '${value}' and the charm never sends that — what it means is never said`);
+  }
+  const rate = talk.match(/^#define HER_RATE\s+(\d+)/m), pcm = EUGENIA_TS.match(/^const PCM_RATE = ([\d_]+);$/m);
+  assert.ok(rate && pcm, 'talk.c or doji-eugenia no longer names the rate as this test reads it');
+  assert.equal(Number(rate[1]), Number(pcm[1].replace(/_/g, '')),
+    'the charm plays her voice at a rate the vendor does not speak it at');
+});
+
+/* Gladys's door answers JSON the charm picks apart by key, and takes an answer
+   as one key: a rename on either side is a charm that sees nothing waiting, or
+   an answer refused as a malformed body. */
+test('Gladys\'s charm reads the keys her door answers with, and posts the one it reads', () => {
+  const gladys = source('supabase/functions/doji-gladys/index.ts');
+  const answered = bodyOf(gladys, 'async function waiting(').match(/return json\(\{ ([^}]+) \}\);/);
+  assert.ok(answered, 'waiting() no longer answers as this test reads it');
+  const keys = answered[1].split(',').map(k => k.split(':')[0].trim());
+  const root = [...GLADYS_C.matchAll(/cJSON_GetObjectItem\(root, "(\w+)"\)/g)].map(m => m[1]);
+  assert.ok(root.length >= 2, 'gladys.c no longer reads her answer as this test reads it');
+  for (const k of root) {
+    assert.ok(keys.includes(k), `the charm reads "${k}" and her door answers ${keys.join(', ')}`);
+  }
+  const select = gladys.match(/const SELECT = "([^"]+)"/)[1].split(',');
+  const fields = [...GLADYS_C.matchAll(/cJSON_GetObjectItem\(trade, "(\w+)"\)/g)].map(m => m[1]);
+  assert.ok(fields.length, 'gladys.c no longer reads the trade as this test reads it');
+  for (const f of [...fields, ...Object.values(COLUMNS)]) {
+    assert.ok(select.includes(f), `the charm reads the trade's ${f} and her door does not select it`);
+  }
+  const posted = GLADYS_C.match(/"\{\\"(\w+)\\":\\"%s\|%s\|%s\\"\}"/);
+  assert.ok(posted, 'gladys.c no longer posts its answer as this test reads it');
+  assert.match(bodyOf(gladys, 'async function charmAnswer('), new RegExp(`\\?\\.${posted[1]}\\b`),
+    `the charm posts its answer as "${posted[1]}" and her door reads it under another key`);
+});
+
+/* The setup proves a key by asking its door: the answer a right key gets is a
+   status in setup.c and a refusal in each function. */
+test('the setup proves a key by the answers each door gives a right one', () => {
+  const m = source('charm/main/setup.c')
+    .match(/bool ok = status == (\d+) \|\| \(eugenia \? status == (\d+) : status == (\d+)\);/);
+  assert.ok(m, 'setup.c no longer judges a key as this test reads it');
+  const [short, eugenia, gladys] = m.slice(1);
+  const door = EUGENIA_TS.slice(EUGENIA_TS.indexOf('if (secretMatches(fromCharm, CHARM_SECRET))'));
+  assert.match(door, new RegExp(`"the charm needs STT_URL, STT_KEY and TTS_KEY" \\}, ${short}\\)`),
+    `the setup takes a ${short} as a right key at a door short of its vendors, and her door answers that otherwise`);
+  assert.match(door, new RegExp(`a recording, up to \\$\\{FILE_MAX\\} bytes\` \\}, ${eugenia}\\)`),
+    `the setup takes a ${eugenia} as Eugenia's answer to a right key, and her door refuses an empty recording otherwise`);
+  // Gladys's GET is waiting(), answered with json's own status.
+  assert.match(source('supabase/functions/doji-gladys/index.ts'), /\? await charmAnswer\(req\) : await waiting\(\)/);
+  assert.equal(source('supabase/functions/_shared/edge.ts').match(/export const json = \(body: unknown, status = (\d+)\)/)?.[1],
+    gladys, `the setup takes a ${gladys} as Gladys's answer to a right key, and her door answers what waits otherwise`);
+});
+
+/* Her door serves today's briefing alone, so the dot that says one waits goes
+   at midnight: decided by briefing_today, which the charm suite drives, and
+   asked where the marks are drawn, which only this can read. */
+test('the sleep screen never promises a briefing her door has stopped serving', () => {
+  const body = bodyOf(source('charm/main/main.c'), 'static void sleep_now(void) {');
+  const drop = body.indexOf('if (briefing_waits && !briefing_today(time(NULL))) briefing_waits = false;');
+  assert.ok(drop > -1 && body.indexOf('face_marks(briefing_waits') > drop,
+    'the sleep screen draws a briefing waiting before asking whether it is still today\'s');
+});
+
 /* The charm updates herself from the object the charm workflow publishes, and
    the workflow checks the image it builds holds the app where the bootloader
    looks: two names and an offset, each written in two files. */
@@ -3065,6 +3135,32 @@ test('every table the backup reads is ordered by a column it has', async () => {
   }
 });
 
+/* AND EVERY TABLE IS IN IT OR SAID NOT TO BE. A table left out of the backup
+   is lost the day it is needed, with nothing having said so; the ones left out
+   on purpose are declared, and the README's count is the backup's. */
+const NOT_BACKED_UP = {
+  eugenia_runs:     'the cost meter: the largest table, and facts about model calls rather than about him',
+  eugenia_market:   'a cache the next quarter hour refills',
+  sync_health:      'two heartbeats, rewritten by the next run',
+  dispatch:         'the ledger of calls made, settled and purged within a month',
+  tradingview_auth: 'a live refresh token, which must never sit in an artifact',
+  calendar_weeks:   'which weeks were fetched whole, refetched with ?history=',
+};
+
+test('every table schema.sql creates is in the backup, or said not to be', async () => {
+  const { TABLES } = await import('../scripts/backup.mjs');
+  const created = [...SCHEMA_SQL.matchAll(/create table if not exists public\.(\w+)/g)].map(m => m[1]);
+  assert.ok(created.length >= 10, `only ${created.length} tables read out of schema.sql — the reader has gone blind`);
+  const backed = TABLES.map(([t]) => t);
+  assert.deepEqual([...created].sort(), [...backed, ...Object.keys(NOT_BACKED_UP)].sort(),
+    'a table is neither in the backup nor said not to be, or one said not to be is in it');
+
+  const WORDS = ['ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen'];
+  const said = source('docs/README.md').match(/reads\s+(\w+) tables into one JSON artifact/);
+  assert.ok(said, 'the README no longer says how many tables the backup reads');
+  assert.equal(said[1], WORDS[backed.length - 10], `the README says ${said[1]} tables and the backup reads ${backed.length}`);
+});
+
 /* ─── verify.sql has to ask about everything the files declare ───────────────
    An object declared and never asked about is drift in the part nobody checks,
    and each fails silently by construction: a missing `*_app_read` policy is
@@ -4826,6 +4922,9 @@ test('the trades trigger fires on the transition, not on every poll', () => {
   assert.ok(closed, 'schema.sql no longer creates trades_eugenia_closed');
   assert.match(closed[0], /old\.fill_time is null/);
   assert.match(closed[0], /is distinct from/);
+  // And the close the email minted, which only the entry arriving can announce.
+  assert.match(closed[0], /old\.entry_time is null and new\.entry_time is distinct from null\s+and new\.fill_time is not null/,
+    'a trade closed inside one poll gap and minted by the email never reaches her');
   assert.ok(!/fill_time\s*<>/.test(closed[0]),
     'the close trigger compares fill_time with <>, which is NULL against an open ' +
     'position and therefore never fires');
@@ -5561,6 +5660,43 @@ test('Eugenia reaches a price through the poller and never holds the broker toke
       `function this repository deploys — every call is a 404`);
     assert.match(eugenia, new RegExp(`fetch\\(${name}[\\s\\S]{0,400}?x-doji-key`),
       `${name}'s read presents no secret, so the poller will refuse it 401`);
+  }
+});
+
+/* ─── A flag one function calls another with ─────────────────────────────────
+   The functions meet over HTTP, behind the cron secret, and a flag the callee
+   does not read falls through to whatever it does by default. For the poller
+   that is the sync: a renamed `?market=1` would run a write of the journal on
+   every quarter-hourly read and serve its JSON as the quote. So every flag a
+   function or a script sends another is read out of the callee's own source,
+   and the doors Eugenia builds from a name are read as names.
+   ─────────────────────────────────────────────────────────────────────────── */
+const FLAG_CALLERS = [...DEPLOYED.map(fn => `supabase/functions/${fn}/index.ts`),
+  ...readdirSync(new URL('../scripts', import.meta.url)).filter(f => f.endsWith('.mjs')).map(f => `scripts/${f}`)];
+
+test('every flag a function or a script calls another with is a flag that function reads', () => {
+  const called = FLAG_CALLERS.flatMap(path => [...uncomment(source(path))
+    .matchAll(/\/functions\/v1\/(doji-[\w-]+)\?(\w+)=(\w+)/g)].map(m => ({ path, fn: m[1], flag: m[2], value: m[3] })));
+  assert.ok(called.length >= 5, `only ${called.length} flagged calls found — the reader has gone blind`);
+  for (const { path, fn, flag, value } of called) {
+    assert.ok(DEPLOYED.includes(fn), `${path} calls ${fn}, which is not a function this repository deploys`);
+    assert.match(source(`supabase/functions/${fn}/index.ts`),
+      new RegExp(`searchParams\\.get\\("${flag}"\\) === "${value}"`),
+      `${path} calls ${fn}?${flag}=${value} and ${fn} never reads it — the request falls through to ` +
+      `whatever ${fn} does when nothing is asked`);
+  }
+});
+
+test('every door Eugenia reads TradingView through is a door doji-tradingview opens', () => {
+  const tv = source('supabase/functions/doji-tradingview/index.ts');
+  // tvRead builds the flag from a name: `?${door}=1`.
+  assert.match(bodyOf(EUGENIA_TS, 'async function tvRead('), /doji-tradingview\?\$\{door\}=1/,
+    'tvRead no longer asks for a door as this test reads its names');
+  const doors = [...new Set([...uncomment(EUGENIA_TS).matchAll(/\btvRead\("(\w+)"/g)].map(m => m[1]))];
+  assert.ok(doors.length >= 6, `only ${doors.length} doors read out of tvRead's callers — the reader has gone blind`);
+  for (const door of doors) {
+    assert.match(tv, new RegExp(`searchParams\\.get\\("${door}"\\) === "1"`),
+      `Eugenia reads doji-tradingview's ?${door}=1, and it has no such door — every read is a 400`);
   }
 });
 
@@ -6314,17 +6450,33 @@ const SENDS = {
                          'almost nothing TRIM checks is even reachable' },
 };
 
+/* The primitives every path sends through, and the one path that sends
+   without being a message of hers. Each found below by what it calls, so a
+   new path that sends as text is found as one that speaks is. */
+const SEND_PRIMITIVES = ['say', 'speak', 'sayAloud'];
+const SENDS_APART = {
+  jobFailed: 'the apology for a job that died: a fixed line per job and the ' +
+             'reason, which no gate may rewrite and no turn stores — it is how ' +
+             'he hears that something broke',
+};
+
 test('every path that sends him something is in the census', () => {
-  // A path that speaks, or one that takes a turn of conversation — the charm
-  // speaks through charmAudio rather than sayAloud, and is still a path that sends.
+  // A path that speaks, takes a turn of conversation, or sends text — the
+  // charm speaks through charmAudio rather than sayAloud, and a command's
+  // answer goes as text through say, and each is still a path that sends.
   const fns = [...EUGENIA_TS.matchAll(/^(?:export )?async function (\w+)/gm)]
     .map(m => [m[1], m.index]);
-  const sending = fns.filter(([, at]) => {
+  const sending = fns.filter(([name, at]) => {
     const end = EUGENIA_TS.indexOf('\n}\n', at);
-    return /await sayAloud\(|= await converse\(|charmAudio\(/.test(EUGENIA_TS.slice(at, end === -1 ? undefined : end));
+    return !SEND_PRIMITIVES.includes(name) &&
+      /await sayAloud\(|= await converse\(|charmAudio\(|\bsay\(|tg\("send/.test(EUGENIA_TS.slice(at, end === -1 ? undefined : end));
   }).map(([name]) => name).sort();
+  for (const name of SEND_PRIMITIVES) {
+    assert.match(EUGENIA_TS, new RegExp(`^(?:export )?async function ${name}\\(`, 'm'),
+      `${name} is no longer a primitive the census can set aside`);
+  }
 
-  assert.deepEqual(sending, Object.keys(SENDS).sort(),
+  assert.deepEqual(sending, [...Object.keys(SENDS), ...Object.keys(SENDS_APART)].sort(),
     'a path sends him something and is not in the census, or a censused one no ' +
     'longer sends — the census is what makes a missing gate visible, and it can ' +
     'only see paths it knows about');
