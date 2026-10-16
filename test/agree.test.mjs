@@ -6038,6 +6038,15 @@ test('the rate odds reach the briefing and a conversation, said the way FedWatch
   const body = (name) => EUGENIA_PROMPT.match(new RegExp(`export const ${name} = \`([\\s\\S]*?)\`;`))[1];
   assert.match(body('LATER_MEETINGS').replace(/\s+/g, ' '), /take the percentage out and keep which way futures lean/,
     'LATER_MEETINGS no longer says what to do with a later meeting given a percentage');
+  /* A CHAIN'S LAST LINK IS THE MECHANISM, NOT A VIEW — his decision of 16
+     October, after the position case failed one run in three on "makes gold
+     a harder sell". The writer and both gates read the one sentence, since
+     the gates rewrite last and would strip the link the writer kept. */
+  assert.match(body('MECHANISM').replace(/\s+/g, ' '), /Keep the link; take out the view\./,
+    'MECHANISM no longer says what stays and what goes');
+  for (const who of ['SYSTEM', 'CRITIC', 'TRIM']) {
+    assert.ok(body(who).includes('${MECHANISM}'), `${who} no longer reads MECHANISM, so it decides the last link alone`);
+  }
   for (const gate of ['CRITIC', 'TRIM']) {
     assert.ok(body(gate).includes('${LATER_MEETINGS}'),
       `${gate} no longer checks for a later meeting given a percentage — it runs last, ` +
