@@ -529,41 +529,48 @@ test('doji-gladys: the charm cannot write anything but an answer, and is shut wi
    answer is asked: a key she reads that the door no longer serves is a
    sentence that it could not be read, a meter row, or a call scored on bars
    it never had. */
-const NOW_S = () => Math.floor(Date.now() / 1000);
-// Bars ending now, `every` seconds apart, at `price`.
-const tvBars = (count, every, price) => ({ success: true, bars: Array.from({ length: count }, (_, i) => {
-  const c = price + i / 100;
-  return { t: NOW_S() - (count - i) * every, o: c, h: c + 1, l: c - 1, c, v: 1000 + i };
-}) });
-const sse = (result) => new Response(`data: ${JSON.stringify({ jsonrpc: '2.0', id: 2, result })}\n\n`);
 
+// The poller's broker: every chart's bars are the captured minutes. TradingView's
+// calendar is its 1 October capture, and its reserves China's.
+const TRENDBARS = readFileSync(new URL('./fixtures/ctrader-get-trendbars.txt', import.meta.url), 'utf8');
+const CALENDAR = JSON.parse(readFileSync(new URL('./fixtures/tradingview-calendar.json', import.meta.url), 'utf8'));
+const RESERVES = JSON.parse(readFileSync(new URL('./fixtures/tradingview-reserves.json', import.meta.url), 'utf8'));
+
+// Daily or hourly bars ending now, at `price`.
+const tvBars = (count, every, price) => {
+  const now = Math.floor(Date.now() / 1000);
+  return { success: true, bars: Array.from({ length: count }, (_, i) => {
+    const c = price + i / 100;
+    return { t: now - (count - i) * every, o: c, h: c + 1, l: c - 1, c, v: 1000 + i };
+  }) };
+};
+
+// What TradingView answers each tool with, as the envelope's result.
 function tradingViewAnswer(name, args) {
+  if (name === 'mcp-tv-get-economic-calendar') return CALENDAR.result;
   if (name === 'mcp-tv-get-ohlcv') {
-    if (args.symbol === 'COMEX:GC1!') return tvBars(args.count, 86_400, 4000);
-    if (args.symbol.startsWith('CBOT:ZQ')) return tvBars(args.count, 86_400, 96.1);
-    return tvBars(args.count, args.interval === '1D' ? 86_400 : 3600, 100);
+    const bars = args.symbol === 'COMEX:GC1!' ? tvBars(args.count, 86_400, 4000)
+      : args.symbol.startsWith('CBOT:ZQ') ? tvBars(args.count, 86_400, 96.1)
+      : tvBars(args.count, args.interval === '1D' ? 86_400 : 3600, 100);
+    return { structuredContent: bars };
   }
   if (name === 'mcp-tv-get-news') {
-    return { success: true, data: { headlines: [{ id: `${args.symbol}:1`, published: NOW_S() - 3600,
-      title: `A headline on ${args.symbol}`, provider: { name: 'Reuters' }, paywall: true }] } };
+    return { structuredContent: { success: true, data: { headlines: [{ id: `${args.symbol}:1`,
+      published: Math.floor(Date.now() / 1000) - 3600, title: `A headline on ${args.symbol}`,
+      provider: { name: 'Reuters' }, paywall: true }] } } };
   }
   if (name === 'mcp-tv-get-symbol-data-batch') {
-    return { data: { 'AMEX:GLD': { description: 'SPDR Gold Shares', aum: 141.3e9, 'fund_flows.1M': 2.1e9 },
-                     'AMEX:IAU': { description: 'iShares Gold Trust', aum: 60e9 } }, missing: [] };
+    return { structuredContent: { data: { 'AMEX:GLD': { description: 'SPDR Gold Shares', aum: 141.3e9,
+      'fund_flows.1M': 2.1e9 }, 'AMEX:IAU': { description: 'iShares Gold Trust', aum: 60e9 } }, missing: [] } };
   }
-  if (name === 'mcp-tv-get-economic-data') return RESERVES.CN;
-  return null;
+  return { structuredContent: RESERVES.CN };
 }
-
-// The poller's broker: every chart's bars are the captured minutes.
-const TRENDBARS = readFileSync(new URL('./fixtures/ctrader-get-trendbars.txt', import.meta.url), 'utf8');
-const RESERVES = JSON.parse(readFileSync(new URL('./fixtures/tradingview-reserves.json', import.meta.url), 'utf8'));
 
 test('every answer the poller and doji-tradingview serve Eugenia is one she reads', async () => {
   const poller = await serving('doji-mcp-sync');
   const tv = await serving('doji-tradingview');
   const eugenia = await import(`../supabase/functions/doji-eugenia/index.ts?wire=${n++}`);
-  const stored = new Map(), runs = [], scored = [];
+  const stored = new Map(), runs = [], scored = [], filed = [];
   const made = new Date(Date.now() - 100 * 3600_000).toISOString();
   respond = async (url, init) => {
     const door = url.match(/^https:\/\/db\.test\/functions\/v1\/(doji-mcp-sync|doji-tradingview)\?/);
@@ -573,8 +580,8 @@ test('every answer the poller and doji-tradingview serve Eugenia is one she read
       if (body.method === 'initialize') return new Response('{}', { headers: { 'mcp-session-id': 's' } });
       if (body.method !== 'tools/call') return new Response('', { status: 202 });
       if (url.includes('ctrader')) return new Response(TRENDBARS);
-      const served = tradingViewAnswer(body.params.name, body.params.arguments);
-      return sse(served ? { structuredContent: served } : { isError: true, content: [{ type: 'text', text: '{}' }] });
+      const result = tradingViewAnswer(body.params.name, body.params.arguments);
+      return new Response(`data: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, result })}\n\n`);
     }
     if (url.includes('/rest/v1/tradingview_auth')) {
       return ok([{ id: 'current', access_token: 'A', expires_at: new Date(Date.now() + 3600_000).toISOString() }]);
@@ -585,6 +592,7 @@ test('every answer the poller and doji-tradingview serve Eugenia is one she read
       return ok(at ? [at] : []);
     }
     if (url.includes('/rest/v1/eugenia_runs')) { runs.push(...JSON.parse(init.body)); return ok({}, 201); }
+    if (url.includes('/rest/v1/eugenia_calendar')) { filed.push(...JSON.parse(init.body)); return ok({}, 201); }
     // A call made long before the poller's window of bars reaches back.
     if (url.includes('/rest/v1/eugenia_calls')) {
       if (init.method === 'PATCH') { scored.push(JSON.parse(init.body)); return ok([{}]); }
@@ -609,6 +617,11 @@ test('every answer the poller and doji-tradingview serve Eugenia is one she read
   assert.match(blocks.volume, /contracts/);
   assert.match(blocks.flows, /China: \d+ t in/);
   assert.match(blocks.flows, /SPDR Gold Shares/);
+
+  // The calendar's capture, filed around the day it was taken.
+  const day = Date.parse('2026-10-01T12:00:00Z');
+  assert.equal(await eugenia.fileCalendar(day), filed.length);
+  assert.ok(filed.length, 'the calendar door answered and nothing was filed');
 
   // The bars reach back thirty hours; a call made a hundred ago cannot be scored on them.
   await eugenia.scoreCalls();

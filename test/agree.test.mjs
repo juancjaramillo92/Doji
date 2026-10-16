@@ -328,7 +328,8 @@ test('Gladys\'s charm reads the keys her door answers with, and posts the one it
   for (const k of root) {
     assert.ok(keys.includes(k), `the charm reads "${k}" and her door answers ${keys.join(', ')}`);
   }
-  const select = gladys.match(/const SELECT = "([^"]+)"/)[1].split(',');
+  const select = gladys.match(/const SELECT = "([^"]+)"/)?.[1].split(',');
+  assert.ok(select, 'doji-gladys no longer names the columns it selects as this test reads them');
   const fields = [...GLADYS_C.matchAll(/cJSON_GetObjectItem\(trade, "(\w+)"\)/g)].map(m => m[1]);
   assert.ok(fields.length, 'gladys.c no longer reads the trade as this test reads it');
   for (const f of [...fields, ...Object.values(COLUMNS)]) {
@@ -3155,10 +3156,11 @@ test('every table schema.sql creates is in the backup, or said not to be', async
   assert.deepEqual([...created].sort(), [...backed, ...Object.keys(NOT_BACKED_UP)].sort(),
     'a table is neither in the backup nor said not to be, or one said not to be is in it');
 
-  const WORDS = ['ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen'];
+  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+                 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen'];
   const said = source('docs/README.md').match(/reads\s+(\w+) tables into one JSON artifact/);
   assert.ok(said, 'the README no longer says how many tables the backup reads');
-  assert.equal(said[1], WORDS[backed.length - 10], `the README says ${said[1]} tables and the backup reads ${backed.length}`);
+  assert.equal(said[1], WORDS[backed.length], `the README says ${said[1]} tables and the backup reads ${backed.length}`);
 });
 
 /* ─── verify.sql has to ask about everything the files declare ───────────────
