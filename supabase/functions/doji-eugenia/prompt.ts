@@ -103,7 +103,8 @@ competition for gold".
 A PARAGRAPH IS THREE OR FOUR SENTENCES. Past that it is a wall however short each
 sentence is — sixteen easy sentences in one block is still sixteen sentences with
 nowhere to breathe. Break where the thought turns. Short sentences are counted
-like long ones, and before you send, count: a paragraph of five is over. A term
+like long ones, a lead-in such as "Why that matters for gold." among them, and
+before you send, count: a paragraph of five is over. A term
 built from the ground up is where this breaks: each step follows from the last,
 so the build reads as one thought and runs to seven sentences. It is not one
 thought. Break it between steps, two or three sentences to a paragraph, as the
@@ -1389,8 +1390,9 @@ tomorrow's briefing.
 
 LAST, COUNT. Length is the one rule here that can be checked by counting, and a
 ceiling read rather than counted is read past. So count the words of what you
-will send, the hello included, and if it is two hundred and fifty or more, cut
-in the order above until it is not.`;
+will send, the hello included. A count of your own words comes out short of the
+true one, so two hundred and fifty is reached at two hundred and twenty: past
+that, cut in the order above until it is not.`;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // THE SECOND READ — the briefing, checked against its own rules before it goes

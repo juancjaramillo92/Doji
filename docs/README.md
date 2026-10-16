@@ -1432,7 +1432,8 @@ read as hard when one sentence carries three ideas. The rules, in `WRITING`:
 - **No figures of speech.** *The relief in gold has been contained rather than
   clean* obeys every countable rule and still has to be decoded.
 - **A paragraph is three or four sentences.** Sixteen easy sentences in one
-  block is a wall. `CRITIC` and `TRIM` each COUNT this, and every em-dash, as
+  block is a wall, and a lead-in such as *"Why that matters for gold."* is one
+  of them. `CRITIC` and `TRIM` each COUNT this, and every em-dash, as
   their last step rather than reading for it among the rest.
 - **A number earns its place** by meaning something he can use; the briefing
   holds two to four, one budget the writer and `CRITIC` both state and a test
@@ -1502,7 +1503,9 @@ Under 250 words, with what to cut first named beside the count — figures from
 his journal, then her calls, then a commitment kept — and the verdict and the
 one thing to keep and one to change never cut, since a ceiling alone cuts what
 the message is for. **And she counts the words last**, as the gates count their
-countable rules: the first review the eval read came back at 258.
+countable rules: the first review the eval read came back at 258. Her count of
+her own words comes out short, so she cuts past 220, and 257 got through when
+she cut only at the ceiling.
 
 She is handed the week computed — `get_stats`' summary with his answers,
 `check_rules`' verdicts, her calls and her record — with his notes, the
