@@ -1029,8 +1029,10 @@ dated, folded by `foldTrend`. The briefing is about the weeks behind his chart,
 and twenty-five hourly bars reach one day, so the dollar's trend and which force
 moved over a month could come only off a search page. Counted in sessions, so a
 holiday moves a date rather than the gap; a series too short for a point keeps
-the points it reaches. `trendList` states levels on days and computes no change,
-as `aroundList` does, and `aroundBlock` carries it, so every reader of the market
+the points it reaches. Gold's own daily bars are read beside the list, for
+`fitOf`'s correlations alone (*Her analysis is never finished*), and a pair of
+series too short for a window gets no figure. `trendList` states levels on
+days and computes no change, as `aroundList` does, and `aroundBlock` carries it, so every reader of the market
 gets the weeks behind it. **Read once a New York day**: a daily close moves once
 a day, and sixteen more charts every quarter hour is the burst TradingView
 refuses, so `storeTrend` keeps a copy read today and asks again on a new day,
@@ -2240,7 +2242,16 @@ rather than searched for, his rules to hold them to, and a meter on each half.
 - **Fundamental: the weeks behind his chart.** The market around gold, the
   calendar and how each release has run against its consensus, what the
   futures price for the Fed, the positioning and the flows, read through §2's
-  six channels. Every read she gives is filed with the channel its chain ran
+  six channels. **And which force gold has been trading on**: `?trend=1` reads
+  gold's own daily bars beside the list and `fitOf` correlates gold's daily
+  changes with the real yield's and the dollar's over the last 20 and 60
+  sessions, each with its dates — the figure two dated levels cannot give and a
+  model cannot work out of them, and the one the years of central banks buying
+  through rising real yields made worth having. Bars are paired by the date
+  their session closes, since vendors stamp a daily bar at different hours;
+  **no capture here says which hours these use**, so the first live run's
+  figures are the check — a dollar index that tracks gold at nearly zero for
+  weeks is the sign of a pairing a day out. Every read she gives is filed with the channel its chain ran
   down.
 - **How a change is proved.** The map's readings by `scripts/calibrate.mjs`,
   her reading of a chart by `scripts/replay.mjs` over the same past mornings

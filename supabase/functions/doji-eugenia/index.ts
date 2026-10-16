@@ -3256,13 +3256,21 @@ export async function aroundBlock(): Promise<string> {
    gets the weeks behind it; never throws.
    ───────────────────────────────────────────────────────────────────────── */
 type Trend = { symbol: string; name: string; unit: string; points: { close: number; at: string }[] };
+type Fit = { symbol: string; name: string; sessions: number; r: number; from: string; to: string };
 
-export function trendList(answer: { market: Trend[]; missing: { name: string }[] }): string {
+/* `fits` is absent from a copy stored before the door computed them, which
+   the next daily read replaces. */
+export function trendList(answer: { market: Trend[]; missing: { name: string }[]; fits?: Fit[] }): string {
   const lines = answer.market.map(m =>
     `· ${m.name} ${m.points.map(p => `${figure(p.close, m.unit)} on ${civilDay(p.at.slice(0, 10))}`).join(", ")}`);
   if (answer.missing.length) lines.push(`· Not read just now: ${answer.missing.map(m => m.name).join(", ")}.`);
+  const fits = answer.fits ?? [];
   return `\n\nThe weeks behind it, from TradingView's daily closes a week, a month and three months ` +
-    `back:\n${lines.join("\n")}`;
+    `back:\n${lines.join("\n")}` +
+    (fits.length ? `\nHow closely gold's daily moves have tracked each, from -1 (opposite ways, day by day) ` +
+      `to +1 (together), a description of those sessions and never a cause:\n` +
+      fits.map(f => `· ${f.name}: ${f.r} over the last ${f.sessions} sessions, ${civilDay(f.from)} to ${civilDay(f.to)}`)
+        .join("\n") : "");
 }
 
 export async function trendBlock(): Promise<string> {

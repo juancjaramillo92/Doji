@@ -529,20 +529,58 @@ export function foldTrend(answer: any) {
   return points;
 }
 
+/* ─── What gold has been trading on ───────────────────────────────────────
+   §2's channels reach gold through the real yield and the dollar above all,
+   and which of them it follows changes: central banks buying through rising
+   real yields is the case that broke the old rule. Two dated levels cannot say
+   it, and a model cannot work a correlation out of them, so it is computed:
+   gold's daily changes against each one's, over FITS sessions, from -1 (the
+   two moving opposite ways, day by day) to +1 (together). A description of
+   the sessions behind it, and never a cause.
+
+   Paired by the date a bar's session closes — a bar opening between noon UTC
+   the day before and noon that day — since vendors stamp a daily bar at
+   different hours and no capture here says which these use; a date one series
+   lacks is dropped from both, never filled. Fewer pairs than the window asks
+   is no figure. */
+export const FITS = [20, 60];
+const FIT_AGAINST = ["FRED:DFII10", "TVC:DXY"];
+
+export function fitOf(gold: any[], other: any[], sessions: number) {
+  const day = (t: number) => new Date((t + 43_200) * 1000).toISOString().slice(0, 10);
+  const theirs = new Map(other.map(b => [day(b.t), b.c]));
+  const paired = gold.filter(b => theirs.has(day(b.t))).map(b => ({ at: day(b.t), g: b.c, o: theirs.get(day(b.t)) }));
+  if (paired.length < sessions + 1) return null;
+  const span = paired.slice(-(sessions + 1));
+  const dg = span.slice(1).map((p, i) => p.g - span[i].g), d = span.slice(1).map((p, i) => p.o - span[i].o);
+  const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const mg = mean(dg), mo = mean(d);
+  const cov = dg.reduce((a, x, i) => a + (x - mg) * (d[i] - mo), 0);
+  const spread = Math.sqrt(dg.reduce((a, x) => a + (x - mg) ** 2, 0) * d.reduce((a, x) => a + (x - mo) ** 2, 0));
+  if (!spread) return null;
+  return { sessions, r: Math.round(cov / spread * 100) / 100, from: span[0].at, to: span.at(-1)!.at };
+}
+
 export async function readTrend() {
   const signal = AbortSignal.timeout(DOOR_MS);
   const session = await tvSession();
   const market: Record<string, unknown>[] = [], missing: Record<string, string>[] = [];
-  await inLanes(MARKET, async (m, i) => {
+  const bars: Record<string, any[]> = {};
+  await inLanes([...MARKET, { symbol: GOLD[0], name: "Gold", unit: "$" }], async (m, i) => {
     try {
-      const points = foldTrend(await tvCall(session, "mcp-tv-get-ohlcv",
-        { symbol: m.symbol, interval: "1D", count: Math.max(...BACK) + 1 }, signal));
-      market[i] = { symbol: m.symbol, name: m.name, unit: m.unit, points };
+      const answer = await tvCall(session, "mcp-tv-get-ohlcv",
+        { symbol: m.symbol, interval: "1D", count: Math.max(...BACK, ...FITS) + 1 }, signal);
+      if (m.symbol === GOLD[0] || FIT_AGAINST.includes(m.symbol)) bars[m.symbol] = answer.bars ?? [];
+      if (m.symbol !== GOLD[0]) market[i] = { symbol: m.symbol, name: m.name, unit: m.unit, points: foldTrend(answer) };
     } catch (err) {
       missing[i] = { symbol: m.symbol, name: m.name, error: unreached(signal, err) };
     }
   });
-  return { ok: true, market: market.filter(Boolean), missing: missing.filter(Boolean) };
+  const fits = FIT_AGAINST.flatMap(symbol => FITS.map(n => {
+    const fit = bars[GOLD[0]] && bars[symbol] ? fitOf(bars[GOLD[0]], bars[symbol], n) : null;
+    return fit && { symbol, name: MARKET.find(m => m.symbol === symbol)!.name, ...fit };
+  })).filter(Boolean);
+  return { ok: true, market: market.filter(Boolean), missing: missing.filter(Boolean), fits };
 }
 
 /* ─── The headlines ────────────────────────────────────────────────────────

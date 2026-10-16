@@ -6077,10 +6077,14 @@ test('the long doors answer inside READ_MS', () => {
   for (const fn of ['readMarket', 'readTrend', 'readRates', 'readFlows']) {
     const body = bodyOf(tv, `export async function ${fn}(`);
     assert.match(body, /const signal = AbortSignal\.timeout\(DOOR_MS\)/, `${fn} carries no deadline`);
-    const calls = [...uncomment(body).matchAll(/tvCall\(session,[\s\S]*?\)\)/g)].map(m => m[0]);
+    // Each call read up to the deadline it carries: one that carries none runs
+    // on into the next call, and two calls in one match is the failure.
+    const calls = [...uncomment(body).matchAll(/tvCall\(session,[\s\S]*?, signal\)/g)].map(m => m[0]);
+    assert.equal(calls.length, (uncomment(body).match(/tvCall\(/g) ?? []).length,
+      `a tvCall in ${fn} carries no deadline`);
     assert.ok(calls.length >= 1, `read no tvCall in ${fn} — the reader has gone blind`);
     for (const call of calls) {
-      assert.match(call, /, signal\)\)$/, `${call.slice(0, 60)}… in ${fn} is outside the deadline`);
+      assert.equal(call.match(/tvCall\(/g).length, 1, `${call.slice(0, 60)}… in ${fn} is outside the deadline`);
     }
   }
 });

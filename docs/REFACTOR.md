@@ -683,6 +683,10 @@ day and carries what a pass misses.
 stripped. She reads two dated levels and says the window. A fund's money in or
 out is the one figure over a window, and the screener names the window.
 **Revisit if:** she is seen getting the arithmetic between two levels wrong.
+**Not a change over a window:** a correlation of gold's daily changes with the
+real yield's and the dollar's (`fitOf`, October 2026, his decision) is a
+figure two levels cannot give, stated with its sessions and its dates, so
+this refusal stands beside it.
 
 ### R-75 — a scoreboard of the channels, kept by the nightly pass
 **Deferred, not refused.** Which force moved over a week or a month is now

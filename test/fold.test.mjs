@@ -28,7 +28,7 @@ import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } fr
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, unwrap, foldCalendar,
   calendarWindow, foldBars, foldHeadlines, FOMC, contractMonths, foldRates, oddsOf, unlisted, zq, foldSessions,
-  readMarket, readRates, foldTrend, BACK, foldReserves, foldFunds, FUNDS, readFlows, RESERVES,
+  readMarket, readRates, foldTrend, BACK, FITS, fitOf, foldReserves, foldFunds, FUNDS, readFlows, RESERVES,
 } from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
@@ -1310,6 +1310,31 @@ test('daily bars fold to the closes a week, a month and three months of sessions
   assert.throws(() => foldTrend({ success: true }), /no bars/);
 });
 
+/* What gold has been trading on: gold's daily changes against another's,
+   paired by the date each bar's session closes, whatever hour a vendor stamps
+   it with. Gold opens at the 17:00 roll, 21:00 UTC the day before; FRED's
+   series at midnight UTC on its date. */
+test('gold\'s daily changes are correlated with another series over sessions paired by date', () => {
+  assert.deepEqual(FITS, [20, 60]);
+  const at = (i, hour) => Date.UTC(2026, 6, 15 + i, hour) / 1000;
+  const steps = [1, -2, 3, -1, 2, -3, 1, 2, -2, 1, 3, -1, -2, 2, 1, -3, 2, 1, -1, 2, 3, -2];
+  let g = 4000, o = 2;
+  const gold = [], real = [], dollar = [];
+  steps.forEach((d, i) => {
+    g += d * 10; o -= d / 100;
+    gold.push({ t: at(i, -3), c: g });                      // 21:00 UTC the day before
+    real.push({ t: at(i, 0), c: o });                       // midnight UTC on the date
+    dollar.push({ t: at(i, 0), c: 100 + (i % 2 ? d : -d) }); // nothing to do with gold
+  });
+  const fit = fitOf(gold, real, 20);
+  assert.deepEqual([fit.r, fit.sessions, fit.from, fit.to], [-1, 20, '2026-07-16', '2026-08-05'],
+    'series that move exactly opposite, a day apart in their stamps, were not paired by their session\'s date');
+  assert.ok(Math.abs(fitOf(gold, dollar, 20).r) < 0.5, 'an unrelated series read as gold\'s driver');
+  assert.equal(fitOf(gold, real, 60), null, 'a window longer than the pairs was given a figure');
+  assert.equal(fitOf(gold, real.filter((_, i) => i % 5), 20), null, 'dates one series lacks were filled');
+  assert.equal(fitOf(gold, gold.map(b => ({ ...b, c: 1 })), 20), null, 'a flat series was given a correlation');
+});
+
 const TREND = { ok: true, market: [
   { symbol: 'TVC:DXY', name: 'Dollar index', unit: '', points: [
     { close: 101.2, at: '2026-10-08T00:00:00.000Z' }, { close: 99.5, at: '2026-09-16T00:00:00.000Z' },
@@ -1325,6 +1350,10 @@ test('the weeks behind the market are levels on stated days, and no change is co
   assert.match(out, /· Ten-year breakeven inflation 2\.41% on 7 Oct/);
   assert.match(out, /Not read just now: Gold volatility index \(GVZ\)\./);
   assert.doesNotMatch(out, /\b(up|down|rose|fell|higher|lower)\b/);
+  assert.doesNotMatch(out, /tracked/, 'a copy stored before the fits says something about them');
+  const fitted = trendList({ ...TREND, fits: [
+    { symbol: 'FRED:DFII10', name: 'Ten-year real yield (TIPS)', sessions: 20, r: -0.62, from: '2026-09-15', to: '2026-10-13' }] });
+  assert.match(fitted, /How closely gold's daily moves have tracked each, from -1 \(opposite ways, day by day\) to \+1 \(together\), a description of those sessions and never a cause:\n· Ten-year real yield \(TIPS\): -0\.62 over the last 20 sessions, 15 Sept? to 13 Oct/);
 });
 
 /* ─── What central banks and the gold funds hold ─────────────────────────────

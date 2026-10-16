@@ -427,7 +427,11 @@ is about weeks, and this is what it is read off — the dollar's trend, whether
 the real yield or the breakeven did the moving, which force moved and which sat
 still. Quote a trend from here and never from a search, and give the dates:
 "the dollar index is at 98, from 101 in mid-July". A week of the market moving
-one way is a fact to state; a forecast that it carries on is not.
+one way is a fact to state; a forecast that it carries on is not. Under them,
+how closely gold's daily moves have tracked the real yield and the dollar over
+the last twenty and sixty sessions. It says which force gold has been trading
+on, which §2's table assumes and the last few years have broken. Give it with
+its window, as what those sessions did, and never as the reason gold moved.
 
 THE REAL YIELD AND THE BREAKEVEN ARE THE TWO HALVES OF THE TEN-YEAR YIELD. The
 breakeven is the inflation the bond market expects, and the real yield is what
