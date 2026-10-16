@@ -887,6 +887,11 @@ async function readVolume() {
      futures    what a daily bar of gold's front month carries
      flows      what ?flows=1 folds, raw: one economy's gold reserves and
                 the funds' screener columns, so the units can be read
+     china      what China's demand for gold could be read off: the names
+                Shanghai's gold goes by, a daily bar of its futures front month
+                in yuan a gram, and the yuan and the yen against the dollar —
+                the premium over London is that price in dollars an ounce
+                less gold's, and no reader is written before this is captured
 
    Every argument is written here; none is read from the request. */
 const GOLD = ["PEPPERSTONE:XAUUSD", "OANDA:XAUUSD", "FX_IDC:XAUUSD", "TVC:GOLD", "COMEX:GC1!"];
@@ -931,6 +936,12 @@ const PROBES: Record<string, () => Call[]> = {
   flows: () => [
     ["mcp-tv-get-economic-data", { symbol: "ECONOMICS:CNGRES", date_from: day(-RESERVE_DAYS) }],
     ["mcp-tv-get-symbol-data-batch", { symbols: FUNDS, columns: FUND_COLUMNS }],
+  ],
+  china: () => [
+    ["mcp-tv-search-symbols", { query: "Shanghai gold" }],
+    ["mcp-tv-search-symbols", { query: "SGE gold" }],
+    ...["SHFE:AU1!", "FX_IDC:USDCNH", "FX_IDC:USDCNY", "FX:USDJPY"]
+      .map((symbol): Call => ["mcp-tv-get-ohlcv", { symbol, interval: "1D", count: 3 }]),
   ],
 };
 

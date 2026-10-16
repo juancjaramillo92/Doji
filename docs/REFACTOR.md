@@ -662,6 +662,11 @@ one written before its probe. She reads both off their pages with `web_fetch`,
 dated and sourced.
 **Revisit if:** a capture of either is saved as a fixture, or a central bank
 outside the five starts moving the story.
+**China's premium is the same case, decided October 2026.** The fastest live
+read of central-bank and Chinese buying is the Shanghai premium — Shanghai's
+gold in dollars an ounce less London's — with the yuan beside it.
+`doji-tradingview?probe=china` asks for the names and a daily bar of each, raw;
+the reader is written against its capture, saved as a fixture, and not before.
 
 ### R-72 — gold's reaction to each print, filed beside it
 **Built, October 2026, his decision, without either cost named here.** A table

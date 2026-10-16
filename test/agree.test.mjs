@@ -5736,6 +5736,20 @@ test('every flag a function or a script calls another with is a flag that functi
   }
 });
 
+// The probes are what every reader was written after, and the README's table
+// is how a person knows which to run: one list, written twice.
+test('every probe doji-tradingview answers is a row of the README\'s probe table, and no row is gone', () => {
+  const tv = source('supabase/functions/doji-tradingview/index.ts');
+  const set = tv.match(/const PROBES: Record<string, \(\) => Call\[\]> = \{([\s\S]*?)\n\};/);
+  assert.ok(set, 'doji-tradingview no longer declares PROBES as this test reads it');
+  const probes = [...set[1].matchAll(/^  (\w+): \(\) =>/gm)].map(m => m[1]);
+  assert.ok(probes.length >= 8, `only ${probes.length} probes read — the reader has gone blind`);
+  const table = source('docs/README.md').match(/\| `\?probe=` \| what it asks \|\n\|---\|---\|\n((?:\|.*\n)+)/);
+  assert.ok(table, 'the README no longer carries the probe table');
+  assert.deepEqual([...table[1].matchAll(/^\| `(\w+)` \|/gm)].map(m => m[1]).sort(), [...probes].sort(),
+    'the probes doji-tradingview answers and the README\'s table have parted');
+});
+
 test('every door Eugenia reads TradingView through is a door doji-tradingview opens', () => {
   const tv = source('supabase/functions/doji-tradingview/index.ts');
   // tvRead builds the flag from a name: `?${door}=1`.
