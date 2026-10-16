@@ -68,7 +68,7 @@ import { CHANNELS, CHANNEL_STATES, SYSTEM } from '../supabase/functions/doji-eug
 import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { backup, readAll, TABLES } from '../scripts/backup.mjs';
 import { lastRun, stale } from '../scripts/health.mjs';
-import { score, table, readingsGrid, NEAR } from '../scripts/calibrate.mjs';
+import { score, table, readingsGrid, NEAR, HOLD, holdOf, holds, holdTable } from '../scripts/calibrate.mjs';
 import { replayed, tally, request as replayRequest, CLEAN_FROM } from '../scripts/replay.mjs';
 
 const USER = '00000000-0000-0000-0000-000000000001';
@@ -1138,6 +1138,35 @@ test('a replayed answer is refused, scored or no call, as the live path would ha
   assert.match(asked.messages[0].content, /no news, no calendar[\s\S]*This is YOUR map/,
     'the replay does not say she has her map and nothing else');
   assert.ok(CLEAN_FROM >= '2026-07-01', 'the replay walks into months the model may have read about');
+});
+
+/* WHETHER A MARK HOLDS, every doubt against the map, and the chance it is
+   measured against: the whole dollars nobody marked. */
+test('a mark holds when price goes back from it before going through, against chance', () => {
+  assert.equal(HOLD, 10);
+  const m = (n, high, low) => ({ t: n * 60_000, open: (high + low) / 2, high, low, close: (high + low) / 2 });
+  // Resistance at 4040, price at 4026: reached, then $10 back down.
+  assert.equal(holdOf(4040, 4026, [m(0, 4030, 4025), m(1, 4041, 4035), m(2, 4032, 4029)]), 'held');
+  assert.equal(holdOf(4040, 4026, [m(1, 4041, 4035), m(2, 4051, 4040)]), 'broken');
+  assert.equal(holdOf(4040, 4026, [m(1, 4041, 4035), m(2, 4050, 4030)]), 'broken', 'a bar doing both was read as held');
+  assert.equal(holdOf(4040, 4026, [m(1, 4041, 4035), m(2, 4045, 4033)]), null, 'a session that settled neither was settled');
+  assert.equal(holdOf(4040, 4026, [m(1, 4035, 4030)]), null, 'a mark price never reached was settled');
+  // Support at 4010, mirrored.
+  assert.equal(holdOf(4010, 4026, [m(1, 4015, 4009), m(2, 4021, 4012)]), 'held');
+  const served = { at: MAP_NOW, charts: MAP_CHARTS, bars: [m(0, 4030, 4021), m(1, 4050, 4045), m(2, 4061, 4055)] };
+  const got = holds(served);
+  // 4023 under price was reached first and price went $10 above it: held. 4049
+  // (the week's top) and 4050 (round) were run through; the 4060 previous-day
+  // high, reached at the end, settles nothing.
+  assert.deepEqual([got.levels, got.round, got.higher], [{ held: 1, broken: 1 }, { held: 0, broken: 1 }, { held: 0, broken: 0 }]);
+  assert.ok(got.chance.held + got.chance.broken > 0, 'no unmarked dollar was tested, so there is no chance to measure against');
+  assert.equal(holds({ ...served, bars: [] }), null);
+  const out = holdTable([got, got]);
+  assert.match(out, /^2 sessions; a mark holds when price goes \$10 back before \$10 through/);
+  assert.match(out, /levels {3}held 2 of 4 \(50%\)/);
+  const zero = { held: 0, broken: 0 };
+  assert.match(holdTable([{ levels: { held: 3, broken: 1 }, higher: zero, pools: zero, quarter: zero, round: zero,
+                            chance: { held: 1, broken: 1 } }]), /levels {3}held 3 of 4 \(75%\) {2}against chance 1\.50×/);
 });
 
 /* THE CALIBRATION SCORES A READING BY WHAT IT FOUND OF HIS, NOT BY HOW MUCH IT

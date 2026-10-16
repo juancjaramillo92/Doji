@@ -2088,7 +2088,19 @@ put that setup: at the range's edge for Support & Resistance, inside for Break
 & Retest. Today's readings are marked. Each row also scores the levels with
 the bigger charts' highs and lows added, against their own chance, since the
 entries door now serves the daily and 4H as they stood at his click: that
-column is what decides whether they join the levels. It changes nothing; a reading worth
+column is what decides whether they join the levels.
+
+**Whether her marks hold is measured too, of the map alone.** The same run
+then folds the map at 08:00 New York on each of the last sixty weekdays (the
+poller's `?replay=N`) and walks that session's minute bars: a mark price
+reached is **held** when price went `HOLD` ($10) back to the side it came
+from before going $10 through, and **broken** the other way round, a bar
+doing both counted broken. Every whole dollar the session reached that sits
+clear of every mark is the same test by chance, and each kind of mark —
+levels, the bigger charts' highs and lows, pools, quarters, round numbers —
+is printed against it. A kind that holds no more often than a price nobody
+marked is drawn for nothing. It is research, never handed to her: a hold rate
+beside a level would be a forecast. It changes nothing; a reading worth
 changing is a behaviour change to `structure.ts` with the table in its commit.
 
 ```sh
