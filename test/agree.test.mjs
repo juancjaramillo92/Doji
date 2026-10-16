@@ -5297,7 +5297,7 @@ test('the entries door serves only bars closed by the minute he clicked, for tra
   const body = bodyOf(src, 'async function readEntries(', 'doji-mcp-sync no longer has readEntries()');
   assert.match(body, /const at = Math\.floor\(Date\.parse\(t\.entry_time\) \/ MINUTE\) \* MINUTE;/,
     'the door no longer reads each chart to the minute of the entry');
-  assert.match(body, /readCharts\(session, at, LEVEL_CHARTS\)/, 'the door no longer reads the charts to the entry');
+  assert.match(body, /readCharts\(session, at, ENTRY_CHARTS\)/, 'the door no longer reads the charts to the entry');
   assert.match(body, /\?\.filter\(b => b\.t \+ c\.ms <= at\)/,
     'the door serves bars that closed after he clicked, so the calibration looks ahead');
   assert.match(body, /&order=entry_time\.desc&limit=\$\{ENTRIES\}/, 'the door no longer reads the newest entries, bounded');
@@ -5862,7 +5862,7 @@ test('the map is hers, printed, built into her call, and kept out of the briefin
      'the map\'s levels are not held to the printed-level rule'],
     [/nothing setup-flavoured comes off it in a message you start while he is in a position/,
      'the map can put a level beside his open position'],
-    [/YOUR CALL IS BUILT ON THE MAP\. Its level is a turn or a quarter on it/,
+    [/YOUR CALL IS BUILT ON THE MAP\. Its level is a turn, a quarter or a high or low off the bigger charts on it/,
      'her call is no longer built on his charts'],
     [/Break & Retest inside the range, Support & Resistance at its edge/,
      'her call no longer takes the setup his rules name for where the level sits'],

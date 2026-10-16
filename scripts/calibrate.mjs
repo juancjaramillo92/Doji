@@ -14,7 +14,11 @@
      every time and means nothing; the lift is what says it found HIS;
    · for an entry journalled with a setup, whether the map put that level
      where his rules put the setup: at the edge of the range for Support &
-     Resistance (R-06), inside it for Break & Retest (R-05).
+     Resistance (R-06), inside it for Break & Retest (R-05);
+   · the first two again with the bigger charts' highs and lows added — the
+     previous day's and week's, and the daily and 4H turns — which the map
+     holds apart from its levels until a run says they find more of his than
+     chance does.
 
    It changes nothing. A reading worth changing is a behaviour change to
    structure.ts, its own commit, with this run's table in the message.
@@ -48,10 +52,14 @@ const median = (xs) => {
 /* One set of readings against every entry. An entry the map draws no level for
    is a miss at no distance it can name, and adds nothing to the chance. */
 export function score(entries, setups, r) {
-  let hits = 0, chance = 0, judged = 0, agreed = 0;
+  let hits = 0, chance = 0, judged = 0, agreed = 0, wider = 0, widerChance = 0;
   const distances = [];
   for (const e of entries) {
-    const levels = foldStructure(e.charts, e.at, r).levels;
+    const map = foldStructure(e.charts, e.at, r);
+    const levels = map.levels;
+    const prices = [...new Set([...levels, ...map.higher].map(l => l.price))];
+    widerChance += Math.min(1, prices.length * NEAR / r.REACH);
+    if (prices.some(p => Math.abs(p - e.entry_price) <= NEAR)) wider++;
     chance += Math.min(1, levels.length * NEAR / r.REACH);
     if (!levels.length) continue;
     const nearest = levels.reduce((m, l) =>
@@ -71,6 +79,8 @@ export function score(entries, setups, r) {
     readings: { TURN: r.TURN, ON_GRID: r.ON_GRID, EDGE: r.EDGE },
     entries: n, hits, hit: n ? hits / n : null, chance: n ? chance / n : null,
     lift: hits && chance ? hits / chance : 0, median: median(distances), judged, agreed,
+    wider: n ? wider / n : null, widerChance: n ? widerChance / n : null,
+    widerLift: wider && widerChance ? wider / widerChance : 0,
   };
 }
 
@@ -82,7 +92,8 @@ export function table(rows) {
   const lines = [...rows].sort((a, b) => b.lift - a.lift).map(r =>
     `${today(r) ? '*' : ' '} TURN ${r.readings.TURN}  ON_GRID ${r.readings.ON_GRID}  EDGE ${r.readings.EDGE}` +
     `  at a level ${pct(r.hit)} (chance ${pct(r.chance)}, lift ${r.lift.toFixed(2)})` +
-    `  median $${r.median ?? '—'}  setup agrees ${r.agreed}/${r.judged}`);
+    `  median $${r.median ?? '—'}  setup agrees ${r.agreed}/${r.judged}` +
+    `  with the bigger charts ${pct(r.wider)} (chance ${pct(r.widerChance)}, lift ${r.widerLift.toFixed(2)})`);
   return [`${rows[0]?.entries ?? 0} entries, within $${NEAR} of a level; * is today's readings`, ...lines].join('\n');
 }
 

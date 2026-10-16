@@ -59,12 +59,16 @@ export interface Quarter { price: number; round: boolean; turned: boolean }
 export interface Sweep { period: Period; at: number; level: number; kind: 'high' | 'low'; wick: number; close: number }
 export interface Pool { price: number; kind: 'high' | 'low'; periods: Period[]; touches: number[] }
 export interface Session { name: string; from: number; to: number; high: number; low: number }
+/* `daily` marks one read off a daily bar, timed by the session it closed:
+   a daily bar knows its high, not when it printed. */
+export interface Mark { price: number; from: { what: string; at: number; daily: boolean }[] }
 export interface Shape { body: number; upper: number; lower: number; through: { price: number; closed: 'above' | 'below' | 'on' }[] }
 export interface Structure {
   last: Candle | null;
   bias: Bias[];
   range: { high: Turn; low: Turn } | null;
   levels: Level[];
+  higher: Mark[];
   pools: Pool[];
   grid: Quarter[];
   sweeps: Sweep[];
@@ -196,6 +200,45 @@ function levelsOf(charts: Partial<Record<Period, Candle[]>>, now: number, price:
   return levels.sort((a, b) => b.price - a.price);
 }
 
+/* §4.2's "previous high or low" off the bigger charts: the last closed day's
+   high and low, the last whole week's, and the turns on the daily and 4H,
+   within REACH and merged within ON_GRID. Kept apart from `levels`, which is
+   §4's 1H and 30m marking and what the calibration scores, so a run can say
+   whether these find his entries before they join it. A daily bar opens at the
+   17:00 New York roll and closes on its session's date, which is also that
+   instant's UTC date, so its week needs no time zone. */
+function higherOf(charts: Partial<Record<Period, Candle[]>>, now: number, price: number, r: Readings): Mark[] {
+  const daily = closed(charts.D_1 ?? [], 'D_1', now);
+  const found: { price: number; what: string; at: number; daily: boolean }[] = [];
+  const on = (b: Candle, price: number, what: string) => ({ price, what, at: b.t + DAY, daily: true });
+  const day = daily.at(-1);
+  if (day) found.push(on(day, day.high, "the previous day's high"), on(day, day.low, "the previous day's low"));
+  const monday = (b: Candle) => {
+    const d = new Date(b.t + DAY);
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - ((d.getUTCDay() + 6) % 7) * DAY;
+  };
+  const forming = charts.D_1?.at(-1);
+  const current = forming ? monday(forming) : null;
+  const before = daily.filter(b => monday(b) !== current);
+  const week = before.length ? before.filter(b => monday(b) === monday(before.at(-1)!)) : [];
+  if (week.length) {
+    const top = week.reduce((m, b) => b.high > m.high ? b : m), bottom = week.reduce((m, b) => b.low < m.low ? b : m);
+    found.push(on(top, top.high, "the previous week's high"), on(bottom, bottom.low, "the previous week's low"));
+  }
+  for (const t of turns(daily, r.TURN)) found.push({ price: t.price, what: `a daily ${t.kind}`, at: t.at + DAY, daily: true });
+  for (const t of turns(closed(charts.H_4 ?? [], 'H_4', now), r.TURN)) {
+    found.push({ price: t.price, what: `a 4H ${t.kind}`, at: t.at, daily: false });
+  }
+  const marks: Mark[] = [];
+  for (const f of found.filter(f => Math.abs(f.price - price) <= r.REACH)) {
+    const same = marks.find(m => Math.abs(m.price - f.price) <= r.ON_GRID);
+    const from = { what: f.what, at: f.at, daily: f.daily };
+    if (same) { if (!same.from.some(x => x.what === f.what)) same.from.push(from); continue; }
+    marks.push({ price: f.price, from: [from] });
+  }
+  return marks.sort((a, b) => b.price - a.price);
+}
+
 /* Contiguous runs of one session name over the last day, the bar still
    forming included: a session's range so far is what has printed. */
 function sessionsOf(bars: Candle[], p: Period, since: number): Session[] {
@@ -247,6 +290,7 @@ export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: nu
   } : null;
 
   const levels = last ? levelsOf(charts, now, last.close, range, r) : [];
+  const higher = last ? higherOf(charts, now, last.close, r) : [];
   // One line for a pool both level charts show.
   const pools: Pool[] = [];
   for (const p of (['H_1', 'M_30'] as const).flatMap(p => poolsOf(p, read(p), r))) {
@@ -265,7 +309,7 @@ export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: nu
   }
 
   // Every price the map marks, which a candle is read against.
-  const marks = [...new Set([...levels, ...pools, ...grid].map(m => m.price))];
+  const marks = [...new Set([...levels, ...higher, ...pools, ...grid].map(m => m.price))];
   const since = now - DAY;
   const daily = read('D_1');
   const forming = charts.D_1?.at(-1);
@@ -275,6 +319,7 @@ export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: nu
       .filter(([, bars]) => bars.length).map(([p, bars]) => biasOf(p, bars, r.TURN)),
     range,
     levels,
+    higher,
     pools,
     grid,
     sweeps: (['H_1', 'M_15'] as const).flatMap(p => sweepsOf(p, read(p), since, r.TURN))

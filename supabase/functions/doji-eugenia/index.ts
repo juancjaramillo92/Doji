@@ -1148,7 +1148,8 @@ const STRUCTURE_TOOL = {
   description:
     "His six charts, read off his own broker's bars every quarter hour: the turns on the daily, " +
     "4H and 1H, the sequence they make and whether the last close has broken it; where price has turned on the 1H and 30m, with the $25 " +
-    "grid beside them and where the two agree; which of those sit at the edge of the week's hourly " +
+    "grid beside them and where the two agree; the previous day's and week's highs and lows and " +
+    "the daily and 4H turns near price; which of those sit at the edge of the week's hourly " +
     "range and which inside it; equal highs and lows still resting, the liquidity pools of his " +
     "step 2; wicks through a turn that closed back; the sessions' ranges; the average daily range; " +
     "and the last four closed 15m and 5m candles, each with its body, its wicks and the marks it " +
@@ -3327,6 +3328,11 @@ export function structureList(s: Structure, now = Date.now()): string {
       `, on the ${l.periods.map(name).join(" and ")}, newest ${when(l.at)}` +
       (l.quarter === null ? "" : `; on the ${l.quarter} ${l.quarter % (2 * GRID) === 0 ? "round number" : "quarter"}`) +
       (l.edge ? `; at the ${l.edge} of the week's range` : s.range ? "; inside the range" : "")) : ["· none"]),
+    ...(s.higher.length
+      ? [`On the bigger charts, within $${READINGS.REACH}: the highs and lows §4.2 calls important levels:`,
+         ...s.higher.map(m => `· ${m.price} — ` + m.from.map(f =>
+           `${f.what}, ${f.daily ? `the session closing ${when(f.at)}` : when(f.at)}`).join("; "))]
+      : [`No previous day's, previous week's or daily and 4H high or low within $${READINGS.REACH}.`]),
     ...(s.pools.length
       ? ["Where highs or lows have printed level and still rest, the stops beyond them not yet taken:",
          ...s.pools.map(p => `· ${p.price} — equal ${p.kind}s, on the ${p.periods.map(name).join(" and ")}, ` +

@@ -2038,6 +2038,14 @@ broker token stays in the poller, as for `get_market` — and `foldStructure` in
   `ON_GRID` ($3), a high and a low on one price being a level that has flipped;
   the quarter it sits on, if one is within $3; and the `$25` grid beside them,
   00 and 50 round, where a turn on a quarter is §4's stronger level.
+- **The bigger charts' highs and lows** (`higher`): the previous day's and
+  the previous week's high and low, and the turns on the daily and 4H, within
+  `REACH` and merged within `ON_GRID` — §4.2's *previous high or low*, which
+  the level charts alone miss once it is more than a week old. A daily bar
+  knows its high but not when it printed, so those are timed by the session
+  they closed. **Held apart from the levels**, which are §4's 1H and 30m
+  marking and what the calibration scores, until a run says they find more of
+  his entries than chance does; a candle is read against both.
 - **R-05 against R-06**: the week of hourly bars is the range, and a level
   within `EDGE` ($5) of its high or low is at its edge, the rest inside it.
 - **Step 2's liquidity pools** (`poolsOf`): two highs within `EQUAL` ($1.50),
@@ -2068,7 +2076,10 @@ chance given how many the readings draw — the **lift**, since readings that
 draw a level every five dollars find every entry and mean nothing — the median
 distance, and how often a level he journalled a setup at sits where his rules
 put that setup: at the range's edge for Support & Resistance, inside for Break
-& Retest. Today's readings are marked. It changes nothing; a reading worth
+& Retest. Today's readings are marked. Each row also scores the levels with
+the bigger charts' highs and lows added, against their own chance, since the
+entries door now serves the daily and 4H as they stood at his click: that
+column is what decides whether they join the levels. It changes nothing; a reading worth
 changing is a behaviour change to `structure.ts` with the table in its commit.
 
 ```sh
@@ -2114,8 +2125,8 @@ you.
 - **Filed before it is said.** A level about where price goes next is allowed
   in a filed call and nowhere else, since a call in words alone is a tip nobody
   scores. Both gates keep a filed call whole and never change a number in it.
-- **Built on her map of his charts.** Its level is a turn or a quarter on the
-  map, its setup the one his rules name for where the level sits, its stop
+- **Built on her map of his charts.** Its level is a turn, a quarter or a high
+  or low off the bigger charts on the map, its setup the one his rules name for where the level sits, its stop
   where the idea is wrong beyond it. A call whose level is not on the map is a
   guess, and one that needs a chart the map says was not read is not made.
 - **A call can wait for its setup.** In the morning the setup is usually not

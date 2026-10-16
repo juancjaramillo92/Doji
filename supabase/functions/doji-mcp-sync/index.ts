@@ -566,11 +566,12 @@ async function readCharts(session: Record<string, string>, to: number, charts: r
    For scripts/calibrate.mjs, which folds her map at the minute of each of his
    newest entries and asks whether it had the level he traded. The trades come
    from the table, never the request, so the door still puts nothing a caller
-   sends into a broker call. The two level charts only, and only bars closed by
-   the minute he clicked: one that closed after it holds prices he could not
-   have seen, and a map drawn from it would find his level by looking ahead. */
+   sends into a broker call. The two level charts and the two bigger ones the
+   map reads highs and lows off, and only bars closed by the minute he clicked:
+   one that closed after it holds prices he could not have seen, and a map
+   drawn from it would find his level by looking ahead. */
 const ENTRIES = 20;
-const LEVEL_CHARTS = CHARTS.filter(c => c.period === "H_1" || c.period === "M_30");
+const ENTRY_CHARTS = CHARTS.filter(c => ["D_1", "H_4", "H_1", "M_30"].includes(c.period));
 
 async function readEntries(session: Record<string, string>) {
   const res = await fetch(
@@ -582,8 +583,8 @@ async function readEntries(session: Record<string, string>) {
   const out = [];
   for (const t of await res.json() as { id: string; direction: string; entry_time: string; entry_price: number }[]) {
     const at = Math.floor(Date.parse(t.entry_time) / MINUTE) * MINUTE;
-    const { charts, missing } = await readCharts(session, at, LEVEL_CHARTS);
-    for (const c of LEVEL_CHARTS) charts[c.period] = charts[c.period]?.filter(b => b.t + c.ms <= at);
+    const { charts, missing } = await readCharts(session, at, ENTRY_CHARTS);
+    for (const c of ENTRY_CHARTS) charts[c.period] = charts[c.period]?.filter(b => b.t + c.ms <= at);
     out.push({ ...t, at, charts, missing });
   }
   return out;

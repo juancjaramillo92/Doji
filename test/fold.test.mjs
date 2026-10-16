@@ -1048,6 +1048,29 @@ test('a candle is said by its body, its wicks and the marks it closed beyond', (
     "the fold reads a candle against fewer marks than the map draws: the 4023 level and pool, and the 4025 quarter");
 });
 
+/* §4.2's "previous high or low" off the bigger charts. On the fixture the
+   15th is forming, so the 14th is the previous day, and no week has closed. */
+test('the bigger charts give the previous day, the previous week and their turns', () => {
+  const map = foldStructure(MAP_CHARTS, MAP_NOW);
+  assert.deepEqual(map.higher.map(m => [m.price, m.from.map(f => f.what)]), [
+    [4060, ["the previous day's high"]], [4000, ["the previous day's low"]]]);
+  assert.equal(map.higher[0].from[0].at, Date.UTC(2026, 9, 14, 21), 'the previous day is not timed by the session it closed');
+  // Two weeks of daily bars, Sunday's 21:00 open a Monday session: the week
+  // before the one forming runs 5 to 9 October.
+  const D = 86_400_000, open = Date.UTC(2026, 9, 4, 21);
+  const daily = [4010, 4015, 4020, 4058, 4012, 4030, 4031, 4033, 4032]
+    .map((h, i) => candle(open + i * D + (i >= 5 ? 2 * D : 0), h, h - 30));
+  const weeks = foldStructure({ D_1: daily, M_5: [candle(MAP_NOW, 4030, 4025, 4027)] }, MAP_NOW);
+  const said = (what) => weeks.higher.find(m => m.from.some(f => f.what === what))?.price;
+  assert.equal(said("the previous week's high"), 4058, 'the week before the forming one was not read whole');
+  assert.equal(said("the previous week's low"), 3980);
+  assert.equal(said("the previous day's high"), 4033, 'the last closed day is not the previous day');
+  assert.ok(weeks.higher.find(m => m.price === 4058).from.some(f => f.what === 'a daily high'),
+    "a daily turn on the previous week's high is not merged into its line");
+  assert.ok(!weeks.higher.some(m => Math.abs(m.price - 4027) > READINGS.REACH),
+    `a mark more than $${READINGS.REACH} away is on the map`);
+});
+
 test('the map is said as hers, with every price timed and nothing about what comes next', () => {
   const out = structureList(foldStructure(MAP_CHARTS, MAP_NOW), MAP_NOW);
   assert.match(out, /This is YOUR map, computed from the bars; his is drawn in TradingView/);
@@ -1062,6 +1085,7 @@ test('the map is said as hers, with every price timed and nothing about what com
   assert.match(out, /· 4049 — a high, on the 1H, newest 23:00 ET Wednesday 14 Oct; on the 4050 round number; at the top of the week's range/);
   assert.match(out, /· 4023 — turned both ways, a level that has flipped, on the 30m and 1H, newest 07:30 ET; on the 4025 quarter; inside the range/);
   assert.match(out, /4050 \(round, a turn sits on it\)/);
+  assert.match(out, /On the bigger charts, within \$60[^\n]*\n· 4060 — the previous day's high, the session closing 17:00 ET Wednesday 14 Oct\n· 4000 — the previous day's low/);
   assert.match(out, /No wick through a turn closed back in the last day\./);
   assert.match(out, /09:00 ET to 10:15 so far, 4020 to 4031/);
   assert.match(out, /averaged \$50 over the last 14 sessions; this session has covered \$30 so far\./);
@@ -1107,6 +1131,13 @@ test('the calibration scores her map by the levels he traded, against chance', (
   const out = table([got]);
   assert.match(out, /^3 entries, within \$3 of a level/);
   assert.match(out, /\* TURN 3  ON_GRID 3  EDGE 5  at a level 67% \(chance 15%, lift 4\.44\)  median \$2  setup agrees 1\/2/);
+  // With the daily bars, the previous day's low at 4000 finds the third entry,
+  // and its high at 4060 adds to chance without finding one: five marks, 25%.
+  const bigger = score(entries.map(e => ({ ...e, charts: { ...charts, D_1: MAP_CHARTS.D_1 } })), setups, today);
+  assert.deepEqual([bigger.hits, bigger.chance], [got.hits, got.chance], 'the bigger charts moved the levels the map is scored on');
+  assert.deepEqual([bigger.wider, bigger.widerChance, bigger.widerLift], [1, 0.25, 4],
+    "the bigger charts' highs and lows are not scored as the levels they would add");
+  assert.match(table([bigger]), /with the bigger charts 100% \(chance 25%, lift 4\.00\)/);
 });
 
 /* EVERY READ STAYS INSIDE WHAT ONE ANSWER CAN CARRY, as the broker's own
