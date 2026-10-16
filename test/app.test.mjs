@@ -841,18 +841,25 @@ test('the modal opens onto the form alone, with no broker controls', () => {
 
 test('the discipline answers are read from the modal body, not the document', () => {
   // pickRadio is scoped to #jm-body, so a decoy is how to assert it: a radio of
-  // the same name EARLIER in the document, answering the other way.
+  // the same name EARLIER in the document, answering the other way. In a form of
+  // its own, since radios sharing a name and no form are one group, and checking
+  // the decoy would uncheck the modal's answer — as a browser does, and jsdom
+  // from 30.1.
   seed([journalled({ id: 'PID1', pnl: 57.1, setup: 'Support & Resistance', followed_sl: false })]);
   app.Journal.open('PID1');
 
+  const elsewhere = win.document.createElement('form');
   const decoy = win.document.createElement('input');
   decoy.type = 'radio'; decoy.name = 'followed_sl'; decoy.value = 'yes'; decoy.checked = true;
-  win.document.body.insertBefore(decoy, win.document.body.firstChild);
+  elsewhere.appendChild(decoy);
+  win.document.body.insertBefore(elsewhere, win.document.body.firstChild);
   try {
+    assert.ok(win.document.querySelector('input[name="followed_sl"]:checked') === decoy,
+      'the decoy is not the first checked radio of the name, so it proves nothing');
     assert.equal(app.pickYN('followed_sl'), false);   // the form's NO, not the decoy's YES
     assert.equal(app.pickYN('followed_rules'), true);
   } finally {
-    decoy.remove();
+    elsewhere.remove();
     app.Journal.close();
   }
 });
