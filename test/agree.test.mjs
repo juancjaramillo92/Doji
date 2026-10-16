@@ -1208,7 +1208,7 @@ test('the client writes no colour of its own, and reads them all through cssToke
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('every door a function opens is written down in the README', () => {
-  const readme = source('README.md');
+  const readme = source('docs/README.md');
 
   const doors = new Set();
   for (const fn of DEPLOYED) {
@@ -1239,7 +1239,7 @@ test('every door a function opens is written down in the README', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the README names every setting, table, function, tool and command the code defines', () => {
-  const readme = source('README.md');
+  const readme = source('docs/README.md');
   const fns = readdirSync(new URL('../supabase/functions', import.meta.url), { recursive: true })
     .filter(f => f.endsWith('.ts')).map(f => source(`supabase/functions/${f}`)).join('\n');
   const all = (text, re) => [...new Set([...text.matchAll(re)].map(m => m[1]))];
@@ -1727,8 +1727,8 @@ test('the documents name only symbols the repository has', () => {
   const missing = [];
 
   /* REFACTOR.md too: its value is that a cold session can trust it. */
-  for (const doc of ['README.md', 'CLAUDE.md', 'REFACTOR.md']) {
-    const text = source(`${doc}`);
+  for (const doc of ['docs/README.md', '.claude/CLAUDE.md', 'docs/REFACTOR.md']) {
+    const text = source(doc);
     const named = new Set();
 
     for (const [, name] of text.matchAll(SYMBOLS)) {
@@ -1738,7 +1738,7 @@ test('the documents name only symbols the repository has', () => {
 
     // WITHOUT THIS THE LOOP BELOW PROVES NOTHING. A pattern that stopped
     // matching would report every document clean.
-    const floor = doc === 'REFACTOR.md' ? 10 : 40;
+    const floor = doc === 'docs/REFACTOR.md' ? 10 : 40;
     assert.ok(named.size > floor,
       `${doc}: only ${named.size} symbols found — the reader has gone blind`);
 
@@ -1775,7 +1775,7 @@ test('the Data model names every column the trades table has, and no other', () 
   assert.ok(columns.length >= 20,
     `only ${columns.length} columns read out of the schema — the reader has gone blind`);
 
-  const readme = source('README.md');
+  const readme = source('docs/README.md');
   const from = readme.indexOf('## Data model');
   const to   = readme.indexOf('## What is derived');
   assert.ok(from > -1 && to > from, 'the README has no Data model section to read');
@@ -1804,7 +1804,7 @@ test('the Data model names every column the trades table has, and no other', () 
    what the damaged one held. Read against the schema.
    ─────────────────────────────────────────────────────────────────────────── */
 test('the restore procedure writes every column the table lets it write', () => {
-  const readme = source('README.md');
+  const readme = source('docs/README.md');
   const sql = readme.match(/```sql\n-- 1\. paste the file's `tables.trades` array[\s\S]*?```/)?.[0];
   assert.ok(sql, 'the README no longer carries the restore procedure');
 
@@ -1839,7 +1839,7 @@ test('the restore procedure writes every column the table lets it write', () => 
 /* A path, whitespace, prose. An INDENTED entry is a detail under the directory
    above it, checked for existence rather than counted as coverage. */
 const layoutBlock = () => {
-  const found = source('README.md')
+  const found = source('docs/README.md')
     .match(/\n## Layout\n+```\n([\s\S]*?)\n```\n/);
   assert.ok(found, 'README.md has no Layout block');
 
@@ -2473,7 +2473,7 @@ test('every list of the rules check_rules answers is the list it evaluates', () 
   const lists = {
     'check_rules description': between(EUGENIA_TS, 'const CHECK_TOOL', 'input_schema'),
     'the prompt': between(EUGENIA_PROMPT, 'CHECKING HIS RULES', 'USE IT INSTEAD'),
-    'the README': between(source('README.md'), '`adherence.ts` evaluates the', '`check_rules` serves it'),
+    'the README': between(source('docs/README.md'), '`adherence.ts` evaluates the', '`check_rules` serves it'),
   };
 
   const WORDS = { five: 5, six: 6, seven: 7, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, eighteen: 18 };
@@ -2846,7 +2846,7 @@ test('the kinds a loop may have are the kinds the table accepts', () => {
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the README registers each bot for the updates its code actually handles', () => {
-  const readme = source('README.md');
+  const readme = source('docs/README.md');
   const wanted = {
     'doji-eugenia': ['message', 'callback_query'],
     'doji-gladys':  ['callback_query'],
@@ -3022,7 +3022,7 @@ test('the test count the instructions state is the count the suite runs', () => 
       .match(/^test\(/gm) || []).length, 0);
   assert.ok(total > 100, `counted ${total} tests — the pattern has stopped matching`);
 
-  const doc = source('CLAUDE.md');
+  const doc = source('.claude/CLAUDE.md');
   const stated = doc.match(/npm test\s+# (\d+) tests, (\w+) suites/);
   assert.ok(stated, 'CLAUDE.md no longer states what npm test prints');
   assert.equal(Number(stated[1]), total,
@@ -4319,7 +4319,7 @@ test('pace_line states its ceiling once and quotes that one', () => {
 
   /* AND THE PROSE HOLDS THE SAME NUMBER, a platform fact, so a plan change moves
      both or neither. */
-  const claude = source('CLAUDE.md');
+  const claude = source('.claude/CLAUDE.md');
   assert.ok(claude.includes(`${ms / 1000}s paid`),
     `CLAUDE.md does not name ${ms / 1000}s as the paid wall clock that pace_line watches ` +
     `— one of the two has been changed without the other`);
@@ -4382,7 +4382,7 @@ test('the writing worker spends what is left of its own clock, and no step more'
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the README names every cron job schema.sql schedules, on its stated schedule', () => {
-  const readme = source('README.md');
+  const readme = source('docs/README.md');
 
   const scheduled = new Map(
     [...CRON_SQL.matchAll(/cron\.schedule\(\s*'([\w-]+)',\s*'([^']+)'/g)]

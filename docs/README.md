@@ -38,10 +38,9 @@ manifest `background_color`, a dark `color-scheme` and an
 ## Layout
 
 ```
-README.md                               the contract: what the app does and why
-CLAUDE.md                               how to work on it; the README outranks it
-REFACTOR.md                             every move refused, and why
-RESEARCH-eugenia.md                     what other systems do that Eugenia did not
+docs/README.md                          the contract: what the app does and why
+docs/REFACTOR.md                        every move refused, and why
+.claude/CLAUDE.md                       how to work on it; the README outranks it
 index.html                              the entire application
 icon-512.png                            home-screen icon
 vercel.json                             no-cache header for the app shell
@@ -2079,8 +2078,8 @@ are refused (`REFACTOR.md` R-69): his rules read none.
 **A coach who cannot do the thing is not one**, so she trades beside you on
 paper, on your rules, and is scored on price. A call is a trade she would take:
 buy or sell, an entry, a stop, a target, and what price has to do first. You
-decided this in October 2026, after the evidence on both sides was put to you
-(`RESEARCH-eugenia.md`, §5).
+decided this on 15 October 2026, after the evidence on both sides was put to
+you.
 
 - **On your rules, checked in code.** `make_call` refuses a call off them before
   it is filed (`callProblem`): the stop no further than the $20 a full stop is
@@ -2147,8 +2146,8 @@ rather than searched for, his rules to hold them to, and a meter on each half.
   her calls by their record, her reads by theirs, counted per channel, and any
   change to her prompts by the eval, run before and after with `--plant` first
   (*Tests*). Both records count a month, so a month is the shortest span to
-  judge a change on. An idea not yet built is weighed the way
-  `RESEARCH-eugenia.md` weighs one; one refused goes in `REFACTOR.md`.
+  judge a change on. An idea refused goes in `REFACTOR.md`, with the
+  reasoning that decided it.
 
 ### What she remembers
 
