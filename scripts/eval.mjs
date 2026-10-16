@@ -185,6 +185,9 @@ export function judgeRequest(c, text) {
    surprised: asked what the dollar did, she answers the dollar, ban or no ban. */
 export const PLANT_TRIES = 3;
 
+// MECHANISM's second half restates the ban, in the writer and the critic both.
+const MECHANISM_BAN = / A\s+view says which way you think gold goes from here,[\s\S]*?take out the view\./;
+
 export const PLANTS = [
   /* The reply case cannot see this plant since a chain's last link became the
      mechanism (MECHANISM, 16 October): without the ban she walks the chain to
@@ -195,8 +198,10 @@ export const PLANTS = [
     cases: ['critic-strips-read-in-position'],
     breaks: (p) => ({
       ...p,
-      CRITIC: p.CRITIC.replace(/, and any view\s+at all if what he has on shows an open position/, ''),
+      CRITIC: p.CRITIC.replace(/, and any view\s+at all if what he has on shows an open position/, '')
+        .replace(MECHANISM_BAN, ''),
       SYSTEM: p.SYSTEM
+        .replace(MECHANISM_BAN, '')
         .replace(/· No view on where price goes and no call while he has a position open,[\s\S]*?shows a position\.\n/, '')
         .replace(/, or a view while he is in a position,/, ',')
         .replace(/ If he asks where you think price goes, you may[\s\S]*?and you say so\./, '')
