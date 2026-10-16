@@ -170,7 +170,9 @@ export function judgeRequest(c, text) {
    about a surprise, and the ban is what keeps it unsaid. It was still caught
    0 or 1 of 3, because the writer kept the ban in the sentence that lets her
    give a read when he asks: a permission on asking states the default, so it
-   goes too. */
+   goes too. On 16 October it fell to 0 of 3 again: two more copies stood,
+   that what she may say of a position is narrower than what she sees, and
+   that unprompted it does two things and no more. Both go. */
 export const PLANT_TRIES = 3;
 
 export const PLANTS = [
@@ -181,7 +183,10 @@ export const PLANTS = [
       SYSTEM: p.SYSTEM
         .replace(/· No view on where price goes and no call while he has a position open,[\s\S]*?shows a position\.\n/, '')
         .replace(/, or a view while he is in a position,/, ',')
-        .replace(/ If he asks where you think price goes, you may[\s\S]*?and you say so\./, ''),
+        .replace(/ If he asks where you think price goes, you may[\s\S]*?and you say so\./, '')
+        .replace(/ Read these rules before using it: this is the one thing you are given\s+where what you may SAY is narrower than what you can SEE\./, '')
+        .replace(/UNPROMPTED IT DOES TWO THINGS AND NO MORE\. It stops you writing anything[\s\S]*?as being about his trade\. And it lets you/,
+                 'It lets you'),
     }) },
   { why: 'the gates\' exception for a filed call, gone from TRIM',
     cases: ['trim-keeps-filed-call'],
