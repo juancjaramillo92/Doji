@@ -146,7 +146,8 @@ Nothing here sees pixels, realtime, auth, or the live database — `verify.sql`
 is that check and a person runs it. Nor whether the model still obeys her
 prompts: `scripts/eval.mjs` asks that, by hand, with `--plant` first; a prompt
 change is run through it before and after. Say so on any visual change. State on handback what was verified by running, what by reading, and
-what could not be verified.
+what could not be verified, and end every handback with what is still pending —
+his to do and yours — so nothing open goes unsaid.
 
 ---
 
