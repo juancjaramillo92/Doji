@@ -247,9 +247,9 @@ function r01(rows: TradeRow[]): RuleResult {
 /* ─── R-02 ─────────────────────────────────────────────────────────────────
    Stop never beyond $20 from entry, and never widened. §7: no loss with
    |exit − entry| > 20, and no closed trade whose stop in trade_stops moved away
-   from entry. The second half reaches only the trades the poller recorded, so
-   a loss with no history is judged on the cap alone and a win with none is not
-   in the population. An exit past a stop that never moved is slippage, and
+   from entry. The second half reaches only a trade the poller saw carry a
+   stop, so without one a loss is judged on the cap alone and a win is not in
+   the population. An exit past a stop that never moved is slippage, and
    passes.
 
    Each sighting is held against the last stop that rested, so a stop pulled
@@ -264,17 +264,15 @@ function r02(rows: TradeRow[], stops: Map<string, Stop[]>): RuleResult {
     if (!isBroker(t) || !closed(t)) continue;
     const loss = (t.pnl as number) < 0;
     const seen = history(stops, t.id).map(s => s.sl == null ? null : Number(s.sl));
-    if (!loss && !seen.length) continue;
-
     const rested = seen.filter((sl): sl is number => sl !== null);
-    const sided = t.direction === 'BUY' || t.direction === 'SELL';
-    const wider = sided && rested.some((sl, i) =>
+    if (!loss && !rested.length) continue;
+
+    const wider = rested.some((sl, i) =>
       i > 0 && (t.direction === 'BUY' ? sl < rested[i - 1] - CENT : sl > rested[i - 1] + CENT));
     const pulled = rested.length > 0 && seen[seen.length - 1] === null;
-    const moved = rested.some(sl => Math.abs(sl - rested[0]) > CENT);
 
     if ((loss && priced(t) && gap(t) > FULL_STOP + CENT) || wider) fail.push(t.id);
-    else if ((loss && !priced(t)) || pulled || (!sided && moved)) unknown.push(t.id);
+    else if ((loss && !priced(t)) || pulled) unknown.push(t.id);
     else pass.push(t.id);
   }
   return result('R-02', `losses further than $${FULL_STOP} from entry, and stops moved away from entry where the poller recorded them`,
