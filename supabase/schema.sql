@@ -853,12 +853,17 @@ $$;
 -- Broker rows only, never a soft-deleted one, and on the transition only: the
 -- poller re-upserts every two minutes and would fire it on every tick
 -- otherwise. `is distinct from`, since `<>` is null against the null it is
--- moving away from.
+-- moving away from. Two transitions, because a trade closed inside one poll
+-- gap can be minted by the email, already closed and with no entry: its close
+-- never moves, and the day it belongs to is known only once the poller adds
+-- the entry, so that is when she is told.
 create or replace trigger trades_eugenia_closed
   after update on public.trades
   for each row
   when (new.id like 'PID%' and new.deleted = false
-        and old.fill_time is null and new.fill_time is distinct from null)
+        and ((old.fill_time is null and new.fill_time is distinct from null)
+          or (old.entry_time is null and new.entry_time is distinct from null
+              and new.fill_time is not null)))
   execute function public.trades_eugenia_on_event();
 
 -- ─── What the app may see ──────────────────────────────────────────────────

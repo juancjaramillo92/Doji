@@ -124,6 +124,8 @@ static void close_eyes(void) {
    marks differ from what the panel already holds, then deep sleep until the
    next errand, the motion sensor armed. */
 static void sleep_now(void) {
+    // Her door reads today's briefing alone: past midnight, yesterday's is gone.
+    if (briefing_waits && !briefing_today(time(NULL))) briefing_waits = false;
     int charge = power_charge();
     bool low = power_low();
     int marks = face_marks(briefing_waits, trade_waits, low, offline, charge);

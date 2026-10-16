@@ -36,3 +36,9 @@ void briefing_announced(time_t now) {
     localtime_r(&now, &t);
     announced = day_of(&t);
 }
+
+bool briefing_today(time_t now) {
+    struct tm t;
+    localtime_r(&now, &t);
+    return day_of(&t) == announced;
+}

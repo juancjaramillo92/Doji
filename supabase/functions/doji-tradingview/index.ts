@@ -16,8 +16,9 @@
 //      place a tool name becomes a request. Each carries readOnlyHint in the
 //      listing kept in test/fixtures/tradingview-tools-list.json, which the
 //      test holds it against.
-//   2. ?connect=1, ?tools=1 and ?probe= present DOJI_CRON_SECRET on x-doji-key.
-//      ?probe= picks from a fixed set and every argument is written here.
+//   2. Every door but the two public paths presents DOJI_CRON_SECRET on
+//      x-doji-key. ?probe= picks from a fixed set and every argument is
+//      written here.
 //   3. /client and /callback are public because they must be. /callback acts
 //      only on a `state` ?connect=1 stored, compared in constant time and
 //      cleared on success.

@@ -9,3 +9,7 @@ bool briefing_due(time_t now);
 
 // She announced today's: no more asking until the next briefing.
 void briefing_announced(time_t now);
+
+/* Whether the briefing she announced is today's. Her door reads today's alone,
+   so a dot left from yesterday's would promise one it no longer serves. */
+bool briefing_today(time_t now);
