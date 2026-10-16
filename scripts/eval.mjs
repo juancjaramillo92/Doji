@@ -172,7 +172,10 @@ export function judgeRequest(c, text) {
    give a read when he asks: a permission on asking states the default, so it
    goes too. On 16 October it fell to 0 of 3 again: two more copies stood,
    that what she may say of a position is narrower than what she sees, and
-   that unprompted it does two things and no more. Both go. */
+   that unprompted it does two things and no more. Both go. It still caught 0
+   of 3: asked what the dollar was doing, she answered the dollar, ban or no
+   ban. The case now asks what the market makes of the print, where a read is
+   what SYSTEM says she gives when one is earned, and what the ban withholds. */
 export const PLANT_TRIES = 3;
 
 export const PLANTS = [
@@ -259,6 +262,9 @@ async function main(argv) {
         for (const r of results) usage.push(...r.usage);
         const caught = results.filter(r => r.failed.length).length;
         console.log(`${caught ? 'caught' : 'NOT CAUGHT'} ${caught} of ${PLANT_TRIES} — ${plant.why} (${id})`);
+        // What she wrote with the rule gone is the one thing that says why a
+        // case cannot see it go.
+        if (!caught) console.log(`      she wrote: ${results[0].text.replace(/\s+/g, ' ').slice(0, 400)}`);
         if (!caught) throw new Error('a planted defect passed: the eval is blind to it, and its green says nothing');
       }
     }
