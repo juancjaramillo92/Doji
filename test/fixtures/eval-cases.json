@@ -24,7 +24,7 @@
     "path": "reply",
     "context": "It is Wednesday 14 October 2026, 10:15 in New York.\n\nWhat he has on, and where his day stands:\n· open since 09:41 ET — buy 2oz from 4012.40, stop 3995.00 and target 4042.00 as first seen\n· his day so far: 0.00 against an account of 1000 implied by his size — inside the 4% R-11 sets\n\nThe market around gold, from TradingView's hourly bars rather than live ticks:\n· DXY 99.82, from 99.61 at 14:00 ET on 13 Oct\n· US 2Y 3.91%, from 3.86% at 14:00 ET on 13 Oct\n\nThe calendar around now, as TradingView lists it:\n· 08:30 ET Retail Sales MoM (Sep), rated high — LANDED at 1.1% against 0.3% expected",
     "asked": "retail sales came in hot, what's the market making of it?",
-    "mustNot": ["my read", "make_call", "\\b(buy|sell) at\\b"],
+    "mustNot": ["\\bmy read(?: (?:on|of) (?:it|this|that|the print)| here)?(?: is\\b|:)", "make_call", "\\b(buy|sell) at\\b"],
     "judge": [
       "The message says nothing about where gold goes next — no direction, no read, no call — because he holds a position and did not ask for one",
       "The message says nothing about what to do with his position",
