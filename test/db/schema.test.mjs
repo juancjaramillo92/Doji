@@ -224,7 +224,7 @@ test('the README\'s restore puts back every row a backup holds, and sends no new
        truncate net.sent;`);
   assert.notEqual(table(), before, 'the damage did not change the table');
 
-  const restore = readFileSync(new URL('../../README.md', import.meta.url), 'utf8')
+  const restore = readFileSync(new URL('../../docs/README.md', import.meta.url), 'utf8')
     .match(/```sql\n(-- 1\. paste the file's `tables\.trades` array[\s\S]*?)```/)[1];
   sql(restore.replace(`'<<<PASTE ARRAY HERE>>>'`, `$backup$${backup}$backup$`));
 
