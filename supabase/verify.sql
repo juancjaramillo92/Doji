@@ -3,7 +3,7 @@
 -- ───────────────────────────────────────────────────────────────────────────
 -- The schema is applied by hand on purpose, which makes schema.sql a claim
 -- about the database. This tests the claim. It writes nothing: run the
--- whole file after any manual change and read the `ok` column — all 98 checks.
+-- whole file after any manual change and read the `ok` column — all 100 checks.
 --
 -- One statement, because a SQL editor shows only the last statement's result.
 -- The listings that say which object, grant or schedule are diagnose.sql.
@@ -33,8 +33,8 @@ from (values
        and table_name in ('eugenia_runs','eugenia_calendar','eugenia_thesis',
                           'eugenia_loops','eugenia_feedback','eugenia_portrait',
                           'eugenia_reads','eugenia_market','eugenia_rewrites',
-                          'eugenia_calls')),
-   '10'),
+                          'eugenia_calls','eugenia_inputs')),
+   '11'),
 
   -- The thesis is PATCHed by primary key, so a missing seed row is a 200 that
   -- lands nowhere: every rewrite dropped, silently.
@@ -439,6 +439,12 @@ from (values
    'true'),
   ('no policy on eugenia_calls',
    (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_calls')),
+   '0'),
+  ('RLS on eugenia_inputs',
+   (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_inputs')),
+   'true'),
+  ('no policy on eugenia_inputs',
+   (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_inputs')),
    '0'),
   ('RLS on eugenia_rewrites',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_rewrites')),

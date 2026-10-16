@@ -3944,6 +3944,7 @@ async function postBriefing(due: Brief): Promise<Response> {
     + health + price + chart + around + rates + crowd + held + traded + notes + portrait + channels + trades + breaches
     + story + loops + calendar + desk + record + calls;
 
+  await keepInput(`${due} briefing`, asked);
   const left = () => Math.max(0, opened + WRITER_MS - Date.now());
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`, CHAT_TOOLS, Math.min(TURN_MS, left()));
@@ -3989,6 +3990,20 @@ async function postBriefing(due: Brief): Promise<Response> {
           + `(${handed}), ${heard ? "spoken" : "sent as text"} in ${Math.round((spoken - stored) / 1000)}s`,
   });
   return json({ ok: true, brief: due, chars: brief.length });
+}
+
+/* What a briefing was handed, kept whole for a person to replay a changed
+   prompt against: nothing else says what a past morning looked like to her.
+   Never throws — a failed keep must never cost the briefing it describes. */
+async function keepInput(caller: string, asked: string): Promise<void> {
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/eugenia_inputs`, {
+      method: "POST", headers: sbHeaders("return=minimal"), body: JSON.stringify([{ caller, asked }]),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  } catch (err) {
+    console.error("doji-eugenia: input not kept —", why(err));
+  }
 }
 
 /* Today's stored briefing, found by its marker and paired with its text by the

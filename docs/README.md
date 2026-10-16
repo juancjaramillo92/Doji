@@ -519,11 +519,11 @@ add-on.
 
 **A copy of what exists nowhere else is taken daily, outside Supabase.**
 `scripts/backup.mjs`, run every night by `.github/workflows/backup.yml`, reads
-thirteen tables into one JSON artifact: `trades`, whose journal columns only
-you can supply, and the twelve of hers with no other source — the channel map,
-notes, turns, thesis, portrait, her record, open loops, calendar, feedback,
-every stop and target a position carried, her calls, and what the thesis and
-the portrait said before each rewrite. `trades` goes whole, the soft-deleted
+fourteen tables into one JSON artifact: `trades`, whose journal columns only
+you can supply, and the thirteen of hers with no other source — the channel
+map, notes, turns, thesis, portrait, her record, open loops, calendar,
+feedback, every stop and target a position carried, her calls, what the thesis
+and the portrait said before each rewrite, and what each briefing was handed. `trades` goes whole, the soft-deleted
 rows included: a restore without them lets the poller rebuild every trade you
 removed. `eugenia_runs` is left out: the largest table, and facts about model
 calls rather than about you.
@@ -2252,7 +2252,7 @@ rather than searched for, his rules to hold them to, and a meter on each half.
 
 ### What she remembers
 
-Twelve tables, separated by how long a thing is true for. A turn rolls over inside
+Thirteen tables, separated by how long a thing is true for. A turn rolls over inside
 a morning; a note about him outlives twenty of those; what he UNDERSTANDS
 outlives both; a thesis and a portrait are only ever current, so each is one row
 rewritten, and what each said before is kept beside it; a loop stays until it
@@ -2272,6 +2272,7 @@ closes; and the calendar and her record are the datasets here that compound.
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
 | `eugenia_rewrites` | what the thesis and the portrait said before each rewrite | never handed to her | a trigger on both, `eugenia_keep_rewrite` |
 | `eugenia_calls` | every call she made, and how price scored it | the last 30 days | her `make_call` tool; scored by the nightly pass |
+| `eugenia_inputs` | the whole message each briefing was asked, for a person to replay a changed prompt against | never handed to her | `postBriefing`, before the writer is called |
 
 **Notes are how he corrects her, and the only way he can.** There is no settings
 page, the button under a briefing carries a verdict and not a reason, and the

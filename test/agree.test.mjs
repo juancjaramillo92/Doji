@@ -3878,6 +3878,20 @@ test('a call is filed before it is said, kept whole by both gates, and never mad
   assert.match(pass, /\+ calls \+ losses \+ chart \+/, 'the losses or the map are read and never sent');
 });
 
+/* What the briefing was asked is kept before the writer runs, so a failed or
+   timed-out briefing still leaves the morning it failed on — and it is the
+   augmented message, the one the turn table never holds. */
+test('the briefing keeps the message it was asked, before it is written', () => {
+  const brief = uncomment(bodyOf(EUGENIA_TS, 'async function postBriefing('));
+  const kept = brief.indexOf('await keepInput(`${due} briefing`, asked);');
+  assert.ok(kept > -1, 'the briefing no longer keeps what it was asked');
+  assert.ok(kept < brief.indexOf("content: asked }]"), 'the input is kept only once the writer has answered');
+  const keep = bodyOf(EUGENIA_TS, 'async function keepInput(');
+  assert.match(keep, /rest\/v1\/eugenia_inputs/);
+  assert.match(keep, /catch \(err\)/, 'a failed keep can throw into the briefing it describes');
+  assert.doesNotMatch(uncomment(EUGENIA_TS), /eugenia_inputs\?select/, 'something reads the inputs back to her');
+});
+
 test('a printed level may be named, never beside her read, in the writer and both gates', () => {
   const bodies = Object.fromEntries(
     [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)]

@@ -770,6 +770,24 @@ alter table public.eugenia_calls add column if not exists lesson text
 
 alter table public.eugenia_calls enable row level security;
 
+-- ─── What each briefing was handed ─────────────────────────────────────────
+-- The briefing is written from a dozen reads of things that are only ever
+-- current — the market, the calendar, her map, the odds — and the turn stored
+-- is a marker, never the augmented prompt. So nothing could say what a past
+-- morning looked like to her, and a change to her prompts could be tried only
+-- on mornings yet to come. This keeps the whole message she was asked, once a
+-- briefing, for a person to replay against a changed prompt. Never handed to
+-- her, and never read by the function.
+create table if not exists public.eugenia_inputs (
+  id     bigserial primary key,
+  at     timestamptz not null default now(),
+  -- Which briefing: the caller's label, as eugenia_runs carries it.
+  caller text not null,
+  asked  text not null
+);
+
+alter table public.eugenia_inputs enable row level security;
+
 -- ─── Open threads ──────────────────────────────────────────────────────────
 -- An odd thing she flagged (`watch`) or a question she asked him in a
 -- conversation (`question`), handed back until the nightly pass closes it.
