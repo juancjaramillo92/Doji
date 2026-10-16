@@ -196,6 +196,13 @@ const gap = (t: TradeRow) => Math.abs((t.exit_price as number) - (t.entry_price 
 // $20.000000001.
 const CENT = 0.005;
 
+/* What trade_stops holds for a position. The read is newest first, and every
+   rule walks it in the order the poller saw it. */
+export interface Stop { seen_at: string; sl: number | null; tp: number | null }
+
+const history = (stops: Map<string, Stop[]>, id: string): Stop[] =>
+  [...(stops.get(id) ?? [])].sort((a, b) => +new Date(a.seen_at) - +new Date(b.seen_at));
+
 /* ─── R-01 ─────────────────────────────────────────────────────────────────
    Take profit $30, or $25 where the level looks hard. §7: no win with
    |exit − entry| < 25, a Friday close-out being unknown. R-15 forces that
@@ -256,9 +263,7 @@ function r02(rows: TradeRow[], stops: Map<string, Stop[]>): RuleResult {
   for (const t of rows) {
     if (!isBroker(t) || !closed(t)) continue;
     const loss = (t.pnl as number) < 0;
-    const seen = [...(stops.get(t.id) ?? [])]
-      .sort((a, b) => +new Date(a.seen_at) - +new Date(b.seen_at))
-      .map(s => s.sl == null ? null : Number(s.sl));
+    const seen = history(stops, t.id).map(s => s.sl == null ? null : Number(s.sl));
     if (!loss && !seen.length) continue;
 
     const rested = seen.filter((sl): sl is number => sl !== null);
@@ -607,8 +612,6 @@ function r18(rows: TradeRow[], now: number): RuleResult {
    ───────────────────────────────────────────────────────────────────────── */
 export const STOP_GRACE_MIN = 5;
 
-export interface Stop { seen_at: string; sl: number | null; tp: number | null }
-
 function r19(rows: TradeRow[], cal: Calendar, stops: Map<string, Stop[]>): RuleResult {
   const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
   const prints = cal.releases.map(r => +new Date(r)).sort((a, b) => a - b);
@@ -626,7 +629,7 @@ function r19(rows: TradeRow[], cal: Calendar, stops: Map<string, Stop[]>): RuleR
     const print = prints.find(p => p > e && p < end && sessionAt(new Date(p)) !== opened);
     if (print === undefined) continue;
 
-    const seen = [...(stops.get(t.id) ?? [])].sort((a, b) => +new Date(a.seen_at) - +new Date(b.seen_at));
+    const seen = history(stops, t.id);
     const first = seen[0];
     const held = seen.filter(s => +new Date(s.seen_at) <= print + STOP_GRACE_MIN * 60_000).pop();
     const buy = t.direction === 'BUY';
