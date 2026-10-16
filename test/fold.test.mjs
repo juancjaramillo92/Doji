@@ -6615,6 +6615,13 @@ test('every planted defect breaks a prompt and names a case that exists', () => 
     'the position-ban plant leaves the writer a statement of the ban');
   assert.doesNotMatch(banned.CRITIC.replace(/\s+/g, ' '), /any view at all if what he has on shows an open position/,
     'the position-ban plant leaves the critic, which runs last, its statement of the ban');
+  // MECHANISM restates the ban in both, so the plant takes that half too.
+  for (const k of ['SYSTEM', 'CRITIC']) {
+    assert.doesNotMatch(banned[k].replace(/\s+/g, ' '), /position rule keeps out|take out the view/,
+      `the position-ban plant leaves ${k} MECHANISM's statement of the ban`);
+    assert.match(banned[k].replace(/\s+/g, ' '), /it is the mechanism, and the part he learns from/,
+      `the position-ban plant takes MECHANISM's chain rule from ${k} as well as its ban`);
+  }
   // And the case's read is one CRITIC keeps with the ban gone: labelled, with
   // its falsifier, and no level.
   const read = EVAL.CASES.find(c => c.id === 'critic-strips-read-in-position').draft.split('\n\n')
