@@ -6030,6 +6030,13 @@ test('a word count never stands without what to cut instead: the briefing\'s two
      a ceiling alone, the first review the eval read came back at 258. */
   assert.match(review.slice(review.lastIndexOf('LAST, COUNT')), /count the words[\s\S]*two hundred and fifty/,
     'the review no longer counts its own words last, so its ceiling is read past');
+  /* THE KEEP IS A MOMENT TOO, WITH AN EXAMPLE BESIDE THE RULE: on 16 October
+     two eval runs in a row named a moment for the change and a habit for the
+     keep, and one drew the keep from his answers at open, which record intent. */
+  assert.match(review, /The keep is held to that as much as the change/, 'the review lets the keep be a resolution');
+  assert.match(review, /never from his answers at open, which record what he meant to do/,
+    'the review lets a keep rest on what he meant to do rather than what a row shows');
+  assert.match(review, /"keep respecting your stops" is a resolution/, 'the keep\'s rule has lost its worked example');
 });
 
 test('the gold-against-real-yields chain is exempt from the rung, in both copies', () => {
