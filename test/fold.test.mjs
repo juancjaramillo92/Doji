@@ -6298,7 +6298,7 @@ test('every planted defect breaks a prompt and names a case that exists', () => 
   const chart = mapCase.draft.split('\n\n').find(par => /On the charts/.test(par));
   assert.doesNotMatch(chart, /\d/, 'the map case\'s chart paragraph carries a number the budget would cut anyway');
   // Nor a trader's word, which the plain-words rule rewrites whatever the map rule says.
-  assert.doesNotMatch(chart, /swe(e|p)t|flip/i, 'the map case\'s chart paragraph carries a word the plain-words rule would cut anyway');
+  assert.doesNotMatch(chart, /swe(pt|ep)|flip/i, 'the map case\'s chart paragraph carries a word the plain-words rule would cut anyway');
   assert.doesNotMatch(map.CRITIC, /Is the map of his charts in the prose/,
     'the map plant leaves the critic its check');
 });

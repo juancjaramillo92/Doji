@@ -447,6 +447,7 @@ single-sourced at run time:
 | each function's **required secrets** | its `env()` calls and its own boot guard |
 | each function's **gateway setting** | `config.toml`'s stanza and the deploy command's flag |
 | her **map's grid and candle count** | `GRID` and `CANDLES` in `structure.ts`, said in words by `get_structure`'s description and by `SYSTEM`; the grid is §4's, in `strategy.ts` |
+| the **review's length** | `REVIEW`'s ceiling and the count it cuts past, in words, the figures the README gives, and the ceiling `review-process-over-pnl` counts against |
 | **what the eval reads** | `scripts/eval.mjs`'s imports and `file()` reads, and the paths `test.yml`'s eval-owed job compares with main |
 | the **tables the backup holds** | `TABLES` in `scripts/backup.mjs`, the tables `schema.sql` creates less the ones `agree.test.mjs` declares not backed up, and the count the README's backup paragraph gives |
 

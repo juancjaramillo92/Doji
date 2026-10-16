@@ -3,7 +3,8 @@
 #include <time.h>
 
 /* Updates over Wi-Fi. Whether tonight's look for one is due: once a night,
-   in the small hours, never before the internet has set the clock. */
+   in the small hours, never before the internet has set the clock. Asking
+   spends it: a yes marks the night looked. */
 bool ota_due(time_t now);
 
 /* Looks at the newest app from main and, when its version is not hers,

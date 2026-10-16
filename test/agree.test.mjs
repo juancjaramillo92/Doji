@@ -1580,7 +1580,7 @@ test('the charm asks for the briefing in the hours it is written', () => {
 
 
 /* Asking ota_due spends the night's look, so the battery is asked before it:
-   asked after, a low battery at the first errand of the hour lost the night
+   asked after, a low battery at the hour's first errand would spend the night
    though the cable went in minutes later. */
 test('a low battery leaves the night\'s look for an update to a later errand', () => {
   const errand = bodyOf(source('charm/main/main.c'), 'static void errand(void) {');
@@ -6197,6 +6197,19 @@ test('a word count never stands without what to cut instead: the briefing\'s two
      a ceiling alone, the first review the eval read came back at 258. */
   assert.match(review.slice(review.lastIndexOf('LAST, COUNT')), /count the words[\s\S]*two hundred and fifty/,
     'the review no longer counts its own words last, so its ceiling is read past');
+  /* AND CUTS WITH ROOM, since her count of her own words comes out short: the
+     ceiling and the cut in words here, in figures in the README, and the
+     ceiling the eval counts the review against. */
+  const TENS = { ten: 10, twenty: 20, thirty: 30, forty: 40 };
+  const cut = review.match(/two hundred and fifty is reached at two hundred and (\w+):/);
+  assert.ok(cut && TENS[cut[1]], 'the review no longer cuts below its ceiling as this test reads it');
+  const said = source('docs/README.md').replace(/\s+/g, ' ');
+  assert.match(said, /Under 250 words/, 'the README no longer gives the review its ceiling');
+  assert.equal(Number(said.match(/she cuts past (\d+)/)?.[1]), 200 + TENS[cut[1]],
+    `the review cuts past two hundred and ${cut[1]} and the README says otherwise`);
+  assert.equal(JSON.parse(source('test/fixtures/eval-cases.json'))
+    .find(c => c.id === 'review-process-over-pnl').counts.words, 250,
+    'the eval counts the review against a ceiling other than the one she is given');
   /* THE KEEP IS A MOMENT TOO, WITH AN EXAMPLE BESIDE THE RULE, since a model
      matches an example where it ignores an adjective: held to the change's
      rule alone, the keep came back a habit, drawn from his answers at open,

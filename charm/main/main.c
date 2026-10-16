@@ -167,7 +167,7 @@ static void errand(void) {
         }
         // A new app from main, in the small hours: she wakes into it at once,
         // quietly, for this errand's place. The battery is asked first, since
-        // asking ota_due spends the night's look: one a low battery skipped
+        // asking ota_due spends the night's look: one a low battery skips
         // waits for a later errand in the hour, on the cable perhaps.
         if (!power_low() && ota_due(time(NULL)) && ota_update()) {
             errand_at = time(NULL);
