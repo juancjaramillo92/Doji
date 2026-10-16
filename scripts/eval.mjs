@@ -114,7 +114,10 @@ export function counted(c, text) {
     if (said !== true) failed.push(said);
   }
   for (const re of c.must ?? []) if (!new RegExp(re, 'i').test(text)) failed.push(`missing /${re}/`);
-  for (const re of c.mustNot ?? []) if (new RegExp(re, 'i').test(text)) failed.push(`has /${re}/`);
+  for (const re of c.mustNot ?? []) {
+    const hit = text.match(new RegExp(re, 'i'));
+    if (hit) failed.push(`has /${re}/ in "…${text.slice(Math.max(0, hit.index - 60), hit.index + 60)}…"`);
+  }
   if (c.equals !== undefined && text.trim() !== c.equals) failed.push(`not "${c.equals}"`);
   return failed;
 }

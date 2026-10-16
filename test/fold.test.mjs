@@ -6202,8 +6202,21 @@ test('the eval counts what the gates are told to count', () => {
   assert.match(EVAL.counted(c({ words: 3 }), 'one two three four')[0], /4 words/);
   assert.match(EVAL.counted({ mustNot: ['\\bcut\\b'] }, 'a cut is priced')[0], /has \/\\bcut\\b\//);
   assert.match(EVAL.counted({ must: ['4,?002'] }, 'buy at 4,003')[0], /missing/);
+  assert.match(EVAL.counted({ mustNot: ['\\bcut\\b'] }, 'a cut is priced')[0], /in "…a cut is priced…"/,
+    'a failed pattern does not say where it matched');
   assert.match(EVAL.counted({}, '<invoke name="get_market">\n</invoke>')[0], /reached for get_market/,
     'a tool she reached for was graded as her message');
+});
+
+// On 16 October the position case failed on an offer, "ask if you want my read",
+// which is what the ban leaves her to say, and the judge passed it.
+test('the position case refuses a read given, not one offered', () => {
+  const c = EVAL.CASES.find(c => c.id === 'view-unasked-in-position');
+  for (const read of ['My read is this print is bad news for gold.', 'My read: the dollar wins.',
+                      'My read on the print is that it lifts yields.', 'My read here is that gold slips.'])
+    assert.ok(EVAL.counted(c, read).length, `a read given passed: ${read}`);
+  for (const offer of ['If you want my read on where gold goes, ask.', 'I will keep my read to myself while you are in it.'])
+    assert.deepEqual(EVAL.counted(c, offer), [], `an offer of a read failed: ${offer}`);
 });
 
 test('each eval path asks what its call site asks, of the model it runs on', () => {
