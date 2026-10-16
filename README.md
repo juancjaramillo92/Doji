@@ -2124,6 +2124,31 @@ decided this in October 2026, after the evidence on both sides was put to you
 Her reads stay what they were — a view on the news, judged by the test she
 stated and never by price. A call is the one thing of hers price judges.
 
+### Her analysis is never finished
+
+**Her technical and her fundamental analysis are an area of constant research
+and improvement, not a finished feature.** Neither is a skill she was trained
+in here. The model brings what it knows of price action and of macro, and what
+this repository adds is what keeps that knowledge honest: facts handed to her
+rather than searched for, his rules to hold them to, and a meter on each half.
+
+- **Technical: his charts, his way.** What she sees is *Her map of his charts*:
+  his sequence's first two steps, the pools and sweeps, the sessions and the
+  last candles. Her calls, scored on price, are what tests it. She cannot see
+  what he draws (`REFACTOR.md` R-70), reads no indicator (R-69), and never sees
+  the candle he waits for.
+- **Fundamental: the weeks behind his chart.** The market around gold, the
+  calendar and how each release has run against its consensus, what the
+  futures price for the Fed, the positioning and the flows, read through §2's
+  six channels. Every read she gives is filed with the channel its chain ran
+  down.
+- **How a change is proved.** The map's readings by `scripts/calibrate.mjs`,
+  her calls by their record, her reads by theirs, counted per channel, and any
+  change to her prompts by the eval, run before and after with `--plant` first
+  (*Tests*). Both records count a month, so a month is the shortest span to
+  judge a change on. An idea not yet built is weighed the way
+  `RESEARCH-eugenia.md` weighs one; one refused goes in `REFACTOR.md`.
+
 ### What she remembers
 
 Twelve tables, separated by how long a thing is true for. A turn rolls over inside
