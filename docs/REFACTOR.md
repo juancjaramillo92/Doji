@@ -664,12 +664,14 @@ dated and sourced.
 outside the five starts moving the story.
 
 ### R-72 — gold's reaction to each print, filed beside it
-**Deferred, not refused.** `get_releases` says how a release ran against its
-consensus, not what gold did on it, and "the reaction is the more interesting
-fact" has no base rate. Filing it means a second writer to `eugenia_calendar`,
-which `agree.test.mjs` refuses on purpose, and the poller's minute bars read
-for every print at night.
-**Revisit if:** her reads keep leaning on how gold usually takes a release.
+**Built, October 2026, his decision, without either cost named here.** A table
+of its own keyed on the calendar row, so the calendar keeps its one writer;
+filed off the thirty hours of minute bars the nightly pass already reads, so
+no print's bars are read twice. What it does not have is the history before
+it: the record starts the night it shipped.
+**Revisit if:** a base rate is wanted before a year of prints has been filed —
+the poller's `?replay=N` door reaches the 08:30, 10:00 and 14:00 prints of the
+last 120 weekdays.
 
 ### R-73 — reading the weeks with the market every quarter hour
 **Why refused:** a daily close moves once a day, and sixteen more charts on

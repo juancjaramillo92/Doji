@@ -42,7 +42,7 @@ import {
   VOICE_TROUBLE,
   positionsList, isOpen, healthLine, sweepLine, serve, parseChannel, sayAloud, postSpeak,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock, portraitBlock, NOTES, recordBlock, recordList, recordQuery,
-  callProblem, expiryOf, scoreCall, callsList, lossesList, effortMessages, BASE_EFFORT,
+  callProblem, expiryOf, scoreCall, callsList, lossesList, reactionOf, fileReactions, effortMessages, BASE_EFFORT,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock,
@@ -4860,6 +4860,63 @@ test('a release\'s prints are told oldest first, and the tally against the conse
     print(new Date(Date.UTC(2026, 9, 1) - i * 30 * 86_400_000).toISOString(), `NFP (${i})`, '200K', '180K'));
   assert.match(printsList(full, 'NFP'), new RegExp(`${RELEASE_PRINTS} above, 0 below, 0 on it\\.[\\s\\S]*` +
     `stops at its ${RELEASE_PRINTS} newest prints, so it reaches back only to \\d+ \\w+ 2024\\.`));
+});
+
+/* WHAT GOLD DID ON A PRINT, read off the minute bars: the open of the print's
+   minute and the close fifteen and sixty minutes on, a missing minute a null. */
+test('gold\'s move on a print is read off the minute it landed and the minutes after', () => {
+  const at = Date.parse('2026-10-14T12:30:00Z');
+  const bar = (n, close) => ({ t: at + n * 60_000, open: 4000 + n, high: 4100, low: 3900, close });
+  const bars = [bar(-1, 3999), bar(0, 4003), bar(14, 4012.5), bar(59, 3990)];
+  assert.deepEqual(reactionOf(at, bars), { before: 4000, after_15: 4012.5, after_60: 3990 });
+  assert.deepEqual(reactionOf(at + 20_000, bars), { before: 4000, after_15: 4012.5, after_60: 3990 },
+    'a print stamped inside its minute was read off another one');
+  assert.deepEqual(reactionOf(at, bars.filter(b => b.t !== at + 59 * 60_000)).after_60, null,
+    'a missing minute was filled from the nearest one');
+  assert.equal(reactionOf(at, bars.slice(2)), null, 'a print whose minute the bars lack was given a move');
+});
+
+test('gold\'s moves sit beside each print, and how they ran is counted, never forecast', () => {
+  const rows = PRINTS.map((p, i) => ({ ...p, id: i + 1 }));
+  const out = printsList(rows, 'Core Inflation Rate MoM', [
+    { release: 1, at: rows[0].at, before: 4000, after_15: 4012.5, after_60: 3990 },
+    { release: 3, at: rows[2].at, before: 3900, after_15: null, after_60: 3910 },
+  ]);
+  assert.match(out, /\(Sep\): 0\.4% against 0\.3% expected, after 0\.3%; gold 4000 at the print, \+\$12\.50 fifteen minutes on, -\$10\.00 an hour on/);
+  assert.match(out, /\(Jul\): 0\.2% against 0\.3% expected; gold 3900 at the print, \+\$10\.00 an hour on/);
+  assert.match(out, /after a print above the consensus, 0 higher and 1 not; after one below, 1 higher and 0 not\. That is what these prints did, never a rule for the next one\./);
+  assert.doesNotMatch(printsList(rows, 'Core Inflation Rate MoM'), /an hour on/, 'moves were said where none are on file');
+});
+
+test('the night files gold\'s move on the day\'s home prints, once, and says how many', async () => {
+  const sent = [];
+  const at = Date.now() - 3 * 3_600_000;
+  const minute = Math.floor(at / 60_000) * 60_000;
+  await stubbed(async () => {
+    globalThis.fetch = async (url, opts = {}) => {
+      sent.push({ url: String(url), method: opts.method ?? 'GET', body: opts.body });
+      if (String(url).includes('doji-mcp-sync?bars=1')) {
+        return new Response(JSON.stringify({ ok: true, from: at - 3_600_000, bars: [
+          { t: minute, open: 4000, high: 4001, low: 3999, close: 4000.5 },
+          { t: minute + 59 * 60_000, open: 4010, high: 4011, low: 4009, close: 4010 }] }));
+      }
+      if (String(url).includes('eugenia_calendar')) {
+        return new Response(JSON.stringify([{ id: 7, at: new Date(at).toISOString() }, { id: 8, at: new Date(at - 7_200_000).toISOString() }]));
+      }
+      if (String(url).includes('eugenia_reactions')) return new Response(JSON.stringify([{ release: 7 }]), { status: 201 });
+      return new Response('[]', { status: 201 });
+    };
+    await fileReactions();
+  });
+  const read = sent.find(r => r.url.includes('eugenia_calendar'));
+  assert.match(read.url, /importance=eq\.high&country=eq\.US&actual=not\.is\.null&at=gte\.[^&]+&at=lte\.[^&]+&order=at\.desc&limit=20/,
+    'the prints read is not the bounded, newest-first read of home prints with an actual');
+  const post = sent.find(r => r.url.includes('eugenia_reactions'));
+  assert.match(post.url, /on_conflict=release$/);
+  assert.deepEqual(JSON.parse(post.body), [{ release: 7, at: new Date(at).toISOString(), before: 4000, after_15: null, after_60: 4010 }],
+    'a print the bars do not reach was filed, or one they do was not');
+  const run = JSON.parse(sent.find(r => r.url.includes('eugenia_runs')).body);
+  assert.deepEqual([run[0].caller, run[0].ok, run[0].detail], ['reactions', true, 'filed 1 of 2 prints']);
 });
 
 test('the prints read is bounded, newest first, and takes what she named as a value, never a pattern', () => {

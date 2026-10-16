@@ -519,11 +519,12 @@ add-on.
 
 **A copy of what exists nowhere else is taken daily, outside Supabase.**
 `scripts/backup.mjs`, run every night by `.github/workflows/backup.yml`, reads
-fourteen tables into one JSON artifact: `trades`, whose journal columns only
-you can supply, and the thirteen of hers with no other source — the channel
+fifteen tables into one JSON artifact: `trades`, whose journal columns only
+you can supply, and the fourteen of hers with no other source — the channel
 map, notes, turns, thesis, portrait, her record, open loops, calendar,
 feedback, every stop and target a position carried, her calls, what the thesis
-and the portrait said before each rewrite, and what each briefing was handed. `trades` goes whole, the soft-deleted
+and the portrait said before each rewrite, what each briefing was handed, and
+what gold did on each print. `trades` goes whole, the soft-deleted
 rows included: a restore without them lets the poller rebuild every trade you
 removed. `eugenia_runs` is left out: the largest table, and facts about model
 calls rather than about you.
@@ -1609,6 +1610,20 @@ as a value: `*` is taken out and one put back at the end, and the rest is
 `encodeURIComponent`. In `CHAT_TOOLS`, so the briefing and a reply can both read
 it.
 
+**And what gold did on each print** (`fileReactions`, at the nightly pass,
+after the calls are scored). The pass already reads the poller's thirty hours
+of minute bars, so off the same window it files, for every high-rated home
+print with an actual and an hour behind it, gold at the open of the print's
+minute and at the close fifteen and sixty minutes on, in `eugenia_reactions`
+keyed on the calendar row — a table of its own, so the calendar keeps its one
+writer, and duplicates ignored, so a retry files nothing twice. A minute the
+bars lack is a null, never the nearest one. `get_releases` puts the moves
+beside each print and counts, in code, how often gold stood higher an hour on
+after a print above the consensus and after one below, said as what those
+prints did and never as a rule for the next. The record grows a night at a
+time from October 2026; nothing reads further back than the bars. Both
+outcomes are a `caller: 'reactions'` row.
+
 **Every reply is read once more before it is sent**, as the briefing is.
 `CRITIC` reads the briefing; `TRIM` reads every reply. The reply is gated inside
 the typing indicator, so she never reads as having finished and said nothing,
@@ -2263,7 +2278,7 @@ rather than searched for, his rules to hold them to, and a meter on each half.
 
 ### What she remembers
 
-Thirteen tables, separated by how long a thing is true for. A turn rolls over inside
+Fourteen tables, separated by how long a thing is true for. A turn rolls over inside
 a morning; a note about him outlives twenty of those; what he UNDERSTANDS
 outlives both; a thesis and a portrait are only ever current, so each is one row
 rewritten, and what each said before is kept beside it; a loop stays until it
@@ -2283,6 +2298,7 @@ closes; and the calendar and her record are the datasets here that compound.
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
 | `eugenia_rewrites` | what the thesis and the portrait said before each rewrite | never handed to her | a trigger on both, `eugenia_keep_rewrite` |
 | `eugenia_calls` | every call she made, and how price scored it | the last 30 days | her `make_call` tool; scored by the nightly pass |
+| `eugenia_reactions` | what gold did fifteen and sixty minutes after each high-rated home print | beside each print `get_releases` reads | `fileReactions`, nightly, off the minute bars |
 | `eugenia_inputs` | the whole message each briefing was asked, for a person to replay a changed prompt against | never handed to her | `postBriefing`, before the writer is called |
 
 **Notes are how he corrects her, and the only way he can.** There is no settings

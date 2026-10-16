@@ -770,6 +770,22 @@ alter table public.eugenia_calls add column if not exists lesson text
 
 alter table public.eugenia_calls enable row level security;
 
+-- ─── What gold did on each print ───────────────────────────────────────────
+-- Gold at the open of a print's minute and at the close fifteen and sixty
+-- minutes on, filed each night from the minute bars the pass reads anyway, for
+-- the high-rated home prints in their window. Keyed on the calendar row and in
+-- a table of its own, so the calendar keeps its one writer; get_releases hands
+-- the moves to her beside each print. A minute the bars lack is a null.
+create table if not exists public.eugenia_reactions (
+  release  bigint primary key references public.eugenia_calendar (id),
+  at       timestamptz not null,
+  before   numeric not null,
+  after_15 numeric,
+  after_60 numeric
+);
+
+alter table public.eugenia_reactions enable row level security;
+
 -- ─── What each briefing was handed ─────────────────────────────────────────
 -- The briefing is written from a dozen reads of things that are only ever
 -- current — the market, the calendar, her map, the odds — and the turn stored

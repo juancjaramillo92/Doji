@@ -1014,7 +1014,8 @@ const RELEASES_TOOL = {
   description:
     `Past prints of one release from the calendar on file — the newest ${RELEASE_PRINTS} ` +
     "inside the months asked, oldest first, each with its actual against the consensus " +
-    "and the prior — and a count of how many came in above, below or on the consensus. " +
+    "and the prior, and what gold did fifteen and sixty minutes on where that is on file — " +
+    "and a count of how many came in above, below or on the consensus. " +
     "Name the release as the calendar lists it, without the period in brackets: " +
     "'Core Inflation Rate MoM', 'Non Farm Payrolls', 'Fed Interest Rate Decision'. One " +
     "from abroad starts with its country's code: 'EU Inflation Rate YoY Flash'. Use it " +
@@ -1049,7 +1050,7 @@ const yearDay = (iso: string) => new Intl.DateTimeFormat('en-GB', {
 }).format(new Date(iso));
 
 // Newest first as read, so the limit keeps the latest; told oldest first.
-export function printsList(rows: Release[], release: string): string {
+export function printsList(rows: Release[], release: string, moves: Reaction[] = []): string {
   // A figure as TradingView writes it — `0.3%`, `254K`, `-1.2B` — split into
   // its number and its unit, or null for anything else.
   const figureOf = (v: string | null) => {
@@ -1058,14 +1059,23 @@ export function printsList(rows: Release[], release: string): string {
   };
   const told = [...rows].reverse();
   const tally = { above: 0, below: 0, on: 0, apart: 0 };
+  const byRelease = new Map(moves.map(m => [m.release, m]));
+  const signed = (v: number) => `${v >= 0 ? "+" : "-"}$${Math.abs(v).toFixed(2)}`;
+  const hour = { above: [0, 0], below: [0, 0] };
   const lines = told.map(r => {
     const a = figureOf(r.actual), c = figureOf(r.consensus);
-    if (a && c && a.unit === c.unit) tally[a.n > c.n ? 'above' : a.n < c.n ? 'below' : 'on']++;
-    else tally.apart++;
+    const side = a && c && a.unit === c.unit ? (a.n > c.n ? 'above' : a.n < c.n ? 'below' : 'on') : 'apart';
+    tally[side]++;
+    const m = byRelease.get(r.id);
+    if (m?.after_60 != null && (side === 'above' || side === 'below')) hour[side][m.after_60 > m.before ? 0 : 1]++;
     return `· ${yearDay(r.at)}, ${r.name}: ${r.actual}` +
            (r.consensus ? ` against ${r.consensus} expected` : ", no consensus on file") +
-           (r.prior ? `, after ${r.prior}` : "");
+           (r.prior ? `, after ${r.prior}` : "") +
+           (m ? `; gold ${m.before} at the print` +
+                (m.after_15 != null ? `, ${signed(m.after_15 - m.before)} fifteen minutes on` : "") +
+                (m.after_60 != null ? `, ${signed(m.after_60 - m.before)} an hour on` : "") : "");
   });
+  const onFile = hour.above[0] + hour.above[1] + hour.below[0] + hour.below[1];
   const reach = rows.length === RELEASE_PRINTS
     ? `\nThe read stops at its ${RELEASE_PRINTS} newest prints, so it reaches back only to ` +
       `${yearDay(told[0].at)}.`
@@ -1073,7 +1083,10 @@ export function printsList(rows: Release[], release: string): string {
   return `How "${release}" has printed against the consensus, oldest first, from the calendar on file:\n` +
     `${lines.join("\n")}\nAgainst the consensus: ${tally.above} above, ${tally.below} below, ` +
     `${tally.on} on it` + (tally.apart ? `; ${tally.apart} with no consensus or no comparable figure` : "") +
-    `. Above and below are arithmetic, not good or bad news.` + reach;
+    `. Above and below are arithmetic, not good or bad news.` +
+    (onFile ? `\nGold an hour on, where it is on file: after a print above the consensus, ${hour.above[0]} higher ` +
+      `and ${hour.above[1]} not; after one below, ${hour.below[0]} higher and ${hour.below[1]} not. That is ` +
+      `what these prints did, never a rule for the next one.` : "") + reach;
 }
 
 async function readPrints(release: unknown, months: unknown): Promise<string> {
@@ -1081,8 +1094,10 @@ async function readPrints(release: unknown, months: unknown): Promise<string> {
   if (!name) return "Name the release as the calendar lists it, without its period.";
   try {
     const rows = await readRows<Release>('Prints', printsQuery(name, months));
+    const moves = rows.length ? await readRows<Reaction>('Reactions',
+      `eugenia_reactions?select=*&release=in.(${rows.map(r => r.id).join(",")})&order=at.desc&limit=${RELEASE_PRINTS}`) : [];
     return rows.length
-      ? printsList(rows, name)
+      ? printsList(rows, name, moves)
       : "Nothing on file starts with that name and carries a figure in that window. Check the " +
         "name against the calendar, and say you have no record rather than that it never printed: " +
         "the calendar holds only what was filed.";
@@ -1748,6 +1763,57 @@ export async function scoreCalls(): Promise<void> {
     const reason = why(err);
     console.error("doji-eugenia: calls not scored —", reason);
     await recordRun({ caller: 'calls', ok: false, detail: reason.slice(0, 500) });
+  }
+}
+
+/* ─── What gold did on each print ──────────────────────────────────────────
+   get_releases said how a release ran against its consensus and nothing of
+   what gold did on it, so how gold usually takes one was hers to guess. Filed
+   each night from the minute bars the pass reads anyway: gold at the open of
+   the print's minute and at the close fifteen and sixty minutes on, for every
+   high-rated home print with an actual inside the bars' window and an hour
+   behind it. Its own table keyed on the calendar row, so the calendar keeps
+   its one writer, and duplicates ignored, so a retry files nothing twice. The
+   record grows a night at a time; nothing reads further back than the bars.
+   ───────────────────────────────────────────────────────────────────────── */
+export type Reaction = { release: number; at: string; before: number; after_15: number | null; after_60: number | null };
+
+/* Null when the print's own minute is not in the bars; a later minute that is
+   missing is a null figure, never the nearest one. */
+export function reactionOf(at: number, bars: Candle[]): Omit<Reaction, 'release' | 'at'> | null {
+  const t = Math.floor(at / 60_000) * 60_000;
+  const by = new Map(bars.map(b => [b.t, b]));
+  const close = (minutes: number) => by.get(t + (minutes - 1) * 60_000)?.close ?? null;
+  const first = by.get(t);
+  return first ? { before: first.open, after_15: close(15), after_60: close(60) } : null;
+}
+
+/* Never throws; both outcomes are a row, counted on what the insert returned. */
+export async function fileReactions(): Promise<void> {
+  try {
+    const served = await readNightBars();
+    const settled = new Date(Date.now() - 3_600_000).toISOString();
+    const prints = await readRows<{ id: number; at: string }>('Prints',
+      `eugenia_calendar?select=id,at&importance=eq.${HIGH}&country=eq.${HOME}&actual=not.is.null` +
+      `&at=gte.${new Date(served.from).toISOString()}&at=lte.${settled}&order=at.desc&limit=20`);
+    const rows = prints.flatMap(p => {
+      const moved = reactionOf(Date.parse(p.at), served.bars);
+      return moved ? [{ release: p.id, at: p.at, ...moved }] : [];
+    });
+    let filed = 0;
+    if (rows.length) {
+      const res = await fetch(`${SB_URL}/rest/v1/eugenia_reactions?on_conflict=release`, {
+        method: "POST", headers: sbHeaders("resolution=ignore-duplicates,return=representation"),
+        body: JSON.stringify(rows),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      filed = (await res.json()).length;
+    }
+    await recordRun({ caller: 'reactions', ok: true, detail: `filed ${filed} of ${prints.length} prints` });
+  } catch (err) {
+    const reason = why(err);
+    console.error("doji-eugenia: reactions not filed —", reason);
+    await recordRun({ caller: 'reactions', ok: false, detail: reason.slice(0, 500) });
   }
 }
 
@@ -4148,8 +4214,10 @@ export async function feedbackBlock(): Promise<string> {
 }
 
 async function postConsolidation(): Promise<Response> {
-  // Scored first, so the pass reads tonight's outcomes; never throws.
+  // Scored first, so the pass reads tonight's outcomes; never throws. And
+  // what gold did on the day's prints, off the same window of bars.
   await scoreCalls();
+  await fileReactions();
   const day = await turnsSince(CONSOLIDATE_HOURS);
 
   /* A silent day skips the model call but still leaves a row, or 23:00 runs it

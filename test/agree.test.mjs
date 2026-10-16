@@ -3872,6 +3872,9 @@ test('a call is filed before it is said, kept whole by both gates, and never mad
   assert.ok(pass.indexOf('await scoreCalls()') > -1 &&
             pass.indexOf('await scoreCalls()') < pass.indexOf("ask([{ role: 'user', content: asked }]"),
     'the calls are not scored before the pass reads them, so it judges yesterday');
+  assert.ok(pass.indexOf('await fileReactions()') > -1 &&
+            pass.indexOf('await fileReactions()') < pass.indexOf("ask([{ role: 'user', content: asked }]"),
+    'the night no longer files what gold did on the day\'s prints');
   for (const block of ['lossesBlock()', 'structureBlock()']) {
     assert.ok(pass.includes(block), `the pass is not handed ${block}, so a loss is explained from nothing`);
   }
