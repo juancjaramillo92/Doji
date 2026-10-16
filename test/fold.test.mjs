@@ -6440,6 +6440,17 @@ test('every eval case names a path, carries what that path needs, and checks som
   }
 });
 
+/* The map cases hand her the map as structureList says it, folded from a
+   fixture of bars; held here, so a change to the map's wording is a change to
+   what those cases ask, never a case quietly testing words she no longer gets. */
+test('the eval\'s map cases hand her the map structureList says today', () => {
+  const { now, charts } = JSON.parse(readFileSync(new URL('./fixtures/eval-map.json', import.meta.url), 'utf8'));
+  const said = structureList(foldStructure(charts, now), now);
+  const cases = EVAL.CASES.filter(c => c.id.startsWith('map-'));
+  assert.ok(cases.length >= 3, `only ${cases.length} map cases`);
+  for (const c of cases) assert.ok(c.context.endsWith(said), `${c.id} hands her a map structureList no longer says`);
+});
+
 test('the eval counts what the gates are told to count', () => {
   const c = (counts) => ({ counts });
   assert.deepEqual(EVAL.counted(c({ emDash: true }), 'Plain. Words.'), []);

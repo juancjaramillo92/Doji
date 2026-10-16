@@ -3662,6 +3662,12 @@ She is sent no tools: a case hands her what a tool would have returned, a
 strategy section read from the module `get_strategy` serves, and an answer that
 reaches for a tool anyway fails, because it is not a message and a judge once
 passed one.
+**Three cases ask whether she reads her own map** — a 4H sequence the last
+close has broken, a Break & Retest level at the edge of the week's range, and
+what the 15m candles did at a quarter — each handed the map as `structureList`
+says it, folded from the bars in `test/fixtures/eval-map.json`; `fold.test.mjs`
+holds the cases to that, so a change to the map's wording is a change to what
+they ask.
 **`--plant` runs first** the cases a deliberately broken prompt must fail, each
 three times since a broken prompt does not break every answer, and stops if
 all three pass: an eval that cannot fail says nothing. It costs money, so
