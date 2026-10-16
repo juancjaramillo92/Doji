@@ -28,6 +28,7 @@ import { CONSOLIDATE, SYSTEM, PITCH, REVIEW } from '../supabase/functions/doji-e
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled,
          discipline }
   from '../supabase/functions/doji-eugenia/journal.ts';
+import { GRID, CANDLES } from '../supabase/functions/doji-eugenia/structure.ts';
 import { HOME, FULL_STOP, TO_BREAK_EVEN, TARGET_MIN, TARGET_MAX, checkRules } from '../supabase/functions/doji-eugenia/adherence.ts';
 
 // A repository file, read once however many tests ask for it.
@@ -5715,6 +5716,22 @@ test('the map is hers, printed, built into her call, and kept out of the briefin
     'CRITIC takes the map out of the call too, and a filed call is never changed');
 });
 
+/* The map's grid is §4's, and the tool and the writer each say it and how many
+   candles ride on it in words, where nothing interpolates them. */
+test('the map\'s grid and candle count are the ones the tool, the writer and §4 say', () => {
+  const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+  const tool = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const STRUCTURE_TOOL = {'));
+  const said = tool.slice(0, tool.indexOf('} as const;')).replace(/" \+\s*"/g, '');
+  const system = SYSTEM.replace(/\s+/g, ' ');
+  for (const [where, text] of [['get_structure', said], ['SYSTEM', system]]) {
+    assert.ok(text.includes(`the $${GRID} grid`), `${where} names a grid other than structure.ts's ${GRID}`);
+    assert.ok(text.includes(`the last ${WORDS[CANDLES]} closed 15m and 5m candles`),
+      `${where} counts the candles on the map other than CANDLES, ${CANDLES}`);
+  }
+  assert.ok(source('supabase/functions/doji-eugenia/strategy.ts').includes(`**The quarter grid** — the $${GRID} increments`),
+    `§4's grid is no longer the $${GRID} structure.ts draws`);
+});
+
 /* ─── The market around gold, in a conversation ──────────────────────────────
    The tool array and the prompt: a tool in neither is a reply that searches
    for the dollar, against the rule that it never be quoted from a search. */
@@ -6030,9 +6047,10 @@ test('a word count never stands without what to cut instead: the briefing\'s two
      a ceiling alone, the first review the eval read came back at 258. */
   assert.match(review.slice(review.lastIndexOf('LAST, COUNT')), /count the words[\s\S]*two hundred and fifty/,
     'the review no longer counts its own words last, so its ceiling is read past');
-  /* THE KEEP IS A MOMENT TOO, WITH AN EXAMPLE BESIDE THE RULE: on 16 October
-     two eval runs in a row named a moment for the change and a habit for the
-     keep, and one drew the keep from his answers at open, which record intent. */
+  /* THE KEEP IS A MOMENT TOO, WITH AN EXAMPLE BESIDE THE RULE, since a model
+     matches an example where it ignores an adjective: held to the change's
+     rule alone, the keep came back a habit, drawn from his answers at open,
+     which record intent. */
   assert.match(review, /The keep is held to that as much as the change/, 'the review lets the keep be a resolution');
   assert.match(review, /never from his answers at open, which record what he meant to do/,
     'the review lets a keep rest on what he meant to do rather than what a row shows');

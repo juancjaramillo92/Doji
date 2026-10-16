@@ -440,6 +440,7 @@ single-sourced at run time:
 | the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow, the Apps Script and the charm's `charm/main/net.h` |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
 | each function's **gateway setting** | `config.toml`'s stanza and the deploy command's flag |
+| her **map's grid and candle count** | `GRID` and `CANDLES` in `structure.ts`, said in words by `get_structure`'s description and by `SYSTEM`; the grid is §4's, in `strategy.ts` |
 | **what the eval reads** | `scripts/eval.mjs`'s imports and `file()` reads, and the paths `test.yml`'s eval-owed job compares with main |
 
 Copies are the cost; copies that can *disagree* are the risk.
@@ -2124,6 +2125,31 @@ decided this in October 2026, after the evidence on both sides was put to you
 Her reads stay what they were — a view on the news, judged by the test she
 stated and never by price. A call is the one thing of hers price judges.
 
+### Her analysis is never finished
+
+**Her technical and her fundamental analysis are an area of constant research
+and improvement, not a finished feature.** Neither is a skill she was trained
+in here. The model brings what it knows of price action and of macro, and what
+this repository adds is what keeps that knowledge honest: facts handed to her
+rather than searched for, his rules to hold them to, and a meter on each half.
+
+- **Technical: his charts, his way.** What she sees is *Her map of his charts*:
+  his sequence's first two steps, the pools and sweeps, the sessions and the
+  last candles. Her calls, scored on price, are what tests it. She cannot see
+  what he draws (`REFACTOR.md` R-70), reads no indicator (R-69), and never sees
+  the candle he waits for.
+- **Fundamental: the weeks behind his chart.** The market around gold, the
+  calendar and how each release has run against its consensus, what the
+  futures price for the Fed, the positioning and the flows, read through §2's
+  six channels. Every read she gives is filed with the channel its chain ran
+  down.
+- **How a change is proved.** The map's readings by `scripts/calibrate.mjs`,
+  her calls by their record, her reads by theirs, counted per channel, and any
+  change to her prompts by the eval, run before and after with `--plant` first
+  (*Tests*). Both records count a month, so a month is the shortest span to
+  judge a change on. An idea not yet built is weighed the way
+  `RESEARCH-eugenia.md` weighs one; one refused goes in `REFACTOR.md`.
+
 ### What she remembers
 
 Twelve tables, separated by how long a thing is true for. A turn rolls over inside
@@ -3538,8 +3564,9 @@ ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs --plant
 ```
 
 Or from GitHub: **Actions → eval → Run workflow**, with `ANTHROPIC_API_KEY` as a
-repository secret; the verdicts and the cost are in the run's log, and a failed
-case fails the run. Nothing runs it unasked, so `test.yml` says when it is owed:
+repository secret; the verdicts and the cost are in the run's log, with what
+she wrote wherever a case or a plant failed and, for a pattern, where in it the
+pattern matched, and a failed case fails the run. Nothing runs it unasked, so `test.yml` says when it is owed:
 a push to a branch whose prompts, cases or eval differ from main's carries the
 warning *The eval is owed*, and a branch is run through it before it is merged.
 `index.ts` is outside that list though the eval reads its model names: a warning

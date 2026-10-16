@@ -21,7 +21,8 @@
 
    Run:  SUPABASE_URL=… SB_SECRET_KEY=… DOJI_CRON_SECRET=… \
            node --experimental-strip-types scripts/calibrate.mjs
-   Cost: forty broker reads through the poller, and one read of the journal.
+   Cost: two broker reads an entry, through the poller, and one read of the
+   journal.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { foldStructure, READINGS } from '../supabase/functions/doji-eugenia/structure.ts';
 

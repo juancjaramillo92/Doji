@@ -164,21 +164,14 @@ export function judgeRequest(c, text) {
    then fail. Run first with --plant: if those cases still pass, the eval is
    blind to that rule and its green means nothing.
 
-   A broken prompt does not break every answer. With the position ban gone she
-   still mostly answered the dollar question and nothing more: caught in 9 of
-   16 runs, where the whole prompt failed 0 of 8. So each case is asked
-   PLANT_TRIES times, and one failure is the eval seeing the breakage. On 15
-   October it was caught 1 of 9 against a question with no figure in it, so
-   its case now hands her a print that surprised: a read is something to say
-   about a surprise, and the ban is what keeps it unsaid. It was still caught
-   0 or 1 of 3, because the writer kept the ban in the sentence that lets her
-   give a read when he asks: a permission on asking states the default, so it
-   goes too. On 16 October it fell to 0 of 3 again: two more copies stood,
-   that what she may say of a position is narrower than what she sees, and
-   that unprompted it does two things and no more. Both go. It still caught 0
-   of 3: asked what the dollar was doing, she answered the dollar, ban or no
-   ban. The case now asks what the market makes of the print, where a read is
-   what SYSTEM says she gives when one is earned, and what the ban withholds. */
+   A broken prompt does not break every answer, so each case is asked
+   PLANT_TRIES times, and one failure is the eval seeing the breakage. A rule
+   the writer states more than once goes from every copy, or the one left
+   standing keeps her to it: the position ban stands in the ban, in the
+   permission on asking, which states the default, in what she may say of a
+   position being narrower than what she sees, and in what she does unprompted.
+   And its case asks for what the ban withholds, a read on a print that
+   surprised: asked what the dollar did, she answers the dollar, ban or no ban. */
 export const PLANT_TRIES = 3;
 
 export const PLANTS = [
@@ -201,9 +194,9 @@ export const PLANTS = [
       TRIM: p.TRIM.replace(/YOUR CALL IS THE ONE\s+EXCEPTION:[\s\S]*?never changed\./, 'A call with levels in it comes out whole.'),
     }) },
   /* The map rule restates the hours rule above it for the map, and the critic
-     runs under both, so both go. Its draft names no level off the map: on 15
-     October, with eight levels in it, the number budget cut them with the rule
-     gone, and the plant was caught 0 of 3. */
+     runs under both, so both go. Its draft names no level off the map: a draft
+     full of levels has the number budget cut them with the rule gone, and the
+     case cannot see it go. */
   { why: 'the map of his charts kept out of the briefing\'s prose, gone from the critic and the writer',
     cases: ['critic-keeps-map-out-of-prose'],
     breaks: (p) => ({
@@ -267,8 +260,10 @@ async function main(argv) {
         console.log(`${caught ? 'caught' : 'NOT CAUGHT'} ${caught} of ${PLANT_TRIES} — ${plant.why} (${id})`);
         // What she wrote with the rule gone is the one thing that says why a
         // case cannot see it go.
-        if (!caught) console.log(`      she wrote: ${results[0].text.replace(/\s+/g, ' ').slice(0, 400)}`);
-        if (!caught) throw new Error('a planted defect passed: the eval is blind to it, and its green says nothing');
+        if (!caught) {
+          console.log(`      she wrote: ${results[0].text.replace(/\s+/g, ' ').slice(0, 400)}`);
+          throw new Error('a planted defect passed: the eval is blind to it, and its green says nothing');
+        }
       }
     }
   }

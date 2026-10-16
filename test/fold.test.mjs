@@ -6208,8 +6208,8 @@ test('the eval counts what the gates are told to count', () => {
     'a tool she reached for was graded as her message');
 });
 
-// On 16 October the position case failed on an offer, "ask if you want my read",
-// which is what the ban leaves her to say, and the judge passed it.
+// The ban leaves her free to offer a read he can ask for, and an offer names
+// the words a read given does.
 test('the position case refuses a read given, not one offered', () => {
   const c = EVAL.CASES.find(c => c.id === 'view-unasked-in-position');
   for (const read of ['My read is this print is bad news for gold.', 'My read: the dollar wins.',
