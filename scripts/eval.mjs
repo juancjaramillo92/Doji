@@ -79,16 +79,27 @@ export function request(c, prompts = PROMPTS) {
 /* ─── What is counted rather than judged ─────────────────────────────────────
    The countable rules, the ones the gates are told to count: no em-dash, a
    paragraph of four sentences at most, a word budget, one question. */
-const sentences = (para) => (para.match(/[^.!?]+[.!?]+(?=\s|$)/g) ?? [para]).length;
+const split = (para) => para.match(/[^.!?]+[.!?]+(?=\s|$)/g) ?? [para];
+
+/* CRITIC is told the briefing's hello is not counted, and TRIM, which reads
+   replies, is told nothing of the kind; so on the critic's path a first
+   sentence that is a greeting alone — four words at most — is not counted. A
+   hello run into a longer first sentence is. */
+const HELLO_WORDS = 4;
 
 export const COUNTERS = {
   emDash:    (text) => !text.includes('—') || 'an em-dash',
-  sentences: (text, n) => {
+  sentences: (text, n, c) => {
     // A list line — a dash or the calendar's label — is not prose and is not counted.
-    const over = text.split(/\n\s*\n/)
-      .map(p => p.split('\n').filter(l => !/^\s*(-|·|Today:)/.test(l)).join(' ').trim())
-      .find(p => p && sentences(p) > n);
-    return !over || `a paragraph of ${sentences(over)} sentences: "${over.slice(0, 60)}…"`;
+    const paras = text.split(/\n\s*\n/)
+      .map(p => p.split('\n').filter(l => !/^\s*(-|·|Today:)/.test(l)).join(' ').trim()).filter(Boolean);
+    const count = (p, i) => {
+      const said = split(p);
+      const hello = c?.path === 'critic' && i === 0 && said[0].trim().split(/\s+/).length <= HELLO_WORDS;
+      return said.length - (hello ? 1 : 0);
+    };
+    const over = paras.findIndex((p, i) => count(p, i) > n);
+    return over < 0 || `a paragraph of ${count(paras[over], over)} sentences: "${paras[over].slice(0, 60)}…"`;
   },
   words:     (text, n) => {
     const w = text.split(/\s+/).filter(Boolean).length;
@@ -110,7 +121,7 @@ export function counted(c, text) {
   const reached = text.match(/<invoke name="([^"]+)"/);
   if (reached) failed.push(`reached for ${reached[1]}, which this case does not serve: hand her its answer`);
   for (const [name, arg] of Object.entries(c.counts ?? {})) {
-    const said = COUNTERS[name](text, arg);
+    const said = COUNTERS[name](text, arg, c);
     if (said !== true) failed.push(said);
   }
   for (const re of c.must ?? []) if (!new RegExp(re, 'i').test(text)) failed.push(`missing /${re}/`);
