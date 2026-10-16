@@ -37,10 +37,11 @@ export function readingsGrid() {
     ({ ...READINGS, TURN, ON_GRID, EDGE }))));
 }
 
+// In cents, as every price here is: halving two of them leaves float noise.
 const median = (xs) => {
   if (!xs.length) return null;
   const s = [...xs].sort((a, b) => a - b), m = s.length >> 1;
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  return Math.round((s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) * 100) / 100;
 };
 
 /* One set of readings against every entry. An entry the map draws no level for
