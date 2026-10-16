@@ -6610,9 +6610,16 @@ test('every planted defect breaks a prompt and names a case that exists', () => 
     for (const id of plant.cases) assert.ok(EVAL.CASES.some(c => c.id === id), `the plant names no case ${id}`);
   }
   // A plant that leaves a copy of its rule standing tests the copy, not the eval.
-  const ban = EVAL.PLANTS.find(p => p.cases.includes('view-unasked-in-position')).breaks(EVAL.PROMPTS).SYSTEM;
-  assert.doesNotMatch(ban, /No view on where price goes|a view while he is in a position|If he asks where you think price goes|what you may SAY is narrower|UNPROMPTED IT DOES TWO THINGS AND NO MORE/,
+  const banned = EVAL.PLANTS.find(p => p.cases.includes('critic-strips-read-in-position')).breaks(EVAL.PROMPTS);
+  assert.doesNotMatch(banned.SYSTEM, /No view on where price goes|a view while he is in a position|If he asks where you think price goes|what you may SAY is narrower|UNPROMPTED IT DOES TWO THINGS AND NO MORE/,
     'the position-ban plant leaves the writer a statement of the ban');
+  assert.doesNotMatch(banned.CRITIC.replace(/\s+/g, ' '), /any view at all if what he has on shows an open position/,
+    'the position-ban plant leaves the critic, which runs last, its statement of the ban');
+  // And the case's read is one CRITIC keeps with the ban gone: labelled, with
+  // its falsifier, and no level.
+  const read = EVAL.CASES.find(c => c.id === 'critic-strips-read-in-position').draft.split('\n\n')
+    .find(par => /My read/.test(par));
+  assert.match(read, /My read is[\s\S]*I would be wrong if/, 'the case\'s read is not one a gate without the ban would keep');
   const map = EVAL.PLANTS.find(p => p.cases.includes('critic-keeps-map-out-of-prose')).breaks(EVAL.PROMPTS);
   assert.doesNotMatch(map.SYSTEM, /THE MAP OF HIS CHARTS IS THE HOURS ON IT|NOT THE HOURS ON IT/,
     'the map plant leaves the writer, whose prompt the critic runs under, a statement of the rule');

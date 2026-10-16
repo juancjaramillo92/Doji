@@ -186,10 +186,16 @@ export function judgeRequest(c, text) {
 export const PLANT_TRIES = 3;
 
 export const PLANTS = [
-  { why: 'the ban on a view while he holds a position, gone from every place the writer states it',
-    cases: ['view-unasked-in-position'],
+  /* The reply case cannot see this plant since a chain's last link became the
+     mechanism (MECHANISM, 16 October): without the ban she walks the chain to
+     gold, which is now allowed, and volunteers no read. So the critic is
+     handed a draft carrying her labelled read while he holds a position; with
+     the ban it comes out, without it CRITIC is told a labelled read stays. */
+  { why: 'the ban on a view while he holds a position, gone from the writer and the critic',
+    cases: ['critic-strips-read-in-position'],
     breaks: (p) => ({
       ...p,
+      CRITIC: p.CRITIC.replace(/, and any view\s+at all if what he has on shows an open position/, ''),
       SYSTEM: p.SYSTEM
         .replace(/· No view on where price goes and no call while he has a position open,[\s\S]*?shows a position\.\n/, '')
         .replace(/, or a view while he is in a position,/, ',')
