@@ -41,6 +41,8 @@ manifest `background_color`, a dark `color-scheme` and an
 docs/README.md                          the contract: what the app does and why
 docs/REFACTOR.md                        every move refused, and why
 .claude/CLAUDE.md                       how to work on it; the README outranks it
+.claude/settings.json                   registers the session-start hook
+.claude/hooks/session-start.sh          a cloud session's Node floor and npm ci
 index.html                              the entire application
 icon-512.png                            home-screen icon
 vercel.json                             no-cache header for the app shell
@@ -3530,7 +3532,10 @@ npm run test:db      # schema.sql on a real Postgres — see below
 
 Node 22.22.2 or newer — jsdom's floor — stated in `package.json`'s `engines` and
 enforced by `engine-strict=true` in `.npmrc`, so `npm ci` refuses below it and a
-green CI run proves the runner's Node. `--experimental-strip-types` lets the
+green CI run proves the runner's Node. A Claude Code cloud session ships an older
+one, so `.claude/hooks/session-start.sh` fetches the floor from nodejs.org,
+checked against its published sums, and runs `npm ci`; it reads the version from
+`engines`, and does nothing outside a cloud session. `--experimental-strip-types` lets the
 suite import the Edge Functions' `.ts` directly. `jsdom` and `typescript` are the
 only dependencies, both dev; the app installs nothing. **`typescript` is never a
 build step**: `test/types.test.mjs` uses it to ask two scope questions of the
