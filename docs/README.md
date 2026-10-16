@@ -3505,8 +3505,9 @@ the jobs, and `agree.test.mjs` holds that count against `schema.sql`.
    "callback_query"]` — both, or the taps under a briefing are never delivered.
    **Set a spend limit on the key's workspace** (Console → Workspaces → Spend
    limits; a key has none of its own): it is the only enforceable bound on what
-   she can cost, and every key in that workspace spends against it. Store `eugenia_bot_token` and `telegram_chat_id` in Vault too,
-   lower-case — the watchers post to Telegram themselves.
+   she can cost, and every key in that workspace spends against it. Store
+   `eugenia_bot_token` and `telegram_chat_id` in Vault too, lower-case — the
+   watchers post to Telegram themselves.
 7. Run `supabase/schema.sql` in the SQL editor — last, because its triggers and
    schedules call the functions and secrets above from the moment it lands.
    Connect TradingView (see **TradingView**), then walk the history door once
@@ -3699,9 +3700,9 @@ one `net.http_post` each.
 
 Neither of the last two can reach a column. The value sits in Vault and in
 function secrets and crosses no untrusted channel; the one enforceable bound is
-the spend limit on the Anthropic key's workspace. `DOJI_EMAIL_SECRET` is deliberately a
-different secret: it lives in Google's infrastructure and opens five columns of
-one table.
+the spend limit on the Anthropic key's workspace. `DOJI_EMAIL_SECRET` is
+deliberately a different secret: it lives in Google's infrastructure and opens
+five columns of one table.
 
 **One value, two stores, two spellings**: the functions read `DOJI_CRON_SECRET`,
 the database reads `doji_cron_secret` from Vault — the four calling jobs and the
