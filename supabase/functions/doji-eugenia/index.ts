@@ -1711,6 +1711,18 @@ function confirmedAt(bars: Candle[], buy: boolean, level: number, from: number):
   return null;
 }
 
+/* The poller's last thirty hours of minute bars, and where they begin.
+   Throws, for its callers to record. */
+async function readNightBars(): Promise<{ from: number; bars: Candle[] }> {
+  const res = await fetch(`${SB_URL}/functions/v1/doji-mcp-sync?bars=1`, {
+    headers: { "x-doji-key": CRON_SECRET }, signal: AbortSignal.timeout(READ_MS),
+  });
+  if (!res.ok) throw new Error(`bars: HTTP ${res.status}`);
+  const served = await res.json();
+  if (!served?.ok || !Array.isArray(served.bars)) throw new Error("bars: no readable answer");
+  return served;
+}
+
 /* Tonight's scoring: every call whose session has ended and is not yet scored,
    against one read of the bars. The PATCH is filtered on `outcome is null`, so
    a retry never rescores one. Both outcomes are a row; never throws. Exported
@@ -1721,12 +1733,7 @@ export async function scoreCalls(): Promise<void> {
       `eugenia_calls?select=*&outcome=is.null&expires_at=lte.${new Date().toISOString()}` +
       `&order=id.desc&limit=10`);
     if (!due.length) return;
-    const res = await fetch(`${SB_URL}/functions/v1/doji-mcp-sync?bars=1`, {
-      headers: { "x-doji-key": CRON_SECRET }, signal: AbortSignal.timeout(READ_MS),
-    });
-    if (!res.ok) throw new Error(`bars: HTTP ${res.status}`);
-    const served = await res.json();
-    if (!served?.ok || !Array.isArray(served.bars)) throw new Error("bars: no readable answer");
+    const served = await readNightBars();
     const scored: string[] = [];
     for (const c of due) {
       const score = scoreCall(c, served.bars, served.from);
