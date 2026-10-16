@@ -765,6 +765,15 @@ broad box is worth more as his own account: where his mark and the computed
 rule disagree is the finding she uses.
 **Revisit if:** he stops bringing her a plan before he enters.
 
+### R-85 — R-04's guard on a row with no side
+**Kept on purpose**, where R-02's and R-19's went. Those two reach a trade only
+through its stop history, so the poller saw it open and wrote the broker's side.
+R-04 reads `best_price`, which the poller recovers for trades older than its own
+history, written by paths that predate `emailRow`'s check, so a broker row
+without a side can reach it.
+**Revisit if:** the live database holds no broker row whose `direction` is
+null.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

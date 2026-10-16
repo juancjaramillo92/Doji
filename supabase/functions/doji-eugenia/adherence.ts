@@ -631,8 +631,7 @@ function r19(rows: TradeRow[], cal: Calendar, stops: Map<string, Stop[]>): RuleR
     const first = seen[0];
     const held = seen.filter(s => +new Date(s.seen_at) <= print + STOP_GRACE_MIN * 60_000).pop();
     const buy = t.direction === 'BUY';
-    if (!first || !held || +new Date(first.seen_at) > print || t.entry_price == null ||
-        (t.direction !== 'BUY' && t.direction !== 'SELL')) { unknown.push(t.id); continue; }
+    if (!first || !held || +new Date(first.seen_at) > print || t.entry_price == null) { unknown.push(t.id); continue; }
 
     const [was, now] = [price(first.sl), price(held.sl)];
     const targetMoved = price(first.tp) !== null && price(held.tp) !== price(first.tp);
