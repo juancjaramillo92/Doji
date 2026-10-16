@@ -62,7 +62,7 @@ import {
   SWEEP_MIN, DAY_LOSS, STRETCH, TO_BREAK_EVEN, ALERT_GRACE_MIN, HIGH, HOME, weekOf, STOP_GRACE_MIN,
 } from '../supabase/functions/doji-eugenia/adherence.ts';
 import {
-  turns, biasOf, sweepsOf, poolsOf, foldStructure, READINGS, GRID, CANDLES,
+  turns, biasOf, sweepsOf, poolsOf, shapeOf, foldStructure, READINGS, GRID, CANDLES,
 } from '../supabase/functions/doji-eugenia/structure.ts';
 import { CHANNELS, CHANNEL_STATES } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts';
@@ -1031,6 +1031,23 @@ test('the map reads his level charts in his words, off printed bars only', () =>
   assert.ok(READINGS.ON_GRID >= 2 && READINGS.EDGE >= 1, 'the fixture is drawn for a level two dollars off its quarter');
 });
 
+/* STEP 3 IN NUMBERS. His signal is a candle reaching a level and rejecting it,
+   so the map says what each entry candle traded through and which side it
+   closed on, with its body and wicks worked out rather than left to her. */
+test('a candle is said by its body, its wicks and the marks it closed beyond', () => {
+  const down = shapeOf({ t: 0, open: 4030, high: 4031, low: 4019, close: 4026 }, [4050, 4025, 4020, 4000]);
+  assert.deepEqual(down, { body: -4, upper: 1, lower: 7,
+    through: [{ price: 4020, closed: 'above' }, { price: 4025, closed: 'above' }] },
+    'a wick through a mark and a close back above it was not read as one');
+  assert.deepEqual(shapeOf({ t: 0, open: 4020, high: 4026, low: 4019.5, close: 4024 }, [4025]).through,
+    [{ price: 4025, closed: 'below' }], 'a high through the quarter and a close under it is a rejection from above');
+  assert.deepEqual(shapeOf({ t: 0, open: 4010, high: 4012, low: 4008, close: 4011 }, [4025]).through, [],
+    'a mark the candle never reached was read as traded through');
+  const map = foldStructure(MAP_CHARTS, MAP_NOW);
+  assert.deepEqual(map.candles.find(c => c.period === 'M_5').shapes[0].through.map(t => t.price), [4023, 4025],
+    "the fold reads a candle against fewer marks than the map draws: the 4023 level and pool, and the 4025 quarter");
+});
+
 test('the map is said as hers, with every price timed and nothing about what comes next', () => {
   const out = structureList(foldStructure(MAP_CHARTS, MAP_NOW), MAP_NOW);
   assert.match(out, /This is YOUR map, computed from the bars; his is drawn in TradingView/);
@@ -1048,7 +1065,7 @@ test('the map is said as hers, with every price timed and nothing about what com
   assert.match(out, /No wick through a turn closed back in the last day\./);
   assert.match(out, /09:00 ET to 10:15 so far, 4020 to 4031/);
   assert.match(out, /averaged \$50 over the last 14 sessions; this session has covered \$30 so far\./);
-  assert.match(out, /The last closed 5m candles, oldest first: 09:55 ET open 4025, high 4027, low 4023, close 4025; 10:00 ET open 4026, high 4028, low 4024, close 4026\./);
+  assert.match(out, /The last closed 5m candles, oldest first: 09:55 ET open 4025, high 4027, low 4023, close 4025 \(closed where it opened, wicks \$2\.00 above and \$2\.00 below; through 4023, closed above it, and 4025, closed on it\); 10:00 ET open 4026, high 4028, low 4024, close 4026 \(closed where it opened, wicks \$2\.00 above and \$2\.00 below; through 4025, closed above it\)\./);
   assert.match(out, /The last closed 15m candles, oldest first: 09:00 ET open 4026/);
   assert.match(out, /· 4023 — equal lows, on the 30m, touched 05:00 ET, 07:30 ET/);
   assert.match(structureList({ ...foldStructure(MAP_CHARTS, MAP_NOW), pools: [] }, MAP_NOW),

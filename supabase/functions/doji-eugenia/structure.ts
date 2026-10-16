@@ -59,6 +59,7 @@ export interface Quarter { price: number; round: boolean; turned: boolean }
 export interface Sweep { period: Period; at: number; level: number; kind: 'high' | 'low'; wick: number; close: number }
 export interface Pool { price: number; kind: 'high' | 'low'; periods: Period[]; touches: number[] }
 export interface Session { name: string; from: number; to: number; high: number; low: number }
+export interface Shape { body: number; upper: number; lower: number; through: { price: number; closed: 'above' | 'below' | 'on' }[] }
 export interface Structure {
   last: Candle | null;
   bias: Bias[];
@@ -68,7 +69,7 @@ export interface Structure {
   grid: Quarter[];
   sweeps: Sweep[];
   sessions: Session[];
-  candles: { period: Period; bars: Candle[] }[];
+  candles: { period: Period; bars: Candle[]; shapes: Shape[] }[];
   adr: number | null;
   today: number | null;
   missing: Period[];
@@ -213,6 +214,20 @@ function sessionsOf(bars: Candle[], p: Period, since: number): Session[] {
   return out;
 }
 
+/* Step 3 in numbers: a candle's body and both wicks, and every mark on the map
+   its range traded through with the side it closed on. A wick and a body are
+   subtraction a model gets wrong across four candles at once, and a candle
+   reaching a level and closing back is his signal, so it is said, not left to
+   be found. Nothing here names a pattern. */
+export function shapeOf(b: Candle, marks: number[]): Shape {
+  const top = Math.max(b.open, b.close), bottom = Math.min(b.open, b.close);
+  return {
+    body: round2(b.close - b.open), upper: round2(b.high - top), lower: round2(bottom - b.low),
+    through: marks.filter(m => b.low <= m && m <= b.high).sort((x, y) => x - y)
+      .map(price => ({ price, closed: b.close > price ? 'above' : b.close < price ? 'below' : 'on' })),
+  };
+}
+
 export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: number,
                               r = READINGS): Structure {
   const read = (p: Period) => closed(charts[p] ?? [], p, now);
@@ -249,6 +264,8 @@ export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: nu
     }
   }
 
+  // Every price the map marks, which a candle is read against.
+  const marks = [...new Set([...levels, ...pools, ...grid].map(m => m.price))];
   const since = now - DAY;
   const daily = read('D_1');
   const forming = charts.D_1?.at(-1);
@@ -263,8 +280,10 @@ export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: nu
     sweeps: (['H_1', 'M_15'] as const).flatMap(p => sweepsOf(p, read(p), since, r.TURN))
       .sort((a, b) => b.at - a.at).slice(0, SWEEPS),
     sessions: sessionsOf(charts.M_15 ?? [], 'M_15', since),
-    candles: (['M_15', 'M_5'] as const).map(p => ({ period: p, bars: read(p).slice(-CANDLES) }))
-      .filter(c => c.bars.length),
+    candles: (['M_15', 'M_5'] as const).map(p => {
+      const bars = read(p).slice(-CANDLES);
+      return { period: p, bars, shapes: bars.map(b => shapeOf(b, marks)) };
+    }).filter(c => c.bars.length),
     adr: daily.length
       ? round2(daily.slice(-ADR_SESSIONS).reduce((s, b) => s + b.high - b.low, 0) / Math.min(daily.length, ADR_SESSIONS))
       : null,

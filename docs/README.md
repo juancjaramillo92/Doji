@@ -2050,7 +2050,11 @@ broker token stays in the poller, as for `get_market` — and `foldStructure` in
 - **The sessions** over the last day on the 15m, by `sessionAt`, the bar still
   forming included; **the average daily range** over fourteen sessions and what
   this one has covered; **the last four closed 15m and 5m candles** (`CANDLES`),
-  oldest first, since three can make a pattern and one never does.
+  oldest first, since three can make a pattern and one never does — **each
+  with its step 3 worked out** (`shapeOf`): its body and both wicks in dollars,
+  and every mark on the map its range traded through, with the side it closed
+  on. A candle reaching a level and closing back is his signal, and four
+  candles' wicks are subtraction a model gets wrong; no pattern is named.
 
 `TURN`, `ON_GRID`, `EDGE`, `REACH` and `EQUAL` are readings rather than facts, kept in
 one object, `READINGS`, so each can be argued with and the calibration can fold
