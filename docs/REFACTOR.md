@@ -794,6 +794,16 @@ no declaration. The quote stays held by its two interfaces, which already name
 every field.
 **Revisit if:** a door is added that the driven test cannot stub a vendor for.
 
+### R-88 — loosening the eval's counts to the model's miss
+**Why refused:** a review of 257 against 250 and a paragraph of five against four
+are misses by a word and a sentence, and widening each count to what she sent
+would have been green the same day. But the count is the rule she is given, and
+an eval that moves to meet her stops saying whether she keeps it. The prompt
+moved instead: the review cuts with room below its ceiling, and a lead-in is
+counted as the sentence it is.
+**Revisit if:** she misses a count by the same margin with the room given, which
+says the room is in the wrong place rather than too small.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED
