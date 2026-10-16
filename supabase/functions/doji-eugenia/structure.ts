@@ -47,7 +47,10 @@ export const ADR_SESSIONS = 14;
 const DAY = 86_400_000;
 
 export interface Turn { price: number; at: number; kind: 'high' | 'low' }
-export interface Bias { period: Period; trend: 'up' | 'down' | 'mixed' | null; highs: Turn[]; lows: Turn[]; close: number }
+export interface Bias {
+  period: Period; trend: 'up' | 'down' | 'mixed' | null; highs: Turn[]; lows: Turn[]; close: number;
+  broken: boolean;
+}
 export interface Level {
   price: number; sides: 'high' | 'low' | 'both'; periods: Period[]; at: number;
   quarter: number | null; edge: 'top' | 'bottom' | null;
@@ -96,7 +99,10 @@ export function turns(bars: Candle[], turn = READINGS.TURN): Turn[] {
 }
 
 /* The two newest turns of each kind, and the sequence they make. Fewer than two
-   of either is no sequence, never a guess at one. */
+   of either is no sequence, never a guess at one. A sequence is named off
+   turns, and the newest TURN bars can never be one, so a close back beyond
+   the newest turn that held it — under the higher low, over the lower high —
+   is the sequence broken before any turn can say so. */
 export function biasOf(period: Period, bars: Candle[], turn = READINGS.TURN): Bias {
   const all = turns(bars, turn);
   const highs = all.filter(t => t.kind === 'high').slice(-2);
@@ -105,7 +111,9 @@ export function biasOf(period: Period, bars: Candle[], turn = READINGS.TURN): Bi
     : highs[1].price > highs[0].price && lows[1].price > lows[0].price ? 'up'
     : highs[1].price < highs[0].price && lows[1].price < lows[0].price ? 'down'
     : 'mixed';
-  return { period, trend, highs, lows, close: bars[bars.length - 1].close };
+  const close = bars[bars.length - 1].close;
+  const broken = trend === 'up' ? close < lows[1].price : trend === 'down' ? close > highs[1].price : false;
+  return { period, trend, highs, lows, close, broken };
 }
 
 /* A wick beyond a turn that closed back on the side it came from, while the

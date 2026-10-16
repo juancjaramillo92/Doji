@@ -2029,6 +2029,10 @@ broker token stays in the poller, as for `get_market` — and `foldStructure` in
 - **Step 1, the bias charts** — daily, 4H, 1H: the two newest turns of each
   kind, and the sequence they make: higher highs and higher lows, lower and
   lower, or neither. Fewer than two of either is no sequence, never a guess.
+  **A close back beyond the newest turn that held the sequence** — under the
+  higher low, over the lower high — is said as the sequence broken, since the
+  newest three bars can never be a turn and the turns alone would go on
+  reading *up* for hours after price had left.
 - **Step 2, the level charts** — 1H and 30m: every turn within `REACH` ($60, a
   call's wait and its $30 target) of price, merged where two are within
   `ON_GRID` ($3), a high and a low on one price being a level that has flipped;

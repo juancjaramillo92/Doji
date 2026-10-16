@@ -1147,7 +1147,7 @@ const STRUCTURE_TOOL = {
   name: "get_structure",
   description:
     "His six charts, read off his own broker's bars every quarter hour: the turns on the daily, " +
-    "4H and 1H and the sequence they make; where price has turned on the 1H and 30m, with the $25 " +
+    "4H and 1H, the sequence they make and whether the last close has broken it; where price has turned on the 1H and 30m, with the $25 " +
     "grid beside them and where the two agree; which of those sit at the edge of the week's hourly " +
     "range and which inside it; equal highs and lows still resting, the liquidity pools of his " +
     "step 2; wicks through a turn that closed back; the sessions' ranges; the average daily range; " +
@@ -3312,7 +3312,9 @@ export function structureList(s: Structure, now = Date.now()): string {
     `TradingView. Every figure on it has already printed.`,
     `The turns on the bias charts, the newest two of each:`,
     ...s.bias.map(b => `· ${name(b.period)}: ${pair(b.highs, "highs")}; ${pair(b.lows, "lows")} — ` +
-      (b.trend ? SEQUENCE[b.trend] : "too few turns for a sequence") + `. Last close ${b.close}.`),
+      (b.trend ? SEQUENCE[b.trend] : "too few turns for a sequence") + `. Last close ${b.close}` +
+      (b.broken ? `, ${b.trend === 'up' ? `under the newest low, ${b.lows[1].price}` : `over the newest high, ${b.highs[1].price}`}` +
+        `: the sequence has broken and no turn says so yet.` : `.`)),
   ];
   if (s.range) {
     lines.push(`The week of hourly bars runs from ${turn(s.range.low)} to ${turn(s.range.high)}. A level ` +

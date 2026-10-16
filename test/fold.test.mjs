@@ -888,6 +888,17 @@ test('the sequence of turns is named only when both sides agree, and two of each
   assert.deepEqual(turns(rising).map(t => [t.kind, t.price]),
     [['high', 20], ['low', 0.5], ['high', 25], ['low', 1]]);
   assert.equal(biasOf('H_1', rising).trend, 'up');
+  assert.equal(biasOf('H_1', rising).broken, false);
+  // Rising, then a close under the newest low at 1, among the bars too new to
+  // be a turn: the sequence still reads up off its turns, and has broken.
+  const broke = bars([5, 6, 7, 20, 7, 6, 5, 6, 7, 25, 7, 6, 5, 0.8],
+                     [3, 2, 1, 0.5, 2, 3, 4, 3, 2, 1, 2, 3, 4, 0.2]);
+  assert.deepEqual([biasOf('H_1', broke).trend, biasOf('H_1', broke).broken], ['up', true],
+    'a close under the higher low was read as the sequence holding');
+  const fell = bars([5, 6, 7, 25, 7, 6, 5, 6, 7, 20, 7, 6, 5, 24],
+                    [3, 2, 1.5, 1, 2, 3, 4, 3, 2, 0.5, 2, 3, 4, 21]);
+  assert.deepEqual([biasOf('H_1', fell).trend, biasOf('H_1', fell).broken], ['down', true]);
+  assert.equal(biasOf('H_1', wide).broken, false, 'a mixed sequence has nothing to break');
   const falling = bars([5, 6, 7, 25, 7, 6, 5, 6, 7, 20, 7, 6, 5, 4],
                        [3, 2, 1.5, 1, 2, 3, 4, 3, 2, 0.5, 2, 3, 4, 5]);
   assert.equal(biasOf('H_1', falling).trend, 'down');
@@ -1025,6 +1036,11 @@ test('the map is said as hers, with every price timed and nothing about what com
   assert.match(out, /This is YOUR map, computed from the bars; his is drawn in TradingView/);
   assert.match(out, /The newest bar read opened at 10:05 ET and last traded 4026\./);
   assert.match(out, /· daily: no highs yet; no lows yet — too few turns for a sequence\. Last close 4030\./);
+  const lows = (rows) => rows.map(p => ({ price: p, at: MAP_HOUR, kind: 'low' }));
+  const highs = (rows) => rows.map(p => ({ price: p, at: MAP_HOUR, kind: 'high' }));
+  assert.match(structureList({ ...foldStructure(MAP_CHARTS, MAP_NOW), bias: [{ period: 'H_4', trend: 'up',
+    highs: highs([4040, 4050]), lows: lows([4000, 4010]), close: 4005, broken: true }] }, MAP_NOW),
+    /· 4H: highs[^\n]*— higher highs and higher lows\. Last close 4005, under the newest low, 4010: the sequence has broken and no turn says so yet\./);
   assert.match(out, /The week of hourly bars runs from 3980 \(02:00 ET\) to 4049 \(23:00 ET Wednesday 14 Oct\)/);
   assert.match(out, /· 4049 — a high, on the 1H, newest 23:00 ET Wednesday 14 Oct; on the 4050 round number; at the top of the week's range/);
   assert.match(out, /· 4023 — turned both ways, a level that has flipped, on the 30m and 1H, newest 07:30 ET; on the 4025 quarter; inside the range/);
