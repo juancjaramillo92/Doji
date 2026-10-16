@@ -3747,13 +3747,16 @@ test('R-02 checks the cap on every loss, and the stop history wherever the polle
   assert.equal(r(win(), [at(3990), at(null, 5, null)]).verdict, 'unknown');
   // A position first seen bare and given its stop after is no widening.
   assert.equal(r(win(), [at(null, 0, null), at(3990, 1)]).verdict, 'pass');
+  /* NEVER A STOP AT ALL is no history: a win seen only bare is outside the
+     population, not a stop kept, and a loss seen only bare has the cap. */
+  assert.equal(r(win(), [at(null, 0, null)]).verdict, 'unknown',
+    'a win that never carried a stop passed as one never widened');
+  assert.equal(r(eighteen, [at(null, 0, null)]).verdict, 'pass');
 
-  // A short is the mirror, and a row with no side cannot say which way is out.
+  // A short is the mirror.
   const short = win({ direction: 'SELL', exit_price: 3970 });
   assert.equal(r(short, [at(4010), at(4000, 5)]).verdict, 'pass');
   assert.equal(r(short, [at(4010), at(4015, 5)]).verdict, 'fail');
-  assert.equal(r(win({ direction: null }), [at(3990), at(3985, 5)]).verdict, 'unknown');
-  assert.equal(r(win({ direction: null }), [at(3990)]).verdict, 'pass');
 });
 
 test('R-03 allows no entry after a $20 stop, and a tighter loss is not one', () => {

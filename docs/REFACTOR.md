@@ -727,6 +727,53 @@ judge's model. It now matches a read stated, "my read is" or "my read:", and
 **Revisit if:** she gives a read in words the pattern does not name, and the
 judge is what catches it.
 
+### R-80 — "never widened" as a rule of its own
+**Why refused:** §7 already called it R-02's respect half, and it answers the
+stop question R-02 asks, on the same marker. A new ID would move the twelve in
+every list and count `agree.test.mjs` holds, for a predicate that is one more
+`fail` in an existing rule.
+**Revisit if:** he wants the cap and the widening reported apart.
+
+### R-81 — R-02 judging a position still open
+**Why refused:** `check_rules` runs while he may be holding the trade, and a
+widening named on a live position is a remark about what to do with it, which
+`SYSTEM` forbids. The rule reads closed trades only, as the cap always did.
+**Revisit if:** the prohibition on his open positions changes.
+
+### R-82 — a stop pulled and never put back read as widened
+**Why refused:** the poller writes a pulled side as null, so no distance was
+recorded, and a verdict on a distance nobody saw is the claim §8 warns about.
+`unknown` names the trade. A pull put back further out is a `fail` already.
+**Revisit if:** he decides that pulling the stop is itself the breach.
+
+### R-83 — the folds over captures with their stop history
+**Deferred, not refused.** `golden-fold.json`'s captures predate `trade_stops`,
+so the widening half runs there over no history and only `fold.test.mjs`'s
+planted histories drive it. A capture of the table would have to be read off
+the live database, which this session's network refuses.
+**Revisit if:** a capture of `trade_stops` beside its trades is saved as a
+fixture.
+
+### R-84 — her day check on an open, and a narrower rules question at fill
+**Why refused, both, by him.** Eugenia proposed that a trade opening should
+first say whether the day already had its entry or its −4%, and that Gladys's
+rules question become *"first entry today, or a sweep re-entry?"*. The first
+arrives after the click, about a position he holds, which v1.23 removed for
+that reason; he now brings her the plan before entering, and that check holds
+R-03 and R-11. The second asks what R-03, R-10 and R-11 already compute, and the
+broad box is worth more as his own account: where his mark and the computed
+rule disagree is the finding she uses.
+**Revisit if:** he stops bringing her a plan before he enters.
+
+### R-85 — R-04's guard on a row with no side
+**Kept on purpose**, where R-02's and R-19's went. Those two reach a trade only
+through its stop history, so the poller saw it open and wrote the broker's side.
+R-04 reads `best_price`, which the poller recovers for trades older than its own
+history, written by paths that predate `emailRow`'s check, so a broker row
+without a side can reach it.
+**Revisit if:** the live database holds no broker row whose `direction` is
+null.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

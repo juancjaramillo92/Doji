@@ -409,8 +409,9 @@ async function writePlan(plan: OpenPlan): Promise<number> {
 }
 
 /* ─── Every stop and target, as they move ──────────────────────────────────
-   R-19 asks where the stop and target sat when a print landed, and a closed
-   position reports only its last. A row per change, never per poll: a
+   R-19 asks where the stop and target sat when a print landed, R-02 whether
+   the stop ever moved away from entry, and a closed position reports only its
+   last. A row per change, never per poll: a
    position whose latest row matches the broker gets nothing. A side the
    broker stopped carrying is a change, written as null, so a pulled target is
    not read as still resting. Pure; `latest` is newest first. */

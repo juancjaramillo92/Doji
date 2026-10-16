@@ -196,6 +196,13 @@ const gap = (t: TradeRow) => Math.abs((t.exit_price as number) - (t.entry_price 
 // $20.000000001.
 const CENT = 0.005;
 
+/* What trade_stops holds for a position. The read is newest first, and every
+   rule walks it in the order the poller saw it. */
+export interface Stop { seen_at: string; sl: number | null; tp: number | null }
+
+const history = (stops: Map<string, Stop[]>, id: string): Stop[] =>
+  [...(stops.get(id) ?? [])].sort((a, b) => +new Date(a.seen_at) - +new Date(b.seen_at));
+
 /* ─── R-01 ─────────────────────────────────────────────────────────────────
    Take profit $30, or $25 where the level looks hard. §7: no win with
    |exit − entry| < 25, a Friday close-out being unknown. R-15 forces that
@@ -240,9 +247,9 @@ function r01(rows: TradeRow[]): RuleResult {
 /* ─── R-02 ─────────────────────────────────────────────────────────────────
    Stop never beyond $20 from entry, and never widened. §7: no loss with
    |exit − entry| > 20, and no closed trade whose stop in trade_stops moved away
-   from entry. The second half reaches only the trades the poller recorded, so
-   a loss with no history is judged on the cap alone and a win with none is not
-   in the population. An exit past a stop that never moved is slippage, and
+   from entry. The second half reaches only a trade the poller saw carry a
+   stop, so without one a loss is judged on the cap alone and a win is not in
+   the population. An exit past a stop that never moved is slippage, and
    passes.
 
    Each sighting is held against the last stop that rested, so a stop pulled
@@ -256,20 +263,16 @@ function r02(rows: TradeRow[], stops: Map<string, Stop[]>): RuleResult {
   for (const t of rows) {
     if (!isBroker(t) || !closed(t)) continue;
     const loss = (t.pnl as number) < 0;
-    const seen = [...(stops.get(t.id) ?? [])]
-      .sort((a, b) => +new Date(a.seen_at) - +new Date(b.seen_at))
-      .map(s => s.sl == null ? null : Number(s.sl));
-    if (!loss && !seen.length) continue;
-
+    const seen = history(stops, t.id).map(s => s.sl == null ? null : Number(s.sl));
     const rested = seen.filter((sl): sl is number => sl !== null);
-    const sided = t.direction === 'BUY' || t.direction === 'SELL';
-    const wider = sided && rested.some((sl, i) =>
+    if (!loss && !rested.length) continue;
+
+    const wider = rested.some((sl, i) =>
       i > 0 && (t.direction === 'BUY' ? sl < rested[i - 1] - CENT : sl > rested[i - 1] + CENT));
     const pulled = rested.length > 0 && seen[seen.length - 1] === null;
-    const moved = rested.some(sl => Math.abs(sl - rested[0]) > CENT);
 
     if ((loss && priced(t) && gap(t) > FULL_STOP + CENT) || wider) fail.push(t.id);
-    else if ((loss && !priced(t)) || pulled || (!sided && moved)) unknown.push(t.id);
+    else if ((loss && !priced(t)) || pulled) unknown.push(t.id);
     else pass.push(t.id);
   }
   return result('R-02', `losses further than $${FULL_STOP} from entry, and stops moved away from entry where the poller recorded them`,
@@ -607,8 +610,6 @@ function r18(rows: TradeRow[], now: number): RuleResult {
    ───────────────────────────────────────────────────────────────────────── */
 export const STOP_GRACE_MIN = 5;
 
-export interface Stop { seen_at: string; sl: number | null; tp: number | null }
-
 function r19(rows: TradeRow[], cal: Calendar, stops: Map<string, Stop[]>): RuleResult {
   const pass: string[] = [], fail: string[] = [], unknown: string[] = [];
   const prints = cal.releases.map(r => +new Date(r)).sort((a, b) => a - b);
@@ -626,12 +627,11 @@ function r19(rows: TradeRow[], cal: Calendar, stops: Map<string, Stop[]>): RuleR
     const print = prints.find(p => p > e && p < end && sessionAt(new Date(p)) !== opened);
     if (print === undefined) continue;
 
-    const seen = [...(stops.get(t.id) ?? [])].sort((a, b) => +new Date(a.seen_at) - +new Date(b.seen_at));
+    const seen = history(stops, t.id);
     const first = seen[0];
     const held = seen.filter(s => +new Date(s.seen_at) <= print + STOP_GRACE_MIN * 60_000).pop();
     const buy = t.direction === 'BUY';
-    if (!first || !held || +new Date(first.seen_at) > print || t.entry_price == null ||
-        (t.direction !== 'BUY' && t.direction !== 'SELL')) { unknown.push(t.id); continue; }
+    if (!first || !held || +new Date(first.seen_at) > print || t.entry_price == null) { unknown.push(t.id); continue; }
 
     const [was, now] = [price(first.sl), price(held.sl)];
     const targetMoved = price(first.tp) !== null && price(held.tp) !== price(first.tp);

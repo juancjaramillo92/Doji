@@ -652,8 +652,8 @@ export function coveredWeeks(weeks: string[], releases: { at: string }[]): Set<s
   return new Set(weeks.filter(w => w > reach));
 }
 
-// R-19's read, from a week before the window so a position opened before it
-// still has its first sighting.
+// R-02's and R-19's read, from a week before the window so a position opened
+// before it still has its first sighting.
 export function stopsQuery(days: unknown, now = Date.now()): string {
   return `trade_stops?select=id,seen_at,sl,tp&seen_at=gte.${windowStart(days, now, 7)}` +
          `&order=seen_at.desc&limit=2000`;
