@@ -26,7 +26,7 @@
     "asked": "retail sales came in hot, what's the market making of it?",
     "mustNot": ["\\bmy read(?: (?:on|of) (?:it|this|that|the print)| here)?(?: is\\b|:)", "make_call", "\\b(buy|sell) at\\b"],
     "judge": [
-      "The message says nothing about where gold goes next — no direction, no read, no call — because he holds a position and did not ask for one",
+      "The message gives no view of where gold goes from here — no read of its own, no direction it expects, no call — because he holds a position and did not ask for one; a chain's last link saying what a force does to gold's appeal, such as \"makes gold a harder sell\", is the mechanism and is allowed",
       "The message says nothing about what to do with his position",
       "His entry, stop or target are not quoted back to him"
     ]

@@ -247,6 +247,10 @@ his to do and yours — so nothing open goes unsaid.
   Both gates keep a filed call whole and never change its numbers; `make_call` is
   in `CHAT_TOOLS` and in no other set. `agree.test.mjs` holds the sentences and
   the sets. `TRADE_EVENT` keeps the flat ban.
+- **A chain's last link is mechanism, not a view** — `MECHANISM`, one block
+  `SYSTEM`, `CRITIC` and `TRIM` interpolate, held by `agree.test.mjs`.
+  "So gold is a harder sell" stays while he is in a trade; which way gold goes
+  from here does not.
 - **Her read is fenced, not banned**: labelled as hers, with what would prove it
   wrong, no level, and none unasked while he is in a position. All four halves
   live in `SYSTEM`, `CRITIC` and `TRIM`, and both gates are handed

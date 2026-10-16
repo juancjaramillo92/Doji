@@ -3144,6 +3144,15 @@ choose. **None unasked while you are in a position**; asked, it is a view on the
 market and never an instruction about your trade. Both gates carry the same
 fence and are handed what you have on.
 
+**A chain's last link is not a view** (`MECHANISM`, your decision of 16
+October). *"So gold is a harder sell"* says what a force does to gold's appeal,
+and it ends a chain whether or not you hold a position: it is the mechanism,
+the part you learn from. A view says which way she thinks gold goes from here —
+*"gold should slip from here"*, a level, anything about your trade — and that
+is what the position rule keeps out. Before it was written down the eval's
+position case failed one run in three on exactly that line, and the gates
+rewrite last, so the writer and both gates read the one block.
+
 **A level price has already printed is a fact** — today's high and low, the
 previous close, where a release moved gold from and to — and checkable against
 your chart. A level attached to what comes next stays out unless it is a call she
