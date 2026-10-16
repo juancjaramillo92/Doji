@@ -3085,7 +3085,8 @@ commit it was made from, and a build of `main` is also published, the app
 alone, to a public Storage bucket, `charm`, which the workflow makes on first
 use with the repository's `SUPABASE_URL` and `SB_SECRET_KEY` secrets. Once a
 night, in the 03:00 hour in New York and off a low battery, an errand reads the
-newest image's description from its first bytes; when its version is not
+newest image's description from its first bytes — a low battery leaves the
+look to a later errand in that hour — and when its version is not
 hers, the rest is written into her other app slot (`charm/partitions.csv`
 gives her two of 7 MB) and she wakes into it at once, quietly. A new app is
 good only once it has reached her Wi-Fi: one that never does is rolled back by

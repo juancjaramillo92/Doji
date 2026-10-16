@@ -166,8 +166,10 @@ static void errand(void) {
             briefing_announced(time(NULL));
         }
         // A new app from main, in the small hours: she wakes into it at once,
-        // quietly, for this errand's place.
-        if (ota_due(time(NULL)) && !power_low() && ota_update()) {
+        // quietly, for this errand's place. The battery is asked first, since
+        // asking ota_due spends the night's look: one a low battery skipped
+        // waits for a later errand in the hour, on the cable perhaps.
+        if (!power_low() && ota_due(time(NULL)) && ota_update()) {
             errand_at = time(NULL);
             sleep_until(errand_at, false);
         }

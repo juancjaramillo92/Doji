@@ -1579,6 +1579,18 @@ test('the charm asks for the briefing in the hours it is written', () => {
 });
 
 
+/* Asking ota_due spends the night's look, so the battery is asked before it:
+   asked after, a low battery at the first errand of the hour lost the night
+   though the cable went in minutes later. */
+test('a low battery leaves the night\'s look for an update to a later errand', () => {
+  const errand = bodyOf(source('charm/main/main.c'), 'static void errand(void) {');
+  assert.match(errand, /if \(!power_low\(\) && ota_due\(time\(NULL\)\) && ota_update\(\)\)/,
+    'the errand asks for an update before the battery, so a low one spends the night\'s look');
+  // And ota_due is what marks the night looked.
+  assert.match(bodyOf(source('charm/main/ota.c'), 'bool ota_due(time_t now) {'), /looked = day;\s*return true;/,
+    'ota_due no longer marks the night as this test reads it');
+});
+
 /* A new app is good once she has reached her Wi-Fi, whichever waking it is:
    confirmed where every join succeeds, and nowhere else. Confirmed on one
    path only, a press in the second after an update took the other, and the
