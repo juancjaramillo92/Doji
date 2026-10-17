@@ -853,8 +853,8 @@ needs the same window.
 **Why refused:** `SYSTEM` says "a fifteen-minute candle", a copy of
 `CONFIRM_MS` in words. It is also R-07's 15m, his rule, which she is told in his
 words everywhere a call waits, so the words stay and a test holds them to the
-constant. The correlation windows were the other copy, and they went: each line
-of the block states its own sessions.
+constant. The correlation windows are not copied at all: each line of the block
+states its own sessions, and the prompt points her to it.
 **Revisit if:** his rules move the confirming candle off the 15m.
 
 ### R-92 — a cap on what each briefing was handed
