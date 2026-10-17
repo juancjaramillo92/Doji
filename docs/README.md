@@ -431,12 +431,14 @@ single-sourced at run time:
 | the **country his rules count** | `HOME` in `adherence.ts`, the default on `eugenia_calendar.country`, and the watch card's `.eq('country', 'US')` — and every rated read but the Sunday week filters on it |
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, the check constraint |
 | how **firmly a read was said** | `READ_FIRMNESS` in `doji-eugenia` and the check constraint on `eugenia_reads.firmness` |
-| her **calls' sides, outcomes and condition length** | `CALL_SIDES`, `CALL_OUTCOMES` and `CALL_MAX` in `doji-eugenia`, and the check constraints on `eugenia_calls` |
+| her **calls' sides, outcomes, confirmations, steps and lengths** | `CALL_SIDES`, `CALL_OUTCOMES`, `CALL_CONFIRMS`, `CALL_STEPS`, `CALL_MAX` and `NOTE_MAX` in `doji-eugenia`, and the check constraints on `eugenia_calls` |
+| the **candle her calls wait for** | `CONFIRM_MS` in `doji-eugenia`, said in words by `make_call`'s description and by `SYSTEM` |
+| the **correlations' windows and series** | `FITS` and `FIT_AGAINST` in `doji-tradingview`, said in words by `SYSTEM` |
 | the **rules her calls are held to** | `FULL_STOP`, `TARGET_MIN`, `TARGET_MAX` and `TO_BREAK_EVEN` in `adherence.ts` and `RR_MIN` in `doji-eugenia`, which `callProblem` and `scoreCall` apply, and the words `SYSTEM` tells her them in |
 | the **thesis length** | `THESIS_MAX` and the check constraint |
 | the **portrait length** | `PORTRAIT_MAX` and the check constraint |
 | the **verdicts a read may carry** | `READ_VERDICTS` in `index.ts` and the check constraint |
-| the **length of a filed read** | `READ_MAX` and the three check constraints on `eugenia_reads`; a lesson's, `NOTE_MAX` and its own |
+| the **length of a filed read** | `READ_MAX` and the three check constraints on `eugenia_reads`; a lesson's, `NOTE_MAX` and its own, as a lost call's is |
 | the **two writers' names** | `sync_health_id_check`, the seed beside it, and each function's `heartbeat("…")` call |
 | the **columns of `eugenia_runs`** | the table, the object literals `recordRun` is called with, and the `verify.sql` row on the cache-write columns |
 | **which rules a row can answer** | §7's `Evaluable` column, the twelve predicates in `adherence.ts`, and the lists and counts in `check_rules`' description, the prompt and the paragraph below |
@@ -788,10 +790,10 @@ when a suspicious row gets looked at.
 - **`?replay=N`** returns his six charts as they stood at 08:00 New York, the
   briefing's hour, N weekdays back, closed bars only, and that session's
   minute bars to the 17:00 roll — `scripts/replay.mjs`'s input (*Her own
-  calls*). N is clamped to `REPLAY_DAYS` (120) as `?hours=` is clamped, and the
-  door turns it into the instant itself, so all that reaches a broker call is
-  a time it chose; a bad N is refused, since a replay of the wrong day scores
-  the wrong call. A holiday serves no minute bars.
+  calls*). N runs from 1 to `REPLAY_DAYS` (120), and the door turns it into
+  the instant itself, so all that reaches a broker call is a time it chose; a
+  bad N is refused rather than read as a default, since a replay of the wrong
+  day scores the wrong call. A holiday serves no minute bars.
 
 ```sh
 curl -s "https://<project>.supabase.co/functions/v1/doji-mcp-sync?raw=1&hours=72" \
@@ -1613,8 +1615,9 @@ as a value: `*` is taken out and one put back at the end, and the rest is
 it.
 
 **And what gold did on each print** (`fileReactions`, at the nightly pass,
-after the calls are scored). The pass already reads the poller's thirty hours
-of minute bars, so off the same window it files, for every high-rated home
+after the calls are scored). Off the poller's thirty hours of minute bars,
+read again rather than handed over from the scoring so each job's failure is
+its own row, it files, for every high-rated home
 print with an actual and an hour behind it, gold at the open of the print's
 minute and at the close fifteen and sixty minutes on, in `eugenia_reactions`
 keyed on the calendar row — a table of its own, so the calendar keeps its one
@@ -2073,7 +2076,8 @@ broker token stays in the poller, as for `get_market` — and `foldStructure` in
   knows its high but not when it printed, so those are timed by the session
   they closed. **Held apart from the levels**, which are §4's 1H and 30m
   marking and what the calibration scores, until a run says they find more of
-  his entries than chance does; a candle is read against both.
+  his entries than chance does — the first, in October 2026, said they do
+  not (`REFACTOR.md` R-89); a candle is read against both.
 - **R-05 against R-06**: the week of hourly bars is the range, and a level
   within `EDGE` ($5) of its high or low is at its edge, the rest inside it.
 - **Step 2's liquidity pools** (`poolsOf`): two highs within `EQUAL` ($1.50),

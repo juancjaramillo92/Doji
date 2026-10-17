@@ -79,8 +79,6 @@ export function request(c, prompts = PROMPTS) {
 /* ─── What is counted rather than judged ─────────────────────────────────────
    The countable rules, the ones the gates are told to count: no em-dash, a
    paragraph of four sentences at most, a word budget, one question. */
-const split = (para) => para.match(/[^.!?]+[.!?]+(?=\s|$)/g) ?? [para];
-
 /* CRITIC is told the briefing's hello is not counted, and TRIM, which reads
    replies, is told nothing of the kind; so on the critic's path a first
    sentence that is a greeting alone — four words at most — is not counted. A
@@ -94,7 +92,7 @@ export const COUNTERS = {
     const paras = text.split(/\n\s*\n/)
       .map(p => p.split('\n').filter(l => !/^\s*(-|·|Today:)/.test(l)).join(' ').trim()).filter(Boolean);
     const count = (p, i) => {
-      const said = split(p);
+      const said = p.match(/[^.!?]+[.!?]+(?=\s|$)/g) ?? [p];
       const hello = c?.path === 'critic' && i === 0 && said[0].trim().split(/\s+/).length <= HELLO_WORDS;
       return said.length - (hello ? 1 : 0);
     };
@@ -131,7 +129,7 @@ export function counted(c, text) {
 }
 
 // The counts alone: the writing rules, which settle() asks again before failing.
-export function writing(c, text) {
+function writing(c, text) {
   return Object.entries(c.counts ?? {}).map(([name, arg]) => COUNTERS[name](text, arg, c)).filter(said => said !== true);
 }
 
@@ -191,9 +189,8 @@ export const PLANT_TRIES = 3;
 const MECHANISM_BAN = / A\s+view says which way you think gold goes from here,[\s\S]*?take out the view\./;
 
 export const PLANTS = [
-  /* The reply case cannot see this plant since a chain's last link became the
-     mechanism (MECHANISM, 16 October): without the ban she walks the chain to
-     gold, which is now allowed, and volunteers no read. So the critic is
+  /* A reply case cannot see this plant: without the ban she walks the chain to
+     gold, which MECHANISM allows, and volunteers no read. So the critic is
      handed a draft carrying her labelled read while he holds a position; with
      the ban it comes out, without it CRITIC is told a labelled read stays. */
   { why: 'the ban on a view while he holds a position, gone from the writer and the critic',
@@ -213,10 +210,8 @@ export const PLANTS = [
     }) },
   /* Taken out alone, the exception leaves a call TRIM keeps anyway: it is
      labelled and says what would prove it wrong, which is what the fence
-     above it asks of a read. So the plant turns it into an order to cut, and
-     an order it cannot read back as the rule: "comes out whole" was read as
-     "stays whole", and "a call is no exception" as no exception to a fence
-     the call passes, three times in three each, on 17 October. */
+     above it asks of a read. So the plant turns it into a plain order to cut,
+     in words that cannot be read as keeping the call whole or as the fence. */
   { why: 'the gates\' exception for a filed call, gone from TRIM',
     cases: ['trim-keeps-filed-call'],
     breaks: (p) => ({

@@ -154,7 +154,6 @@ export function holdTable(sessions) {
     })].join('\n');
 }
 
-
 export function table(rows) {
   const today = (r) => r.readings.TURN === READINGS.TURN && r.readings.ON_GRID === READINGS.ON_GRID &&
                        r.readings.EDGE === READINGS.EDGE;
