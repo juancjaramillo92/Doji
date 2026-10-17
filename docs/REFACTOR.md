@@ -820,6 +820,25 @@ counted as the sentence it is.
 **Revisit if:** she misses a count by the same margin with the room given, which
 says the room is in the wrong place rather than too small.
 
+### R-89 — the bigger charts' highs and lows joining the levels, and today's readings changed
+**Why refused, on the first calibration, 16 October 2026.** The map holds the
+previous day's and week's highs and lows and the daily and 4H turns apart
+until a run says they find more of his entries than chance does. They did
+not: added to the levels, his twenty newest entries sat at one 85% of the
+time against 86% by chance under today's readings, a lift of 0.99, and no set
+of readings beat 1.11. Over sixty sessions they held 50% of the time against
+53% for a price nobody marked. The levels themselves held no better (52%,
+0.97×), which says the hold test does not separate a turn from any price, not
+that the levels are wrong — they find his entries at a lift of 1.19. Two
+readings beat today's on lift (TURN 3 with ON_GRID 5, 1.48), but on twenty
+entries, picked as the best of thirty-six, with EDGE changing nothing in any
+row; a best of thirty-six on twenty is a fit, not a finding. The one kind that
+held clearly better than chance was the quarter off the round number (69%,
+1.28×, seventy settled) — noted, not acted on.
+**Revisit if:** a run over twice the entries still puts the bigger charts
+above 1.0, or still puts another reading ahead of today's, or the quarters
+still hold above 1.2× over another sixty sessions.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED
