@@ -887,11 +887,13 @@ async function readVolume() {
      futures    what a daily bar of gold's front month carries
      flows      what ?flows=1 folds, raw: one economy's gold reserves and
                 the funds' screener columns, so the units can be read
-     china      what China's demand for gold could be read off: the names
-                Shanghai's gold goes by, a daily bar of its futures front month
-                in yuan a gram, and the yuan and the yen against the dollar —
-                the premium over London is that price in dollars an ounce
-                less gold's, and no reader is written before this is captured
+     china      what China's demand for gold could be read off: CME's
+                Shanghai Gold futures, in dollars and in yuan, under their root
+                and continuous names, and the offshore yuan under the prefix
+                the market list reads forex by. The first capture (17 October)
+                found SHFE refused on his plan and the yuan readable as
+                FX_IDC; the premium over London is Shanghai's dollar price less
+                gold's, and no reader is written before this is captured
 
    Every argument is written here; none is read from the request. */
 const GOLD = ["PEPPERSTONE:XAUUSD", "OANDA:XAUUSD", "FX_IDC:XAUUSD", "TVC:GOLD", "COMEX:GC1!"];
@@ -938,9 +940,7 @@ const PROBES: Record<string, () => Call[]> = {
     ["mcp-tv-get-symbol-data-batch", { symbols: FUNDS, columns: FUND_COLUMNS }],
   ],
   china: () => [
-    ["mcp-tv-search-symbols", { query: "Shanghai gold" }],
-    ["mcp-tv-search-symbols", { query: "SGE gold" }],
-    ...["SHFE:AU1!", "FX_IDC:USDCNH", "FX_IDC:USDCNY", "FX:USDJPY"]
+    ...["COMEX:SGU1!", "COMEX:SGU", "COMEX:SGC1!", "COMEX:SGC", "FX:USDCNH", "FX_IDC:USDCNH"]
       .map((symbol): Call => ["mcp-tv-get-ohlcv", { symbol, interval: "1D", count: 3 }]),
   ],
 };
