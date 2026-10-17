@@ -433,7 +433,7 @@ single-sourced at run time:
 | how **firmly a read was said** | `READ_FIRMNESS` in `doji-eugenia` and the check constraint on `eugenia_reads.firmness` |
 | her **calls' sides, outcomes, confirmations, steps and lengths** | `CALL_SIDES`, `CALL_OUTCOMES`, `CALL_CONFIRMS`, `CALL_STEPS`, `CALL_MAX` and `NOTE_MAX` in `doji-eugenia`, and the check constraints on `eugenia_calls` |
 | the **candle her calls wait for** | `CONFIRM_MS` in `doji-eugenia`, said in words by `make_call`'s description and by `SYSTEM` |
-| the **correlations' windows and series** | `FITS` and `FIT_AGAINST` in `doji-tradingview`, said in words by `SYSTEM` |
+| the **series gold is correlated against** | `FIT_AGAINST` in `doji-tradingview`, said in words by `SYSTEM`; the windows, `FITS`, are stated only by the block |
 | the **rules her calls are held to** | `FULL_STOP`, `TARGET_MIN`, `TARGET_MAX` and `TO_BREAK_EVEN` in `adherence.ts` and `RR_MIN` in `doji-eugenia`, which `callProblem` and `scoreCall` apply, and the words `SYSTEM` tells her them in |
 | the **thesis length** | `THESIS_MAX` and the check constraint |
 | the **portrait length** | `PORTRAIT_MAX` and the check constraint |
@@ -529,7 +529,11 @@ and the portrait said before each rewrite, what each briefing was handed, and
 what gold did on each print. `trades` goes whole, the soft-deleted
 rows included: a restore without them lets the poller rebuild every trade you
 removed. `eugenia_runs` is left out: the largest table, and facts about model
-calls rather than about you.
+calls rather than about you. **Nothing in it is ever pruned**, so it only grows,
+and fastest in what each briefing was handed — a whole prompt a day. The run's
+log gives every table's rows and size, which is where that growth is read, and
+ninety copies of the document are what the account's artifact storage holds
+(`REFACTOR.md` R-92 says what to do when that nears its limit).
 
 It needs `SUPABASE_URL` and `SB_SECRET_KEY` as repository secrets and no install
 step. **Give it its own named `sb_secret_` key**: both bypass RLS identically,

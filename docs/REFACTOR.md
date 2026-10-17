@@ -849,13 +849,25 @@ nothing to read. Apart, each job's row says what happened to that job.
 **Revisit if:** the poller's bars door is seen slowing the pass, or a third job
 needs the same window.
 
-### R-91 — the confirming candle and the correlation windows out of the prompt
-**Why refused:** `SYSTEM` says "a fifteen-minute candle" and "the last twenty
-and sixty sessions", copies of `CONFIRM_MS` and `FITS` in words. The block and
-the tool already state each figure, so the prompt could drop them, but a prompt
-change owes the eval a run, and the words help her read the block. A test holds
-the copies instead, and the Facts list names them.
-**Revisit if:** either figure changes, which is the prompt change anyway.
+### R-91 — the confirming candle out of the prompt
+**Why refused:** `SYSTEM` says "a fifteen-minute candle", a copy of
+`CONFIRM_MS` in words. It is also R-07's 15m, his rule, which she is told in his
+words everywhere a call waits, so the words stay and a test holds them to the
+constant. The correlation windows were the other copy, and they went: each line
+of the block states its own sessions.
+**Revisit if:** his rules move the confirming candle off the 15m.
+
+### R-92 — a cap on what each briefing was handed
+**Why refused:** `eugenia_inputs` keeps the whole message a briefing was asked,
+one a day, and nothing prunes it, so it is the table that grows fastest. A cap
+or a window would delete the one record of what a past morning looked like to
+her, which nothing else can rebuild, and the system is meant to run for years.
+Postgres already compresses long text out of line, and the backup's artifact
+is zipped, so the growth is a fraction of the prompt's size. The run's log
+states each table's size, so the growth is watched, not guessed.
+**Revisit if:** ninety copies of the backup come near the account's artifact
+storage. Then the inputs move to their own artifact, taken once a week and kept
+as long as the others, rather than any row being dropped.
 
 ---
 

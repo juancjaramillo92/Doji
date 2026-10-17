@@ -3583,10 +3583,6 @@ test('a read is filed with the verdicts and lengths the table accepts', () => {
     'record_read offers channels from a list of its own');
 });
 
-/* NEVER BY PRICE. A read graded on where gold went is a forecast with a score,
-   and a score pulls the next read toward one — the thing the prohibitions
-   exist to stop. Enforced by nothing but the sentence, in the two places the
-   grader reads it. */
 test('a call is filed and explained with the vocabularies and lengths the table accepts', () => {
   const vocab = (name) => SCHEMA_SQL.match(new RegExp(`eugenia_calls_${name}_check check \\(${name} in \\(([^)]*)\\)\\)`))?.[1]
     ?.split(',').map(v => v.trim().replace(/'/g, ''));
@@ -3614,6 +3610,10 @@ test('the call rules she is told are the ones make_call checks', () => {
   ]) assert.ok(system.includes(said), `SYSTEM no longer states ${why} as make_call and scoreCall hold it: "${said}"`);
 });
 
+/* NEVER BY PRICE. A read graded on where gold went is a forecast with a score,
+   and a score pulls the next read toward one — the thing the prohibitions
+   exist to stop. Enforced by nothing but the sentence, in the two places the
+   grader reads it. */
 test('a read is judged by the test she stated, never by where price went', () => {
   const consolidate = CONSOLIDATE.replace(/\s+/g, ' ');
   assert.match(consolidate, /a read is never judged by where price went/,
@@ -5933,10 +5933,11 @@ test('the map\'s grid and candle count are the ones the tool, the writer and §4
 });
 
 /* Said in words where nothing interpolates them: the confirming candle her
-   calls wait for, in the writer and the tool, and the windows and the two
-   series gold's correlations are taken over, in the writer. */
+   calls wait for, which is R-07's 15m, in the writer and the tool, and the two
+   series gold's correlations are taken over, in the writer. The windows are
+   the block's to state, so the writer names none. */
 test('the confirming candle and the correlations are the ones the writer and the tool say', () => {
-  const WORDS = { 15: 'fifteen', 20: 'twenty', 60: 'sixty' };
+  const WORDS = { 15: 'fifteen' };
   const tool = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const CALL_TOOL = {'));
   const said = tool.slice(0, tool.indexOf('} as const;')).replace(/" \+\s*"/g, '');
   const system = SYSTEM.replace(/\s+/g, ' ');
@@ -5944,8 +5945,12 @@ test('the confirming candle and the correlations are the ones the writer and the
     assert.ok(text.includes(`a ${WORDS[CONFIRM_MS / 60_000]}-minute candle`),
       `${where} names a confirming candle other than CONFIRM_MS, ${CONFIRM_MS / 60_000} minutes`);
   }
-  assert.ok(system.includes(`over the last ${FITS.map(n => WORDS[n]).join(' and ')} sessions`),
-    `SYSTEM names correlation windows other than FITS, ${FITS}`);
+  assert.ok(system.includes('each over the sessions its line states'), 'SYSTEM no longer leaves the windows to the block');
+  const spoken = { 20: 'twenty', 60: 'sixty' };
+  for (const n of FITS) {
+    assert.ok(spoken[n], `FITS holds ${n}, which this check cannot spell`);
+    assert.doesNotMatch(system, new RegExp(`\\b(${n}|${spoken[n]})\\b[^.]*sessions`), `SYSTEM names a correlation window, ${n}, a copy of FITS`);
+  }
   const against = source('supabase/functions/doji-tradingview/index.ts').match(/const FIT_AGAINST = \[([^\]]*)\]/)?.[1];
   assert.equal(against, '"FRED:DFII10", "TVC:DXY"', 'gold is correlated against another series than the real yield and the dollar');
   assert.ok(system.includes('tracked the real yield and the dollar'), 'SYSTEM names other series than the two correlated');
