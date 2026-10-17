@@ -5907,6 +5907,8 @@ test('the map is hers, printed, built into her call, and kept out of the briefin
      'the briefing\'s call slot no longer builds on the map'],
     [/With no chart, get_structure shows you the bias and where his level sits on your map, and you say it is yours/,
      'a plan he brings without a chart is judged blind, or off a map not said to be hers'],
+    [/A sentence summing them up is that range too: .* Say what they did together with no figure in it/,
+     'a summing-up sentence may draw the range the map never gave across the candles'],
     [/A pattern those candles have printed is a fact you may name; the candle he waits for at his level has not printed yet/,
      'the candles on the map can be read as the confirmation he is still waiting for'],
   ]) assert.match(system, said, `SYSTEM: ${why}`);
