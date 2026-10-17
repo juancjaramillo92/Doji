@@ -1142,7 +1142,7 @@ const AROUND_TOOL = {
     "ten-year yields, the real yield, the breakeven, silver, oil, the S&P 500, the VIX " +
     "and gold's own volatility index, and " +
     "abroad the German, French, Italian, UK and Japanese ten-year yields and the " +
-    "euro, each a level now beside the level at a stated time, and its daily close a week, " +
+    "euro and the offshore yuan, each a level now beside the level at a stated time, and its daily close a week, " +
     "a month and three months back; and gold's and the dollar's " +
     "headlines from the last six hours, titles only; what fed funds futures price for " +
     "the Fed's meetings over the next year; central banks' gold reserves and the two " +
@@ -3272,7 +3272,7 @@ export async function storeStructure(): Promise<void> {
 
 /* ─── The market around gold ───────────────────────────────────────────────
    The dollar, yields, real yield, breakeven, silver, oil, the S&P, the VIX and
-   GVZ, and abroad four European ten-year yields, Japan's and the euro, for the
+   GVZ, and abroad four European ten-year yields, Japan's, the euro and the yuan, for the
    briefing and get_around, which explain gold against them.
 
    Every line is a level now beside the level at a stated time, and no change

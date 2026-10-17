@@ -455,8 +455,10 @@ export function foldCalendar(answer: any) {
    options price its swing at over the next month. Abroad, the ten-year yields
    she reads the calendar's auctions and central banks against — France and
    Italy each against Germany is what lenders charge for the doubt — and the
-   euro, more than half the dollar index. The names live here, once, beside the
-   symbols — this list is the whole of what is read. */
+   euro, more than half the dollar index. And the offshore yuan, what China's
+   buying is paid in, since Shanghai's own price reads nothing usable (the
+   china probe). The names live here, once, beside the symbols — this list is
+   the whole of what is read. */
 const MARKET = [
   { symbol: "TVC:DXY",     name: "Dollar index",              unit: "" },
   { symbol: "TVC:US02Y",   name: "Two-year Treasury yield",   unit: "%" },
@@ -474,6 +476,7 @@ const MARKET = [
   { symbol: "TVC:GB10Y",   name: "UK ten-year gilt yield",    unit: "%" },
   { symbol: "TVC:JP10Y",   name: "Japanese ten-year yield",   unit: "%" },
   { symbol: "FX:EURUSD",   name: "Euro in dollars",           unit: "" },
+  { symbol: "FX:USDCNH",   name: "Offshore yuan per dollar",  unit: "" },
 ];
 
 /* A span, not a change: where the first bar opened and the last one stands,
@@ -512,7 +515,7 @@ export async function readMarket() {
    reach one day, so the dollar's trend could come only off a search page.
    Counted in sessions, so a holiday moves a date rather than the gap, and every
    close carries its date. Its own door, because a daily close moves once a day
-   and sixteen more charts every quarter hour is the burst TradingView refuses.
+   and the whole list again every quarter hour is the burst TradingView refuses.
    The answer's list is `market`, as the hourly door's is, since it is the same
    list and one carry serves both.
    ───────────────────────────────────────────────────────────────────────── */
@@ -890,10 +893,10 @@ async function readVolume() {
      china      what China's demand for gold could be read off: CME's
                 Shanghai Gold futures, in dollars and in yuan, under their root
                 and continuous names, and the offshore yuan under the prefix
-                the market list reads forex by. The first capture (17 October)
-                found SHFE refused on his plan and the yuan readable as
-                FX_IDC; the premium over London is Shanghai's dollar price less
-                gold's, and no reader is written before this is captured
+                the market list reads forex by. The captures of 17 October
+                found SHFE refused on his plan, CME's contracts printing flat
+                settlements with no volume, and FX:USDCNH trading — so the
+                yuan is in MARKET and the premium is not read
 
    Every argument is written here; none is read from the request. */
 const GOLD = ["PEPPERSTONE:XAUUSD", "OANDA:XAUUSD", "FX_IDC:XAUUSD", "TVC:GOLD", "COMEX:GC1!"];
@@ -907,7 +910,7 @@ const PROBES: Record<string, () => Call[]> = {
     ["mcp-tv-get-economic-calendar", { countries: "US", date_from: day(-7), date_to: day(0), min_importance: 1 }],
   ],
   quotes: () => [
-    // Without the euro: a forex symbol is what drew the scanner's 429.
+    // Without forex: a forex symbol is what drew the scanner's 429.
     ["mcp-tv-get-symbol-data-batch", { symbols: AROUND.filter(s => !s.startsWith("FX:")) }],
     // A daily series' 15m bar answers nothing.
     ...MARKET.map(({ symbol, daily }): Call =>

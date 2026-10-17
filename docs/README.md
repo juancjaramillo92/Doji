@@ -1010,7 +1010,8 @@ the S&P 500, the VIX and gold's volatility index (GVZ) — and abroad the German
 French, Italian, UK and Japanese ten-year yields and EUR/USD, what the
 calendar's auctions and central banks are read against: France and Italy each
 against Germany is what lenders charge for the doubt, and the euro is more than
-half the dollar index. The quote batch refused on every probe with the scanners'
+half the dollar index. And the offshore yuan (`FX:USDCNH`), what China's buying
+is paid in, since Shanghai's own price reads nothing usable (`?probe=china`). The quote batch refused on every probe with the scanners'
 429, while the OHLCV read answered for every symbol, so each is twenty-five
 hourly bars folded by `foldBars` to where the first opened and where the last
 stands, each with its time. The real yield and the breakeven are FRED's daily
@@ -1035,7 +1036,7 @@ the points it reaches. Gold's own daily bars are read beside the list, for
 series too short for a window gets no figure. `trendList` states levels on
 days and computes no change, as `aroundList` does, and `aroundBlock` carries it, so every reader of the market
 gets the weeks behind it. **Read once a New York day**: a daily close moves once
-a day, and sixteen more charts every quarter hour is the burst TradingView
+a day, and the whole list again every quarter hour is the burst TradingView
 refuses, so `storeTrend` keeps a copy read today and asks again on a new day,
 with what a pass misses carried as the hourly lines are.
 
@@ -1141,7 +1142,7 @@ failure is its own answer:
 | `?probe=` | what it asks |
 |---|---|
 | `calendar` | the next three days of US events, and the past week at high importance, to see whether a release that printed carries its actual beside the forecast and the prior |
-| `quotes` | whether the quote batch answers for the dollar, the yields at home and abroad, the real yield, the breakeven, silver, oil, the S&P, the VIX and GVZ with no forex symbol in it (the euro is left out) — it refused twice with the forex scanner's 429, taking the whole batch with it — and each one's last bars from the OHLCV read, which answered where the batch did not, with the bar times saying how fresh each feed is |
+| `quotes` | whether the quote batch answers for the dollar, the yields at home and abroad, the real yield, the breakeven, silver, oil, the S&P, the VIX and GVZ with no forex symbol in it (the euro and the yuan are left out) — it refused twice with the forex scanner's 429, taking the whole batch with it — and each one's last bars from the OHLCV read, which answered where the batch did not, with the bar times saying how fresh each feed is |
 | `gold` | the broker's quote through the poller and TradingView's gold feeds read in the same second, plus the last three one-minute bars, which say how stale a TradingView quote is |
 | `news` | headlines for gold and the dollar, and what one carries |
 | `econ` | which US price and money series exist, the actual releases a calendar entry would be judged against |
@@ -1149,7 +1150,7 @@ failure is its own answer:
 | `fedfunds` | whether thirty-day fed funds futures answer, under the continuous names (`ZQ1!` to `ZQ3!`) and under named contract months, and what a bar of them carries — the price `?rates=1` works the meeting odds out from |
 | `futures` | what a daily bar of gold's front month (`COMEX:GC1!`) carries — the bars `?volume=1` folds |
 | `flows` | what `?flows=1` folds, raw: China's gold reserves and the funds' screener columns, so the units can be read |
-| `china` | what China's demand for gold could be read off before anything folds it: a daily bar of CME's Shanghai Gold futures in dollars (`COMEX:SGU`) and in yuan (`COMEX:SGC`), under their root and continuous names, and the offshore yuan under `FX:`, the prefix the market list reads forex by. The first capture, of 17 October, found the Shanghai Futures Exchange refused on his plan, the CME contracts by search, and the yuan readable as `FX_IDC:USDCNH`. The Shanghai premium is Shanghai's dollar price less gold's; **no reader is written until a capture of this is saved** (`REFACTOR.md` R-71) |
+| `china` | what China's demand for gold could be read off before anything folds it: a daily bar of CME's Shanghai Gold futures in dollars (`COMEX:SGU`) and in yuan (`COMEX:SGC`), under their root and continuous names, and the offshore yuan under `FX:`, the prefix the market list reads forex by. The captures of 17 October found the Shanghai Futures Exchange refused on his plan, the CME contracts printing the same settlement three days running with no volume, nowhere near gold, and `FX:USDCNH` trading. So the yuan is in `MARKET` and the Shanghai premium is not read (`REFACTOR.md` R-71) |
 
 **How the sign-in is found.** OAuth 2.1 as MCP specifies it, discovered rather
 than configured: the only TradingView address in the file is the endpoint, whose
@@ -2733,7 +2734,7 @@ its door** — *TradingView calendar: no answer in 45s* — since the abort's ow
 message names nothing, and the meter rows are where an outage is read afterwards.
 
 **The market and the Fed's odds are read ahead, and she reads the copy.**
-`?market=1` makes sixteen chart calls and `?rates=1` up to twelve. Read while a briefing
+`?market=1` makes seventeen chart calls and `?rates=1` up to twelve. Read while a briefing
 waited, they were paid for out of its clock: on 12 October, with the news
 door's two calls taking 25 seconds, both outran her 45 and the briefing lost
 each block whole, and on 13 and 14 October, at five or six seconds a chart,

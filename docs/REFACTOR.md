@@ -662,11 +662,16 @@ one written before its probe. She reads both off their pages with `web_fetch`,
 dated and sourced.
 **Revisit if:** a capture of either is saved as a fixture, or a central bank
 outside the five starts moving the story.
-**China's premium is the same case, decided October 2026.** The fastest live
-read of central-bank and Chinese buying is the Shanghai premium — Shanghai's
-gold in dollars an ounce less London's — with the yuan beside it.
-`doji-tradingview?probe=china` asks for the names and a daily bar of each, raw;
-the reader is written against its capture, saved as a fixture, and not before.
+**China's premium is refused, the yuan read instead, October 2026.** The
+fastest live read of Chinese buying is the Shanghai premium — Shanghai's gold
+in dollars an ounce less London's. `?probe=china` was captured twice on 17
+October: the Shanghai Futures Exchange is refused on his TradingView plan, and
+CME's Shanghai Gold contracts (`COMEX:SGU1!` in dollars, `COMEX:SGC1!` in
+yuan) printed the same settlement three days running with no volume, the
+dollar one some $600 above gold — a stale number a premium cannot be read
+off. `FX:USDCNH` traded, so the offshore yuan joined `MARKET`.
+**Revisit if:** his plan gains SHFE, or the CME contracts start printing
+volume.
 
 ### R-72 — gold's reaction to each print, filed beside it
 **Built, October 2026, his decision, without either cost named here.** A table
@@ -679,9 +684,9 @@ the poller's `?replay=N` door reaches the 08:30, 10:00 and 14:00 prints of the
 last 120 weekdays.
 
 ### R-73 — reading the weeks with the market every quarter hour
-**Why refused:** a daily close moves once a day, and sixteen more charts on
-every pass is the burst TradingView refuses. `storeTrend` asks once a New York
-day and carries what a pass misses.
+**Why refused:** a daily close moves once a day, and the whole market list
+again on every pass is the burst TradingView refuses. `storeTrend` asks once a
+New York day and carries what a pass misses.
 **Revisit if:** TradingView's quote batch answers, so one call serves the list.
 
 ### R-74 — computing the move over a week or a month
