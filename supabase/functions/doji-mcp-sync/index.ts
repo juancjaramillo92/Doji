@@ -593,9 +593,9 @@ async function readEntries(session: Record<string, string>) {
 /* ─── A past session, as she would have seen it ────────────────────────────
    For scripts/replay.mjs, which asks her for the call she would have made on a
    past morning and scores it as the nightly pass does. `?replay=N` is the
-   weekday N back, clamped to REPLAY_DAYS as `?hours=` is clamped: the door
-   turns it into that day's 08:00 New York, the briefing's hour, so all it puts
-   into a broker call is an instant it chose itself. His six charts as they
+   weekday N back, at most REPLAY_DAYS: the door turns it into that day's 08:00
+   New York, the briefing's hour, so all it puts into a broker call is an
+   instant it chose itself. His six charts as they
    stood then, only bars closed by it — one closed after holds prices she could
    not have seen — and the minute bars from then to the 17:00 roll, which the
    call is scored against. Weekdays, not sessions: a holiday serves no bars.

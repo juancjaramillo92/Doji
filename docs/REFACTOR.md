@@ -676,8 +676,9 @@ volume.
 ### R-72 — gold's reaction to each print, filed beside it
 **Built, October 2026, his decision, without either cost named here.** A table
 of its own keyed on the calendar row, so the calendar keeps its one writer;
-filed off the thirty hours of minute bars the nightly pass already reads, so
-no print's bars are read twice. What it does not have is the history before
+filed off the same thirty-hour window of minute bars the nightly pass scores
+her calls on, so nothing reads further back than the bars already reach. What
+it does not have is the history before
 it: the record starts the night it shipped.
 **Revisit if:** a base rate is wanted before a year of prints has been filed —
 the poller's `?replay=N` door reaches the 08:30, 10:00 and 14:00 prints of the
@@ -838,6 +839,23 @@ held clearly better than chance was the quarter off the round number (69%,
 **Revisit if:** a run over twice the entries still puts the bigger charts
 above 1.0, or still puts another reading ahead of today's, or the quarters
 still hold above 1.2× over another sixty sessions.
+
+### R-90 — one read of the night's minute bars for the scoring and the reactions
+**Why refused:** `scoreCalls` and `fileReactions` each read the poller's thirty
+hours of bars, two requests a night where one would serve. Handing one read to
+both ties their outcomes: a refused read becomes one failure reported twice, or
+a scoring that never ran because there was nothing due leaves the reactions
+nothing to read. Apart, each job's row says what happened to that job.
+**Revisit if:** the poller's bars door is seen slowing the pass, or a third job
+needs the same window.
+
+### R-91 — the confirming candle and the correlation windows out of the prompt
+**Why refused:** `SYSTEM` says "a fifteen-minute candle" and "the last twenty
+and sixty sessions", copies of `CONFIRM_MS` and `FITS` in words. The block and
+the tool already state each figure, so the prompt could drop them, but a prompt
+change owes the eval a run, and the words help her read the block. A test holds
+the copies instead, and the Facts list names them.
+**Revisit if:** either figure changes, which is the prompt change anyway.
 
 ---
 

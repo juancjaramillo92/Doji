@@ -22,13 +22,14 @@ import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
-         READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_CONFIRMS, CALL_STEPS, CALL_MAX, RR_MIN, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
+         READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_CONFIRMS, CALL_STEPS, CALL_MAX, RR_MIN, CONFIRM_MS, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH, REVIEW } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled,
          discipline }
   from '../supabase/functions/doji-eugenia/journal.ts';
 import { GRID, CANDLES } from '../supabase/functions/doji-eugenia/structure.ts';
+import { FITS } from '../supabase/functions/doji-tradingview/index.ts';
 import { HOME, FULL_STOP, TO_BREAK_EVEN, TARGET_MIN, TARGET_MAX, checkRules } from '../supabase/functions/doji-eugenia/adherence.ts';
 
 // A repository file, read once however many tests ask for it.
@@ -3586,7 +3587,7 @@ test('a read is filed with the verdicts and lengths the table accepts', () => {
    and a score pulls the next read toward one — the thing the prohibitions
    exist to stop. Enforced by nothing but the sentence, in the two places the
    grader reads it. */
-test('a call is filed with the sides, outcomes and condition length the table accepts', () => {
+test('a call is filed and explained with the vocabularies and lengths the table accepts', () => {
   const vocab = (name) => SCHEMA_SQL.match(new RegExp(`eugenia_calls_${name}_check check \\(${name} in \\(([^)]*)\\)\\)`))?.[1]
     ?.split(',').map(v => v.trim().replace(/'/g, ''));
   assert.deepEqual(vocab('direction'), [...CALL_SIDES], 'make_call files a side the table refuses');
@@ -5929,6 +5930,25 @@ test('the map\'s grid and candle count are the ones the tool, the writer and §4
   }
   assert.ok(source('supabase/functions/doji-eugenia/strategy.ts').includes(`**The quarter grid** — the $${GRID} increments`),
     `§4's grid is no longer the $${GRID} structure.ts draws`);
+});
+
+/* Said in words where nothing interpolates them: the confirming candle her
+   calls wait for, in the writer and the tool, and the windows and the two
+   series gold's correlations are taken over, in the writer. */
+test('the confirming candle and the correlations are the ones the writer and the tool say', () => {
+  const WORDS = { 15: 'fifteen', 20: 'twenty', 60: 'sixty' };
+  const tool = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const CALL_TOOL = {'));
+  const said = tool.slice(0, tool.indexOf('} as const;')).replace(/" \+\s*"/g, '');
+  const system = SYSTEM.replace(/\s+/g, ' ');
+  for (const [where, text] of [['make_call', said], ['SYSTEM', system]]) {
+    assert.ok(text.includes(`a ${WORDS[CONFIRM_MS / 60_000]}-minute candle`),
+      `${where} names a confirming candle other than CONFIRM_MS, ${CONFIRM_MS / 60_000} minutes`);
+  }
+  assert.ok(system.includes(`over the last ${FITS.map(n => WORDS[n]).join(' and ')} sessions`),
+    `SYSTEM names correlation windows other than FITS, ${FITS}`);
+  const against = source('supabase/functions/doji-tradingview/index.ts').match(/const FIT_AGAINST = \[([^\]]*)\]/)?.[1];
+  assert.equal(against, '"FRED:DFII10", "TVC:DXY"', 'gold is correlated against another series than the real yield and the dollar');
+  assert.ok(system.includes('tracked the real yield and the dollar'), 'SYSTEM names other series than the two correlated');
 });
 
 /* ─── The market around gold, in a conversation ──────────────────────────────

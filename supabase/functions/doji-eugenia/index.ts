@@ -1769,10 +1769,10 @@ export async function scoreCalls(): Promise<void> {
 /* ─── What gold did on each print ──────────────────────────────────────────
    get_releases said how a release ran against its consensus and nothing of
    what gold did on it, so how gold usually takes one was hers to guess. Filed
-   each night from the minute bars the pass reads anyway: gold at the open of
-   the print's minute and at the close fifteen and sixty minutes on, for every
-   high-rated home print with an actual inside the bars' window and an hour
-   behind it. Its own table keyed on the calendar row, so the calendar keeps
+   each night off the window of minute bars her calls are scored on: gold at
+   the open of the print's minute and at the close fifteen and sixty minutes
+   on, for every high-rated home print with an actual inside the bars' window
+   and an hour behind it. Its own table keyed on the calendar row, so the calendar keeps
    its one writer, and duplicates ignored, so a retry files nothing twice. The
    record grows a night at a time; nothing reads further back than the bars.
    ───────────────────────────────────────────────────────────────────────── */
@@ -4215,7 +4215,8 @@ export async function feedbackBlock(): Promise<string> {
 
 async function postConsolidation(): Promise<Response> {
   // Scored first, so the pass reads tonight's outcomes; never throws. And
-  // what gold did on the day's prints, off the same window of bars.
+  // what gold did on the day's prints, off the same window of bars, read
+  // again so each job's failure is its own row.
   await scoreCalls();
   await fileReactions();
   const day = await turnsSince(CONSOLIDATE_HOURS);

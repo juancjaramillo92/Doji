@@ -772,8 +772,8 @@ alter table public.eugenia_calls enable row level security;
 
 -- ─── What gold did on each print ───────────────────────────────────────────
 -- Gold at the open of a print's minute and at the close fifteen and sixty
--- minutes on, filed each night from the minute bars the pass reads anyway, for
--- the high-rated home prints in their window. Keyed on the calendar row and in
+-- minutes on, filed each night off the thirty hours of minute bars the pass
+-- scores her calls on, for the high-rated home prints in their window. Keyed on the calendar row and in
 -- a table of its own, so the calendar keeps its one writer; get_releases hands
 -- the moves to her beside each print. A minute the bars lack is a null.
 create table if not exists public.eugenia_reactions (
