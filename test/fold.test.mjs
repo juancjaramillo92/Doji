@@ -1467,13 +1467,17 @@ test('the weeks are read once a New York day, and a symbol a pass misses keeps i
   const yesterday = new Date(Date.now() - 86_400_000).toISOString();
   world.stored.set('trend', { door: 'trend', answer: TREND, read_at: yesterday });
   world.doors.trend = [{ ok: true, market: [TREND.market[1]], missing: [
-    { symbol: 'TVC:DXY', name: 'Dollar index', error: 'not reached in 35s' }] }, 200];
+    { symbol: 'TVC:DXY', name: 'Dollar index', error: 'not reached in 35s' }],
+    fits: [{ symbol: 'TVC:DXY', name: 'Dollar index', sessions: 20, r: -0.41, from: '2026-09-18', to: '2026-10-16' }] }, 200];
   await stubbed(async () => {
     globalThis.fetch = world.fetch;
     await storeTrend();
     assert.equal(asked, 1, 'a copy from yesterday was not read again');
     assert.match(trendList(world.stored.get('trend').answer), /Dollar index 101\.2 on 8 Oct/,
       'the dollar this pass missed lost the line the last pass read');
+    // The copy is all she reads, so a figure the door computed and the store dropped never reaches her.
+    assert.match(trendList(world.stored.get('trend').answer), /Dollar index: -0\.41 over the last 20 sessions/,
+      'the correlations the door served were not stored');
     await storeTrend();
     assert.equal(asked, 1, 'a copy read today was read again');
     assert.match(await trendBlock(), /The weeks behind it/);

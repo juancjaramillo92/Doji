@@ -3218,7 +3218,7 @@ export async function storeMarket(): Promise<void> {
 
 /* Daily closes move once a day, so a copy read today is kept and the door is
    asked again only on a new New York day; what a pass misses carries, as the
-   hourly lines do. */
+   hourly lines do. The correlations are the pass's own, each dated. */
 export async function storeTrend(): Promise<void> {
   try {
     const kept = await readStored("trend");
@@ -3226,7 +3226,7 @@ export async function storeTrend(): Promise<void> {
     const answer = await tvRead("trend");
     if (!answer.market?.length) throw new Error("no symbol served");
     if (answer.missing.length) await unread("trend", missed(answer.missing));
-    await store("trend", keptMarket(answer, kept?.answer ?? null));
+    await store("trend", { ...keptMarket(answer, kept?.answer ?? null), fits: answer.fits });
   } catch (err) {
     await unread("trend", why(err));
   }
