@@ -6586,6 +6586,19 @@ test('the position case refuses a read given, not one offered', () => {
     assert.deepEqual(EVAL.counted(c, offer), [], `an offer of a read failed: ${offer}`);
 });
 
+// The close is the trade event's subject, so the ban is on telling him to close,
+// hold or tighten, never on the noun: her right answer begins "That close".
+test('the trade look case refuses an instruction, not the word for what happened', () => {
+  const c = EVAL.CASES.find(c => c.id === 'trade-event-flat-ban');
+  for (const told of ['Close it now.', 'Hold on to the runner.', 'Tighten your stop.', 'Close the rest and walk away.',
+                      'Hold your position.'])
+    assert.ok(EVAL.counted({ mustNot: c.mustNot }, told).length, `an instruction passed: ${told}`);
+  assert.deepEqual(EVAL.counted({ mustNot: c.mustNot },
+    'That close puts the day at −$92.40, which is 4.6% of the $2,000 account your size implies. ' +
+    'R-11 says the day ends at −4% of account, however it was reached.'), [],
+    'the right answer, the fact and then the rule, failed on the noun');
+});
+
 test('each eval path asks what its call site asks, of the model it runs on', () => {
   const fn = readFileSync(new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
   const [opus, sonnet] = ['OPUS', 'SONNET'].map(k => fn.match(new RegExp(`const ${k} = "([^"]+)"`))[1]);

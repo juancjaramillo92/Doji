@@ -282,6 +282,8 @@ export const costOf = (usage) => usage.reduce((sum, u) => sum +
 async function main(argv) {
   if (!KEY) throw new Error('ANTHROPIC_API_KEY is not set; this eval calls the model and costs money');
   const only = argv.includes('--only') ? argv[argv.indexOf('--only') + 1] : null;
+  // A mistyped id would run nothing and pass.
+  if (only && !CASES.some(c => c.id === only)) throw new Error(`no case ${only}`);
   const usage = [];
 
   if (argv.includes('--plant')) {
@@ -313,7 +315,7 @@ async function main(argv) {
     for (const f of result.failed) console.log(`      · ${f}`);
     if (result.failed.length) console.log(`      she wrote: ${result.text.replace(/\s+/g, ' ').slice(0, 400)}`);
   }
-  console.log(`\n${red} of ${CASES.length} failed; this run cost about $${costOf(usage).toFixed(2)}`);
+  console.log(`\n${red} of ${only ? 1 : CASES.length} failed; this run cost about $${costOf(usage).toFixed(2)}`);
   process.exitCode = red ? 1 : 0;
 }
 
