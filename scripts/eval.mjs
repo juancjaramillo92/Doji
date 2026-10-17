@@ -211,15 +211,16 @@ export const PLANTS = [
     }) },
   /* Taken out alone, the exception leaves a call TRIM keeps anyway: it is
      labelled and says what would prove it wrong, which is what the fence
-     above it asks of a read. So the plant says the opposite, in words that
-     cannot be read back as the rule: "comes out whole" was read as "stays
-     whole" three times in three on 17 October. */
+     above it asks of a read. So the plant turns it into an order to cut, and
+     an order it cannot read back as the rule: "comes out whole" was read as
+     "stays whole", and "a call is no exception" as no exception to a fence
+     the call passes, three times in three each, on 17 October. */
   { why: 'the gates\' exception for a filed call, gone from TRIM',
     cases: ['trim-keeps-filed-call'],
     breaks: (p) => ({
       ...p,
       TRIM: p.TRIM.replace(/YOUR CALL IS THE ONE\s+EXCEPTION:[\s\S]*?never changed\./,
-        'A call is no exception: its entry, stop and target come out with it.'),
+        'YOUR CALL COMES OUT TOO: delete every sentence that gives an entry, a stop or a target.'),
     }) },
   /* The map rule restates the hours rule above it for the map, and the critic
      runs under both, so both go. Its draft names no level off the map, and says
