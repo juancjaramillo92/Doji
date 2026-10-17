@@ -102,7 +102,7 @@ test/                                   node:test suites — see Tests
 .github/workflows/health.yml            the hourly outside check; a failed run is the alarm
 .github/workflows/charm.yml             builds the charm firmware, kept as a download; main's is her update
 .github/workflows/calibrate.yml         runs scripts/calibrate.mjs, by hand from the Actions tab
-.github/workflows/eval.yml              runs scripts/eval.mjs --plant, by hand from the Actions tab
+.github/workflows/eval.yml              runs scripts/eval.mjs --plant, or one case alone, by hand from the Actions tab
 .github/workflows/replay.yml            runs scripts/replay.mjs, by hand from the Actions tab
 .github/dependabot.yml                  monthly update PRs, both ecosystems
 package.json                            two dev dependencies and the test script
@@ -3719,7 +3719,9 @@ ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs --plant
 ```
 
 Or from GitHub: **Actions → eval → Run workflow**, with `ANTHROPIC_API_KEY` as a
-repository secret; the verdicts and the cost are in the run's log, with what
+repository secret, and a case id in `only` to re-run that case alone, without
+the plants, for cents — a recheck after a fix, never the green a prompt change
+is owed; the verdicts and the cost are in the run's log, with what
 she wrote wherever a case or a plant failed and, for a pattern, where in it the
 pattern matched, and a failed case fails the run. Nothing runs it unasked, so `test.yml` says when it is owed:
 a push to a branch whose prompts, cases or eval differ from main's carries the

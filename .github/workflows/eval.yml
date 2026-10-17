@@ -2,11 +2,17 @@
 # scripts/eval.mjs with --plant first, so a green run means the eval could
 # have failed. It spends money on the Anthropic key — about fifty model calls
 # — which is why nothing schedules it. The verdicts and the cost are in the
-# run's log; a failed case fails the run.
+# run's log; a failed case fails the run. A case id asks that one case alone,
+# without the plants, for cents: a recheck after a fix, never the green a
+# prompt change is owed.
 name: eval
 
 on:
   workflow_dispatch:
+    inputs:
+      only:
+        description: One case id to re-run alone, without the plants; empty for the full run
+        default: ""
 
 permissions:
   contents: read
@@ -28,4 +34,10 @@ jobs:
       - name: Ask her real prompts the fixed cases, planted defects first
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: node --experimental-strip-types scripts/eval.mjs --plant
+          ONLY: ${{ inputs.only }}
+        run: |
+          if [ -n "$ONLY" ]; then
+            node --experimental-strip-types scripts/eval.mjs --only "$ONLY"
+          else
+            node --experimental-strip-types scripts/eval.mjs --plant
+          fi
