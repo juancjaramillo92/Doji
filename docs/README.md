@@ -529,11 +529,12 @@ and the portrait said before each rewrite, what each briefing was handed, and
 what gold did on each print. `trades` goes whole, the soft-deleted
 rows included: a restore without them lets the poller rebuild every trade you
 removed. `eugenia_runs` is left out: the largest table, and facts about model
-calls rather than about you. **Nothing in it is ever pruned**, so it only grows,
-and fastest in what each briefing was handed — a whole prompt a day. The run's
-log gives every table's rows and size, which is where that growth is read, and
-ninety copies of the document are what the account's artifact storage holds
-(`REFACTOR.md` R-92 says what to do when that nears its limit).
+calls rather than about you. **None of these tables is ever pruned**, so the
+document only grows, fastest in what each briefing was handed — a whole prompt
+a day. The run's log gives every table's rows and size, which is where that
+growth is read, and ninety copies of the document are what the account's
+artifact storage holds (`REFACTOR.md` R-92 says what to do when that nears its
+limit).
 
 It needs `SUPABASE_URL` and `SB_SECRET_KEY` as repository secrets and no install
 step. **Give it its own named `sb_secret_` key**: both bypass RLS identically,
