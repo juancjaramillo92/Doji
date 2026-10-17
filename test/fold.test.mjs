@@ -712,7 +712,7 @@ test('a TradingView that stops answering costs the symbols not reached, not the 
     const market = await stubbed(async () => { globalThis.fetch = slowTradingView(3); return readMarket(); });
     // MARKET's first three: its order is what a slow morning keeps.
     assert.deepEqual(market.market.map(m => m.symbol), ['TVC:DXY', 'TVC:US02Y', 'TVC:US10Y']);
-    assert.deepEqual(market.missing.map(m => m.error), Array(13).fill('not reached in 35s'));
+    assert.deepEqual(market.missing.map(m => m.error), Array(14).fill('not reached in 35s'));
 
     const rates = await stubbed(async () => { globalThis.fetch = slowTradingView(1); return readRates(); });
     assert.equal(rates.ok, true);
@@ -752,7 +752,7 @@ test('the market is read three charts at a time and answered in its own order', 
   // Asked in the list's order and finished out of it.
   assert.deepEqual(answer.market.map(m => m.symbol), symbols, 'the answer is in the order the charts finished');
   assert.equal(answer.market[0].symbol, 'TVC:DXY');
-  assert.equal(answer.market.length, 16);
+  assert.equal(answer.market.length, 17);
   assert.deepEqual(answer.missing, []);
 });
 
@@ -1456,7 +1456,7 @@ test('the flows are levels on their dates, newest first, in tonnes and dollars, 
   });
 });
 
-/* ONCE A NEW YORK DAY. A daily close moves once a day, and sixteen charts a
+/* ONCE A NEW YORK DAY. A daily close moves once a day, and the whole list a
    quarter hour is the burst TradingView refuses: a copy read today is kept, one
    from yesterday is read again, and what that pass misses carries. */
 test('the weeks are read once a New York day, and a symbol a pass misses keeps its last line', async () => {
