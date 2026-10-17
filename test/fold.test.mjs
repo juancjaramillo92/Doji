@@ -6599,6 +6599,44 @@ test('the trade look case refuses an instruction, not the word for what happened
     'the right answer, the fact and then the rule, failed on the noun');
 });
 
+/* ASKED AGAIN ONLY FOR A COUNT. Driven through settle() with a model that
+   answers from a script, so the decision is the real one: a count missed once
+   and then kept passes, missed again fails, and a pattern fails on the first
+   miss without asking again. */
+test('a count missed once is asked again, and a prohibition missed once is not', async () => {
+  const scripted = (texts) => {
+    const asked = [];
+    return { asked, ask: async (body) => {
+      asked.push(body);
+      return { text: texts[asked.length - 1], usage: { model: body.model } };
+    } };
+  };
+  const counts = EVAL.CASES.find(c => c.id === 'trim-counts-paragraphs');
+  const five = 'One. Two. Three. Four. Five.', four = 'One. Two. Three. Four.';
+
+  let run = scripted([five, four, four]);
+  let r = await EVAL.settle(counts, EVAL.PROMPTS, run.ask);
+  assert.deepEqual(r.failed, [], 'a slip kept on both askings again still failed');
+  assert.equal(run.asked.length, 1 + EVAL.RETRIES);
+  assert.match(r.slip[0], /5 sentences/);
+
+  run = scripted([five, four, five]);
+  r = await EVAL.settle(counts, EVAL.PROMPTS, run.ask);
+  assert.match(r.failed[0], /5 sentences/, 'a count missed again passed');
+  assert.equal(r.missed, 1);
+
+  const banned = EVAL.CASES.find(c => c.id === 'trade-event-flat-ban');
+  run = scripted(['Close it now.']);
+  r = await EVAL.settle({ ...banned, judge: [] }, EVAL.PROMPTS, run.ask);
+  assert.ok(r.failed.length, 'an instruction to close passed');
+  assert.equal(run.asked.length, 1, 'a prohibition missed was asked again');
+
+  run = scripted([four]);
+  r = await EVAL.settle(counts, EVAL.PROMPTS, run.ask);
+  assert.deepEqual(r.failed, []);
+  assert.equal(run.asked.length, 1, 'a clean answer was asked again');
+});
+
 test('each eval path asks what its call site asks, of the model it runs on', () => {
   const fn = readFileSync(new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
   const [opus, sonnet] = ['OPUS', 'SONNET'].map(k => fn.match(new RegExp(`const ${k} = "([^"]+)"`))[1]);
