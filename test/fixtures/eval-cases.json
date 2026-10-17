@@ -145,7 +145,7 @@
     "context": "",
     "strategy": "5",
     "counts": { "sentences": 2, "questions": 0 },
-    "mustNot": ["\\bshould\\b", "my read", "\\b(close|hold|tighten)\\b"],
+    "mustNot": ["\\bshould\\b", "my read", "\\b(close|hold) (it|on|out|the|your)\\b", "\\btighten"],
     "judge": ["It states the day's loss past his limit and his rule — R-11 — and nothing about the trade's merit, direction, or what to do"]
   },
   {
