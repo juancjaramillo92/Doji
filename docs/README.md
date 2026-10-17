@@ -1149,7 +1149,7 @@ failure is its own answer:
 | `fedfunds` | whether thirty-day fed funds futures answer, under the continuous names (`ZQ1!` to `ZQ3!`) and under named contract months, and what a bar of them carries — the price `?rates=1` works the meeting odds out from |
 | `futures` | what a daily bar of gold's front month (`COMEX:GC1!`) carries — the bars `?volume=1` folds |
 | `flows` | what `?flows=1` folds, raw: China's gold reserves and the funds' screener columns, so the units can be read |
-| `china` | what China's demand for gold could be read off before anything folds it: the names Shanghai's gold goes by, a daily bar of the Shanghai futures front month (`SHFE:AU1!`, yuan a gram), and the yuan and the yen against the dollar. The Shanghai premium is that price in dollars an ounce less gold's; **no reader is written until a capture of this is saved** (`REFACTOR.md` R-71) |
+| `china` | what China's demand for gold could be read off before anything folds it: a daily bar of CME's Shanghai Gold futures in dollars (`COMEX:SGU`) and in yuan (`COMEX:SGC`), under their root and continuous names, and the offshore yuan under `FX:`, the prefix the market list reads forex by. The first capture, of 17 October, found the Shanghai Futures Exchange refused on his plan, the CME contracts by search, and the yuan readable as `FX_IDC:USDCNH`. The Shanghai premium is Shanghai's dollar price less gold's; **no reader is written until a capture of this is saved** (`REFACTOR.md` R-71) |
 
 **How the sign-in is found.** OAuth 2.1 as MCP specifies it, discovered rather
 than configured: the only TradingView address in the file is the endpoint, whose
