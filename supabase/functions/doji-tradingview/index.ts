@@ -569,7 +569,8 @@ export async function readTrend() {
   const session = await tvSession();
   const market: Record<string, unknown>[] = [], missing: Record<string, string>[] = [];
   const bars: Record<string, any[]> = {};
-  await inLanes([...MARKET, { symbol: GOLD[0], name: "Gold", unit: "$" }], async (m, i) => {
+  // Named for what its absence costs, since a missed read is listed under the weeks.
+  await inLanes([...MARKET, { symbol: GOLD[0], name: "Gold itself, so no correlations", unit: "$" }], async (m, i) => {
     try {
       const answer = await tvCall(session, "mcp-tv-get-ohlcv",
         { symbol: m.symbol, interval: "1D", count: Math.max(...BACK, ...FITS) + 1 }, signal);

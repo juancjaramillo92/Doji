@@ -98,7 +98,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(1);
   }
   const out = await backup(url, key);
-  const counts = Object.entries(out.tables).map(([t, r]) => `${t}=${r.length}`).join(' ');
+  // With each table's size, since growth is read off this line: nothing is
+  // ever pruned, and ninety of these documents are what the artifacts hold.
+  const counts = Object.entries(out.tables)
+    .map(([t, r]) => `${t}=${r.length} (${Math.round(JSON.stringify(r).length / 1024)} KB)`).join(' ');
   // To stderr, so stdout is the document and nothing else.
   console.error(`backup: ${counts}`);
   process.stdout.write(JSON.stringify(out));

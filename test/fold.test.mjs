@@ -28,7 +28,7 @@ import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } fr
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, unwrap, foldCalendar,
   calendarWindow, foldBars, foldHeadlines, FOMC, contractMonths, foldRates, oddsOf, unlisted, zq, foldSessions,
-  readMarket, readRates, foldTrend, BACK, FITS, fitOf, foldReserves, foldFunds, FUNDS, readFlows, RESERVES,
+  readMarket, readRates, readTrend, foldTrend, BACK, FITS, fitOf, foldReserves, foldFunds, FUNDS, readFlows, RESERVES,
 } from '../supabase/functions/doji-tradingview/index.ts';
 import {
   briefDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
@@ -697,6 +697,28 @@ function slowTradingView(answers) {
     return new Promise((_, reject) => init.signal?.addEventListener('abort', () => reject(init.signal.reason)));
   };
 }
+
+/* Gold's own daily bars feed the correlations alone, so a failed read of them
+   is listed under the weeks as what it costs, never as gold missing. */
+test('a failed read of gold\'s own bars is listed as the correlations lost', async () => {
+  const days = { bars: Array.from({ length: 64 }, (_, i) => ({ t: 1785000000 + i * 86_400, o: 1, h: 1, l: 1, c: 1 + i })) };
+  const answer = await stubbed(async () => {
+    globalThis.fetch = async (url, init = {}) => {
+      if (url.includes('/rest/v1/tradingview_auth')) {
+        return Response.json([{ id: 'current', access_token: 'A', expires_at: new Date(Date.now() + 3600_000).toISOString() }]);
+      }
+      const body = JSON.parse(init.body);
+      if (body.method === 'initialize') return new Response('{}', { headers: { 'mcp-session-id': 's' } });
+      if (body.method !== 'tools/call') return new Response('', { status: 202 });
+      if (body.params.arguments.symbol === 'PEPPERSTONE:XAUUSD') throw new Error('refused');
+      return new Response(`data: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, result: { structuredContent: days } })}\n\n`);
+    };
+    return readTrend();
+  });
+  assert.deepEqual(answer.missing.map(m => m.name), ['Gold itself, so no correlations']);
+  assert.deepEqual(answer.fits, []);
+  assert.match(trendList(answer), /Not read just now: Gold itself, so no correlations\./);
+});
 
 /* THE DEADLINE, DRIVEN. On 12 October the market's fourteen calls outran her
    45 seconds and the block was lost whole, the symbols that had answered with
