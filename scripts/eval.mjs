@@ -120,10 +120,7 @@ export function counted(c, text) {
   const failed = [];
   const reached = text.match(/<invoke name="([^"]+)"/);
   if (reached) failed.push(`reached for ${reached[1]}, which this case does not serve: hand her its answer`);
-  for (const [name, arg] of Object.entries(c.counts ?? {})) {
-    const said = COUNTERS[name](text, arg, c);
-    if (said !== true) failed.push(said);
-  }
+  failed.push(...writing(c, text));
   for (const re of c.must ?? []) if (!new RegExp(re, 'i').test(text)) failed.push(`missing /${re}/`);
   for (const re of c.mustNot ?? []) {
     const hit = text.match(new RegExp(re, 'i'));
@@ -131,6 +128,11 @@ export function counted(c, text) {
   }
   if (c.equals !== undefined && text.trim() !== c.equals) failed.push(`not "${c.equals}"`);
   return failed;
+}
+
+// The counts alone: the writing rules, which settle() asks again before failing.
+export function writing(c, text) {
+  return Object.entries(c.counts ?? {}).map(([name, arg]) => COUNTERS[name](text, arg, c)).filter(said => said !== true);
 }
 
 /* ─── The judge ──────────────────────────────────────────────────────────────
@@ -263,7 +265,24 @@ export async function grade(c, prompts = PROMPTS, ask = claude) {
     usage.push(judged.usage);
     for (const v of JSON.parse(judged.text).verdicts) if (!v.pass) failed.push(`${v.criterion}: ${v.why}`);
   }
-  return { id: c.id, text: sent.text, failed, usage };
+  return { id: c.id, text: sent.text, failed, usage, slipped: failed.length > 0 && failed.length === writing(c, sent.text).length };
+}
+
+/* A case is asked once, and the model does not write the same words twice, so
+   one miss of a count could be the rule broken or a slip a second asking would
+   not repeat. A miss of the writing counts alone is asked RETRIES more times,
+   and fails if either misses again: a rule broken misses every time. Anything
+   else fails on the first miss: a prohibition kept most of the time is broken,
+   and so is a judge's verdict or a pattern. */
+export const RETRIES = 2;
+
+export async function settle(c, prompts = PROMPTS, ask = claude) {
+  const first = await grade(c, prompts, ask);
+  if (!first.slipped) return first;
+  const again = await Promise.all(Array.from({ length: RETRIES }, () => grade(c, prompts, ask)));
+  const missed = again.filter(r => r.failed.length).length;
+  return { ...first, failed: missed ? first.failed : [], slip: first.failed, missed,
+           usage: [first, ...again].flatMap(r => r.usage) };
 }
 
 // Per million tokens, each model's list price: a five-minute write is 1.25×
@@ -308,12 +327,13 @@ async function main(argv) {
 
   let red = 0;
   for (const c of CASES.filter(c => !only || c.id === only)) {
-    const result = await grade(c);
+    const result = await settle(c);
     usage.push(...result.usage);
     if (result.failed.length) red++;
-    console.log(`${result.failed.length ? 'FAIL' : 'pass'}  ${c.id} — ${c.why}`);
-    for (const f of result.failed) console.log(`      · ${f}`);
-    if (result.failed.length) console.log(`      she wrote: ${result.text.replace(/\s+/g, ' ').slice(0, 400)}`);
+    console.log(`${result.failed.length ? 'FAIL' : 'pass'}  ${c.id} — ${c.why}` +
+      (result.slip ? `  (a count missed, then ${result.missed} of ${RETRIES} asked again)` : ''));
+    for (const f of result.slip ?? result.failed) console.log(`      · ${f}`);
+    if (result.slip || result.failed.length) console.log(`      she wrote: ${result.text.replace(/\s+/g, ' ').slice(0, 400)}`);
   }
   console.log(`\n${red} of ${only ? 1 : CASES.length} failed; this run cost about $${costOf(usage).toFixed(2)}`);
   process.exitCode = red ? 1 : 0;

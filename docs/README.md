@@ -3706,6 +3706,13 @@ what the 15m candles did at a quarter — each handed the map as `structureList`
 says it, folded from the bars in `test/fixtures/eval-map.json`; `fold.test.mjs`
 holds the cases to that, so a change to the map's wording is a change to what
 they ask.
+**A miss of a count alone is asked again.** The model never writes the same
+words twice, so a case run once cannot tell a writing rule broken from a slip.
+A case whose only misses are its counts (a paragraph's sentences, an em-dash,
+words, questions) is asked twice more, and fails if either misses again. Every
+other miss fails at once, since a prohibition kept most of the time is broken:
+a pattern, a judge's verdict, a tool reached for. The log says when a case was
+asked again and what the first answer missed.
 **`--plant` runs first** the cases a deliberately broken prompt must fail, each
 three times since a broken prompt does not break every answer, and stops if
 all three pass: an eval that cannot fail says nothing. It costs money, so
