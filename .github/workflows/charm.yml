@@ -43,7 +43,6 @@ jobs:
         shell: bash
         working-directory: charm
         run: |
-          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git ls-files --error-unmatch dependencies.lock > /dev/null || { cat dependencies.lock; exit 1; }
           git diff --exit-code -- dependencies.lock
       # The image must hold the app where the bootloader looks for it: the first
