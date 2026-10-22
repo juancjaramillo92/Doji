@@ -1238,7 +1238,7 @@ grammar.
 
 **Her charm journals a trade on its own screen.** It sleeps, wakes every few
 minutes to ask what waits — every half hour while the market is shut and
-nothing waits already — and shows a still near-white dot
+nothing waits already — and shows a still near-white ring on its sleep screen
 while anything does. A `GET` with `x-charm-key: <GLADYS_CHARM_SECRET>` answers
 `{ waiting, trade }`: his trades from the last week (`WAITING_DAYS`) with any of
 the four answers missing, not deleted, oldest first so they are journalled in
