@@ -8,7 +8,7 @@
 void net_start(void);
 
 // Whether she is online, waiting up to `ms` for it. False once every network
-// has been tried and none answered.
+// has been tried and none answered, or the one she joined has gone.
 bool net_wait(int ms);
 
 // Long enough for the last network asked directly and four saved ones in turn.

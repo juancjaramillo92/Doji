@@ -1622,6 +1622,21 @@ test('the charm never takes her own leaving for a network refusing her', () => {
   }
 });
 
+/* Nothing joins again once the join is done, so a network lost while she
+   talks must say so: kept online, every door she knocks at fails with no
+   sign and she records turns that go nowhere, where losing it is meant to
+   send her to the lock screen. net.c's handler is the board's, so it is read. */
+test('the charm hears a network it has joined go', () => {
+  const net = source('charm/main/net.c');
+  const handler = bodyOf(net, 'static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {',
+    'net.c has no on_event()');
+  const lost = handler.slice(handler.indexOf('WIFI_EVENT_STA_DISCONNECTED'));
+  assert.match(lost, /^[^}]*if \(xEventGroupClearBits\(events, JOINED\) & JOINED\) xEventGroupSetBits\(events, GAVE_UP\);/,
+    'a disconnect once joined no longer takes her offline, so net_wait() says online about a network that has gone');
+  assert.match(bodyOf(net, 'bool net_wait(int ms) {'), /JOINED \| GAVE_UP/,
+    'net_wait() no longer returns on the network given up');
+});
+
 /* ─── Every secret a function needs is one it refuses to run without ────────
    Each function answers 503 if a required secret is unset, rather than starting
    and authorising nobody. The guard is a hand-written list, so this reads the
