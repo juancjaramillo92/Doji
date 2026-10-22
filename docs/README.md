@@ -467,9 +467,8 @@ owner and says nothing about columns, so `schema.sql` revokes insert,
 update, delete and truncate and grants back update on exactly five columns —
 `Data.OWNED`'s four and `deleted`. TRUNCATE matters because RLS does not govern
 it, and the signed-out key keeps no SELECT either: the app reads only once
-signed in. The threat it stops is a client already
-holding the session token, a narrow one; it is done because the test above made
-it cheap. `updated_at` needs no grant: column privileges are checked against the
+signed in. The threat it stops is a client already holding the session token, a
+narrow one; it is done because the test above made it cheap. `updated_at` needs no grant: column privileges are checked against the
 SET list, and `trades_touch` is a BEFORE trigger assigning `NEW`.
 `test/db/schema.test.mjs` runs it: a journal save as `authenticated` succeeds
 and moves `updated_at`; a write to `net_pnl`, an insert, a hard delete and a
@@ -2925,8 +2924,8 @@ left`) accuses nobody. `verify.sql` ends with the count still unembedded, which
 should fall to zero and stay there.
 
 R-19 is `unknown` on every trade until a week is marked in `calendar_weeks`, so
-walk the history door once from a year back, or from his first trade if that is earlier (`select
-min(open_day) from trades`):
+walk the history door once from a year back, or from his first trade if that is
+earlier (`select min(open_day) from trades`):
 
 ```sql
 select net.http_get(
