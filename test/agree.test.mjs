@@ -6386,13 +6386,13 @@ test('every market read she goes without writes a row', () => {
    briefing that reads TradingView itself pays for it out of its own clock, as
    on 13 and 14 October; a second writer to the store races the market's
    read-then-write. The census above catches a block reading the door again;
-   this holds the job's half and the store's one way in. */
+   this holds the job's half, gated by readsDue, and the store's one way in. */
 test('the quarter-hourly job reads the market ahead, and nothing else writes the copy', () => {
   const run = bodyOf(EUGENIA_TS, 'async function postScheduled(');
   const door = run.slice(run.indexOf('get("calendar") === "1"'));
   assert.match(door.slice(0, door.indexOf('return json')),
-    /await filed\(\);\s*await Promise\.all\(\[storeMarket\(\), storeRates\(\), storeTrend\(\), storeStructure\(\)\]\);/,
-    'the quarter-hourly job no longer reads the market ahead, so every copy goes stale');
+    /await filed\(\);\s*const \{ market, rates \} = readsDue\(new Date\(\)\);\s*await Promise\.all\(\[market && storeMarket\(\), rates && storeRates\(\), storeTrend\(\), storeStructure\(\)\]\);/,
+    'the quarter-hourly job no longer reads the market ahead as readsDue budgets it, so a copy goes stale or the quota runs out');
   for (const name of ['aroundBlock', 'ratesBlock', 'trendBlock', 'structureBlock']) {
     assert.match(bodyOf(EUGENIA_TS, `export async function ${name}(`), /readStored\("/,
       `${name} no longer reads the copy the job keeps`);

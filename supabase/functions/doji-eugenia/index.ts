@@ -3205,6 +3205,21 @@ export function keptMarket<T extends { symbol: string }>(fresh: { market: T[]; m
   };
 }
 
+/* TradingView's daily budget, which the job spends. From 18 October every UTC
+   day was refused by four in the morning New York, some thirty passes in at
+   thirty calls a pass, so each briefing after went without the odds and the
+   market. So the hourly bars are read once an hour, on its last pass, while
+   the market is open; the odds every other hour, which ODDS_HOURS allows; and
+   both on the pass before a briefing, whatever the hour, so Sunday's has them
+   with the market still shut. About seven hundred calls a weekday, the
+   calendar's ninety-six and the weeks' once a day included. Pure, so a week of
+   passes is walked and counted. */
+export function readsDue(now: Date): { market: boolean; rates: boolean } {
+  if (now.getUTCMinutes() < 45) return { market: false, rates: false };
+  const briefing = briefDue(new Date(now.getTime() + 15 * 60_000)) !== null;
+  return { market: briefing || marketOpen(now), rates: briefing || nyClock(now).hour % 2 === 1 };
+}
+
 export async function storeMarket(): Promise<void> {
   try {
     const answer = await tvRead("market");
@@ -3499,7 +3514,8 @@ export function ratesList(answer: { meetings: Priced[]; unread: string[]; read_a
       : `${bps(m.total_bp)} priced in all by then, ${Math.abs(Math.round(m.move_bp))} of them at this meeting`));
   if (answer.unread.length) lines.push(`· Not read just now: ${answer.unread.map(civilDay).join(", ")}.`);
   return `\n\nWhat fed funds futures price for the next Fed meetings, worked out as CME's FedWatch ` +
-    `works them, from daily bars at least fifteen minutes behind, read at ${nyTime(answer.read_at)} ET:` +
+    `works them, from daily bars at least fifteen minutes behind, read at ${nyTime(answer.read_at)} ET, ` +
+    `so nothing that printed after that is in them:` +
     `\n${lines.join("\n")}`;
 }
 
@@ -3831,11 +3847,12 @@ async function postScheduled(url: URL): Promise<Response> {
   try {
     if (url.searchParams.get("consolidate") === "1") { job = 'consolidate'; return await postConsolidation(); }
     // The calendar, on its own quarter-hourly job, so an actual lands within
-    // one, and the market, its weeks and his charts read ahead after it; none
-    // of the five throws.
+    // one, and the market, its weeks and his charts read ahead after it, as
+    // TradingView's budget allows; none of the five throws.
     if (url.searchParams.get("calendar") === "1") {
       await filed();
-      await Promise.all([storeMarket(), storeRates(), storeTrend(), storeStructure()]);
+      const { market, rates } = readsDue(new Date());
+      await Promise.all([market && storeMarket(), rates && storeRates(), storeTrend(), storeStructure()]);
       return json({ ok: true, filed: true });
     }
 

@@ -1581,7 +1581,8 @@ hourly predicates all test `hour ===` and a `*/15` job would run four briefings.
 Every filing is an `eugenia_runs` row under `calendar`, failed or not, since a
 calendar that stopped moving looks like a quiet week. After it files, the same
 job reads the market around gold and the Fed's odds ahead into `eugenia_market`
-(see *The market and the Fed's odds are read ahead*).
+as TradingView's daily quota allows (see *The market and the Fed's odds are read
+ahead*).
 
 **One release is one row, whatever it is called**, because the key is
 TradingView's id and nothing she can call creates a row. Keyed on a name the
@@ -2763,16 +2764,28 @@ it kept six lines of fourteen. Now the quarter-hourly job reads both after it
 files the calendar (`storeMarket`, `storeRates`), and the weeks behind the market
 once a day (`storeTrend`), and keeps the answers in `eugenia_market`, one row per
 door; `aroundBlock`, `trendBlock` and `ratesBlock` read that row, so a briefing
-or a reply never waits on TradingView for them. The hourly copy is a quarter
-hour old at most, of hourly and daily bars. **A symbol a pass misses
+or a reply never waits on TradingView for them.
+
+**TradingView's daily quota decides how often** (`readsDue`). From 18 October
+every UTC day was refused by about four in the morning New York, some thirty
+passes in at thirty calls a pass, and each briefing after went without the
+odds and the market. So the hourly bars are read on the last pass of each hour
+while the market is open, the odds every other hour, and both on the pass
+before a briefing, whatever the hour, so Sunday's has them with the market
+shut: about seven hundred calls a weekday, the calendar's ninety-six and the
+weeks included. A test walks a week of passes and counts them against 750. The
+market copy is an hour old at most; the odds say when they were read and that
+nothing printed since is in them. **A symbol a pass misses
 keeps the line the last pass read** (`keptMarket`), with that pass's bar times
 on it, so one slow call leaves no gap; one never read is still named. The odds
 are replaced whole once a pass prices a meeting, since a fold does not merge,
 and **odds read more than two hours ago are not handed to her** (`ODDS_HOURS`):
 each market line carries its own times, but the odds carry only when they were
-read, and a door that kept refusing would leave its last answer standing. A
-pass that fails leaves the copy as it was. Only the job writes the table, a
-quarter hour apart, so the market's read-then-write has no second writer. His
+read, and a door that kept refusing would leave its last answer standing; a
+read every other hour fits inside it, and one that fails costs the odds until
+the next. A pass that fails leaves the copy as it was. Only the job writes the
+table, a quarter hour apart, so the market's read-then-write has no second
+writer. His
 charts ride the same pass (`storeStructure`) from the poller's `?structure=1`,
 stored as the folded map (*Her map of his charts*). While the market is shut
 they are folded once: the first pass after the close, which has Friday's daily

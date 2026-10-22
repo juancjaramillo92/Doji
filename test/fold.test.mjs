@@ -31,7 +31,7 @@ import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, u
   readMarket, readRates, readTrend, foldTrend, BACK, FITS, fitOf, foldReserves, foldFunds, FUNDS, readFlows, RESERVES,
 } from '../supabase/functions/doji-tradingview/index.ts';
 import {
-  briefDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
+  briefDue, retryDue, readsDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
   chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
   notesList, channelsList, searchList, readStrategy, dayQuery, repliedQuery, spokenQuery,
   spokenBriefing, ask,
@@ -873,7 +873,7 @@ test('the market is read ahead by the job, and a briefing reads the copy a faile
     await Promise.all([storeMarket(), storeRates(), storeTrend()]);
     // The weeks ride with the market, so every reader of the one gets the other.
     assert.match(await aroundBlock(), /Dollar index 102\.16[\s\S]*The weeks behind it[\s\S]*· Dollar index 101\.2 on 8 Oct/);
-    assert.match(await ratesBlock(), /read at \d\d:\d\d ET:\n· 28 Oct: 73% no change/);
+    assert.match(await ratesBlock(), /read at \d\d:\d\d ET, so nothing that printed after that is in them:\n· 28 Oct: 73% no change/);
 
     // A pass that fails, or serves nothing, leaves the copy as it was.
     world.doors.market = [{ ok: false, error: 'not connected' }, 500];
@@ -1587,7 +1587,7 @@ test('odds read more than two hours ago are not handed to her', async () => {
   world.stored.set('rates', { door: 'rates', answer: { ok: true, ...RATES, missing: [] }, read_at });
   await stubbed(async () => {
     globalThis.fetch = world.fetch;
-    assert.match(await ratesBlock(Date.parse(read_at) + 2 * 3600_000), /08:00 ET:\n· 28 Oct/);
+    assert.match(await ratesBlock(Date.parse(read_at) + 2 * 3600_000), /08:00 ET, so nothing that printed after that is in them:\n· 28 Oct/);
     assert.match(await ratesBlock(Date.parse(read_at) + 2 * 3600_000 + 1), /could not be read just now/);
   });
   assert.equal(world.rows.length, 1, 'odds too old to hand her left no row');
@@ -1759,7 +1759,7 @@ test('the first meeting is said as odds and the later ones as what is priced by 
   assert.doesNotMatch(out, /76%|37%/, 'a later meeting is said as its own odds, which FedWatch does not show');
   assert.match(out, /at least\s+fifteen minutes behind/, 'the block does not say the bars are delayed');
   // Read ahead, so the block says when; the odds carry no other time.
-  assert.match(out, /read at 18:00 ET:/);
+  assert.match(out, /read at 18:00 ET, so nothing that printed after that is in them:/);
 
   const cut = ratesList({ meetings: [{ ...RATES.meetings[0], odds: [{ bp: -25, chance: 60 }, { bp: -50, chance: 40 }] },
     { ...RATES.meetings[1], total_bp: -30.4 }], unread: ['2027-01-27'], read_at: RATES.read_at });
@@ -2324,6 +2324,42 @@ test('the timetable holds its New York hours in winter too', () => {
   }
   // 03:00 UTC on the 14th is 22:00 ET on the 13th — the previous night's pass.
   assert.deepEqual(owed, ['03:00 consolidate', '13:00 weekday']);
+});
+
+/* TRADINGVIEW'S DAILY BUDGET IS THE JOB'S TO SPEND. From 18 October every UTC
+   day was refused some thirty passes in, at about a thousand calls, and the
+   briefing went without the odds. Walked over a week of the job's passes as
+   cron fires them, counting what each door costs as the doors are written: the
+   calendar every pass, the weeks once a New York day, the market list and the
+   contracts when readsDue says. */
+const TV_SOURCE = readFileSync(new URL('../supabase/functions/doji-tradingview/index.ts', import.meta.url), 'utf8');
+const EUGENIA_SOURCE = readFileSync(new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+test('the job spends TradingView\'s daily budget, and the pass before a briefing reads it all', () => {
+  const list = TV_SOURCE.slice(TV_SOURCE.indexOf('const MARKET = ['));
+  const symbols = list.slice(0, list.indexOf('];')).match(/symbol: "/g).length;
+  const oddsHours = Number(EUGENIA_SOURCE.match(/const ODDS_HOURS = (\d+);/)[1]);
+  const calls = new Map();
+  let rates = null;
+  for (let q = 0; q < 7 * 96; q++) {
+    const at = new Date(Date.UTC(2026, 7, 16, 0, 5 + 15 * q));
+    const due = readsDue(at);
+    const firstOfDay = nyClock(at).hour === 0 && at.getUTCMinutes() === 5;
+    const spent = 1 + (firstOfDay ? symbols + 1 : 0) + (due.market ? symbols : 0) +
+      (due.rates ? contractMonths(nyDate(at)).length + 1 : 0);
+    const day = at.toISOString().slice(0, 10);
+    calls.set(day, (calls.get(day) ?? 0) + spent);
+    if (due.rates) rates = at;
+    if (briefDue(new Date(at.getTime() + 15 * 60_000)) && at.getUTCMinutes() === 50) {
+      assert.deepEqual(due, { market: true, rates: true }, `the pass before ${at.toISOString()}'s briefing reads both`);
+    }
+    if (rates) assert.ok(at - rates <= oddsHours * 3_600_000, `${at.toISOString()}: the odds outlive ODDS_HOURS`);
+  }
+  for (const [day, n] of calls) assert.ok(n <= 750, `${day} spends ${n} TradingView calls`);
+  // The weekend reads no market but before Sunday's briefing.
+  assert.equal(readsDue(new Date('2026-08-22T18:50:00Z')).market, false, 'a shut market is read on Saturday');
+  assert.deepEqual(readsDue(new Date('2026-08-16T20:50:00Z')), { market: true, rates: true },
+    'Sunday\'s briefing goes without the market it opens on');
 });
 
 test('silence is the word she was told to use, and nothing else', () => {
