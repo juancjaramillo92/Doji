@@ -259,6 +259,15 @@ export const PLANTS = [
       SYSTEM: p.SYSTEM.replace(/HOW THE THREE BIAS CHARTS ADD UP IS YOURS TO JUDGE\.[\s\S]*?then say that is what failed\.\n\n/, '')
         .replace(/, weighed as it is for your own call\./, '.'),
     }) },
+  /* On 22 October, the odds unread, the briefing put an $81 fall the ten-year
+     and the dollar did not explain down to the Fed's path, off the wires'
+     story of revived hike bets. */
+  { why: 'a move rates and the dollar do not explain left unexplained rather than put on the Fed, gone from the writer',
+    cases: ['brief-move-without-a-cause'],
+    breaks: (p) => ({
+      ...p,
+      SYSTEM: p.SYSTEM.replace(/THEN SAY WHAT IS CARRYING IT, FROM WHAT YOU CAN SEE[\s\S]*?a guess said\s+as a fact\.\n\n/, ''),
+    }) },
 ];
 
 /* ─── The run ────────────────────────────────────────────────────────────── */
