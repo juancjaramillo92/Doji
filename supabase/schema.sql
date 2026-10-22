@@ -96,8 +96,9 @@ create table if not exists public.trades (
   constraint trades_commission_nonneg check (commission is null or commission >= 0)
 );
 
--- The client's only read: one user's trades, newest day first. The DESC lets
--- the index serve the sort as well as the filter.
+-- One owner's trades by filing day. Every row is his, so no read the code
+-- makes needs it, and at a few hundred rows the planner takes it or a scan
+-- alike; kept, since dropping it buys nothing measurable (REFACTOR.md R-93).
 create index if not exists trades_user_open_day on public.trades (user_id, open_day desc);
 
 create or replace trigger trades_touch_updated_at

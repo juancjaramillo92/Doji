@@ -62,9 +62,10 @@ export async function readAll(url, key, table, orderBy, fetchImpl = fetch) {
     const res = await fetchImpl(`${url}/rest/v1/${table}?select=*&order=${order}`, {
       headers: {
         apikey: key,
-        // Range rather than limit/offset: PostgREST answers it with a
-        // Content-Range that says how much there is, and an offset walk over a
-        // table being written to can skip a row where a range does not.
+        // PostgREST turns a Range into LIMIT and OFFSET, so a row inserted
+        // mid-walk into pages already read pushes one row onto two pages, and
+        // a row deleted from them would put one on none. Nothing here is ever
+        // hard-deleted, so the walk can repeat a row and never lose one.
         Range: `${from}-${from + PAGE - 1}`,
         'Range-Unit': 'items',
       },

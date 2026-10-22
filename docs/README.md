@@ -632,7 +632,7 @@ direction cannot be fixed in the app, which does not own the column.
 | a closed trade with `exit_price is null` | the poller, whose fold lost its entry deal and was held back | that combination *is* the signature, and `sync_health` names the ids while the close is in the window | `?force=1&hours=N` wide enough to reach the entry | as above — the whole window |
 | `balance`, `planned_sl`, `planned_tp`, `fill_time`, `best_price` | settled by `where … is null` | compare against the broker | clear the column, then let the next poll fill it | first write wins, so a backfill alone changes nothing |
 | setup, the three discipline answers | the trader, through the app or a tap | the log, or `/notes` in her thread | edit it in either place | no broker column moves; the two writers hold the same four names |
-| a session that looks misfiled | derived, never stored | `entry_time is null` on the row — the seam | `?force=1` wide enough to backfill the entry | as above; `get_stats` counts these and says so |
+| a session that looks misfiled | derived, never stored | `entry_time is null` on the row — the seam | `?force=1` wide enough to backfill the entry, inside 720 hours | as above; `get_stats` counts these and says so |
 
 **The two writers with no voice leave a heartbeat.** The poller and the email
 function have no path to Telegram, so `sync_health` holds one row each:
@@ -2923,9 +2923,8 @@ backlog waiting* means the key is unset, and a drained archive (`0 filled, 0
 left`) accuses nobody. `verify.sql` ends with the count still unembedded, which
 should fall to zero and stay there.
 
-R-19 is `unknown` on every trade until a week is marked in `calendar_weeks`, and
-a release carries its series `ticker` only once filed, so walk the history door
-once from a year back, or from his first trade if that is earlier (`select
+R-19 is `unknown` on every trade until a week is marked in `calendar_weeks`, so
+walk the history door once from a year back, or from his first trade if that is earlier (`select
 min(open_day) from trades`):
 
 ```sql
@@ -3874,7 +3873,10 @@ that refuses bots degrades to search, with no sign the figure came from prose.
 
 **The session seam.** A fill the poller never reached has no `entry_time`, so its
 session derives from the close. `get_stats` counts these rows and says so above
-the split. A wide `?force=1` repairs them for good.
+the split. A wide `?force=1` repairs them for good, but only inside the 720
+hours `clampHours` lets one window reach; an older one keeps the seam. The
+journal's hand-entered rows from before the poller carry no position id and no
+instant at all, and nothing can supply one.
 
 **R:R on the dashboard is realised, not planned** — average win over average loss
 per window. The plan is recorded only for positions the poller saw open, as
