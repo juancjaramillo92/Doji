@@ -42,6 +42,9 @@ jobs:
       - name: Check the components are the pinned ones
         shell: bash
         working-directory: charm
+        # The checkout belongs to the runner and the container runs as root, so
+        # git refuses the repository as of dubious ownership without the first
+        # line, and the check reads every lock as uncommitted.
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git ls-files --error-unmatch dependencies.lock > /dev/null || { cat dependencies.lock; exit 1; }

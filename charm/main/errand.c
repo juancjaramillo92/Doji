@@ -13,18 +13,15 @@
 #define ROLL_HOUR 17
 #define GRACE_H   1
 
-static bool weekend(const struct tm *t) {
-    return (t->tm_wday == 5 && t->tm_hour >= ROLL_HOUR + GRACE_H) || t->tm_wday == 6 ||
-           (t->tm_wday == 0 && t->tm_hour < ROLL_HOUR);
-}
-
 int errand_wait(time_t now, bool charging, bool trade, int away) {
     if (charging) return CHARGING_S;
     int wait = CHECK_S << (away < 3 ? away : 3);
     if (wait > LONGEST_S) wait = LONGEST_S;
     struct tm t;
     localtime_r(&now, &t);
-    if (trade || now < CLOCK_SET || !weekend(&t)) return wait;
+    bool weekend = (t.tm_wday == 5 && t.tm_hour >= ROLL_HOUR + GRACE_H) || t.tm_wday == 6 ||
+                   (t.tm_wday == 0 && t.tm_hour < ROLL_HOUR);
+    if (trade || now < CLOCK_SET || !weekend) return wait;
     // The Sunday open, where errands come every few minutes again.
     struct tm open = t;
     open.tm_mday += (7 - t.tm_wday) % 7;

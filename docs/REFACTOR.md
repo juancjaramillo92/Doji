@@ -934,6 +934,64 @@ roles are `nologin`. Revoking it everywhere is one statement and a
 **Revisit if:** anything comes to run SQL as `anon` or `authenticated`, or a
 table of hers is ever found readable by the key.
 
+### R-99 — skipping the bootloader's check of the app on every waking
+**Why refused:** the bootloader hashes the whole 2.18 MB app on every deep-sleep
+wake (ESP-IDF's option to skip it then is off), a fraction of a second
+at most per errand and under a milliamp-hour a day by the October 2026
+estimate. Skipping it gives up the one check that tells a corrupted slot from a
+good one, which is what lets the rollback fall back to the app that was.
+**Revisit if:** the board's own measurement shows a waking's boot is a share
+of the battery worth naming.
+
+### R-100 — her voice sent to the charm as Opus rather than raw pcm
+**Why refused:** pcm needs no decoder on the board and joins end to end across
+parts. Opus would cut the bytes about twelvefold, but the radio is on for the
+whole playback either way, since she is played as she arrives, so the battery
+barely notices; it would add a decoder, its stack, and a frame format to keep.
+**Revisit if:** her voice is heard stuttering on a slow network.
+
+### R-101 — reconnecting after a network lost mid-conversation
+**Why refused:** a network lost once joined takes her to the lock screen, the
+no-internet mark saying why, and the next waking joins afresh, the network she
+was last on asked first. Rejoining in place would be a second join path beside
+`net.c`'s, for a drop the next press repairs in a couple of seconds.
+**Revisit if:** drops mid-conversation turn out common on the networks she
+lives on.
+
+### R-102 — keeping a recording the network could not take, to send later
+**Why refused:** a turn of conversation answered minutes late is not the
+conversation he started, and keeping it means flash writes and a queue to drain
+and expire. A network already given up is not recorded into at all, so what
+is lost is a turn said while she was still joining and the join then failed.
+**Revisit if:** he says a turn lost that way mattered.
+
+### R-103 — TLS sessions resumed across sleep, the last DHCP lease restored
+**Deferred, not refused.** Each waking makes a fresh TLS handshake to each door
+and asks DHCP from the start. Resuming a session needs it kept in RTC memory
+through sleep; restoring a lease writes it to flash. Each would shorten an
+errand by a part of a second, unmeasured against the radio's whole waking.
+**Revisit if:** the board's measurement puts errands at the top of where the
+charge goes.
+
+### R-104 — encrypting her flash
+**Why refused:** her Wi-Fi passwords and both keys sit in NVS in the clear, so
+a charm in someone else's hands over USB gives them up. Flash or NVS
+encryption burns eFuses for good, and a mistake in it bricks the board; the
+keys are cut off by changing them in Supabase, which is the README's answer to
+a lost charm.
+**Revisit if:** a charm is lost on a network whose password cannot be changed.
+
+### R-105 — a dimmer sleep screen, and listening before the screen is up
+**Deferred, not refused.** The sleep screen draws its marks at the face's 75%,
+and the briefing's dot wanders less than its own width; a dimmer sleep screen
+would spare the panel and some charge, at a look he has not seen. A press from
+sleep plays the listening notes only after the panel has started, whose board
+package alone waits 1.2 s; listening first means the screen starting beside
+her recording, a concurrency the firmware does not have today.
+**Revisit if:** he has seen the sleep screen on the board, for the first; the
+serial log's `lit` and `listening` lines put the panel's start at most of a
+press's wait, for the second.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

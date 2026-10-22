@@ -425,7 +425,7 @@ single-sourced at run time:
 | where the **charm's update** lives | `FIRMWARE_URL` in `charm/main/net.h`, and the bucket and object `.github/workflows/charm.yml` makes and writes |
 | where the **charm's app** boots from | the first app slot's offset in `charm/partitions.csv` and the offset `.github/workflows/charm.yml` checks the image against |
 | the **briefing's hours** | `briefDue` and `retryDue` in `doji-eugenia`, and the charm's `BRIEF_WEEKDAY`, `BRIEF_SUNDAY` and `BRIEF_RETRIES` with the line that gives each day its hour — the charm sleeps, so it wakes to ask in those hours |
-| the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts`, `ROLL_HOUR` in `index.ts`, and the charm's `ROLL_HOUR` in `charm/main/errand.c` with the days `weekend()` gives it, which `charm.test.mjs` walks against `marketOpen` |
+| the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts`, `ROLL_HOUR` in `index.ts`, and the charm's `ROLL_HOUR` in `charm/main/errand.c` with the days its weekend is made of, which `charm.test.mjs` walks against `marketOpen` |
 | the **importance a release may carry** | `IMPORTANCE` in `doji-tradingview`, the check constraint, and the rated reads' `importance=eq.high` |
 | the **economies the calendar reads** | `CALENDAR_COUNTRIES` in `doji-tradingview` and the countries `wanted` keeps in `doji-eugenia` |
 | the **country his rules count** | `HOME` in `adherence.ts`, the default on `eugenia_calendar.country`, and the watch card's `.eq('country', 'US')` — and every rated read but the Sunday week filters on it |
@@ -1237,7 +1237,8 @@ is her charm. They share the keyboard, the message and the `callback_data`
 grammar.
 
 **Her charm journals a trade on its own screen.** It sleeps, wakes every few
-minutes around the clock to ask what waits, and shows a still near-white dot
+minutes to ask what waits — every half hour while the market is shut and
+nothing waits already — and shows a still near-white dot
 while anything does. A `GET` with `x-charm-key: <GLADYS_CHARM_SECRET>` answers
 `{ waiting, trade }`: his trades from the last week (`WAITING_DAYS`) with any of
 the four answers missing, not deleted, oldest first so they are journalled in
@@ -3372,7 +3373,7 @@ on its own channel and access point so no scan is needed, then each saved one in
 turn; nothing waits for it but the moment something must be sent. Leaving an
 attempt that failed is never taken for the next network refusing her.
 
-**Asleep, she runs errands in the dark** every five minutes, around the clock,
+**Asleep, she runs errands in the dark** every five minutes, day and night,
 and on the cable every two so the charge stays current (`charm/main/errand.c`).
 An errand that finds no network makes the next one later — ten minutes, then
 twenty, then every half hour — since until one answers there is nothing to ask.
@@ -3472,17 +3473,17 @@ leaving of a network reports `WIFI_REASON_ASSOC_LEAVE`, that a phone stays on
 her setup network while she joins another — the two share one radio, so her
 own moves to the other's channel — whether a full-screen swipe is smooth
 enough to replace the journal's taps, that the Opus encoder keeps up with the
-microphones and five minutes of it fit the room `talk.c` gives the file, how
-much of her stack a turn of talking leaves — the serial log says after each,
-against the 40 KB Espressif's codec README asks for an encoder — how long a
+microphones and five minutes of it fit the room `talk.c` gives the file, and
+how much of her stack a turn of talking leaves, against the 40 KB Espressif's
+codec README asks for an encoder (the serial log says after each). How long a
 battery lasts, and what two things save of it: the panel held in reset under
-an empty sleep screen (and that it shows black while held), and the codecs
-switched off before sleep (the speaker's amplifier is enabled on GPIO46,
-which is left floating in sleep), and that a battery run down resets her as a
-brownout — switching her off — and whether a cable alone switches her back on,
-and how long a press from sleep takes to reach the listening notes: the serial
-log's `lit` and `listening` lines are timestamped from boot, and the board
-package's panel start alone waits 1.2 s.
+an empty sleep screen, and that it shows black while held; the codecs switched
+off before sleep, and that the speaker's amplifier, enabled on GPIO46 and left
+floating in sleep, is quiet. That a battery run down resets her as a brownout
+and so switches her off, and whether a cable alone switches her back on. How
+long a press from sleep takes to reach the listening notes: the serial log's
+`lit` and `listening` lines are timestamped from boot, and the board package's
+panel start alone waits 1.2 s.
 
 ---
 
