@@ -41,13 +41,18 @@ export const MODEL = {
 /* ─── What she is asked, path by path ────────────────────────────────────────
    Each mirrors its call site in index.ts: converse for a reply, critique() and
    trim() for the gates, postTradeEvent for the trade look, postReview for the
-   Saturday review's draft. agree.test.mjs holds
+   Saturday review's draft, postBriefing for the weekday briefing's. agree.test.mjs holds
    the gates' two markers against the function's. `prompts` is a parameter so
    a planted defect can hand in a broken copy. A case whose prompt tells her to
    read a section names it as `strategy`, and is handed the section itself,
    read from the module get_strategy serves. */
 const context = (c) => (c.context ?? '') +
   (c.strategy ? `\n\nWhat get_strategy returned for §${c.strategy}:\n\n${SECTIONS[c.strategy]}` : '');
+
+/* The weekday briefing's draft, asked as postBriefing asks it: the request,
+   then what it was handed. With no tools, so a case hands her what a search
+   or get_around would have. */
+export const BRIEF_ASKED = "Today's briefing, please.";
 
 export const PATHS = {
   reply:  (c) => ({ model: MODEL.opus, effort: 'medium',
@@ -59,6 +64,7 @@ export const PATHS = {
   trade:  (c, p) => ({ model: MODEL.opus, effort: 'medium',
                        content: `${p.TRADE_EVENT}\n\n${c.situation}${context(c)}` }),
   review: (c, p) => ({ model: MODEL.opus, effort: 'high', content: `${p.REVIEW}${context(c)}` }),
+  brief:  (c) => ({ model: MODEL.opus, effort: 'high', content: `${BRIEF_ASKED}${context(c)}` }),
 };
 
 export const PROMPTS = { SYSTEM, CRITIC, TRIM, TRADE_EVENT, REVIEW };
