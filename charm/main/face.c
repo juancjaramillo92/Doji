@@ -317,7 +317,7 @@ static void draw_night(lv_event_t *e) {
         t.font = &hanken_36;
         t.color = lv_color_hex(charge == 100 ? INK : MUTED);
         t.text = percent;
-        lv_area_t where = { 0, 211, 465, 255 };
+        lv_area_t where = { shift[0], 211 + shift[1], 465 + shift[0], 255 + shift[1] };
         lv_draw_label(layer, &t, &where);
     }
     if (hold > 0) draw_hold(layer);

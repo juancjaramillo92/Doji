@@ -35,6 +35,17 @@ jobs:
           idf.py set-target esp32s3
           idf.py build
           idf.py merge-bin -o charm-full.bin
+      # The components are the versions dependencies.lock names. The manifest
+      # asks for ranges, so a build that resolved anything else has changed the
+      # firmware with no commit saying so; an uncommitted lock is printed, to be
+      # committed.
+      - name: Check the components are the pinned ones
+        shell: bash
+        working-directory: charm
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git ls-files --error-unmatch dependencies.lock > /dev/null || { cat dependencies.lock; exit 1; }
+          git diff --exit-code -- dependencies.lock
       # The image must hold the app where the bootloader looks for it: the first
       # app slot, at 0x20000 (partitions.csv).
       - name: Check the image holds the app

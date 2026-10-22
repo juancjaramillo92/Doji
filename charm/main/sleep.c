@@ -22,6 +22,12 @@ void sleep_release(void) {
     gpio_deep_sleep_hold_dis();
 }
 
+void sleep_blank(void) {
+    sleep_release();
+    gpio_set_direction(BSP_LCD_RST, GPIO_MODE_OUTPUT);
+    gpio_set_level(BSP_LCD_RST, 0);
+}
+
 void sleep_woke(void) {
     rtc_gpio_deinit(PWR_PIN);
     for (size_t i = 0; i < COUNT(WAKE); i++) rtc_gpio_deinit(WAKE[i]);

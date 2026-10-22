@@ -28,13 +28,13 @@
    rests the motion sensor for LIFT_REST_S, so a keyring swinging all day
    cannot keep waking her.
 
-   Asleep, she wakes on her own every CHECK_S, without lighting the screen, to
-   ask Gladys's door what waits, with a soft double tick when something new
-   does, and in the briefing's hours (briefing.c) Eugenia's whether it has
-   landed; when it has, her face lights and she says so. The screen is started
-   only when its marks must change: the panel keeps its picture while the chip
-   sleeps, so most errands never touch it. Once a night an errand also looks
-   for a new app from main (ota.c).
+   Asleep, she wakes on her own every few minutes (errand.c), without
+   lighting the screen, to ask Gladys's door what waits, with a soft double
+   tick when something new does, and in the briefing's hours (briefing.c)
+   Eugenia's whether it has landed; when it has, her face lights and she says
+   so. The screen is started only when its marks must change: the panel keeps
+   its picture while the chip sleeps, so most errands never touch it. Once a
+   night an errand also looks for a new app from main (ota.c).
 
    PWR is also the power chip's (power.c): off, a press switches her on, and
    held three seconds she says goodnight and switches off. */
@@ -52,6 +52,7 @@
 #include "briefing.h"
 #include "config.h"
 #include "dial.h"
+#include "errand.h"
 #include "face.h"
 #include "gladys.h"
 #include "motion.h"
@@ -66,8 +67,6 @@
 static const char *TAG = "charm";
 
 #define BRIGHTNESS    75     // percent
-#define CHECK_S       300    // how often she asks what waits, around the clock
-#define CHARGING_S    120    // on the cable, how often the charge is redrawn
 #define AWAKE_MS      30000
 #define LAST_FRAME_MS 200    // the sleep screen reaching the panel
 #define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
@@ -77,10 +76,11 @@ static const char *TAG = "charm";
 #define DOWN_READS    2      // put down this many readings running, she sleeps
 #define QUIET_MS      8000   // held up and quiet this long after her last word, the conversation is over
 
-// What waits, whether the internet answered last time, what the sleep screen
-// last drew, and when the next errand is; all kept through sleep.
+// What waits, whether the internet answered last time and how many errands
+// running it has not, what the sleep screen last drew, and when the next
+// errand is; all kept through sleep.
 static RTC_DATA_ATTR bool briefing_waits, trade_waits, offline;
-static RTC_DATA_ATTR int drawn = -1;
+static RTC_DATA_ATTR int away, drawn = -1;
 static RTC_DATA_ATTR time_t errand_at;
 
 static esp_sleep_wakeup_cause_t woke;
@@ -107,6 +107,9 @@ static void light(face_mode_t mode) {
     bsp_display_lock(-1);
     face_start();
     bsp_display_unlock();
+    // Timestamped from boot, beside talk.c's "listening": how much of a press's
+    // wait is the panel starting.
+    ESP_LOGI(TAG, "lit");
 }
 
 // Her briefing has landed: lit for Eugenia to say so.
@@ -121,8 +124,9 @@ static void close_eyes(void) {
 }
 
 /* Goodnight, her eyes closing, then the sleep screen, drawn only when its
-   marks differ from what the panel already holds, then deep sleep until the
-   next errand, the motion sensor armed. */
+   marks differ from what the panel already holds — and with none, the panel
+   held in reset rather than drawn black — then deep sleep until the
+   next errand, the codecs closed and the motion sensor armed. */
 static void sleep_now(void) {
     // Her door reads today's briefing alone: past midnight, yesterday's is gone.
     if (briefing_waits && !briefing_today(time(NULL))) briefing_waits = false;
@@ -131,13 +135,19 @@ static void sleep_now(void) {
     int marks = face_marks(briefing_waits, trade_waits, low, offline, charge);
     close_eyes();
     if (lit || marks != drawn) {
-        light(FACE_DARK);
-        face_set_marks(briefing_waits, trade_waits, low, offline, charge);
-        face_set_mode(FACE_DARK);
-        vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
+        // No marks: the panel held in reset is the same black, not drawn.
+        if (marks == face_marks(false, false, false, false, -1)) {
+            sleep_blank();
+        } else {
+            light(FACE_DARK);
+            face_set_marks(briefing_waits, trade_waits, low, offline, charge);
+            face_set_mode(FACE_DARK);
+            vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
+        }
         drawn = marks;
     }
-    errand_at = time(NULL) + (charge >= 0 ? CHARGING_S : CHECK_S);
+    errand_at = time(NULL) + errand_wait(time(NULL), charge >= 0, trade_waits, away);
+    sound_stop();
     motion_arm();
     sleep_until(errand_at, true);
 }
@@ -154,6 +164,7 @@ static bool trade_came(void) {
 static void errand(void) {
     net_start();
     offline = !net_wait(NET_ALL_MS);
+    away = offline ? away + 1 : 0;
     if (!offline) {
         bool tick = trade_came(), ask = briefing_due(time(NULL));
         if (tick || ask) {
@@ -171,6 +182,7 @@ static void errand(void) {
         // waits for a later errand in the hour, on the cable perhaps.
         if (!power_low() && ota_due(time(NULL)) && ota_update()) {
             errand_at = time(NULL);
+            sound_stop();
             sleep_until(errand_at, false);
         }
     }
@@ -230,6 +242,7 @@ static void awake(void) {
     net_start();
     if (offline && !net_wait(OFFLINE_TRY_MS)) sleep_now();
     offline = false;
+    away = 0;
 
     // PWR woke her: he wants to talk, so she listens before anything that
     // waits. Otherwise a trade waiting keeps the screen dark until its
@@ -256,10 +269,14 @@ static void awake(void) {
     }
     bool spoke = listen && exchange();
 
+    // A waiting briefing is read once a waking. Read, or none stored for
+    // today, its dot goes; a failure leaves it up for the next waking.
+    bool brief = briefing_waits;
     for (;;) {
-        if (briefing_waits) {
-            briefing_waits = false;
+        if (brief) {
+            brief = false;
             int status = talk_briefing();
+            briefing_waits = status != 200 && status != 204;
             sleep_if_offline(status);
             spoke |= status == 200;
         }
@@ -283,6 +300,11 @@ static void awake(void) {
 static void life(void *arg) {
     (void)arg;
     power_start(xTaskGetCurrentTaskHandle());
+    // A battery too low for her radio resets the chip as its voltage sags,
+    // and every waking would only reset it again, the screen and the radio
+    // drawing the cell down past where it should stop. Off the cable, the
+    // board switches off instead, as the goodnight does.
+    if (esp_reset_reason() == ESP_RST_BROWNOUT && power_charge() < 0) power_off();
     // A lift that was not him: back to sleep at once, the sensor resting.
     if (woke == ESP_SLEEP_WAKEUP_EXT1 && (esp_sleep_get_ext1_wakeup_status() & (1ULL << MOTION_PIN)) && !motion_looked()) {
         time_t rest = time(NULL) + LIFT_REST_S;
@@ -313,6 +335,8 @@ void app_main(void) {
         light(FACE_DARK);
         setup_run();
     }
-    // The stack holds a TLS handshake.
-    xTaskCreatePinnedToCore(life, "life", 12288, NULL, 5, NULL, 0);
+    // The stack holds a TLS handshake, and the Opus encoder, which Espressif's
+    // codec README puts at about 40 KB. Internal RAM, as deep sleep requires
+    // of the task that starts it.
+    xTaskCreatePinnedToCore(life, "life", 40960, NULL, 5, NULL, 0);
 }

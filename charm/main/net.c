@@ -32,11 +32,16 @@ static EventGroupHandle_t events;
 
 /* Her own leaving, after an attempt that failed, is no network refusing her:
    it can arrive once the next attempt has begun, and would end that one
-   before it is tried. */
+   before it is tried. Once joined, a disconnect is the network lost, and
+   nothing joins again this waking: she is no longer online, and nothing is
+   trying, so whatever waits on the network hears so at once. */
 static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
     (void)arg;
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED &&
-        ((wifi_event_sta_disconnected_t *)data)->reason != WIFI_REASON_ASSOC_LEAVE) xEventGroupSetBits(events, REFUSED);
+        ((wifi_event_sta_disconnected_t *)data)->reason != WIFI_REASON_ASSOC_LEAVE) {
+        if (xEventGroupClearBits(events, JOINED) & JOINED) xEventGroupSetBits(events, GAVE_UP);
+        xEventGroupSetBits(events, REFUSED);
+    }
     if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) xEventGroupSetBits(events, JOINED);
 }
 
@@ -109,4 +114,8 @@ void net_start(void) {
 
 bool net_wait(int ms) {
     return xEventGroupWaitBits(events, JOINED | GAVE_UP, pdFALSE, pdFALSE, pdMS_TO_TICKS(ms)) & JOINED;
+}
+
+bool net_gone(void) {
+    return xEventGroupGetBits(events) & GAVE_UP;
 }

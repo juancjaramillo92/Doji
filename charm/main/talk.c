@@ -48,6 +48,7 @@ static const char *TAG = "talk";
 // with nothing is a dead line.
 #define READ_MS 30000
 #define CONFUSED_MS 4000
+#define LOOK_MS 100  // while nothing arrives, how often she looks for PWR
 
 static TickType_t began;
 static bool spoke, speaking, warned;
@@ -97,16 +98,25 @@ static bool said(float loud) {
 }
 
 // Plays her answer as it streams in, and sets the volume she asked for, as
-// the dial does, before the voice that follows it.
-static void play_answer(esp_http_client_handle_t h) {
+// the dial does, before the voice that follows it. False when PWR stopped it.
+static bool play_answer(esp_http_client_handle_t h) {
     static uint8_t in[4096];
     static int16_t voice[sizeof in / 2 + 1];
     frames_t f = { 0 };
     speaking = false;
+    // Read in short waits, so PWR cuts her off while she thinks rather than
+    // at the next beat of silence; READ_MS of nothing is still a dead line.
+    esp_http_client_set_timeout_ms(h, LOOK_MS);
+    TickType_t heard = xTaskGetTickCount();
     for (;;) {
         face_set_level(0);
         int n = esp_http_client_read(h, (char *)in, sizeof in);
-        if (n <= 0) return;
+        if (n == -ESP_ERR_HTTP_EAGAIN) {
+            if (tapped()) return false;
+            if (xTaskGetTickCount() - heard < pdMS_TO_TICKS(READ_MS)) continue;
+        }
+        if (n <= 0) return true;
+        heard = xTaskGetTickCount();
         int volume = -1;
         size_t samples = frames_read(&f, in, (size_t)n, voice, &volume);
         if (volume >= 0) {
@@ -114,14 +124,16 @@ static void play_answer(esp_http_client_handle_t h) {
             cfg.volume = volume;
             config_save();
         }
-        if (!sound_play(voice, samples, HER_RATE, said)) return;
+        if (!sound_play(voice, samples, HER_RATE, said)) return false;
     }
 }
 
 /* Knocks at her door — a POST of `ogg` when there is one, else a GET of
    `url` — and plays the answer when it is 200, after `lit`, when there is
    one, has lit the screen for her. Returns the status, or -1 when the door
-   could not be reached. */
+   could not be reached or her answer was cut off on the way: a dropped line
+   ends a read as her last word does, and only the stream's own end tells the
+   two apart. */
 static int knock(const char *url, const uint8_t *ogg, size_t len, void (*lit)(void)) {
     esp_http_client_config_t c = {
         .url = url,
@@ -162,7 +174,7 @@ static int knock(const char *url, const uint8_t *ogg, size_t len, void (*lit)(vo
         told_low |= low;
         if (lit) lit();
         face_set_mode(FACE_THINKING);
-        play_answer(h);
+        if (play_answer(h) && !esp_http_client_is_complete_data_received(h)) status = -1;
     } else {
         ESP_LOGW(TAG, "her door answered %d", status);
     }
@@ -171,12 +183,18 @@ static int knock(const char *url, const uint8_t *ogg, size_t len, void (*lit)(vo
     return status;
 }
 
+/* Her door failed her while the network is still up: a refusal, an answer
+   broken off, or a door out of reach. With the network gone, the lock screen
+   says so instead. */
 static void confused(void) {
     face_set_mode(FACE_CONFUSED);
     vTaskDelay(pdMS_TO_TICKS(CONFUSED_MS));
 }
 
 int talk(void) {
+    // A network already given up: nothing he says could reach her, so he is
+    // not asked to say it.
+    if (net_gone()) return -1;
     static uint8_t *room;
     if (!room) room = heap_caps_malloc(FILE_ROOM, MALLOC_CAP_SPIRAM);
     esp_opus_enc_config_t opus = ESP_OPUS_ENC_CONFIG_DEFAULT();
@@ -201,6 +219,7 @@ int talk(void) {
     ogg_start(&file, room, FILE_ROOM, esp_random(), SOUND_RATE);
 
     sound_listen();
+    ESP_LOGI(TAG, "listening");
     face_set_mode(FACE_LISTENING);
     spoke = warned = false;
     heard_ms = 0;
@@ -208,13 +227,15 @@ int talk(void) {
     began = xTaskGetTickCount();
     sound_record(heard);
     esp_opus_enc_close(encoder);
+    // What the encoder left of her stack, for the board to say how much it needs.
+    ESP_LOGI(TAG, "a turn left %u bytes of her stack", (unsigned)uxTaskGetStackHighWaterMark(NULL));
     face_set_level(0);
     if (!spoke) { face_set_mode(FACE_IDLE); return 0; }
 
     sound_sent();
     face_set_mode(FACE_THINKING);
     int status = knock(EUGENIA_DOOR, room, ogg_end(&file), NULL);
-    if (status > 0 && status != 200) confused();
+    if (status != 200 && (status > 0 || net_wait(0))) confused();
     face_set_mode(FACE_IDLE);
     return status;
 }
@@ -227,7 +248,7 @@ int talk_briefing(void) {
     tapped();  // a press left over from before — during her confused face — is not a word to her
     face_set_mode(FACE_THINKING);
     int status = knock(EUGENIA_DOOR "?briefing=today", NULL, 0, NULL);
-    if (status > 0 && status != 200 && status != 204) confused();
+    if (status != 200 && status != 204 && (status > 0 || net_wait(0))) confused();
     face_set_mode(FACE_IDLE);
     return status;
 }

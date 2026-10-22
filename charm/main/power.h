@@ -15,6 +15,9 @@ void power_start(TaskHandle_t talker);
 #define PWR_PIN  3
 #define BOOT_PIN 0
 
+// The board switched off through the power chip; PWR switches it on again.
+void power_off(void);
+
 // Whether the battery is low and no cable is charging it.
 bool power_low(void);
 

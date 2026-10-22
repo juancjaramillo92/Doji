@@ -49,6 +49,7 @@ extern const uint8_t font_end[]   asm("_binary_setup_woff2_end");
 #define JOIN_MS   12000
 #define CHECK_MS  10000
 #define TICK_MS   1600   // how long the charm shows a tick or a cross
+#define ALONE_MS  600000 // set up already, and no phone on her network this long: she gives up
 
 #define JOINED  BIT0
 #define REFUSED BIT1
@@ -458,5 +459,15 @@ void setup_run(void) {
         for (size_t i = 0; i < sizeof uris / sizeof *uris; i++) httpd_register_uri_handler(server, &uris[i]);
     }
     ESP_LOGI(TAG, "waiting on %s", ap_name);
-    for (;;) vTaskDelay(portMAX_DELAY);
+    // Left alone — BOOT held in a pocket, or a phone that never came — a charm
+    // already set up restarts as herself rather than keep her network and the
+    // code on her screen up until the battery is gone. One never set up has
+    // nothing else to be, and waits.
+    TickType_t seen = xTaskGetTickCount();
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        wifi_sta_list_t phones;
+        if (esp_wifi_ap_get_sta_list(&phones) == ESP_OK && phones.num) seen = xTaskGetTickCount();
+        if (config_ready() && xTaskGetTickCount() - seen >= pdMS_TO_TICKS(ALONE_MS)) esp_restart();
+    }
 }

@@ -425,7 +425,7 @@ single-sourced at run time:
 | where the **charm's update** lives | `FIRMWARE_URL` in `charm/main/net.h`, and the bucket and object `.github/workflows/charm.yml` makes and writes |
 | where the **charm's app** boots from | the first app slot's offset in `charm/partitions.csv` and the offset `.github/workflows/charm.yml` checks the image against |
 | the **briefing's hours** | `briefDue` and `retryDue` in `doji-eugenia`, and the charm's `BRIEF_WEEKDAY`, `BRIEF_SUNDAY` and `BRIEF_RETRIES` with the line that gives each day its hour — the charm sleeps, so it wakes to ask in those hours |
-| the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts` and `ROLL_HOUR` in `index.ts` |
+| the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts`, `ROLL_HOUR` in `index.ts`, and the charm's `ROLL_HOUR` in `charm/main/errand.c` with the days `weekend()` gives it, which `charm.test.mjs` walks against `marketOpen` |
 | the **importance a release may carry** | `IMPORTANCE` in `doji-tradingview`, the check constraint, and the rated reads' `importance=eq.high` |
 | the **economies the calendar reads** | `CALENDAR_COUNTRIES` in `doji-tradingview` and the countries `wanted` keeps in `doji-eugenia` |
 | the **country his rules count** | `HOME` in `adherence.ts`, the default on `eugenia_calendar.country`, and the watch card's `.eq('country', 'US')` — and every rated read but the Sunday week filters on it |
@@ -1973,9 +1973,12 @@ copy lands.
 transcriber that fails, is answered with its `VOICE_TROUBLE` line, spoken, and
 nothing else happens. A turn that throws is answered with `APOLOGY.reply`, the
 reply's own. A part the speech vendor will not read ends the audio; the copy
-in Telegram is the whole of it. The voice has `SPEAK_MS`, and shares the
-request's wall clock with the turn — a turn that runs to its five minutes
-leaves the voice what is left of four hundred seconds.
+in Telegram is the whole of it. The voice has `SPEAK_MS` for the vendor to
+start answering each part, not to finish it — the charm takes her voice as fast
+as it plays it, so a budget on the whole stream ran at the pace of speech and
+cut a long briefing mid-sentence — and shares the request's wall clock with the
+turn: a turn that runs to its five minutes leaves the voice what is left of
+four hundred seconds.
 
 **The briefing reaches the charm without waking it.** The charm sleeps with its
 radio off, so nothing can be pushed to it: after the briefing's hour it wakes
@@ -3224,7 +3227,10 @@ spare; the same firmware goes on any.
 digest) whenever `charm/` changes. The board's support package
 (`waveshare/esp32_s3_touch_amoled_1_75c`) and LVGL 9.5 come from Espressif's
 component registry, at the versions Waveshare's own examples for this board use,
-with Espressif's audio codecs for the Opus a recording is encoded in.
+with Espressif's audio codecs for the Opus a recording is encoded in. The
+versions every build uses are the ones `charm/dependencies.lock` names, and the
+workflow fails a build that resolved any other, so a new release reaches the
+firmware only by a commit that changes the lock.
 The download is **`charm-full.bin`**, one image written at `0x0`: plug the
 board in by USB-C and flash it from Chrome with Espressif's web flasher, or with
 `esptool.py write_flash 0x0 charm-full.bin`. Not `charm.bin`, which is
@@ -3264,15 +3270,18 @@ was settled in playgrounds before any of this — the claude.ai artifacts
 numbers here are theirs.
 
 **The sleep screen is black but for its marks**, still, so they stay on the
-panel while the chip sleeps. Low on the screen, **one mark for what waits**:
+panel while the chip sleeps. With no marks at all the panel is held in reset
+instead: the same black, without the panel running to show it. Low on the screen, **one mark for what waits**:
 a purple dot with a glow while a briefing does, a white ring while a trade
 does, and the dot inside the ring when both do — one place and one size each,
 so nothing moves or shrinks when the other arrives, and shape tells them apart
 at a glance. At the top, a small battery when she is at 15% or below and off the
 cable, and the **no-internet mark** when her last look for a network found
 none, side by side when both. On the cable, the charge as a ring round the rim
-with its percent. The marks wander a few pixels each time she sleeps, so a mark
-left all night never burns in. **Woken without internet** — the last errand
+with its percent. Every mark but that ring wanders a few pixels each time she
+sleeps, the percent included, so one left all night is not left on the same
+pixels — though the briefing's dot wanders less than its own width, so its
+middle stays lit wherever it lands. **Woken without internet** — the last errand
 found none — she stays on that screen rather than waking to a face that cannot
 answer: she tries the network for eight seconds, wakes properly if it answers,
 and otherwise sleeps again with the mark still up.
@@ -3306,7 +3315,10 @@ way to add one, and Replace for either key, checked before the old one goes. She
 keeps four networks: a fifth is refused until one is removed, never swapped in
 silently. Finishing ends on "All set", since the page cannot close itself.
 Everything is kept in her own flash (NVS, namespace `charm`), and finishing
-restarts her as herself. The addresses of the two doors are the repository's —
+restarts her as herself. So does ten minutes with no phone on her network, once
+she is set up: BOOT held in a pocket does not leave her network and her code
+up until the battery is gone. A board never set up has nothing else to be, and
+waits. The addresses of the two doors are the repository's —
 in `charm/main/net.h`, which `agree.test.mjs` reads with every other caller —
 and only the keys are secret, so a lost charm is cut off by changing them in
 Supabase.
@@ -3322,8 +3334,10 @@ feels about once a second whether she is **held up to look**, which keeps her
 awake, or **has been put down** — lying flat and still, either way up, or face
 down — which puts her to sleep a couple of seconds later (`lift_hold` in
 `charm/main/lift.c`). Anything else, a pocket or a hand at his side, leaves it
-to thirty seconds without a press. Then her eyes close and the chip goes into
-deep sleep, where it wakes as if switched on again: **lifted to look**, on a tap
+to thirty seconds without a press. Then her eyes close, her speaker and
+microphones are switched off — the codecs live on the board's power, which
+the chip's sleep does not take away — and the chip goes into deep sleep,
+where it wakes as if switched on again: **lifted to look**, on a tap
 on the screen, PWR, the BOOT button, or a time. A lift is the motion sensor's:
 armed before every sleep, on GPIO21 (Waveshare's schematic for the 1.75C), it
 wakes the chip on a movement, which then takes two readings a moment apart and
@@ -3359,7 +3373,15 @@ turn; nothing waits for it but the moment something must be sent. Leaving an
 attempt that failed is never taken for the next network refusing her.
 
 **Asleep, she runs errands in the dark** every five minutes, around the clock,
-and on the cable every two so the charge stays current. She asks Gladys's door
+and on the cable every two so the charge stays current (`charm/main/errand.c`).
+An errand that finds no network makes the next one later — ten minutes, then
+twenty, then every half hour — since until one answers there is nothing to ask.
+Over the weekend, from an hour after the Friday close (a trade's row can trail
+it) to the Sunday open, nothing new can come in for Gladys, so unless a trade
+already waits — its ring cleared by a journal in Telegram — she asks every half
+hour and wakes at the open. No errand is ever an hour from the last, so the
+night's look for an update keeps its hour, and a lift or a press tries the
+network whenever it comes. She asks Gladys's door
 what waits — a soft double tick when a trade waits that did not before — and in
 the briefing's hours, from five past 08:00 on a weekday or 17:00 on a Sunday
 through the hour of the last retry (`retryDue`), Eugenia's `?briefing=ready`.
@@ -3371,7 +3393,9 @@ watch is driven against the server's own functions by `test/charm.test.mjs`.
 
 **PWR is the talk button.** A press, and **two quick rising notes** say she is
 listening — from sleep the press that wakes her is enough, and she listens even
-while she is still joining her Wi-Fi, the recording waiting for it, not him. The
+while she is still joining her Wi-Fi, the recording waiting for it, not him —
+but not once her Wi-Fi has given up, when the press takes her to the sleep
+screen and its no-internet mark rather than recording words that cannot go. The
 ring shows round the rim and follows his voice. **His pauses are his own**:
 nothing ends his turn but the next press, so he can stop to think as long as he
 needs; **two falling notes** say his words are on their way. A press with
@@ -3385,11 +3409,15 @@ to speak up or down, she sets the volume before she answers, and keeps it, as
 the dial does. The answer is read out of its frames (`charm/main/frames.c`) and
 played as it streams in (*The charm — her voice on his keyring*): her face
 thinks through the silence and speaks when her voice starts, since the silence
-is exact zeros. A press while she thinks or speaks cuts her off; the copy in
-Telegram is the whole of it. The screen is not for talking: a tap on it answers
+is exact zeros. A press while she thinks or speaks cuts her off at once — she
+looks for it every tenth of a second while nothing arrives, not only when the
+next beat of silence does; the copy in Telegram is the whole of it. The screen is not for talking: a tap on it answers
 a journal question, and asleep wakes her to look. Losing the network sends her
-back to the sleep screen, where the no-internet mark says why; a door that
-answers with an error, or refuses her key, shows her confused for four seconds.
+back to the sleep screen, where the no-internet mark says why — her voice
+breaking off with it, since an answer that stops short of its end is read as
+cut, not finished; with the network up, a door that answers with an error,
+refuses her key, cannot be reached or breaks off her answer shows her confused
+for four seconds.
 
 **The journal asks what waits**, through Gladys's door, and while a
 trade waits the questions take the whole screen, the playground's: the setup
@@ -3425,7 +3453,10 @@ wakes her from sleep and the charm reads the button itself: shorter than
 round the rim as it is, over her face or the sleep screen — she closes her
 eyes and switches the board off through the power chip. The chip's own
 switch-off is set to its longest, ten seconds, so the goodnight always comes
-first, and holding PWR that long is the way out of a charm that has hung.
+first, and holding PWR that long is the way out of a charm that has hung. A
+battery too low for her radio switches her off the same way: its voltage
+sagging resets the chip, and rather than wake into the radio and reset again,
+off the cable she switches the board off, and PWR switches it on again.
 BOOT is not the talk button: the chip reads it at start to choose its
 programming mode, and a press at the wrong moment would choose it.
 
@@ -3441,8 +3472,17 @@ leaving of a network reports `WIFI_REASON_ASSOC_LEAVE`, that a phone stays on
 her setup network while she joins another — the two share one radio, so her
 own moves to the other's channel — whether a full-screen swipe is smooth
 enough to replace the journal's taps, that the Opus encoder keeps up with the
-microphones and five minutes of it fit the room `talk.c` gives the file, and
-how long a battery lasts.
+microphones and five minutes of it fit the room `talk.c` gives the file, how
+much of her stack a turn of talking leaves — the serial log says after each,
+against the 40 KB Espressif's codec README asks for an encoder — how long a
+battery lasts, and what two things save of it: the panel held in reset under
+an empty sleep screen (and that it shows black while held), and the codecs
+switched off before sleep (the speaker's amplifier is enabled on GPIO46,
+which is left floating in sleep), and that a battery run down resets her as a
+brownout — switching her off — and whether a cable alone switches her back on,
+and how long a press from sleep takes to reach the listening notes: the serial
+log's `lit` and `listening` lines are timestamped from boot, and the board
+package's panel start alone waits 1.2 s.
 
 ---
 
@@ -3798,7 +3838,7 @@ home-screen shortcut and every bookmark open `/`.
 | `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load — past one page — save and soft delete, the scratch rule and aggregates, the money split and averages, the week boundary, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the snapshot, the offline boot, and the watch card |
 | `test/golden.test.mjs` | the snapshot: the real page on fixed fixtures and a frozen clock, every derived value and every panel's markup compared against `test/golden.json`, plus `Dates.session` swept across the four DST changeovers; and `test/golden-fold.json`, everything the folds return off the real captures — the rows the poller writes through its two windows, the email parsed and bounded, the calendar folded, and Eugenia's rule verdicts, day standings and stats over that week, with what she is told about each. Regenerate with `GOLDEN=write npm test`, deliberately, in the commit that changes behaviour — never to make a red run go away |
 | `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the charm driven end to end through the real turn — the reply read as the charm reads its frames, silence first, the recording transcribed as the Ogg it is, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, its headers in her turn and the volume she set sent ahead of her voice and nowhere else, the battery line spoken after her answer and neither copied nor stored, a wordless recording answered on the charm alone, and the door refusing a missing vendor, an empty recording and a wrong key; and the briefing on the charm, her ready line then today's briefing read as `pcm` in frames, the right day's briefing asked for, a `204` while none is stored; and Gladys's charm told what waits oldest first and a week back, its answer writing exactly one of the four columns, an edit, a stray column and a malformed body refused, and the door shut without its secret; and between the functions, every door Eugenia reads but the quote — the calendar, the market, its weeks, the rate odds, the wires, futures volume, the flows, his charts and the bars her calls are scored on — served by the real `doji-tradingview` and poller handlers off stubbed vendors, and read by her as she reads it |
-| `test/charm.test.mjs` | the charm's pure C — `charm/main/briefing.c`, `charm/main/lift.c`, `charm/main/dns.c`, `charm/main/ogg.c` and `charm/main/frames.c` — compiled on the machine running the suite and driven in the zone the charm reads its clock in, out of `charm/main/net.c`: the briefing watch against `briefDue` and `retryDue` every five minutes of both weeks the clocks change in, an announced briefing not asked for again until the next day, and waiting until New York's midnight and no longer, on the server's own day, never before the clock is set, a lift judged on readings, held and put down told apart, the setup's answer to a name, with and without the EDNS record a phone may add, a recording's Ogg file page by page against the specification's CRC, and her answer read out of `charmFrame`'s own bytes however the reads fall; and the firmware's names, the other of the two scope questions in C — every static, macro and enum constant a file declares used in it, every function a header declares called from another file, every non-static function in a header — since the ESP-IDF build refuses a name declared nowhere and only warns of one used nowhere |
+| `test/charm.test.mjs` | the charm's pure C — `charm/main/briefing.c`, `charm/main/errand.c`, `charm/main/lift.c`, `charm/main/dns.c`, `charm/main/ogg.c` and `charm/main/frames.c` — compiled on the machine running the suite and driven in the zone the charm reads its clock in, out of `charm/main/net.c`: the briefing watch against `briefDue` and `retryDue` every five minutes of both weeks the clocks change in, an announced briefing not asked for again until the next day, and waiting until New York's midnight and no longer, on the server's own day, never before the clock is set, the wait between errands longer for each that found no network and never an hour, and over the weekend, every five minutes of both weeks the clocks change in against `marketOpen`, half-hourly with the open woken for unless a trade waits, a lift judged on readings, held and put down told apart, the setup's answer to a name, with and without the EDNS record a phone may add, a recording's Ogg file page by page against the specification's CRC, and her answer read out of `charmFrame`'s own bytes however the reads fall; and the firmware's names, the other of the two scope questions in C — every static, macro and enum constant a file declares used in it, every function a header declares called from another file, every non-static function in a header — since the ESP-IDF build refuses a name declared nowhere and only warns of one used nowhere |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions and the app as two programs — with one planted defect per question proving the check can fail |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, and `syncPepperstone`'s three outcomes |

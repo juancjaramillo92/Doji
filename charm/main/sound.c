@@ -34,6 +34,12 @@ void sound_start(void) {
     open_at(SOUND_RATE);
 }
 
+void sound_stop(void) {
+    if (!speaker) return;
+    esp_codec_dev_close(speaker);
+    esp_codec_dev_close(mics);
+}
+
 void sound_volume(int percent) {
     esp_codec_dev_set_out_vol(speaker, percent);
 }

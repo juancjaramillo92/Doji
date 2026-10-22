@@ -4771,7 +4771,13 @@ const CHARM_LOW = "Jefe, I'm running out of battery. Charge me when you can.";
    shortest such limit known, a hundred seconds. Zeros are silence in this
    format, so the charm plays them like anything else, and its face can tell
    thinking from speaking by the level alone. A part the vendor will not read
-   ends the audio; the copy in Telegram is the whole of it. */
+   ends the audio; the copy in Telegram is the whole of it.
+
+   SPEAK_MS bounds each part's wait for the vendor to start answering, not its
+   reading: the charm takes the voice as fast as it plays it, so a budget on
+   the whole stream runs at the pace of speech, and cut a long briefing off
+   mid-sentence. Once she speaks, the charm's own hanging up and the worker's
+   wall clock are the bounds. */
 async function* charmAudio(words: Promise<Spoken>): AsyncGenerator<Uint8Array> {
   let said: Spoken | null = null;
   while (said === null) {
@@ -4781,10 +4787,11 @@ async function* charmAudio(words: Promise<Spoken>): AsyncGenerator<Uint8Array> {
     clearTimeout(beat);
   }
   if (said.volume !== null) yield charmFrame(FRAME.volume, Uint8Array.of(said.volume));
-  const signal = AbortSignal.timeout(SPEAK_MS);
   try {
     for (const part of chunk(said.answer, TTS_LIMIT)) {
-      const spoken = await reading(part, "pcm", signal);
+      const started = new AbortController();
+      const wait = setTimeout(() => started.abort(), SPEAK_MS);
+      const spoken = await reading(part, "pcm", started.signal).finally(() => clearTimeout(wait));
       if (!spoken.ok || !spoken.body) throw new Error(`speech HTTP ${spoken.status}`);
       for await (const bytes of spoken.body) yield charmFrame(FRAME.voice, bytes);
     }

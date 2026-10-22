@@ -445,13 +445,18 @@ that read plainer as they are.
 
 ### R-45 — checking every `esp_err_t` in the firmware
 **Why refused:** a check is for a failure that changes what she does next.
-`esp_http_client_fetch_headers` failing leaves the status at 0, which `talk()`
-already treats as nothing said, and a −1 with the network up shows the same
-nothing; an NVS write that fails costs a setting the next save repeats; the
-codecs and the radio's start-up fail into the same refusals the doors report.
-Each check would be padding where nothing untrusted enters.
-**Revisit if:** `talk()` comes to tell a refused door from silence, or a
-setting is ever written once and never again.
+What she does next is decided by the exchange's outcome, not by each call on
+the way to it: `esp_http_client_fetch_headers` failing leaves the status at
+0, and `talk()` shows any answer but 200 as her confused face while the
+network is up, the lock screen once it is gone — a −1 included, and an answer
+whose stream stopped short of its end, which reads like her last word until
+`esp_http_client_is_complete_data_received` is asked (October 2026: a dropped
+line had been playing as a finished answer). An NVS write that fails costs a
+setting the next save repeats; the codecs and the radio's start-up fail into
+the same refusals the doors report. Each check would be padding where nothing
+untrusted enters.
+**Revisit if:** a failure is found that the exchange's outcome does not carry,
+or a setting is ever written once and never again.
 
 
 ### R-46 — search by date, and a scroll around a hit

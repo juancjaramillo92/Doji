@@ -401,8 +401,14 @@ test('a trade\'s questions wait for the conversation to end, and PWR on them goe
   assert.equal((loop.match(/journal\(\)/g) ?? []).length, 1, 'the conversation reaches the journal by more than one path');
   assert.match(loop, /if \(next == OVER_LOOKING\) \{[^}]*if \(!journal\(\)\) sleep_now\(\);/,
     'the journal after a conversation no longer waits for it to be over, or no longer goes back to her on PWR');
-  const briefing = loop.match(/if \(briefing_waits\) \{[^}]*\}/);
+  const briefing = loop.match(/if \(brief\) \{[^}]*\}/);
   assert.ok(briefing, 'awake() no longer reads a waiting briefing as this test finds it');
+  assert.match(awake, /bool brief = briefing_waits;\s*for \(;;\) \{/,
+    'a waiting briefing is no longer read once a waking, so a failing one is retried after every answer');
+  const read = briefing[0].indexOf('int status = talk_briefing();'),
+        kept = briefing[0].indexOf('briefing_waits = status != 200 && status != 204;');
+  assert.ok(read > -1 && kept > read && !/briefing_waits = false/.test(briefing[0]),
+    'the briefing\'s dot goes before it is read, so one that fails is lost to the charm for the day');
   assert.ok(loop.indexOf(briefing[0]) < loop.indexOf('between_turns('), 'a waiting briefing now waits for the conversation to end');
   assert.doesNotMatch(briefing[0], /motion_hold|between_turns/, 'a waiting briefing now waits on how she is held');
 
@@ -415,6 +421,22 @@ test('a trade\'s questions wait for the conversation to end, and PWR on them goe
   const ask = bodyOf(source('charm/main/journal.c'), 'int journal_ask(int q, const bool missing[4]) {', 'journal.c has no journal_ask()');
   assert.match(ask, /ulTaskNotifyValueClear\(NULL, 0\)/, 'a question no longer gives way to PWR');
   assert.doesNotMatch(ask, /ulTaskNotifyTake/, 'a question takes the press that closed it, so she never hears it');
+});
+
+/* The charm's manifest asks for ranges, so a build resolves its components
+   afresh unless dependencies.lock names them: a new board package would
+   change the firmware under a commit that never touched it. The lock is
+   committed, names every component the manifest asks for, and the charm
+   workflow fails a build that resolved anything else. */
+test('the charm builds from the component versions its lock names', () => {
+  const lock = source('charm/dependencies.lock'), manifest = source('charm/main/idf_component.yml');
+  const asked = [...manifest.matchAll(/^  ([\w/.-]+):$/gm)].map(m => m[1]).sort();
+  const direct = lock.slice(lock.indexOf('direct_dependencies:')).match(/^- ([\w/.-]+)$/gm)?.map(l => l.slice(2)).sort();
+  assert.ok(asked.length >= 4, `only ${asked.length} components read off the manifest — the reader has gone blind`);
+  assert.deepEqual(direct, asked, 'dependencies.lock does not pin what idf_component.yml asks for');
+  const workflow = source('.github/workflows/charm.yml');
+  assert.match(workflow, /git ls-files --error-unmatch dependencies\.lock/, 'the charm workflow builds without a committed lock');
+  assert.match(workflow, /git diff --exit-code -- dependencies\.lock/, 'the charm workflow builds from versions its lock does not name');
 });
 
 /* The charm's words are drawn in fonts holding only the letters
@@ -1580,6 +1602,21 @@ test('the charm asks for the briefing in the hours it is written', () => {
 });
 
 
+/* The charm asks Gladys seldom while the market is shut, from its own copy
+   of the market's week. Read out of errand.c beside marketOpen's hours and
+   index.ts's roll; charm.test.mjs walks what the copy does. */
+test('the charm keeps the market\'s week the server keeps', () => {
+  const c = source('charm/main/errand.c');
+  const roll = Number(c.match(/^#define ROLL_HOUR\s+(\d+)/m)?.[1]);
+  const open = bodyOf(source('supabase/functions/_shared/edge.ts'), 'export function marketOpen(');
+  const close = Number(open.match(/wd === 5 && hour >= (\d+)/)?.[1]), opens = Number(open.match(/wd === 0 && hour < (\d+)/)?.[1]);
+  assert.ok(roll && close && opens, 'errand.c or marketOpen no longer states the week as this test reads it');
+  assert.deepEqual([roll, roll], [close, opens], 'the charm keeps a market week the server does not');
+  assert.equal(Number(EUGENIA_TS.match(/^export const ROLL_HOUR = (\d+);/m)?.[1]), roll, 'the charm\'s roll is not doji-eugenia\'s');
+  assert.match(c, /\(t->tm_wday == 5 && t->tm_hour >= ROLL_HOUR \+ GRACE_H\) \|\| t->tm_wday == 6 \|\|\s*\(t->tm_wday == 0 && t->tm_hour < ROLL_HOUR\)/,
+    'errand.c no longer gives the weekend its days as marketOpen does');
+});
+
 /* Asking ota_due spends the night's look, so the battery is asked before it:
    asked after, a low battery at the hour's first errand would spend the night
    though the cable went in minutes later. */
@@ -1620,6 +1657,149 @@ test('the charm never takes her own leaving for a network refusing her', () => {
     assert.match(source(f), /id == WIFI_EVENT_STA_DISCONNECTED &&\s*\(\(wifi_event_sta_disconnected_t \*\)data\)->reason != WIFI_REASON_ASSOC_LEAVE\)/,
       `${f} marks a refusal on any disconnect, her own leaving included`);
   }
+});
+
+/* A dropped line ends a read exactly as her last word does, so an answer is
+   finished only when its stream says so; one PWR did not stop that ends short
+   is a failure, and a failure while the network is up is shown, where it once
+   played as a finished answer and a briefing cut off counted as read. talk.c
+   is the board's, so the calls are read. */
+test('the charm tells an answer cut off from a finished one, and shows the failure', () => {
+  const talk = source('charm/main/talk.c');
+  const knock = bodyOf(talk, 'static int knock(', 'talk.c has no knock()');
+  assert.match(knock, /if \(play_answer\(h\) && !esp_http_client_is_complete_data_received\(h\)\) status = -1;/,
+    'knock() takes an answer that stopped short of its end for a finished one');
+  assert.match(bodyOf(talk, 'static bool play_answer(', 'talk.c has no play_answer()'), /return false;/,
+    'play_answer() no longer says when PWR stopped it, so a press reads as a line cut');
+  for (const [fn, ok] of [['int talk(void) {', 'status != 200'], ['int talk_briefing(void) {', 'status != 200 && status != 204']]) {
+    assert.ok(bodyOf(talk, fn).includes(`if (${ok} && (status > 0 || net_wait(0))) confused();`),
+      `${fn} no longer shows her confused at a failure while the network is up`);
+  }
+});
+
+/* The marks wander so none left all night burns in, and the one left longest
+   is the charge's percent, every night on the cable: it was drawn at one
+   place. Every mark but the ring round the rim is placed off the shift. */
+test('every mark on the sleep screen but the ring wanders', () => {
+  const night = bodyOf(source('charm/main/face.c'), 'static void draw_night(lv_event_t *e) {', 'face.c has no draw_night()');
+  const percent = night.match(/lv_area_t where = \{([^}]*)\};\s*lv_draw_label/);
+  assert.ok(percent, 'draw_night() no longer places the charge\'s percent as this test reads it');
+  assert.ok((percent[1].match(/shift\[0\]/g) ?? []).length === 2 && (percent[1].match(/shift\[1\]/g) ?? []).length === 2,
+    'the charge\'s percent is drawn at one place every night, where it burns in');
+  assert.match(night, /int x = 233 \+ shift\[0\], y = 404 \+ shift\[1\];/, 'what waits no longer wanders');
+  assert.match(night, /int top = 62 \+ shift\[1\];/, 'the battery and the no-internet mark no longer wander');
+});
+
+/* With no marks the sleep screen is all black, and the panel kept running to
+   show it through every sleep. It is held in reset instead: the same black,
+   and the screen's next start resets it anyway. sleep_now() and sleep.c are
+   the board's, so they are read. */
+test('an empty sleep screen is the panel held in reset, not drawn', () => {
+  const now = bodyOf(source('charm/main/main.c'), 'static void sleep_now(void) {');
+  const empty = now.match(/if \(marks == face_marks\(false, false, false, false, -1\)\) \{([^}]*)\} else \{([^}]*)\}/);
+  assert.ok(empty, 'sleep_now() no longer tells an empty sleep screen apart');
+  assert.match(empty[1], /^\s*sleep_blank\(\);\s*$/, 'an empty sleep screen does more than hold the panel in reset');
+  assert.match(empty[2], /light\(FACE_DARK\)/, 'marks are no longer drawn');
+  const blank = bodyOf(source('charm/main/sleep.c'), 'void sleep_blank(void) {', 'sleep.c has no sleep_blank()');
+  assert.match(blank, /gpio_set_level\(BSP_LCD_RST, 0\);/, 'sleep_blank() no longer puts the panel in reset');
+  assert.match(source('charm/main/sleep.c'), /HELD\[\] = \{[^}]*BSP_LCD_RST/, 'the panel\'s reset is no longer held through sleep');
+});
+
+/* The charm reads her voice as fast as it plays it, so a budget over the
+   whole speech stream runs at the pace of speech: SPEAK_MS on the stream cut a
+   briefing past two and a half minutes off mid-sentence. It bounds the
+   vendor's start of each part, and is cleared once the vendor answers. */
+test('the charm\'s voice is bounded while the vendor starts, not while she speaks', () => {
+  const audio = bodyOf(EUGENIA_TS, 'async function* charmAudio(', 'doji-eugenia has no charmAudio()');
+  assert.doesNotMatch(audio, /AbortSignal\.timeout\(SPEAK_MS\)/,
+    'charmAudio() bounds the whole stream again, at the pace the charm plays it');
+  const part = audio.slice(audio.indexOf('for (const part of chunk('));
+  assert.match(part, /const wait = setTimeout\(\(\) => started\.abort\(\), SPEAK_MS\);\s*const spoken = await reading\(part, "pcm", started\.signal\)\.finally\(\(\) => clearTimeout\(wait\)\);/,
+    'a part\'s budget no longer ends once the vendor answers, or no longer bounds its start');
+});
+
+/* The setup ran until something restarted her, so BOOT held in a pocket left
+   her network up and a white code lit on her screen until the battery went.
+   Set up already and left alone, she restarts as herself; setup.c is the
+   board's, so the loop is read. */
+test('a charm already set up gives the setup up when no phone comes', () => {
+  const setup = source('charm/main/setup.c');
+  const run = bodyOf(setup, 'void setup_run(void) {', 'setup.c has no setup_run()');
+  const alone = Number(setup.match(/^#define ALONE_MS\s+(\d+)/m)?.[1]);
+  assert.ok(alone >= 60_000 && alone <= 30 * 60_000, `the setup gives up after ${alone} ms alone, or no longer says when`);
+  assert.match(run, /if \(esp_wifi_ap_get_sta_list\(&phones\) == ESP_OK && phones\.num\) seen = xTaskGetTickCount\(\);/,
+    'a phone on her network no longer keeps the setup up');
+  assert.match(run, /if \(config_ready\(\) && xTaskGetTickCount\(\) - seen >= pdMS_TO_TICKS\(ALONE_MS\)\) esp_restart\(\);/,
+    'the setup no longer gives up on its own, or gives up on a board never set up');
+});
+
+/* At the end of a charge her radio sags the battery and the chip resets as
+   a brownout, which is no sleep wake, so it woke her — screen and radio —
+   into the next reset. Off the cable that reset switches the board off, before
+   anything is lit or joined. life() is the board's, so it is read. */
+test('a battery too low for her radio switches her off rather than waking her again', () => {
+  const life = bodyOf(source('charm/main/main.c'), 'static void life(void *arg) {', 'main.c has no life()');
+  const off = life.indexOf('if (esp_reset_reason() == ESP_RST_BROWNOUT && power_charge() < 0) power_off();');
+  assert.ok(off > life.indexOf('power_start(') && off < life.indexOf('errand()') && off < life.indexOf('awake()'),
+    'a brownout no longer switches her off before she wakes into the radio again');
+  assert.match(bodyOf(source('charm/main/power.c'), 'void power_off(void) {'), /set\(COMMON, get\(COMMON\) \| 1\);/,
+    'power_off() no longer switches the board off through the power chip');
+});
+
+/* The codecs are powered by the board, not the chip, so deep sleep alone left
+   them biased — microphones, converters and the speaker's amplifier — from
+   the first waking on. Every sleep that can follow sound closes them first;
+   life()'s sleeps come before any sound starts. */
+test('the charm switches her speaker and microphones off before every sleep', () => {
+  const main = source('charm/main/main.c');
+  const sleepers = [...main.matchAll(/^static void (\w+)\(void(?: \*arg)?\) \{$/gm)].map(m => m[1])
+    .filter(name => bodyOf(main, `static void ${name}(`).includes('sleep_until('));
+  assert.deepEqual(sleepers.sort(), ['errand', 'life', 'sleep_now'], 'main.c sleeps from a function this test does not judge');
+  const life = bodyOf(main, 'static void life(');
+  assert.ok(!/sound_start|errand_at = time\(NULL\) \+/.test(life.slice(0, life.lastIndexOf('sleep_until('))),
+    'life() starts sound before one of its sleeps, which would leave the codecs on');
+  for (const name of ['sleep_now', 'errand']) {
+    const body = bodyOf(main, `static void ${name}(`);
+    for (const at of [...body.matchAll(/sleep_until\(/g)].map(m => m.index)) {
+      const before = body.slice(0, at);
+      assert.ok(before.lastIndexOf('sound_stop();') > before.lastIndexOf('{'),
+        `${name}() sleeps with the codecs still open`);
+    }
+  }
+});
+
+/* While she thinks, nothing arrives but a beat of silence every BEAT_MS, and
+   a press was looked for only when audio came: up to fifteen seconds before
+   PWR cut her off. The answer is read in short waits, PWR looked for on each,
+   and READ_MS of nothing stays the dead line. */
+test('PWR cuts her off while she thinks, not at the next beat', () => {
+  const talk = source('charm/main/talk.c');
+  const play = bodyOf(talk, 'static bool play_answer(', 'talk.c has no play_answer()');
+  const look = Number(talk.match(/^#define LOOK_MS\s+(\d+)/m)?.[1]);
+  assert.ok(look > 0 && look <= 250, `talk.c looks for PWR every ${look} ms while nothing arrives, or no longer says how often`);
+  assert.match(play, /esp_http_client_set_timeout_ms\(h, LOOK_MS\);/, 'play_answer() waits for her door as long as a beat');
+  assert.match(play, /if \(n == -ESP_ERR_HTTP_EAGAIN\) \{\s*if \(tapped\(\)\) return false;\s*if \(xTaskGetTickCount\(\) - heard < pdMS_TO_TICKS\(READ_MS\)\) continue;/,
+    'a wait with nothing in it no longer looks for PWR, or no longer gives up at READ_MS');
+});
+
+/* Nothing joins again once the join is done, so a network lost while she
+   talks must say so: kept online, every door she knocks at fails with no
+   sign and she records turns that go nowhere, where losing it is meant to
+   send her to the lock screen. net.c's handler is the board's, so it is read. */
+test('the charm hears a network it has joined go', () => {
+  const net = source('charm/main/net.c');
+  const handler = bodyOf(net, 'static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {',
+    'net.c has no on_event()');
+  const lost = handler.slice(handler.indexOf('WIFI_EVENT_STA_DISCONNECTED'));
+  assert.match(lost, /^[^}]*if \(xEventGroupClearBits\(events, JOINED\) & JOINED\) xEventGroupSetBits\(events, GAVE_UP\);/,
+    'a disconnect once joined no longer takes her offline, so net_wait() says online about a network that has gone');
+  assert.match(bodyOf(net, 'bool net_wait(int ms) {'), /JOINED \| GAVE_UP/,
+    'net_wait() no longer returns on the network given up');
+  // And a press once it has gone is not a turn recorded into nothing.
+  const talk = bodyOf(source('charm/main/talk.c'), 'int talk(void) {', 'talk.c has no talk()');
+  const gone = talk.indexOf('if (net_gone()) return -1;');
+  assert.ok(gone > -1 && gone < talk.indexOf('sound_listen()'),
+    'talk() listens on a network already given up, so his words are recorded and dropped');
 });
 
 /* ─── Every secret a function needs is one it refuses to run without ────────
