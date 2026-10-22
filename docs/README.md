@@ -3435,8 +3435,10 @@ leaving of a network reports `WIFI_REASON_ASSOC_LEAVE`, that a phone stays on
 her setup network while she joins another — the two share one radio, so her
 own moves to the other's channel — whether a full-screen swipe is smooth
 enough to replace the journal's taps, that the Opus encoder keeps up with the
-microphones and five minutes of it fit the room `talk.c` gives the file, and
-how long a battery lasts.
+microphones and five minutes of it fit the room `talk.c` gives the file, how
+much of her stack a turn of talking leaves — the serial log says after each,
+against the 40 KB Espressif's codec README asks for an encoder — and how long
+a battery lasts.
 
 ---
 

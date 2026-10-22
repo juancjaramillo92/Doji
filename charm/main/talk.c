@@ -208,6 +208,8 @@ int talk(void) {
     began = xTaskGetTickCount();
     sound_record(heard);
     esp_opus_enc_close(encoder);
+    // What the encoder left of her stack, for the board to say how much it needs.
+    ESP_LOGI(TAG, "a turn left %u bytes of her stack", (unsigned)uxTaskGetStackHighWaterMark(NULL));
     face_set_level(0);
     if (!spoke) { face_set_mode(FACE_IDLE); return 0; }
 

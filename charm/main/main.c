@@ -313,6 +313,8 @@ void app_main(void) {
         light(FACE_DARK);
         setup_run();
     }
-    // The stack holds a TLS handshake.
-    xTaskCreatePinnedToCore(life, "life", 12288, NULL, 5, NULL, 0);
+    // The stack holds a TLS handshake, and the Opus encoder, which Espressif's
+    // codec README puts at about 40 KB. Internal RAM, as deep sleep requires
+    // of the task that starts it.
+    xTaskCreatePinnedToCore(life, "life", 40960, NULL, 5, NULL, 0);
 }
