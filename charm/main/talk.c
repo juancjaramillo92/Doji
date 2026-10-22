@@ -219,6 +219,7 @@ int talk(void) {
     ogg_start(&file, room, FILE_ROOM, esp_random(), SOUND_RATE);
 
     sound_listen();
+    ESP_LOGI(TAG, "listening");
     face_set_mode(FACE_LISTENING);
     spoke = warned = false;
     heard_ms = 0;

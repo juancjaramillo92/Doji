@@ -108,6 +108,9 @@ static void light(face_mode_t mode) {
     bsp_display_lock(-1);
     face_start();
     bsp_display_unlock();
+    // Timestamped from boot, beside talk.c's "listening": how much of a press's
+    // wait is the panel starting.
+    ESP_LOGI(TAG, "lit");
 }
 
 // Her briefing has landed: lit for Eugenia to say so.

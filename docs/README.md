@@ -3473,7 +3473,10 @@ battery lasts, and what two things save of it: the panel held in reset under
 an empty sleep screen (and that it shows black while held), and the codecs
 switched off before sleep (the speaker's amplifier is enabled on GPIO46,
 which is left floating in sleep), and that a battery run down resets her as a
-brownout — switching her off — and whether a cable alone switches her back on.
+brownout — switching her off — and whether a cable alone switches her back on,
+and how long a press from sleep takes to reach the listening notes: the serial
+log's `lit` and `listening` lines are timestamped from boot, and the board
+package's panel start alone waits 1.2 s.
 
 ---
 
