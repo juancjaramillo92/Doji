@@ -6459,6 +6459,18 @@ test('the number budget is stated to the writer and to the critic, and is one bu
     'the writer and the critic hold different number budgets, and the critic runs last');
 });
 
+/* HER TECHNICAL HALF WAS MUTE ON A RULE NOBODY WROTE. From 15 to 22 October she
+   made one call in five free sessions, refusing the rest because the three bias
+   charts did not agree; his step 1 says nothing of how they combine, and he left
+   that to her judgment. A sentence, so it is read, in her call and in his plan. */
+test('her bias is weighed rather than failed on disagreement, for her call and his plan', () => {
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  assert.match(system, /HOW THE THREE BIAS CHARTS ADD UP IS YOURS TO JUDGE\. .*?charts that disagree are something to weigh, never a failed step on their own\. Say which chart your bias rests on and why/,
+    'charts that disagree read as a failed step again, so she makes no call');
+  assert.match(system, /The bias on the higher timeframes, weighed as it is for your own call\./,
+    'his plan\'s bias is failed on a rule her own call is not held to');
+});
+
 test('the briefing opens on the weeks, in the writer and in the critic', () => {
   /* THE SCALE IS STATED TWICE, because the critic runs last and rewrites: a
      writer told to open on the big picture under a critic that tests the opening

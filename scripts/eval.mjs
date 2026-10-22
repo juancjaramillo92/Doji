@@ -239,6 +239,15 @@ export const PLANTS = [
         .replace(/THE MAP OF HIS CHARTS IS THE HOURS ON IT,[\s\S]*?a call you file\.\n\n/, ''),
       CRITIC: p.CRITIC.replace(/Is the map of his charts in the prose\?[\s\S]*?it comes out\.\n\n/, ''),
     }) },
+  /* From 15 to 22 October she failed the bias step whenever the three charts
+     disagreed. The plan check points at the call's rule, so both go. */
+  { why: 'the bias weighed rather than failed on disagreement, gone from the writer',
+    cases: ['bias-weighed'],
+    breaks: (p) => ({
+      ...p,
+      SYSTEM: p.SYSTEM.replace(/HOW THE THREE BIAS CHARTS ADD UP IS YOURS TO JUDGE\.[\s\S]*?then say that is what failed\.\n\n/, '')
+        .replace(/, weighed as it is for your own call\./, '.'),
+    }) },
 ];
 
 /* ─── The run ────────────────────────────────────────────────────────────── */

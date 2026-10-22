@@ -2199,6 +2199,12 @@ you.
   or low off the bigger charts on the map, its setup the one his rules name for where the level sits, its stop
   where the idea is wrong beyond it. A call whose level is not on the map is a
   guess, and one that needs a chart the map says was not read is not made.
+  **How the three bias charts add up is hers to judge**, his decision of 22
+  October: his step 1 names the daily, 4H and 1H and not how they combine, and
+  §4.2 says the bias does not gate Support & Resistance. Read as needing all
+  three to agree, it left one call in five free sessions; charts that disagree
+  are now weighed, and she says which chart decided. His plan's bias is weighed
+  the same way.
 - **A call can wait for its setup.** In the morning the setup is usually not
   there yet, so the call says what it waits for — *if price comes back to 4,000
   and a fifteen-minute candle closes above it, buy at 4,002*. The condition is
