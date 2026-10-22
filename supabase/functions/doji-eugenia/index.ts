@@ -4728,8 +4728,12 @@ async function handleMessage(update: any): Promise<void> {
       clearInterval(keepTyping);
     }
 
-    // Sent before the write: the message is what he is waiting on.
-    await sayAloud(answer);
+    // Sent before the write: the message is what he is waiting on. Its own
+    // row, as the briefing's delivery has: on 18 October a reply stored as
+    // spoken never reached him, and nothing said how it had gone out.
+    const heard = await sayAloud(answer);
+    await recordRun({ caller: 'reply delivered', chars: answer.length, ok: true,
+                      detail: heard ? 'spoken' : 'sent as text' });
     // The text, never the blocks or the audio: a megabyte resent as history.
     await remember([{ role: 'user', content: asked }, { role: 'assistant', content: answer }]);
   } catch (err) {

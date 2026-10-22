@@ -4628,6 +4628,16 @@ test('a trigger that cannot record its dispatch still makes it', () => {
 
 const PACE_SQL = subject("How much of the worker's clock the briefing spends");
 
+/* A REPLY SAYS HOW IT WENT OUT, as the briefing does. On 18 October a reply
+   stored as spoken never reached him, and no row could say whether it went
+   as a voice note or as text. Read off the call site, since handleMessage
+   is driven by nothing. */
+test('a reply records how it reached him, from what sayAloud answered', () => {
+  const body = bodyOf(EUGENIA_TS, 'async function handleMessage(', 'doji-eugenia no longer has handleMessage()');
+  assert.match(body, /const heard = await sayAloud\(answer\);\s*await recordRun\(\{ caller: 'reply delivered', chars: answer\.length, ok: true,\s*detail: heard \? 'spoken' : 'sent as text' \}\);/,
+    'a reply no longer records whether it was spoken or sent as text, so a missing one cannot be traced');
+});
+
 test('the row pace_line looks for is the row postBriefing writes', () => {
   const src = source('supabase/functions/doji-eugenia/index.ts');
 

@@ -2876,7 +2876,10 @@ questions: `<brief> briefing written` (`stored in 1s, handed to the speaking
 worker`, with its total `ms`) and `<brief> briefing delivered`, carrying the
 length he received and how it went out (`spoken in 19s`, or `sent as text`). A
 manual `?force=1` answers `accepted`, so the delivered row is where its length is
-read.
+read. **A reply writes `reply delivered` the same way** — its length, and
+`spoken` or `sent as text` off what `sayAloud` answered — since on 18 October a
+reply stored as spoken never reached him and nothing could say how it had gone
+out. `spoken` means Telegram accepted the voice note, not that it played.
 
 **Three nightly meters write rows, both outcomes.** Her calls' scoring writes
 `caller: 'calls'`, since a broker door that stopped answering leaves every call
