@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 811 tests, eight suites
+npm test      # 812 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -477,8 +477,8 @@ The firmware in `charm/` is C on ESP-IDF, built by the charm workflow in a
 pinned image; the README's *The charms* says what it does. Three levels of
 proof, and a change says which it rests on:
 
-- **Pure, and driven in `npm test`.** `briefing.c`, `lift.c`, `dns.c`,
-  `ogg.c` and `frames.c` include no ESP-IDF, so `charm.test.mjs` compiles
+- **Pure, and driven in `npm test`.** `briefing.c`, `errand.c`, `lift.c`,
+  `dns.c`, `ogg.c` and `frames.c` include no ESP-IDF, so `charm.test.mjs` compiles
   them with the host's `cc -Wall -Werror`, `RTC_DATA_ATTR` stubbed to
   nothing, and drives them against the server's own functions and bytes. A decision that can be pure goes in one of these, or a
   new one added to that compile, so a test can drive it; one that cannot is

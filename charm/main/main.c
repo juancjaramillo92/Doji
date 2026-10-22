@@ -28,10 +28,11 @@
    rests the motion sensor for LIFT_REST_S, so a keyring swinging all day
    cannot keep waking her.
 
-   Asleep, she wakes on her own every CHECK_S, without lighting the screen, to
-   ask Gladys's door what waits, with a soft double tick when something new
-   does, and in the briefing's hours (briefing.c) Eugenia's whether it has
-   landed; when it has, her face lights and she says so. The screen is started
+   Asleep, she wakes on her own every few minutes (errand.c), without
+   lighting the screen, to ask Gladys's door what waits, with a soft double
+   tick when something new does, and in the briefing's hours (briefing.c)
+   Eugenia's whether it has landed; when it has, her face lights and she says
+   so. The screen is started
    only when its marks must change: the panel keeps its picture while the chip
    sleeps, so most errands never touch it. Once a night an errand also looks
    for a new app from main (ota.c).
@@ -52,6 +53,7 @@
 #include "briefing.h"
 #include "config.h"
 #include "dial.h"
+#include "errand.h"
 #include "face.h"
 #include "gladys.h"
 #include "motion.h"
@@ -66,8 +68,6 @@
 static const char *TAG = "charm";
 
 #define BRIGHTNESS    75     // percent
-#define CHECK_S       300    // how often she asks what waits, around the clock
-#define CHARGING_S    120    // on the cable, how often the charge is redrawn
 #define AWAKE_MS      30000
 #define LAST_FRAME_MS 200    // the sleep screen reaching the panel
 #define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
@@ -77,10 +77,11 @@ static const char *TAG = "charm";
 #define DOWN_READS    2      // put down this many readings running, she sleeps
 #define QUIET_MS      8000   // held up and quiet this long after her last word, the conversation is over
 
-// What waits, whether the internet answered last time, what the sleep screen
-// last drew, and when the next errand is; all kept through sleep.
+// What waits, whether the internet answered last time and how many errands
+// running it has not, what the sleep screen last drew, and when the next
+// errand is; all kept through sleep.
 static RTC_DATA_ATTR bool briefing_waits, trade_waits, offline;
-static RTC_DATA_ATTR int drawn = -1;
+static RTC_DATA_ATTR int away, drawn = -1;
 static RTC_DATA_ATTR time_t errand_at;
 
 static esp_sleep_wakeup_cause_t woke;
@@ -143,7 +144,7 @@ static void sleep_now(void) {
         }
         drawn = marks;
     }
-    errand_at = time(NULL) + (charge >= 0 ? CHARGING_S : CHECK_S);
+    errand_at = time(NULL) + errand_wait(charge >= 0, away);
     sound_stop();
     motion_arm();
     sleep_until(errand_at, true);
@@ -161,6 +162,7 @@ static bool trade_came(void) {
 static void errand(void) {
     net_start();
     offline = !net_wait(NET_ALL_MS);
+    away = offline ? away + 1 : 0;
     if (!offline) {
         bool tick = trade_came(), ask = briefing_due(time(NULL));
         if (tick || ask) {
@@ -238,6 +240,7 @@ static void awake(void) {
     net_start();
     if (offline && !net_wait(OFFLINE_TRY_MS)) sleep_now();
     offline = false;
+    away = 0;
 
     // PWR woke her: he wants to talk, so she listens before anything that
     // waits. Otherwise a trade waiting keeps the screen dark until its

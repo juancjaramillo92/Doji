@@ -1,8 +1,8 @@
 /* The charm's pure C, compiled on this machine and driven from here, in the
    time zone the charm itself reads its clock in: the briefing watch held
    against the server's own hours every five minutes of both weeks the clocks
-   change in, a lift judged on readings, the setup's answer to a phone's
-   every name, the Ogg file a recording travels in, and her answer read out of
+   change in, how long she sleeps between errands, a lift judged on
+   readings, the setup's answer to a phone's every name, the Ogg file a recording travels in, and her answer read out of
    the server's own frames. Only what has no ESP-IDF in it is here; the rest is
    the board's to prove. */
 import { test } from 'node:test';
@@ -20,7 +20,7 @@ const MAIN = 'charm/main';
 // `lift <six readings in g>`, `hold <six readings in g>`, `dns <a message in
 // hex>` (- for no answer), `ogg <room> <packet sizes…> 0` (the file in hex, or
 // - when a packet did not fit), `frames <read size> <a stream in hex>` (the
-// volume, -1 for none, then each sample).
+// volume, -1 for none, then each sample), `wait <charging> <away>` (seconds).
 const DRIVER = `
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,6 +28,7 @@ const DRIVER = `
 #include <time.h>
 #include "briefing.h"
 #include "dns.h"
+#include "errand.h"
 #include "frames.h"
 #include "lift.h"
 #include "ogg.h"
@@ -43,6 +44,8 @@ int main(int argc, char **argv) {
     static int16_t voice[512];
     while (scanf("%15s", op) == 1) {
         if (!strcmp(op, "due") && scanf("%lld", &t) == 1) printf("%d\\n", briefing_due((time_t)t));
+        int charging, away;
+        if (!strcmp(op, "wait") && scanf("%d %d", &charging, &away) == 2) printf("%d\\n", errand_wait(charging, away));
         if (!strcmp(op, "announce") && scanf("%lld", &t) == 1) { briefing_announced((time_t)t); printf("ok\\n"); }
         if (!strcmp(op, "today") && scanf("%lld", &t) == 1) printf("%d\\n", briefing_today((time_t)t));
         if (!strcmp(op, "lift") && scanf("%f %f %f %f %f %f", a, a + 1, a + 2, b, b + 1, b + 2) == 6)
@@ -96,7 +99,7 @@ function charm(questions) {
     writeFileSync(join(dir, 'esp_attr.h'), '#define RTC_DATA_ATTR\n');
     writeFileSync(join(dir, 'drive.c'), DRIVER);
     execFileSync('cc', ['-std=c11', '-D_DEFAULT_SOURCE', '-Wall', '-Werror', '-I', dir, '-I', MAIN,
-      join(dir, 'drive.c'), `${MAIN}/briefing.c`, `${MAIN}/lift.c`, `${MAIN}/dns.c`, `${MAIN}/ogg.c`, `${MAIN}/frames.c`, '-lm', '-o', join(dir, 'drive')]);
+      join(dir, 'drive.c'), `${MAIN}/briefing.c`, `${MAIN}/errand.c`, `${MAIN}/lift.c`, `${MAIN}/dns.c`, `${MAIN}/ogg.c`, `${MAIN}/frames.c`, '-lm', '-o', join(dir, 'drive')]);
     return execFileSync(join(dir, 'drive'), [zone[1]], { input: questions.join('\n') + '\n', encoding: 'utf8' })
       .trim().split('\n');
   } finally {
@@ -153,6 +156,15 @@ test('the briefing she announced waits until midnight in New York, and no longer
 test('she never asks before the internet has set her clock', () => {
   // 08:30 on Friday 2 January 1970 in New York: a briefing's hour, on a clock never set.
   assert.deepEqual(charm([`due ${epoch(new Date(Date.UTC(1970, 0, 2, 13, 30)))}`]), ['0']);
+});
+
+/* Every errand that finds no network makes the next one later, since until
+   one answers there is nothing to ask, and none is ever an hour away, so the
+   night's look for an update always has one. On the cable, often. */
+test('she sleeps longer between errands that find no network, never an hour', () => {
+  const waits = charm([0, 1, 2, 3, 4, 50].map(away => `wait 0 ${away}`)).map(Number);
+  assert.deepEqual(waits, [300, 600, 1200, 1800, 1800, 1800]);
+  assert.deepEqual(charm(['wait 1 0', 'wait 1 9']), ['120', '120'], 'on the cable she waits other than two minutes');
 });
 
 test('a lift is him looking only when the screen faces up and is held still', () => {
