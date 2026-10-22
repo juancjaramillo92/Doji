@@ -1705,6 +1705,19 @@ test('an empty sleep screen is the panel held in reset, not drawn', () => {
   assert.match(source('charm/main/sleep.c'), /HELD\[\] = \{[^}]*BSP_LCD_RST/, 'the panel\'s reset is no longer held through sleep');
 });
 
+/* The charm reads her voice as fast as it plays it, so a budget over the
+   whole speech stream runs at the pace of speech: SPEAK_MS on the stream cut a
+   briefing past two and a half minutes off mid-sentence. It bounds the
+   vendor's start of each part, and is cleared once the vendor answers. */
+test('the charm\'s voice is bounded while the vendor starts, not while she speaks', () => {
+  const audio = bodyOf(EUGENIA_TS, 'async function* charmAudio(', 'doji-eugenia has no charmAudio()');
+  assert.doesNotMatch(audio, /AbortSignal\.timeout\(SPEAK_MS\)/,
+    'charmAudio() bounds the whole stream again, at the pace the charm plays it');
+  const part = audio.slice(audio.indexOf('for (const part of chunk('));
+  assert.match(part, /const wait = setTimeout\(\(\) => started\.abort\(\), SPEAK_MS\);\s*const spoken = await reading\(part, "pcm", started\.signal\)\.finally\(\(\) => clearTimeout\(wait\)\);/,
+    'a part\'s budget no longer ends once the vendor answers, or no longer bounds its start');
+});
+
 /* The setup ran until something restarted her, so BOOT held in a pocket left
    her network up and a white code lit on her screen until the battery went.
    Set up already and left alone, she restarts as herself; setup.c is the

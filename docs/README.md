@@ -1968,9 +1968,12 @@ copy lands.
 transcriber that fails, is answered with its `VOICE_TROUBLE` line, spoken, and
 nothing else happens. A turn that throws is answered with `APOLOGY.reply`, the
 reply's own. A part the speech vendor will not read ends the audio; the copy
-in Telegram is the whole of it. The voice has `SPEAK_MS`, and shares the
-request's wall clock with the turn — a turn that runs to its five minutes
-leaves the voice what is left of four hundred seconds.
+in Telegram is the whole of it. The voice has `SPEAK_MS` for the vendor to
+start answering each part, not to finish it — the charm takes her voice as fast
+as it plays it, so a budget on the whole stream ran at the pace of speech and
+cut a long briefing mid-sentence — and shares the request's wall clock with the
+turn: a turn that runs to its five minutes leaves the voice what is left of
+four hundred seconds.
 
 **The briefing reaches the charm without waking it.** The charm sleeps with its
 radio off, so nothing can be pushed to it: after the briefing's hour it wakes
