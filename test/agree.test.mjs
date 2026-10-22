@@ -1646,6 +1646,28 @@ test('the charm tells an answer cut off from a finished one, and shows the failu
   }
 });
 
+/* The codecs are powered by the board, not the chip, so deep sleep alone left
+   them biased — microphones, converters and the speaker's amplifier — from
+   the first waking on. Every sleep that can follow sound closes them first;
+   life()'s sleeps come before any sound starts. */
+test('the charm switches her speaker and microphones off before every sleep', () => {
+  const main = source('charm/main/main.c');
+  const sleepers = [...main.matchAll(/^static void (\w+)\(void(?: \*arg)?\) \{$/gm)].map(m => m[1])
+    .filter(name => bodyOf(main, `static void ${name}(`).includes('sleep_until('));
+  assert.deepEqual(sleepers.sort(), ['errand', 'life', 'sleep_now'], 'main.c sleeps from a function this test does not judge');
+  const life = bodyOf(main, 'static void life(');
+  assert.ok(!/sound_start|errand_at = time\(NULL\) \+/.test(life.slice(0, life.lastIndexOf('sleep_until('))),
+    'life() starts sound before one of its sleeps, which would leave the codecs on');
+  for (const name of ['sleep_now', 'errand']) {
+    const body = bodyOf(main, `static void ${name}(`);
+    for (const at of [...body.matchAll(/sleep_until\(/g)].map(m => m.index)) {
+      const before = body.slice(0, at);
+      assert.ok(before.lastIndexOf('sound_stop();') > before.lastIndexOf('{'),
+        `${name}() sleeps with the codecs still open`);
+    }
+  }
+});
+
 /* While she thinks, nothing arrives but a beat of silence every BEAT_MS, and
    a press was looked for only when audio came: up to fifteen seconds before
    PWR cut her off. The answer is read in short waits, PWR looked for on each,

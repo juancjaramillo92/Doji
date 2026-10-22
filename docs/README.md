@@ -3316,8 +3316,10 @@ feels about once a second whether she is **held up to look**, which keeps her
 awake, or **has been put down** — lying flat and still, either way up, or face
 down — which puts her to sleep a couple of seconds later (`lift_hold` in
 `charm/main/lift.c`). Anything else, a pocket or a hand at his side, leaves it
-to thirty seconds without a press. Then her eyes close and the chip goes into
-deep sleep, where it wakes as if switched on again: **lifted to look**, on a tap
+to thirty seconds without a press. Then her eyes close, her speaker and
+microphones are switched off — the codecs live on the board's power, which
+the chip's sleep does not take away — and the chip goes into deep sleep,
+where it wakes as if switched on again: **lifted to look**, on a tap
 on the screen, PWR, the BOOT button, or a time. A lift is the motion sensor's:
 armed before every sleep, on GPIO21 (Waveshare's schematic for the 1.75C), it
 wakes the chip on a movement, which then takes two readings a moment apart and
@@ -3444,7 +3446,9 @@ enough to replace the journal's taps, that the Opus encoder keeps up with the
 microphones and five minutes of it fit the room `talk.c` gives the file, how
 much of her stack a turn of talking leaves — the serial log says after each,
 against the 40 KB Espressif's codec README asks for an encoder — and how long
-a battery lasts.
+a battery lasts, and what switching the codecs off before sleep saves of it
+(the speaker's amplifier is enabled on GPIO46, which is left floating in
+sleep).
 
 ---
 

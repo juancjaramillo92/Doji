@@ -10,6 +10,11 @@ void sound_start(void);
 // The rate the microphones record at, and the notes play at.
 #define SOUND_RATE 16000
 
+/* Both codecs closed, the speaker's amplifier with them: they are powered
+   by the board, not the chip, so deep sleep alone leaves them biased. Before
+   every sleep; nothing to do when sound never started. */
+void sound_stop(void);
+
 // 0 to 100.
 void sound_volume(int percent);
 

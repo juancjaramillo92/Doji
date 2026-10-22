@@ -122,7 +122,7 @@ static void close_eyes(void) {
 
 /* Goodnight, her eyes closing, then the sleep screen, drawn only when its
    marks differ from what the panel already holds, then deep sleep until the
-   next errand, the motion sensor armed. */
+   next errand, the codecs closed and the motion sensor armed. */
 static void sleep_now(void) {
     // Her door reads today's briefing alone: past midnight, yesterday's is gone.
     if (briefing_waits && !briefing_today(time(NULL))) briefing_waits = false;
@@ -138,6 +138,7 @@ static void sleep_now(void) {
         drawn = marks;
     }
     errand_at = time(NULL) + (charge >= 0 ? CHARGING_S : CHECK_S);
+    sound_stop();
     motion_arm();
     sleep_until(errand_at, true);
 }
@@ -171,6 +172,7 @@ static void errand(void) {
         // waits for a later errand in the hour, on the cable perhaps.
         if (!power_low() && ota_due(time(NULL)) && ota_update()) {
             errand_at = time(NULL);
+            sound_stop();
             sleep_until(errand_at, false);
         }
     }
