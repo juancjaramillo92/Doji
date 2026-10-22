@@ -1003,13 +1003,15 @@ press's wait, for the second.
 **Deferred, not refused, his decision of 22 October.** `SYSTEM`'s *THEN SAY
 WHAT IS CARRYING IT* paragraph ships without a plant that proves its case can
 see it go. With the paragraph removed, `brief-move-without-a-cause` caught the
-removal 1 of 3, 1 of 3 and 0 of 3 in three runs: without web search the eval
-cannot hand her the pull the live morning had, so she seldom blames the Fed
-either way. A plant caught that rarely stops most eval runs and proves little,
-so it is out; the case stays, and passes, as a check that the rule's presence
-does no harm. `agree.test.mjs` holds the sentences.
-**Revisit if:** the eval can hand the briefing what a search returned, or a
-briefing is seen putting an unexplained move on an unread Fed again.
+removal 1 of 3, 1 of 3 and 0 of 3 in three runs, and 1 of 3 again with the
+case handed the wires' headlines and what `web_fetch` returned that morning,
+the Fed story told in full: even with the live morning's pull in front of her,
+she seldom blames the Fed either way. A plant caught that rarely stops most
+eval runs and proves little, so it is out; the case stays, and passes, as a
+check that the rule's presence does no harm. `agree.test.mjs` holds the
+sentences.
+**Revisit if:** a briefing is seen putting an unexplained move on an unread
+Fed again; that briefing's own inputs are the case to try.
 
 ---
 
