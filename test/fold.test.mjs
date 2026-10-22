@@ -49,7 +49,7 @@ import {
   releaseName, printsQuery, printsList, RELEASE_PRINTS,
   sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
   volumeList, volumeBlock, keptMarket, storeMarket, storeRates, storeTrend, trendList, trendBlock,
-  flowsList, flowsBlock,
+  flowsList, flowsBlock, storeFlows, storePositioning,
   structureList, structureBlock, storeStructure,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
@@ -1821,6 +1821,47 @@ test('positioning that will not read is a sentence, and never takes the briefing
   });
 });
 
+/* THE FLOWS AND THE COUNT ARE READ AHEAD TOO, ONCE A NEW YORK DAY. Read live,
+   get_around spent six of TradingView's calls on the flows, and on 22 October
+   the briefing's own get_around found the quota gone. The reserves are
+   quarterly and the count weekly, so yesterday's copy is read again and
+   today's is kept; a report that will not read leaves the last one standing. */
+test('the flows and the speculators\' count are read once a New York day, and the blocks read the copy', async () => {
+  const world = marketWorld();
+  let asked = 0, counted = 0;
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString();
+  const flows = { ok: true, reserves: [{ country: 'CN', name: 'China', points: foldReserves(RESERVES_READ.CN) }],
+                  funds: [], missing: [{ name: 'AMEX:GLD, AMEX:IAU', symbol: 'AMEX:GLD, AMEX:IAU', error: 'not served' }] };
+  world.doors.flows = [flows, 200];
+  let report = COT;
+  const fetch = async (url, init) => {
+    if (url.includes('?flows=1')) asked++;
+    if (url.startsWith('https://publicreporting.cftc.gov/')) { counted++; return Response.json(report); }
+    return world.fetch(url, init);
+  };
+  await stubbed(async () => {
+    globalThis.fetch = fetch;
+    assert.match(await flowsBlock(), /could not be read just now/, 'a copy never read reads as one');
+    assert.match(await positioningBlock(), /could not be read just now/);
+    world.stored.set('flows', { door: 'flows', answer: flows, read_at: yesterday });
+    world.stored.set('positioning', { door: 'positioning', answer: COT, read_at: yesterday });
+    await Promise.all([storeFlows(), storePositioning()]);
+    assert.deepEqual([asked, counted], [1, 1], 'a copy from yesterday was not read again');
+    await Promise.all([storeFlows(), storePositioning()]);
+    assert.deepEqual([asked, counted], [1, 1], 'a copy read today was read again');
+    assert.match(await flowsBlock(), /· China: 2346 t in Jun 2026/);
+    assert.match(await positioningBlock(), /Net long 127,389 contracts/);
+    // A report that will not fold is never stored over the one that did.
+    world.stored.set('positioning', { door: 'positioning', answer: COT, read_at: yesterday });
+    report = [{ ...COT[0], m_money_positions_long_all: 'n/a' }];
+    await storePositioning();
+    assert.match(await positioningBlock(), /Net long 127,389 contracts/, 'an unreadable report replaced a readable one');
+  });
+  assert.deepEqual(world.rows.map(r => r.detail),
+    ['flows: not read yet', 'positioning: not read yet', 'flows: AMEX:GLD, AMEX:IAU: not served',
+     'positioning: no readable report']);
+});
+
 /* ─── What COMEX gold futures traded ─────────────────────────────────────────
    The front month's daily bars from the 5 October futures probe, verbatim, read
    at 15:47 UTC: Thursday's session, Friday's, and Monday's still forming. Each
@@ -2330,8 +2371,8 @@ test('the timetable holds its New York hours in winter too', () => {
    day was refused some thirty passes in, at about a thousand calls, and the
    briefing went without the odds. Walked over a week of the job's passes as
    cron fires them, counting what each door costs as the doors are written: the
-   calendar every pass, the weeks once a New York day, the market list and the
-   contracts when readsDue says. */
+   calendar every pass, the weeks and the flows once a New York day, the market
+   list and the contracts when readsDue says. */
 const TV_SOURCE = readFileSync(new URL('../supabase/functions/doji-tradingview/index.ts', import.meta.url), 'utf8');
 const EUGENIA_SOURCE = readFileSync(new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
@@ -2345,7 +2386,7 @@ test('the job spends TradingView\'s daily budget, and the pass before a briefing
     const at = new Date(Date.UTC(2026, 7, 16, 0, 5 + 15 * q));
     const due = readsDue(at);
     const firstOfDay = nyClock(at).hour === 0 && at.getUTCMinutes() === 5;
-    const spent = 1 + (firstOfDay ? symbols + 1 : 0) + (due.market ? symbols : 0) +
+    const spent = 1 + (firstOfDay ? symbols + 1 + 1 + RESERVES.length : 0) + (due.market ? symbols : 0) +
       (due.rates ? contractMonths(nyDate(at)).length + 1 : 0);
     const day = at.toISOString().slice(0, 10);
     calls.set(day, (calls.get(day) ?? 0) + spent);

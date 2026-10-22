@@ -3212,8 +3212,8 @@ export function keptMarket<T extends { symbol: string }>(fresh: { market: T[]; m
    the market is open; the odds every other hour, which ODDS_HOURS allows; and
    both on the pass before a briefing, whatever the hour, so Sunday's has them
    with the market still shut. About seven hundred calls a weekday, the
-   calendar's ninety-six and the weeks' once a day included. Pure, so a week of
-   passes is walked and counted. */
+   calendar's ninety-six and the weeks' and the flows' once a day included.
+   Pure, so a week of passes is walked and counted. */
 export function readsDue(now: Date): { market: boolean; rates: boolean } {
   if (now.getUTCMinutes() < 45) return { market: false, rates: false };
   const briefing = briefDue(new Date(now.getTime() + 15 * 60_000)) !== null;
@@ -3599,7 +3599,9 @@ export async function headlinesBlock(): Promise<string> {
    from the week before's row rather than the dataset's own change column,
    since the 52 rows are already here.
 
-   The Sunday briefing and get_around, since it changes weekly. Never throws.
+   The Sunday briefing and get_around, since it changes weekly. Read ahead
+   once a New York day, as the weeks are, so a briefing that reaches for it
+   through get_around waits on nothing. Never throws.
    ───────────────────────────────────────────────────────────────────────── */
 const COT_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json" +
   "?cftc_contract_market_code=088691&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=52" +
@@ -3642,11 +3644,27 @@ export function positioningList(rows: Cot[]): string {
     `${civilDay(low.day)} to ${side(net(high))} on ${civilDay(high.day)}.`;
 }
 
-export async function positioningBlock(): Promise<string> {
+/* The rows as the dataset sent them, kept only once they fold: a report that
+   will not read leaves yesterday's copy standing. */
+export async function storePositioning(): Promise<void> {
   try {
+    const kept = await readStored("positioning");
+    if (kept && nyDate(new Date(kept.read_at)) === nyDate(new Date())) return;
     const res = await fetch(COT_URL, { signal: AbortSignal.timeout(READ_MS) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return positioningList(await res.json());
+    const rows = await res.json();
+    positioningList(rows);
+    await store("positioning", rows);
+  } catch (err) {
+    await unread("positioning", why(err));
+  }
+}
+
+export async function positioningBlock(): Promise<string> {
+  try {
+    const kept = await readStored("positioning");
+    if (!kept) throw new Error("not read yet");
+    return positioningList(kept.answer);
   } catch (err) {
     await unread("positioning", why(err));
     return "\n\nWhere the speculators stand could not be read just now; do not quote it from a search.";
@@ -3661,7 +3679,9 @@ export async function positioningBlock(): Promise<string> {
    the date is the point. A quarter of buying is the story, and five weekday
    briefings repeating it are not, so it goes where the speculators' count goes:
    the Sunday briefing and get_around. A figure the screener does not serve is
-   said, never shown as zero.
+   said, never shown as zero. Read ahead once a New York day: the reserves are
+   quarterly and the funds' windows a month and longer, and six calls a
+   get_around was TradingView's quota spent on the same answer.
    ───────────────────────────────────────────────────────────────────────── */
 type Reserve = { country: string; name: string; points: { date: string; tonnes: number }[] };
 type Fund = { symbol: string; name: string; aum: number | null;
@@ -3686,9 +3706,26 @@ export function flowsList(answer: { reserves: Reserve[]; funds: Fund[]; missing:
     lines.join("\n");
 }
 
+export async function storeFlows(): Promise<void> {
+  try {
+    const kept = await readStored("flows");
+    if (kept && nyDate(new Date(kept.read_at)) === nyDate(new Date())) return;
+    const answer = await tvRead("flows");
+    if (!answer.reserves?.length && !answer.funds?.length) {
+      throw new Error(answer.missing.length ? missed(answer.missing) : "nothing served");
+    }
+    if (answer.missing.length) await unread("flows", missed(answer.missing));
+    await store("flows", answer);
+  } catch (err) {
+    await unread("flows", why(err));
+  }
+}
+
 export async function flowsBlock(): Promise<string> {
   try {
-    return flowsList(await tvRead("flows"));
+    const kept = await readStored("flows");
+    if (!kept) throw new Error("not read yet");
+    return flowsList(kept.answer);
   } catch (err) {
     await unread("flows", why(err));
     return "\n\nWhat central banks and the gold funds hold could not be read just now; do not quote it " +
@@ -3852,7 +3889,8 @@ async function postScheduled(url: URL): Promise<Response> {
     if (url.searchParams.get("calendar") === "1") {
       await filed();
       const { market, rates } = readsDue(new Date());
-      await Promise.all([market && storeMarket(), rates && storeRates(), storeTrend(), storeStructure()]);
+      await Promise.all([market && storeMarket(), rates && storeRates(), storeTrend(), storeStructure(),
+                         storeFlows(), storePositioning()]);
       return json({ ok: true, filed: true });
     }
 

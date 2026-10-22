@@ -626,8 +626,9 @@ test('every answer the poller and doji-tradingview serve Eugenia is one she read
     return ok([]);
   };
 
-  await Promise.all([eugenia.storeMarket(), eugenia.storeTrend(), eugenia.storeRates(), eugenia.storeStructure()]);
-  assert.deepEqual([...stored.keys()].sort(), ['market', 'rates', 'structure', 'trend'],
+  await Promise.all([eugenia.storeMarket(), eugenia.storeTrend(), eugenia.storeRates(), eugenia.storeStructure(),
+                     eugenia.storeFlows()]);
+  assert.deepEqual([...stored.keys()].sort(), ['flows', 'market', 'rates', 'structure', 'trend'],
     'a door answered and nothing she could keep came of it');
   const blocks = {
     around: await eugenia.aroundBlock(), rates: await eugenia.ratesBlock(), news: await eugenia.headlinesBlock(),
