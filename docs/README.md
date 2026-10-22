@@ -3381,8 +3381,9 @@ to speak up or down, she sets the volume before she answers, and keeps it, as
 the dial does. The answer is read out of its frames (`charm/main/frames.c`) and
 played as it streams in (*The charm — her voice on his keyring*): her face
 thinks through the silence and speaks when her voice starts, since the silence
-is exact zeros. A press while she thinks or speaks cuts her off; the copy in
-Telegram is the whole of it. The screen is not for talking: a tap on it answers
+is exact zeros. A press while she thinks or speaks cuts her off at once — she
+looks for it every tenth of a second while nothing arrives, not only when the
+next beat of silence does; the copy in Telegram is the whole of it. The screen is not for talking: a tap on it answers
 a journal question, and asleep wakes her to look. Losing the network sends her
 back to the sleep screen, where the no-internet mark says why — her voice
 breaking off with it, since an answer that stops short of its end is read as

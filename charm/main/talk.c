@@ -48,6 +48,7 @@ static const char *TAG = "talk";
 // with nothing is a dead line.
 #define READ_MS 30000
 #define CONFUSED_MS 4000
+#define LOOK_MS 100  // while nothing arrives, how often she looks for PWR
 
 static TickType_t began;
 static bool spoke, speaking, warned;
@@ -103,10 +104,19 @@ static bool play_answer(esp_http_client_handle_t h) {
     static int16_t voice[sizeof in / 2 + 1];
     frames_t f = { 0 };
     speaking = false;
+    // Read in short waits, so PWR cuts her off while she thinks rather than
+    // at the next beat of silence; READ_MS of nothing is still a dead line.
+    esp_http_client_set_timeout_ms(h, LOOK_MS);
+    TickType_t heard = xTaskGetTickCount();
     for (;;) {
         face_set_level(0);
         int n = esp_http_client_read(h, (char *)in, sizeof in);
+        if (n == -ESP_ERR_HTTP_EAGAIN) {
+            if (tapped()) return false;
+            if (xTaskGetTickCount() - heard < pdMS_TO_TICKS(READ_MS)) continue;
+        }
         if (n <= 0) return true;
+        heard = xTaskGetTickCount();
         int volume = -1;
         size_t samples = frames_read(&f, in, (size_t)n, voice, &volume);
         if (volume >= 0) {
