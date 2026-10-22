@@ -121,7 +121,8 @@ static void close_eyes(void) {
 }
 
 /* Goodnight, her eyes closing, then the sleep screen, drawn only when its
-   marks differ from what the panel already holds, then deep sleep until the
+   marks differ from what the panel already holds — and with none, the panel
+   held in reset rather than drawn black — then deep sleep until the
    next errand, the codecs closed and the motion sensor armed. */
 static void sleep_now(void) {
     // Her door reads today's briefing alone: past midnight, yesterday's is gone.
@@ -131,10 +132,15 @@ static void sleep_now(void) {
     int marks = face_marks(briefing_waits, trade_waits, low, offline, charge);
     close_eyes();
     if (lit || marks != drawn) {
-        light(FACE_DARK);
-        face_set_marks(briefing_waits, trade_waits, low, offline, charge);
-        face_set_mode(FACE_DARK);
-        vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
+        // No marks: the panel held in reset is the same black, not drawn.
+        if (marks == face_marks(false, false, false, false, -1)) {
+            sleep_blank();
+        } else {
+            light(FACE_DARK);
+            face_set_marks(briefing_waits, trade_waits, low, offline, charge);
+            face_set_mode(FACE_DARK);
+            vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
+        }
         drawn = marks;
     }
     errand_at = time(NULL) + (charge >= 0 ? CHARGING_S : CHECK_S);

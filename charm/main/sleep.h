@@ -13,6 +13,11 @@ void sleep_until(time_t wake_at, bool motion);
 // Lets go of the held pins, before the screen starts.
 void sleep_release(void);
 
+/* The panel put in reset, to be held there through sleep: as black as a
+   sleep screen with no marks, without the panel running to show it. The
+   screen's next start resets it anyway. */
+void sleep_blank(void);
+
 /* Gives the pins that can wake her back to ordinary use: one that woke the
    chip stays with its sleep circuit until it is, and reads nothing. First
    thing at every start. */

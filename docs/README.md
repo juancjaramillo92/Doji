@@ -3258,7 +3258,8 @@ was settled in playgrounds before any of this — the claude.ai artifacts
 numbers here are theirs.
 
 **The sleep screen is black but for its marks**, still, so they stay on the
-panel while the chip sleeps. Low on the screen, **one mark for what waits**:
+panel while the chip sleeps. With no marks at all the panel is held in reset
+instead: the same black, without the panel running to show it. Low on the screen, **one mark for what waits**:
 a purple dot with a glow while a briefing does, a white ring while a trade
 does, and the dot inside the ring when both do — one place and one size each,
 so nothing moves or shrinks when the other arrives, and shape tells them apart
@@ -3445,10 +3446,11 @@ own moves to the other's channel — whether a full-screen swipe is smooth
 enough to replace the journal's taps, that the Opus encoder keeps up with the
 microphones and five minutes of it fit the room `talk.c` gives the file, how
 much of her stack a turn of talking leaves — the serial log says after each,
-against the 40 KB Espressif's codec README asks for an encoder — and how long
-a battery lasts, and what switching the codecs off before sleep saves of it
-(the speaker's amplifier is enabled on GPIO46, which is left floating in
-sleep).
+against the 40 KB Espressif's codec README asks for an encoder — how long a
+battery lasts, and what two things save of it: the panel held in reset under
+an empty sleep screen (and that it shows black while held), and the codecs
+switched off before sleep (the speaker's amplifier is enabled on GPIO46,
+which is left floating in sleep).
 
 ---
 

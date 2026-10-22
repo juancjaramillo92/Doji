@@ -1646,6 +1646,21 @@ test('the charm tells an answer cut off from a finished one, and shows the failu
   }
 });
 
+/* With no marks the sleep screen is all black, and the panel kept running to
+   show it through every sleep. It is held in reset instead: the same black,
+   and the screen's next start resets it anyway. sleep_now() and sleep.c are
+   the board's, so they are read. */
+test('an empty sleep screen is the panel held in reset, not drawn', () => {
+  const now = bodyOf(source('charm/main/main.c'), 'static void sleep_now(void) {');
+  const empty = now.match(/if \(marks == face_marks\(false, false, false, false, -1\)\) \{([^}]*)\} else \{([^}]*)\}/);
+  assert.ok(empty, 'sleep_now() no longer tells an empty sleep screen apart');
+  assert.match(empty[1], /^\s*sleep_blank\(\);\s*$/, 'an empty sleep screen does more than hold the panel in reset');
+  assert.match(empty[2], /light\(FACE_DARK\)/, 'marks are no longer drawn');
+  const blank = bodyOf(source('charm/main/sleep.c'), 'void sleep_blank(void) {', 'sleep.c has no sleep_blank()');
+  assert.match(blank, /gpio_set_level\(BSP_LCD_RST, 0\);/, 'sleep_blank() no longer puts the panel in reset');
+  assert.match(source('charm/main/sleep.c'), /HELD\[\] = \{[^}]*BSP_LCD_RST/, 'the panel\'s reset is no longer held through sleep');
+});
+
 /* The codecs are powered by the board, not the chip, so deep sleep alone left
    them biased — microphones, converters and the speaker's amplifier — from
    the first waking on. Every sleep that can follow sound closes them first;
