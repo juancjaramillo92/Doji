@@ -3179,6 +3179,23 @@ test('every table schema.sql creates is in the backup, or said not to be', async
   assert.equal(said[1], WORDS[backed.length], `the README says ${said[1]} tables and the backup reads ${backed.length}`);
 });
 
+/* ─── The page both journal walks read ───────────────────────────────────────
+   The app's load and the backup each stop on a short page, so a page longer
+   than the project's Max rows ends either walk after its first. Two runtimes,
+   so two constants, and the README states the floor they need once for both.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the app and the backup read pages of one size, the floor the README sets for Max rows', () => {
+  const app = Number(source('index.html').match(/READ_PAGE:\s*(\d+)/)?.[1]);
+  const backup = Number(source('scripts/backup.mjs').match(/const PAGE = (\d+);/)?.[1]);
+  const said = source('docs/README.md').match(/read pages of (\d+) and so need \*\*Max rows[^*]*at (\d+) or more\*\*/);
+  assert.ok(Number.isInteger(app) && Number.isInteger(backup) && said,
+    'a page size or the README\'s floor is no longer where this reads it');
+  assert.equal(app, backup, `the app reads pages of ${app} and the backup pages of ${backup}`);
+  assert.deepEqual([Number(said[1]), Number(said[2])], [app, app],
+    `the README says pages of ${said[1]} and a floor of ${said[2]}; both walks read ${app}`);
+});
+
 /* ─── verify.sql has to ask about everything the files declare ───────────────
    An object declared and never asked about is drift in the part nobody checks,
    and each fails silently by construction: a missing `*_app_read` policy is
