@@ -1135,6 +1135,9 @@ open interest she has.
 **A refusal can arrive marked as success.** The quote batch's 429 came inside a
 result marked `isError: false`, with `success: false` in the payload. `unwrap`
 checks both and reads `structuredContent` rather than the duplicate text block.
+A refusal can also come back as words rather than JSON, and then the words are
+the reason: from 18 to 21 October whole passes were recorded as a parse error
+that kept eleven characters of what TradingView said.
 `test/fixtures/tradingview-calendar.json` is eight events from the 1 October
 calendar probe, one per shape the fold must handle.
 `test/fixtures/tradingview-abroad.json` is every kind of event TradingView listed
@@ -2762,7 +2765,11 @@ read, and a door that kept refusing would leave its last answer standing. A
 pass that fails leaves the copy as it was. Only the job writes the table, a
 quarter hour apart, so the market's read-then-write has no second writer. His
 charts ride the same pass (`storeStructure`) from the poller's `?structure=1`,
-stored as the folded map (*Her map of his charts*).
+stored as the folded map (*Her map of his charts*). While the market is shut
+they are folded once: the first pass after the close, which has Friday's daily
+bar closed, folds the finished week, and the rest skip on a copy read after
+it — by Saturday morning the 5m chart's twelve hours held no bar, and every
+pass metered it as unread.
 
 **Each door reads three charts at a time, inside `DOOR_MS`, 35 seconds.** One by
 one, fourteen did not fit at a slow morning's pace; all at once is the burst
@@ -2839,7 +2846,8 @@ can move a rung.
 false`, the read and the reason in `detail`: the broker's price, the headlines,
 the speculators' count, the flows and COMEX volume as a briefing or a reply reads them;
 the market around gold and the rate odds as the job reads them ahead, whole or
-— those two doors name a `missing` list — in part; and a copy a block could not
+— those two doors name a `missing` list — in part, a pass refused whole naming
+each refusal rather than one bare *no symbol served*; and a copy a block could not
 hand her, not yet read or odds too old. The briefing or the reply still goes
 out and its own row reads ok, so on 12 October the Edge log was the only place
 a briefing written without the dollar and the Fed showed. Failures only: a row for every read that answered would be several
