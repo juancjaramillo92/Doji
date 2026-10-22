@@ -89,12 +89,6 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
   const db = { rows: [], error: null, patches: [] };
   win.__db = db;
 
-  // A real query builder is thenable, so it is awaited wherever the caller stops
-  // chaining; a stub resolving on one terminal method answers `undefined` the day
-  // a query drops it.
-  const answer = () => Promise.resolve(
-    db.error ? { data: null, error: db.error } : { data: db.rows, error: null });
-
   /* Per-table answers, so a query for the calendar is never handed `trades`.
      `db.tables[name]` where set, `db.rows` otherwise. */
   db.tables = {};
@@ -109,6 +103,9 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
       order:  () => t,
       // The filter methods the app chains, each returning the builder.
       eq: () => t, gte: () => t, lte: () => t, is: () => t, limit: () => t,
+      // A real query builder is thenable, so it is awaited wherever the caller
+      // stops chaining; a stub resolving on one terminal method answers
+      // `undefined` the day a query drops it.
       then: (ok, no) => reply().then(ok, no),
       update(patch) { db.patches.push(patch); return t; },
       // db.error honoured here too, or the failure branch of every .single() path —
