@@ -1646,6 +1646,19 @@ test('the charm tells an answer cut off from a finished one, and shows the failu
   }
 });
 
+/* The marks wander so none left all night burns in, and the one left longest
+   is the charge's percent, every night on the cable: it was drawn at one
+   place. Every mark but the ring round the rim is placed off the shift. */
+test('every mark on the sleep screen but the ring wanders', () => {
+  const night = bodyOf(source('charm/main/face.c'), 'static void draw_night(lv_event_t *e) {', 'face.c has no draw_night()');
+  const percent = night.match(/lv_area_t where = \{([^}]*)\};\s*lv_draw_label/);
+  assert.ok(percent, 'draw_night() no longer places the charge\'s percent as this test reads it');
+  assert.ok((percent[1].match(/shift\[0\]/g) ?? []).length === 2 && (percent[1].match(/shift\[1\]/g) ?? []).length === 2,
+    'the charge\'s percent is drawn at one place every night, where it burns in');
+  assert.match(night, /int x = 233 \+ shift\[0\], y = 404 \+ shift\[1\];/, 'what waits no longer wanders');
+  assert.match(night, /int top = 62 \+ shift\[1\];/, 'the battery and the no-internet mark no longer wander');
+});
+
 /* With no marks the sleep screen is all black, and the panel kept running to
    show it through every sleep. It is held in reset instead: the same black,
    and the screen's next start resets it anyway. sleep_now() and sleep.c are

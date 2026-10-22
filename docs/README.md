@@ -3266,8 +3266,10 @@ so nothing moves or shrinks when the other arrives, and shape tells them apart
 at a glance. At the top, a small battery when she is at 15% or below and off the
 cable, and the **no-internet mark** when her last look for a network found
 none, side by side when both. On the cable, the charge as a ring round the rim
-with its percent. The marks wander a few pixels each time she sleeps, so a mark
-left all night never burns in. **Woken without internet** — the last errand
+with its percent. Every mark but that ring wanders a few pixels each time she
+sleeps, the percent included, so one left all night is not left on the same
+pixels — though the briefing's dot wanders less than its own width, so its
+middle stays lit wherever it lands. **Woken without internet** — the last errand
 found none — she stays on that screen rather than waking to a face that cannot
 answer: she tries the network for eight seconds, wakes properly if it answers,
 and otherwise sleeps again with the mark still up.
