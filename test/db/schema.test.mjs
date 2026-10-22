@@ -113,8 +113,11 @@ test('upgrade.sql changes nothing a fresh apply built, however often it runs', (
 /* ─── verify.sql asks what schema.sql builds ────────────────────────────── */
 
 test('verify.sql passes every check against the database schema.sql builds', () => {
-  sql(SECRETS);
+  // The live project holds one account; the second is this suite's, for the
+  // tests of another owner's row, and goes back once the file has run.
+  sql(SECRETS + `delete from auth.users where id = '${V}';`);
   const rows = sql(file('supabase/verify.sql')).split('\n');
+  sql(`insert into auth.users values ('${V}');`);
   assert.ok(rows.length > 1, 'verify.sql returned no rows');
   assert.deepEqual(rows.filter(r => !r.endsWith('|t')), [],
     'verify.sql fails against the database schema.sql builds — one of the two files is wrong');
@@ -183,7 +186,7 @@ test('a missing secret costs the message, never the write', () => {
 
 /* ─── What the app may write ────────────────────────────────────────────── */
 
-test('the app writes its four answers and the soft delete, on its own rows, and nothing else', () => {
+test('the app writes its four answers and the soft delete, on its own rows, and nothing else, and signed out reads nothing', () => {
   sql(RESET + trade('PID6') + `insert into public.trades (id, user_id, direction) values ('PID7', '${V}', 'BUY');`);
   const as = (stmt) => sql(`set role authenticated; set request.jwt.claim.sub = '${U}'; ${stmt}`);
 
@@ -197,9 +200,13 @@ test('the app writes its four answers and the soft delete, on its own rows, and 
 
   for (const stmt of [`update public.trades set net_pnl = 1 where id = 'PID6'`,
                       `insert into public.trades (id, user_id) values ('PID8', '${U}')`,
-                      `delete from public.trades where id = 'PID6'`]) {
+                      `delete from public.trades where id = 'PID6'`,
+                      // RLS does not govern TRUNCATE: a grant of it is every row, everyone's.
+                      `truncate public.trades`]) {
     assert.throws(() => as(stmt), /permission denied/, `the app may: ${stmt}`);
   }
+  assert.throws(() => sql(`set role anon; select count(*) from public.trades`), /permission denied/,
+    'the signed-out key may read trades');
 
   assert.equal(as(`select count(*) from public.trades where id = 'PID7'`), '0', 'another owner\'s row is visible');
   as(`update public.trades set followed_sl = true where id = 'PID7';`);

@@ -869,6 +869,55 @@ states each table's size, so the growth is watched, not guessed.
 storage. Then the inputs move to their own artifact, taken once a week and kept
 as long as the others, rather than any row being dropped.
 
+These five were turned down by a database audit in October 2026, each on a
+read of the live database rather than an argument, so the figures are the
+reason.
+
+### R-93 — dropping `trades_user_open_day`, `eugenia_turns_id_desc` and `eugenia_calendar_ticker`
+**Why refused:** read as code, none is needed. Every trade is his, so
+`user_id` narrows nothing and no read filters it; `eugenia_turns_id_desc`
+copies the primary key, which a backward scan serves; nothing filters or
+orders on `ticker`. Measured on Postgres 16 at 3,000 trades and 60,000 turns,
+the planner chose the scan and the primary key with the indexes present. But
+the live counters showed 2,054 scans of the first and 1,486 of the second,
+against none of the turns' primary key: at 132 trades and 312 turns the
+planner picks between equal plans. A drop is an `upgrade.sql` step and a
+`verify.sql` edit for nothing that can be measured.
+**Revisit if:** a write to either table is ever seen to cost, or `ticker`
+stays unread when the calendar passes ten thousand rows.
+
+### R-94 — a reach line on the stop history read
+**Why refused:** `stopsQuery` takes the newest 2,000 rows over at most 372
+days and says nothing when it stops, where the trades read has `reachLine`;
+cut, R-02 would miss a widening on the oldest trades and pass them. The live
+table held 38 rows in its year, four at most for one position.
+**Revisit if:** `trade_stops` passes a thousand rows in a year.
+
+### R-95 — a hash of the whole schema in `verify.sql`
+**Why refused:** `verify.sql` asks by name, not by definition, so a default or
+a constraint that drifted inside `create table if not exists` before
+`upgrade.sql` existed is invisible to it. One fingerprint of the live database
+against a fresh build found every constraint, index, policy, trigger,
+function, view and job identical; the drift was column order in three tables,
+which nothing reads, and grants on `trades` tighter than the file's, since
+written into it. A hash row would need regenerating with every schema change.
+**Revisit if:** a live object is ever found to differ from a fresh build in a
+way that changes behaviour.
+
+### R-96 — her windowed reads falling back to the fill day, as the app does
+**Why refused:** a row with no `open_day` counts in the app, through `dayOf`,
+and drops out of every read of hers filtered on `open_day`, so the two would
+total differently. The live table held none: the poller files every position it
+folds, and the rows from before it carry a day.
+**Revisit if:** a live row has `open_day is null`.
+
+### R-97 — a mark on a trade whose minute bars never answer
+**Why refused:** `fillExcursions` asks for the newest three trades without a
+`best_price`, so three whose bars never come back would be asked every poll and
+stall every trade behind them. The live table held no closed trade waiting.
+**Revisit if:** the poller's `excursions` reads 0 while a closed trade a minute
+or longer carries no `best_price`.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

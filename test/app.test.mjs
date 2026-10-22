@@ -169,6 +169,24 @@ test('load fills both row sets, hides deleted rows, and reports Synced', async (
   assert.equal($('sync-dot').className, 'sync-dot ok');
 });
 
+/* PostgREST caps every answer at its Max rows, so one read of a journal past
+   that is a page that looks like the whole of it: every all-time figure short,
+   and the snapshot saved short. 2,300 rows against the stand-in's cap of 1000. */
+test('load reads a journal larger than one page to the end, ordered by its key', async () => {
+  db.error = null;
+  db.rows = Array.from({ length: 2300 }, (_, i) =>
+    journalled({ id: `PID${100000 + i}`, open_day: '2026-07-30', pnl: 1 }));
+  db.orders.length = 0;
+  await app.Data.load();
+
+  assert.equal(app.Data.all.length, 2300, 'the load stopped at the first page');
+  assert.deepEqual(Array.from(app.Data.all, t => t.id), db.rows.map(t => t.id), 'rows were lost or repeated');
+  // A range walk without an order can put a row on two pages or none.
+  assert.ok(db.orders.length && db.orders.every(o => o === 'trades.id'),
+    `the pages are not ordered by the key: ${db.orders.join(', ') || 'no order'}`);
+  db.rows = [];
+});
+
 test('a failed load falls back to the snapshot and goes read-only', async () => {
   db.rows = [journalled({ id: 'PID1', open_day: '2026-07-30', pnl: 40 })];
   await app.Data.load();                       // writes the snapshot
