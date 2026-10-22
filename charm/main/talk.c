@@ -177,6 +177,9 @@ static void confused(void) {
 }
 
 int talk(void) {
+    // A network already given up: nothing he says could reach her, so he is
+    // not asked to say it.
+    if (net_gone()) return -1;
     static uint8_t *room;
     if (!room) room = heap_caps_malloc(FILE_ROOM, MALLOC_CAP_SPIRAM);
     esp_opus_enc_config_t opus = ESP_OPUS_ENC_CONFIG_DEFAULT();

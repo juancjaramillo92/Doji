@@ -11,6 +11,10 @@ void net_start(void);
 // has been tried and none answered, or the one she joined has gone.
 bool net_wait(int ms);
 
+// Whether the network has given up for this waking: every network tried and
+// none answered, or the one she joined has gone. Joining is not giving up.
+bool net_gone(void);
+
 // Long enough for the last network asked directly and four saved ones in turn.
 #define NET_ALL_MS 44000
 

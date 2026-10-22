@@ -5,7 +5,8 @@
    PWR; PWR while it runs — a notification to that task — ends his turn, or
    cuts her off. The same holds for the two below. Returns what her
    door answered — 200 when she did — 0 when he said nothing, and -1 when the
-   network could not reach her, which is left to the lock screen to show;
+   network could not reach her, which is left to the lock screen to show, and
+   which a network already given up answers before he is recorded;
    any other answer shows her confused, as does an encoder that will not
    start or no room to record in, which is 0. */
 int talk(void);

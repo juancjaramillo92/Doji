@@ -1635,6 +1635,11 @@ test('the charm hears a network it has joined go', () => {
     'a disconnect once joined no longer takes her offline, so net_wait() says online about a network that has gone');
   assert.match(bodyOf(net, 'bool net_wait(int ms) {'), /JOINED \| GAVE_UP/,
     'net_wait() no longer returns on the network given up');
+  // And a press once it has gone is not a turn recorded into nothing.
+  const talk = bodyOf(source('charm/main/talk.c'), 'int talk(void) {', 'talk.c has no talk()');
+  const gone = talk.indexOf('if (net_gone()) return -1;');
+  assert.ok(gone > -1 && gone < talk.indexOf('sound_listen()'),
+    'talk() listens on a network already given up, so his words are recorded and dropped');
 });
 
 /* ─── Every secret a function needs is one it refuses to run without ────────

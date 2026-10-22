@@ -115,3 +115,7 @@ void net_start(void) {
 bool net_wait(int ms) {
     return xEventGroupWaitBits(events, JOINED | GAVE_UP, pdFALSE, pdFALSE, pdMS_TO_TICKS(ms)) & JOINED;
 }
+
+bool net_gone(void) {
+    return xEventGroupGetBits(events) & GAVE_UP;
+}

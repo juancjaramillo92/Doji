@@ -3365,7 +3365,9 @@ watch is driven against the server's own functions by `test/charm.test.mjs`.
 
 **PWR is the talk button.** A press, and **two quick rising notes** say she is
 listening — from sleep the press that wakes her is enough, and she listens even
-while she is still joining her Wi-Fi, the recording waiting for it, not him. The
+while she is still joining her Wi-Fi, the recording waiting for it, not him —
+but not once her Wi-Fi has given up, when the press takes her to the sleep
+screen and its no-internet mark rather than recording words that cannot go. The
 ring shows round the rim and follows his voice. **His pauses are his own**:
 nothing ends his turn but the next press, so he can stop to think as long as he
 needs; **two falling notes** say his words are on their way. A press with
