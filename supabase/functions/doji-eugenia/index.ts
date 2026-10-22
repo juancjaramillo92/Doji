@@ -3208,7 +3208,10 @@ export function keptMarket<T extends { symbol: string }>(fresh: { market: T[]; m
 export async function storeMarket(): Promise<void> {
   try {
     const answer = await tvRead("market");
-    if (!answer.market?.length) throw new Error("no symbol served");
+    // Every symbol refused is a reason each, never one sentence that hides them.
+    if (!answer.market?.length) {
+      throw new Error(answer.missing.length ? missed(answer.missing) : "no symbol served");
+    }
     if (answer.missing.length) await unread("market", missed(answer.missing));
     await store("market", keptMarket(answer, (await readStored("market"))?.answer ?? null));
   } catch (err) {
@@ -3224,7 +3227,9 @@ export async function storeTrend(): Promise<void> {
     const kept = await readStored("trend");
     if (kept && nyDate(new Date(kept.read_at)) === nyDate(new Date())) return;
     const answer = await tvRead("trend");
-    if (!answer.market?.length) throw new Error("no symbol served");
+    if (!answer.market?.length) {
+      throw new Error(answer.missing.length ? missed(answer.missing) : "no symbol served");
+    }
     if (answer.missing.length) await unread("trend", missed(answer.missing));
     await store("trend", { ...keptMarket(answer, kept?.answer ?? null), fits: answer.fits });
   } catch (err) {
@@ -3237,7 +3242,9 @@ export async function storeTrend(): Promise<void> {
 export async function storeRates(): Promise<void> {
   try {
     const answer = await tvRead("rates");
-    if (!answer.meetings?.length) throw new Error("no meeting served");
+    if (!answer.meetings?.length) {
+      throw new Error(answer.missing.length ? missed(answer.missing) : "no meeting served");
+    }
     if (answer.missing.length) await unread("rates", missed(answer.missing));
     await store("rates", answer);
   } catch (err) {

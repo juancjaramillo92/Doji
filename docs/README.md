@@ -1135,6 +1135,9 @@ open interest she has.
 **A refusal can arrive marked as success.** The quote batch's 429 came inside a
 result marked `isError: false`, with `success: false` in the payload. `unwrap`
 checks both and reads `structuredContent` rather than the duplicate text block.
+A refusal can also come back as words rather than JSON, and then the words are
+the reason: from 18 to 21 October whole passes were recorded as a parse error
+that kept eleven characters of what TradingView said.
 `test/fixtures/tradingview-calendar.json` is eight events from the 1 October
 calendar probe, one per shape the fold must handle.
 `test/fixtures/tradingview-abroad.json` is every kind of event TradingView listed
@@ -2839,7 +2842,8 @@ can move a rung.
 false`, the read and the reason in `detail`: the broker's price, the headlines,
 the speculators' count, the flows and COMEX volume as a briefing or a reply reads them;
 the market around gold and the rate odds as the job reads them ahead, whole or
-— those two doors name a `missing` list — in part; and a copy a block could not
+— those two doors name a `missing` list — in part, a pass refused whole naming
+each refusal rather than one bare *no symbol served*; and a copy a block could not
 hand her, not yet read or odds too old. The briefing or the reply still goes
 out and its own row reads ok, so on 12 October the Edge log was the only place
 a briefing written without the dollar and the Fed showed. Failures only: a row for every read that answered would be several

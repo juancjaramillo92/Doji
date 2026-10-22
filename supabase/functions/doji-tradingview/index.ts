@@ -338,11 +338,19 @@ async function tvPost(session: Record<string, string>, tool: AllowedTool,
 /* What a tool answered, or why not. A refusal can arrive as `success: false`
    inside a result marked `isError: false` — the quote batch's scanner 429 did
    — so the payload is checked as well as the envelope. structuredContent
-   rather than the text block, which repeats it as a string. */
+   rather than the text block, which repeats it as a string. A refusal can also
+   come back as words rather than JSON, and then the words are the reason: from
+   18 to 21 October whole passes failed as a parse error that kept eleven
+   characters of what TradingView said. */
 export function unwrap(envelope: any, tool: string): any {
   if (envelope.error) throw new Error(`TradingView ${tool}: ${envelope.error.message}`);
   const result = envelope.result;
-  const answer = result?.structuredContent ?? JSON.parse(result?.content?.[0]?.text ?? "null");
+  const text: string = result?.content?.[0]?.text ?? "null";
+  let answer = result?.structuredContent;
+  if (answer === undefined) {
+    try { answer = JSON.parse(text); }
+    catch { throw new Error(`TradingView ${tool}: ${text.slice(0, 300)}`); }
+  }
   if (result?.isError || !answer || answer.success === false) {
     throw new Error(`TradingView ${tool}: ${answer?.error || "no answer"}`);
   }

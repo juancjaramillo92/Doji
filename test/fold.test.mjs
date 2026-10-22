@@ -635,6 +635,16 @@ test('a refusal inside a result marked isError false is a refusal', () => {
   assert.equal(unwrap(TV_CALENDAR, 'mcp-tv-get-economic-calendar').status, 'ok');
 });
 
+/* A REFUSAL IN WORDS IS ITS OWN REASON. From 18 to 21 October whole passes
+   came back as prose, and a parse error kept eleven characters of it. */
+test('a refusal written as words, not JSON, keeps the words as its reason', () => {
+  const said = 'tool_pre_invocation: the daily limit for this connection was reached';
+  const envelope = { jsonrpc: '2.0', id: 3, result: { content: [{ type: 'text', text: said }], isError: true } };
+  assert.throws(() => unwrap(envelope, 'mcp-tv-get-ohlcv'),
+    (err) => err.message === `TradingView mcp-tv-get-ohlcv: ${said}`,
+    'a refusal in words reads as a JSON parse error, and what TradingView said is lost');
+});
+
 test('the calendar folds to what her calendar holds, and no more', () => {
   const events = foldCalendar(unwrap(TV_CALENDAR, 'mcp-tv-get-economic-calendar'));
   const by = Object.fromEntries(events.map(e => [e.id, e]));
@@ -879,6 +889,36 @@ test('the market is read ahead by the job, and a briefing reads the copy a faile
     'market: TradingView market: not connected', 'rates: no meeting served',
   ]);
   assert.ok(world.rows.every(r => r.caller === 'market read' && r.ok === false));
+});
+
+/* A PASS WHERE EVERY SYMBOL WAS REFUSED NAMES EACH REFUSAL. Four days of
+   "no symbol served" said a pass failed and never why. */
+test('a pass the door refused whole records why, and leaves the copy as it was', async () => {
+  const world = marketWorld();
+  const no = 'TradingView mcp-tv-get-ohlcv: tool_pre_invocation: daily limit reached';
+  await stubbed(async () => {
+    globalThis.fetch = world.fetch;
+    world.doors.market = [AROUND, 200];
+    world.doors.rates = [{ ok: true, ...RATES, missing: [] }, 200];
+    await Promise.all([storeMarket(), storeRates()]);
+    const before = structuredClone([...world.stored]);
+    world.rows.length = 0;
+
+    world.doors.market = [{ ok: true, market: [], missing: [
+      { symbol: 'TVC:DXY', name: 'Dollar index', error: no },
+      { symbol: 'TVC:US10Y', name: 'Ten-year Treasury yield', error: no }] }, 200];
+    world.doors.rates = [{ ok: true, market: [], meetings: [],
+                           missing: [{ symbol: 'CBOT:ZQX2026', error: no }] }, 200];
+    world.doors.trend = [{ ok: true, market: [], fits: [],
+                           missing: [{ symbol: 'TVC:DXY', error: no }] }, 200];
+    await Promise.all([storeMarket(), storeRates(), storeTrend()]);
+    assert.deepEqual([...world.stored], before, 'a refused pass replaced a copy');
+  });
+  assert.deepEqual(world.rows.map(r => r.detail).sort(), [
+    `market: TVC:DXY, TVC:US10Y: ${no}`,
+    `rates: CBOT:ZQX2026: ${no}`,
+    `trend: TVC:DXY: ${no}`,
+  ], 'a pass refused whole is recorded without the reason the door gave');
 });
 
 /* ─── His charts, as a map ─────────────────────────────────────────────────
