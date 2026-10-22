@@ -401,8 +401,14 @@ test('a trade\'s questions wait for the conversation to end, and PWR on them goe
   assert.equal((loop.match(/journal\(\)/g) ?? []).length, 1, 'the conversation reaches the journal by more than one path');
   assert.match(loop, /if \(next == OVER_LOOKING\) \{[^}]*if \(!journal\(\)\) sleep_now\(\);/,
     'the journal after a conversation no longer waits for it to be over, or no longer goes back to her on PWR');
-  const briefing = loop.match(/if \(briefing_waits\) \{[^}]*\}/);
+  const briefing = loop.match(/if \(brief\) \{[^}]*\}/);
   assert.ok(briefing, 'awake() no longer reads a waiting briefing as this test finds it');
+  assert.match(awake, /bool brief = briefing_waits;\s*for \(;;\) \{/,
+    'a waiting briefing is no longer read once a waking, so a failing one is retried after every answer');
+  const read = briefing[0].indexOf('int status = talk_briefing();'),
+        kept = briefing[0].indexOf('briefing_waits = status != 200 && status != 204;');
+  assert.ok(read > -1 && kept > read && !/briefing_waits = false/.test(briefing[0]),
+    'the briefing\'s dot goes before it is read, so one that fails is lost to the charm for the day');
   assert.ok(loop.indexOf(briefing[0]) < loop.indexOf('between_turns('), 'a waiting briefing now waits for the conversation to end');
   assert.doesNotMatch(briefing[0], /motion_hold|between_turns/, 'a waiting briefing now waits on how she is held');
 

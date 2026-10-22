@@ -256,10 +256,14 @@ static void awake(void) {
     }
     bool spoke = listen && exchange();
 
+    // A waiting briefing is read once a waking. Read, or none stored for
+    // today, its dot goes; a failure leaves it up for the next waking.
+    bool brief = briefing_waits;
     for (;;) {
-        if (briefing_waits) {
-            briefing_waits = false;
+        if (brief) {
+            brief = false;
             int status = talk_briefing();
+            briefing_waits = status != 200 && status != 204;
             sleep_if_offline(status);
             spoke |= status == 200;
         }
