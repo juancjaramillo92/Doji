@@ -1775,9 +1775,9 @@ test('the charm switches her speaker and microphones off before every sleep', ()
 test('PWR cuts her off while she thinks, not at the next beat', () => {
   const talk = source('charm/main/talk.c');
   const play = bodyOf(talk, 'static bool play_answer(', 'talk.c has no play_answer()');
-  const look = Number(talk.match(/^#define LOOK_MS\s+(\d+)/m)?.[1]);
+  const look = Number(talk.match(/^#define PWR_LOOK_MS\s+(\d+)/m)?.[1]);
   assert.ok(look > 0 && look <= 250, `talk.c looks for PWR every ${look} ms while nothing arrives, or no longer says how often`);
-  assert.match(play, /esp_http_client_set_timeout_ms\(h, LOOK_MS\);/, 'play_answer() waits for her door as long as a beat');
+  assert.match(play, /esp_http_client_set_timeout_ms\(h, PWR_LOOK_MS\);/, 'play_answer() waits for her door as long as a beat');
   assert.match(play, /if \(n == -ESP_ERR_HTTP_EAGAIN\) \{\s*if \(tapped\(\)\) return false;\s*if \(xTaskGetTickCount\(\) - heard < pdMS_TO_TICKS\(READ_MS\)\) continue;/,
     'a wait with nothing in it no longer looks for PWR, or no longer gives up at READ_MS');
 });

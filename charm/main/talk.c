@@ -48,7 +48,7 @@ static const char *TAG = "talk";
 // with nothing is a dead line.
 #define READ_MS 30000
 #define CONFUSED_MS 4000
-#define LOOK_MS 100  // while nothing arrives, how often she looks for PWR
+#define PWR_LOOK_MS 100  // while nothing arrives, how often she looks for PWR
 
 static TickType_t began;
 static bool spoke, speaking, warned;
@@ -106,7 +106,7 @@ static bool play_answer(esp_http_client_handle_t h) {
     speaking = false;
     // Read in short waits, so PWR cuts her off while she thinks rather than
     // at the next beat of silence; READ_MS of nothing is still a dead line.
-    esp_http_client_set_timeout_ms(h, LOOK_MS);
+    esp_http_client_set_timeout_ms(h, PWR_LOOK_MS);
     TickType_t heard = xTaskGetTickCount();
     for (;;) {
         face_set_level(0);
