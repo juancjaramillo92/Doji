@@ -1622,6 +1622,24 @@ test('the charm never takes her own leaving for a network refusing her', () => {
   }
 });
 
+/* A dropped line ends a read exactly as her last word does, so an answer is
+   finished only when its stream says so; one PWR did not stop that ends short
+   is a failure, and a failure while the network is up is shown, where it once
+   played as a finished answer and a briefing cut off counted as read. talk.c
+   is the board's, so the calls are read. */
+test('the charm tells an answer cut off from a finished one, and shows the failure', () => {
+  const talk = source('charm/main/talk.c');
+  const knock = bodyOf(talk, 'static int knock(', 'talk.c has no knock()');
+  assert.match(knock, /if \(play_answer\(h\) && !esp_http_client_is_complete_data_received\(h\)\) status = -1;/,
+    'knock() takes an answer that stopped short of its end for a finished one');
+  assert.match(bodyOf(talk, 'static bool play_answer(', 'talk.c has no play_answer()'), /return false;/,
+    'play_answer() no longer says when PWR stopped it, so a press reads as a line cut');
+  for (const [fn, ok] of [['int talk(void) {', 'status != 200'], ['int talk_briefing(void) {', 'status != 200 && status != 204']]) {
+    assert.ok(bodyOf(talk, fn).includes(`if (${ok} && (status > 0 || net_wait(0))) confused();`),
+      `${fn} no longer shows her confused at a failure while the network is up`);
+  }
+});
+
 /* Nothing joins again once the join is done, so a network lost while she
    talks must say so: kept online, every door she knocks at fails with no
    sign and she records turns that go nowhere, where losing it is meant to

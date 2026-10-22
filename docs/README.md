@@ -3384,8 +3384,11 @@ thinks through the silence and speaks when her voice starts, since the silence
 is exact zeros. A press while she thinks or speaks cuts her off; the copy in
 Telegram is the whole of it. The screen is not for talking: a tap on it answers
 a journal question, and asleep wakes her to look. Losing the network sends her
-back to the sleep screen, where the no-internet mark says why; a door that
-answers with an error, or refuses her key, shows her confused for four seconds.
+back to the sleep screen, where the no-internet mark says why — her voice
+breaking off with it, since an answer that stops short of its end is read as
+cut, not finished; with the network up, a door that answers with an error,
+refuses her key, cannot be reached or breaks off her answer shows her confused
+for four seconds.
 
 **The journal asks what waits**, through Gladys's door, and while a
 trade waits the questions take the whole screen, the playground's: the setup

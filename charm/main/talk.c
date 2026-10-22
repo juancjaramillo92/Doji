@@ -97,8 +97,8 @@ static bool said(float loud) {
 }
 
 // Plays her answer as it streams in, and sets the volume she asked for, as
-// the dial does, before the voice that follows it.
-static void play_answer(esp_http_client_handle_t h) {
+// the dial does, before the voice that follows it. False when PWR stopped it.
+static bool play_answer(esp_http_client_handle_t h) {
     static uint8_t in[4096];
     static int16_t voice[sizeof in / 2 + 1];
     frames_t f = { 0 };
@@ -106,7 +106,7 @@ static void play_answer(esp_http_client_handle_t h) {
     for (;;) {
         face_set_level(0);
         int n = esp_http_client_read(h, (char *)in, sizeof in);
-        if (n <= 0) return;
+        if (n <= 0) return true;
         int volume = -1;
         size_t samples = frames_read(&f, in, (size_t)n, voice, &volume);
         if (volume >= 0) {
@@ -114,14 +114,16 @@ static void play_answer(esp_http_client_handle_t h) {
             cfg.volume = volume;
             config_save();
         }
-        if (!sound_play(voice, samples, HER_RATE, said)) return;
+        if (!sound_play(voice, samples, HER_RATE, said)) return false;
     }
 }
 
 /* Knocks at her door — a POST of `ogg` when there is one, else a GET of
    `url` — and plays the answer when it is 200, after `lit`, when there is
    one, has lit the screen for her. Returns the status, or -1 when the door
-   could not be reached. */
+   could not be reached or her answer was cut off on the way: a dropped line
+   ends a read as her last word does, and only the stream's own end tells the
+   two apart. */
 static int knock(const char *url, const uint8_t *ogg, size_t len, void (*lit)(void)) {
     esp_http_client_config_t c = {
         .url = url,
@@ -162,7 +164,7 @@ static int knock(const char *url, const uint8_t *ogg, size_t len, void (*lit)(vo
         told_low |= low;
         if (lit) lit();
         face_set_mode(FACE_THINKING);
-        play_answer(h);
+        if (play_answer(h) && !esp_http_client_is_complete_data_received(h)) status = -1;
     } else {
         ESP_LOGW(TAG, "her door answered %d", status);
     }
@@ -171,6 +173,9 @@ static int knock(const char *url, const uint8_t *ogg, size_t len, void (*lit)(vo
     return status;
 }
 
+/* Her door failed her while the network is still up: a refusal, an answer
+   broken off, or a door out of reach. With the network gone, the lock screen
+   says so instead. */
 static void confused(void) {
     face_set_mode(FACE_CONFUSED);
     vTaskDelay(pdMS_TO_TICKS(CONFUSED_MS));
@@ -219,7 +224,7 @@ int talk(void) {
     sound_sent();
     face_set_mode(FACE_THINKING);
     int status = knock(EUGENIA_DOOR, room, ogg_end(&file), NULL);
-    if (status > 0 && status != 200) confused();
+    if (status != 200 && (status > 0 || net_wait(0))) confused();
     face_set_mode(FACE_IDLE);
     return status;
 }
@@ -232,7 +237,7 @@ int talk_briefing(void) {
     tapped();  // a press left over from before — during her confused face — is not a word to her
     face_set_mode(FACE_THINKING);
     int status = knock(EUGENIA_DOOR "?briefing=today", NULL, 0, NULL);
-    if (status > 0 && status != 200 && status != 204) confused();
+    if (status != 200 && status != 204 && (status > 0 || net_wait(0))) confused();
     face_set_mode(FACE_IDLE);
     return status;
 }
