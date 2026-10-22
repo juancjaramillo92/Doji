@@ -666,7 +666,7 @@ test('the columns schema.sql grants are exactly the columns the app writes', asy
 
   // The revoke has to name PUBLIC as well as both roles. Revoking from one is
   // not revoking from the others — the lesson `eugenia_search` once cost.
-  assert.match(grants, /revoke insert, update, delete on public\.trades\s+from public, anon, authenticated;/,
+  assert.match(grants, /revoke insert, update, delete, truncate on public\.trades\s+from public, anon, authenticated;/,
     'schema.sql revokes from fewer than all three of PUBLIC, anon and authenticated, so ' +
     'the privilege survives under whichever name was left out');
 });
@@ -3357,6 +3357,23 @@ test('every table schema.sql creates is in the backup, or said not to be', async
   const said = source('docs/README.md').match(/reads\s+(\w+) tables into one JSON artifact/);
   assert.ok(said, 'the README no longer says how many tables the backup reads');
   assert.equal(said[1], WORDS[backed.length], `the README says ${said[1]} tables and the backup reads ${backed.length}`);
+});
+
+/* ─── The page both journal walks read ───────────────────────────────────────
+   The app's load and the backup each stop on a short page, so a page longer
+   than the project's Max rows ends either walk after its first. Two runtimes,
+   so two constants, and the README states the floor they need once for both.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+test('the app and the backup read pages of one size, the floor the README sets for Max rows', () => {
+  const app = Number(source('index.html').match(/READ_PAGE:\s*(\d+)/)?.[1]);
+  const backup = Number(source('scripts/backup.mjs').match(/const PAGE = (\d+);/)?.[1]);
+  const said = source('docs/README.md').match(/read pages of (\d+) and so need \*\*Max rows[^*]*at (\d+) or more\*\*/);
+  assert.ok(Number.isInteger(app) && Number.isInteger(backup) && said,
+    'a page size or the README\'s floor is no longer where this reads it');
+  assert.equal(app, backup, `the app reads pages of ${app} and the backup pages of ${backup}`);
+  assert.deepEqual([Number(said[1]), Number(said[2])], [app, app],
+    `the README says pages of ${said[1]} and a floor of ${said[2]}; both walks read ${app}`);
 });
 
 /* ─── verify.sql has to ask about everything the files declare ───────────────

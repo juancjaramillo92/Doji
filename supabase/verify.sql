@@ -3,7 +3,7 @@
 -- ───────────────────────────────────────────────────────────────────────────
 -- The schema is applied by hand on purpose, which makes schema.sql a claim
 -- about the database. This tests the claim. It writes nothing: run the
--- whole file after any manual change and read the `ok` column — all 102 checks.
+-- whole file after any manual change and read the `ok` column — all 103 checks.
 --
 -- One statement, because a SQL editor shows only the last statement's result.
 -- The listings that say which object, grant or schedule are diagnose.sql.
@@ -90,7 +90,8 @@ from (values
 
   /* ─── The journal/broker boundary ────────────────────────────────────────
      Three rows, because they fail differently: no broker column writable,
-     the app's five still writable, and no insert or delete at all. */
+     the app's five still writable, and no insert, delete or truncate at all,
+     nor a read signed out. */
   ('no broker column of trades is writable by the publishable key',
    (select count(*)::text from information_schema.columns c
      where c.table_schema = 'public' and c.table_name = 'trades'
@@ -106,11 +107,14 @@ from (values
      where has_column_privilege('authenticated', 'public.trades', col, 'UPDATE')),
    '5'),
 
-  ('the publishable key can neither insert nor delete a trade',
-   (select count(*)::text from unnest(array['INSERT','DELETE']) priv
-     where has_table_privilege('anon', 'public.trades', priv)
-        or has_table_privilege('authenticated', 'public.trades', priv)),
-   '0'),
+  -- Named, so a grant that came back says which. TRUNCATE bypasses RLS.
+  ('the publishable key cannot insert, delete or truncate a trade, nor read one signed out',
+   (select coalesce(string_agg(r || ':' || priv, ',' order by r, priv), 'none')
+      from (values ('anon', 'INSERT'), ('anon', 'DELETE'), ('anon', 'TRUNCATE'), ('anon', 'SELECT'),
+                   ('authenticated', 'INSERT'), ('authenticated', 'DELETE'),
+                   ('authenticated', 'TRUNCATE')) v(r, priv)
+     where has_table_privilege(r, 'public.trades', priv)),
+   'none'),
 
   -- Without a policy the card reads an empty list and hides itself.
   ('the app can read the three tables its card draws',
@@ -119,6 +123,15 @@ from (values
        and tablename in ('eugenia_calendar','eugenia_thesis','eugenia_loops')
        and cmd = 'SELECT'),
    '3'),
+
+  -- Those three policies read for any signed-in account, so there must be one.
+  -- Whether sign-ups are open is a dashboard setting no query can read; an
+  -- account they let in is one this counts.
+  ('one account, his',
+   (select (xpath('/row/c/text()', query_to_xml(
+             'select count(*) as c from auth.users', false, true, '')))[1]::text
+     where to_regclass('auth.users') is not null),
+   '1'),
 
   -- Expected zero: catches a policy added to the wrong table.
   ('her notes and turns stay closed to the app',

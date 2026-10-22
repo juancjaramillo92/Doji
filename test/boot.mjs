@@ -89,26 +89,35 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
   const db = { rows: [], error: null, patches: [] };
   win.__db = db;
 
-  // A real query builder is thenable, so it is awaited wherever the caller stops
-  // chaining; a stub resolving on one terminal method answers `undefined` the day
-  // a query drops it.
-  const answer = () => Promise.resolve(
-    db.error ? { data: null, error: db.error } : { data: db.rows, error: null });
-
   /* Per-table answers, so a query for the calendar is never handed `trades`.
      `db.tables[name]` where set, `db.rows` otherwise. */
   db.tables = {};
   db.read = [];
 
+  /* PostgREST answers at most its Max rows, whatever is asked — Supabase's
+     default is 1000 — and a range picks the slice. Without the cap a read that
+     forgets to page is handed the whole table here and nowhere else. */
+  const MAX_ROWS = 1000;
+  db.orders = [];
+
   const bind = (name) => {
     const rows = () => (name in db.tables ? db.tables[name] : db.rows);
-    const reply = () => Promise.resolve(
-      db.error ? { data: null, error: db.error } : { data: rows(), error: null });
+    let span = null;
+    const reply = () => {
+      const all = rows(), [from, to] = span ?? [0, all.length - 1];
+      span = null;
+      return Promise.resolve(db.error ? { data: null, error: db.error }
+        : { data: all.slice(from, Math.min(to + 1, from + MAX_ROWS)), error: null });
+    };
     const t = {
       select: () => t,
-      order:  () => t,
+      order(column) { db.orders.push(`${name}.${column}`); return t; },
+      range(from, to) { span = [from, to]; return t; },
       // The filter methods the app chains, each returning the builder.
       eq: () => t, gte: () => t, lte: () => t, is: () => t, limit: () => t,
+      // A real query builder is thenable, so it is awaited wherever the caller
+      // stops chaining; a stub resolving on one terminal method answers
+      // `undefined` the day a query drops it.
       then: (ok, no) => reply().then(ok, no),
       update(patch) { db.patches.push(patch); return t; },
       // db.error honoured here too, or the failure branch of every .single() path —

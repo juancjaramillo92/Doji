@@ -96,8 +96,9 @@ create table if not exists public.trades (
   constraint trades_commission_nonneg check (commission is null or commission >= 0)
 );
 
--- The client's only read: one user's trades, newest day first. The DESC lets
--- the index serve the sort as well as the filter.
+-- One owner's trades by filing day. Every row is his, so no read the code
+-- makes needs it, and at a few hundred rows the planner takes it or a scan
+-- alike; kept, since dropping it buys nothing measurable (REFACTOR.md R-93).
 create index if not exists trades_user_open_day on public.trades (user_id, open_day desc);
 
 create or replace trigger trades_touch_updated_at
@@ -155,11 +156,14 @@ comment on column public.trades.best_price is
 -- agree.test.mjs holds the list against both. To roll back to Supabase's
 -- defaults, with RLS still behind them:
 --
---     grant insert, update, delete on public.trades to anon, authenticated;
+--     grant select, insert, update, delete, truncate on public.trades to anon, authenticated;
 
--- SELECT is untouched: the app and realtime read every column. PUBLIC and both
--- roles by name, for eugenia_search's reason.
-revoke insert, update, delete on public.trades from public, anon, authenticated;
+-- A signed-in session keeps SELECT: the app and realtime read every column.
+-- TRUNCATE goes from both, the one verb RLS does not govern; the signed-out key
+-- loses SELECT, since the app reads only once signed in and RLS would hand it
+-- no row anyway. PUBLIC and both roles by name, for eugenia_search's reason.
+revoke insert, update, delete, truncate on public.trades from public, anon, authenticated;
+revoke select on public.trades from public, anon;
 
 -- The four journal answers and the soft-delete flag.
 grant update (setup, followed_rules, followed_sl, followed_tp, deleted)
@@ -919,7 +923,8 @@ create or replace trigger trades_eugenia_closed
 -- The three tables the dashboard card draws: the calendar, the story, the open
 -- threads. Never her notes or turns, which stay denied to the publishable key.
 -- They hold no user_id, so `using (true)` for a signed-in session is the honest
--- policy; the grants below keep the verb to SELECT.
+-- policy while his is the only account — sign-ups stay off, README Setup from
+-- scratch. The grants below keep the verb to SELECT.
 do $$
 begin
   if not exists (select 1 from pg_policies
