@@ -106,7 +106,10 @@ int gladys_journal(void) {
         char body[96];
         snprintf(body, sizeof body, "{\"data\":\"%s|%s|%s\"}", t.id, ANSWERS[q].key,
                  q == 0 ? SETUPS[half] : half ? "1" : "0");
-        reached = knock(body, &t);
+        // An answer her door did not take, the network still up, leaves the
+        // question where it was to be tapped again: its not moving on is the
+        // sign it was not saved. With the network gone, the journal ends.
+        reached = knock(body, &t) || net_wait(0);
         answered = true;
     }
     if (reached && answered && t.waiting == 0) journal_done(all_yes);

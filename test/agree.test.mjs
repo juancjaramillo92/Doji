@@ -423,6 +423,19 @@ test('a trade\'s questions wait for the conversation to end, and PWR on them goe
   assert.doesNotMatch(ask, /ulTaskNotifyTake/, 'a question takes the press that closed it, so she never hears it');
 });
 
+/* An answer her door did not take ended the journal on the dark, with nothing
+   to say it was not saved. While the network is up the question stays to be
+   tapped again — knock() leaves the trade as it was, so the loop asks the
+   same one — and only the network gone ends it. gladys.c is the board's, so
+   the line is read. */
+test('a journal answer her door does not take is asked again while the network is up', () => {
+  const journal = bodyOf(source('charm/main/gladys.c'), 'int gladys_journal(void) {', 'gladys.c has no gladys_journal()');
+  assert.match(journal, /reached = knock\(body, &t\) \|\| net_wait\(0\);/,
+    'a refused answer ends the journal with the network still up, and nothing says it was not saved');
+  assert.match(bodyOf(source('charm/main/gladys.c'), 'static bool knock(const char *body, trade_t *t) {'),
+    /return ok && read_answer\(got, t\);/, 'a refused answer now changes the trade, so the same question is not asked again');
+});
+
 /* The charm's manifest asks for ranges, so a build resolves its components
    afresh unless dependencies.lock names them: a new board package would
    change the firmware under a commit that never touched it. The lock is
