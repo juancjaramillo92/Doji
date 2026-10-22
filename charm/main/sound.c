@@ -35,7 +35,6 @@ void sound_start(void) {
 }
 
 void sound_stop(void) {
-    if (!speaker) return;
     esp_codec_dev_close(speaker);
     esp_codec_dev_close(mics);
 }
