@@ -1613,7 +1613,7 @@ test('the charm keeps the market\'s week the server keeps', () => {
   assert.ok(roll && close && opens, 'errand.c or marketOpen no longer states the week as this test reads it');
   assert.deepEqual([roll, roll], [close, opens], 'the charm keeps a market week the server does not');
   assert.equal(Number(EUGENIA_TS.match(/^export const ROLL_HOUR = (\d+);/m)?.[1]), roll, 'the charm\'s roll is not doji-eugenia\'s');
-  assert.match(c, /\(t->tm_wday == 5 && t->tm_hour >= ROLL_HOUR \+ GRACE_H\) \|\| t->tm_wday == 6 \|\|\s*\(t->tm_wday == 0 && t->tm_hour < ROLL_HOUR\)/,
+  assert.match(c, /\(t\.tm_wday == 5 && t\.tm_hour >= ROLL_HOUR \+ GRACE_H\) \|\| t\.tm_wday == 6 \|\|\s*\(t\.tm_wday == 0 && t\.tm_hour < ROLL_HOUR\)/,
     'errand.c no longer gives the weekend its days as marketOpen does');
 });
 
