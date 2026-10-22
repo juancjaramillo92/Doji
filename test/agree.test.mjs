@@ -423,6 +423,22 @@ test('a trade\'s questions wait for the conversation to end, and PWR on them goe
   assert.doesNotMatch(ask, /ulTaskNotifyTake/, 'a question takes the press that closed it, so she never hears it');
 });
 
+/* The charm's manifest asks for ranges, so a build resolves its components
+   afresh unless dependencies.lock names them: a new board package would
+   change the firmware under a commit that never touched it. The lock is
+   committed, names every component the manifest asks for, and the charm
+   workflow fails a build that resolved anything else. */
+test('the charm builds from the component versions its lock names', () => {
+  const lock = source('charm/dependencies.lock'), manifest = source('charm/main/idf_component.yml');
+  const asked = [...manifest.matchAll(/^  ([\w/.-]+):$/gm)].map(m => m[1]).sort();
+  const direct = lock.slice(lock.indexOf('direct_dependencies:')).match(/^- ([\w/.-]+)$/gm)?.map(l => l.slice(2)).sort();
+  assert.ok(asked.length >= 4, `only ${asked.length} components read off the manifest — the reader has gone blind`);
+  assert.deepEqual(direct, asked, 'dependencies.lock does not pin what idf_component.yml asks for');
+  const workflow = source('.github/workflows/charm.yml');
+  assert.match(workflow, /git ls-files --error-unmatch dependencies\.lock/, 'the charm workflow builds without a committed lock');
+  assert.match(workflow, /git diff --exit-code -- dependencies\.lock/, 'the charm workflow builds from versions its lock does not name');
+});
+
 /* The charm's words are drawn in fonts holding only the letters
    tools/fonts.sh gave them; a word with any other letter draws a gap. */
 test('every word on the charm\'s screens is in the font that draws it', () => {

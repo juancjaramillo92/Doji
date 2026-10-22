@@ -3218,7 +3218,10 @@ spare; the same firmware goes on any.
 digest) whenever `charm/` changes. The board's support package
 (`waveshare/esp32_s3_touch_amoled_1_75c`) and LVGL 9.5 come from Espressif's
 component registry, at the versions Waveshare's own examples for this board use,
-with Espressif's audio codecs for the Opus a recording is encoded in.
+with Espressif's audio codecs for the Opus a recording is encoded in. The
+versions every build uses are the ones `charm/dependencies.lock` names, and the
+workflow fails a build that resolved any other, so a new release reaches the
+firmware only by a commit that changes the lock.
 The download is **`charm-full.bin`**, one image written at `0x0`: plug the
 board in by USB-C and flash it from Chrome with Espressif's web flasher, or with
 `esptool.py write_flash 0x0 charm-full.bin`. Not `charm.bin`, which is
