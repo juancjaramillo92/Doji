@@ -219,5 +219,20 @@
       "It says which of the daily, 4H and 1H its bias reading rests on, and why that chart",
       "It does not say the bias step fails merely because the three charts disagree or do not all point the same way"
     ]
+  },
+  {
+    "id": "critic-print-beside-his-position",
+    "why": "a print due beside a position he opened knowing it was there is R-20's, his to weigh; on 15 October the briefing tied both 08:30 prints to the position he opened that morning, and the critic, which runs last, sent it",
+    "path": "critic",
+    "context": "\n\nWhat he has on, and where his day stands:\n· open since 07:54 ET — buy 4oz from 4151.32, stop 4130.55 and target 4180.43 as first seen\n· his day so far: 0.00 against an account of 2000 implied by his size — inside the 4% R-11 sets",
+    "draft": "Hola. Wednesday's inflation report came in hot, and the ten-year still ended lower. Futures now price a 31% chance of an October hike, up from about one in five.\n\nWhy that matters for gold.\n\nA hike lifts what bonds pay once inflation is taken out. Gold pays nothing, so that is the return it competes with. A higher return there makes gold a harder sell.\n\nToday:\n- 08:30 Producer prices, expected a little hotter\n- 08:30 Retail sales, expected to slow\n\nBoth 08:30 prints land while you have a position open.\n\nOne thing to notice: silver has fallen hard since yesterday morning, and gold did not.",
+    "mustNot": [
+      "while you (have|hold) a position",
+      "on your position"
+    ],
+    "judge": [
+      "The briefing does not tie the 08:30 releases to the position he opened this morning",
+      "Both 08:30 releases are still named on the calendar list"
+    ]
   }
 ]

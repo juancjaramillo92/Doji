@@ -239,6 +239,17 @@ export const PLANTS = [
         .replace(/THE MAP OF HIS CHARTS IS THE HOURS ON IT,[\s\S]*?a call you file\.\n\n/, ''),
       CRITIC: p.CRITIC.replace(/Is the map of his charts in the prose\?[\s\S]*?it comes out\.\n\n/, ''),
     }) },
+  /* The writer states R-20's caution once, and the critic runs under the
+     writer's prompt, so both copies go. On 15 October the writer tied the
+     08:30 prints to the position opened that morning and the critic, with no
+     check for it, sent it. */
+  { why: 'a print beside a position he opened knowingly left to him, gone from the critic and the writer',
+    cases: ['critic-print-beside-his-position'],
+    breaks: (p) => ({
+      ...p,
+      CRITIC: p.CRITIC.replace(/Is a print put beside a position he opened this session\?[\s\S]*?said with the rule\.\n\n/, ''),
+      SYSTEM: p.SYSTEM.replace(/ A print due beside a position he opened knowing\s+it was there is R-20's,[\s\S]*?adds nothing he did not have\./, ''),
+    }) },
   /* From 15 to 22 October she failed the bias step whenever the three charts
      disagreed. The plan check points at the call's rule, so both go. */
   { why: 'the bias weighed rather than failed on disagreement, gone from the writer',

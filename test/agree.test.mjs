@@ -6459,6 +6459,21 @@ test('the number budget is stated to the writer and to the critic, and is one bu
     'the writer and the critic hold different number budgets, and the critic runs last');
 });
 
+/* A PRINT BESIDE A POSITION HE OPENED KNOWING IT WAS THERE IS HIS. SYSTEM says
+   so, and on 15 October the briefing still told him both 08:30 prints landed
+   on the position he had opened that morning; the critic, which runs last and
+   had no such check, let it through. The two copies name the rule alike. */
+test('a print beside a position he opened knowingly is his, in the writer and in the critic', () => {
+  const flat = (name) => EUGENIA_PROMPT.match(new RegExp(`export const ${name} = \`([\\s\\S]*?)\`;`))[1]
+    .replace(/\s+/g, ' ');
+  assert.match(flat('SYSTEM'), /A print due beside a position he opened knowing it was there is R-20's, his to weigh/,
+    'the writer no longer leaves a print beside his own position to him');
+  assert.match(flat('CRITIC'), /a position he opened knowing it was there is R-20's, his to weigh, and the calendar already names it, so a sentence tying the two together comes out/,
+    'the critic no longer takes a print tied to his position out of the briefing');
+  assert.match(flat('CRITIC'), /landing on a position opened in an earlier session is R-19's collision, and it stays/,
+    'the critic takes R-19\'s collision out with R-20\'s caution');
+});
+
 /* HER TECHNICAL HALF WAS MUTE ON A RULE NOBODY WROTE. From 15 to 22 October she
    made one call in five free sessions, refusing the rest because the three bias
    charts did not agree; his step 1 says nothing of how they combine, and he left

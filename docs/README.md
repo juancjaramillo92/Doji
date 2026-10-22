@@ -1815,6 +1815,13 @@ does it obey his standing instructions. It returns the briefing, not notes about
 them.** Without the map, the mechanism sitting in the paragraph reads as a
 redefinition, and the build-up `PITCH` required is cut — last, fluently.
 
+**It takes out a print tied to a position he opened that session.** That is
+R-20's caution, his to weigh, and the calendar already names the print; on 15
+October the briefing told him both 08:30 prints landed on the position he had
+opened that morning, and the critic, with no check for it, sent it. A print
+landing on a position from an earlier session is R-19's collision and stays.
+`SYSTEM` and `CRITIC` say it alike, and `agree.test.mjs` holds the pair.
+
 **It cannot make things worse, and that is enforced.** A revision that comes back
 empty, apologetic or past `keepDraft`'s bound is a critic that failed, and the
 draft goes.
