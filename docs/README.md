@@ -3441,7 +3441,10 @@ wakes her from sleep and the charm reads the button itself: shorter than
 round the rim as it is, over her face or the sleep screen — she closes her
 eyes and switches the board off through the power chip. The chip's own
 switch-off is set to its longest, ten seconds, so the goodnight always comes
-first, and holding PWR that long is the way out of a charm that has hung.
+first, and holding PWR that long is the way out of a charm that has hung. A
+battery too low for her radio switches her off the same way: its voltage
+sagging resets the chip, and rather than wake into the radio and reset again,
+off the cable she switches the board off, and PWR switches it on again.
 BOOT is not the talk button: the chip reads it at start to choose its
 programming mode, and a press at the wrong moment would choose it.
 
@@ -3463,7 +3466,8 @@ against the 40 KB Espressif's codec README asks for an encoder — how long a
 battery lasts, and what two things save of it: the panel held in reset under
 an empty sleep screen (and that it shows black while held), and the codecs
 switched off before sleep (the speaker's amplifier is enabled on GPIO46,
-which is left floating in sleep).
+which is left floating in sleep), and that a battery run down resets her as a
+brownout — switching her off — and whether a cable alone switches her back on.
 
 ---
 

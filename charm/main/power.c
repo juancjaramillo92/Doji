@@ -80,7 +80,7 @@ static void watch(void *arg) {
         vTaskDelay(pdMS_TO_TICKS(FACE_GOODNIGHT_MS));
         face_set_mode(FACE_DARK);
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
-        set(COMMON, get(COMMON) | 1);
+        power_off();
     }
 }
 
@@ -96,6 +96,10 @@ void power_start(TaskHandle_t talker) {
     gpio_config_t buttons = { .pin_bit_mask = 1ULL << PWR_PIN | 1ULL << BOOT_PIN, .mode = GPIO_MODE_INPUT };
     gpio_config(&buttons);
     xTaskCreate(watch, "power", 3072, talker, 3, NULL);
+}
+
+void power_off(void) {
+    set(COMMON, get(COMMON) | 1);
 }
 
 bool power_low(void) {

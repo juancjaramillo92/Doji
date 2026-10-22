@@ -1705,6 +1705,19 @@ test('an empty sleep screen is the panel held in reset, not drawn', () => {
   assert.match(source('charm/main/sleep.c'), /HELD\[\] = \{[^}]*BSP_LCD_RST/, 'the panel\'s reset is no longer held through sleep');
 });
 
+/* At the end of a charge her radio sags the battery and the chip resets as
+   a brownout, which is no sleep wake, so it woke her — screen and radio —
+   into the next reset. Off the cable that reset switches the board off, before
+   anything is lit or joined. life() is the board's, so it is read. */
+test('a battery too low for her radio switches her off rather than waking her again', () => {
+  const life = bodyOf(source('charm/main/main.c'), 'static void life(void *arg) {', 'main.c has no life()');
+  const off = life.indexOf('if (esp_reset_reason() == ESP_RST_BROWNOUT && power_charge() < 0) power_off();');
+  assert.ok(off > life.indexOf('power_start(') && off < life.indexOf('errand()') && off < life.indexOf('awake()'),
+    'a brownout no longer switches her off before she wakes into the radio again');
+  assert.match(bodyOf(source('charm/main/power.c'), 'void power_off(void) {'), /set\(COMMON, get\(COMMON\) \| 1\);/,
+    'power_off() no longer switches the board off through the power chip');
+});
+
 /* The codecs are powered by the board, not the chip, so deep sleep alone left
    them biased — microphones, converters and the speaker's amplifier — from
    the first waking on. Every sleep that can follow sound closes them first;
