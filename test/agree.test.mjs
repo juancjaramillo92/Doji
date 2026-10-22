@@ -6459,6 +6459,44 @@ test('the number budget is stated to the writer and to the critic, and is one bu
     'the writer and the critic hold different number budgets, and the critic runs last');
 });
 
+/* A PRINT BESIDE A POSITION HE OPENED KNOWING IT WAS THERE IS HIS. SYSTEM says
+   so, and on 15 October the briefing still told him both 08:30 prints landed
+   on the position he had opened that morning; the critic, which runs last and
+   had no such check, let it through. The two copies name the rule alike. */
+test('a print beside a position he opened knowingly is his, in the writer and in the critic', () => {
+  const flat = (name) => EUGENIA_PROMPT.match(new RegExp(`export const ${name} = \`([\\s\\S]*?)\`;`))[1]
+    .replace(/\s+/g, ' ');
+  assert.match(flat('SYSTEM'), /A print due beside a position he opened knowing it was there is R-20's, his to weigh/,
+    'the writer no longer leaves a print beside his own position to him');
+  assert.match(flat('CRITIC'), /a position he opened knowing it was there is R-20's, his to weigh, and the calendar already names it, so a sentence tying the two together comes out/,
+    'the critic no longer takes a print tied to his position out of the briefing');
+  assert.match(flat('CRITIC'), /landing on a position opened in an earlier session is R-19's collision, and it stays/,
+    'the critic takes R-19\'s collision out with R-20\'s caution');
+});
+
+/* HER TECHNICAL HALF WAS MUTE ON A RULE NOBODY WROTE. From 15 to 22 October she
+   made one call in five free sessions, refusing the rest because the three bias
+   charts did not agree; his step 1 says nothing of how they combine, and he left
+   that to her judgment. A sentence, so it is read, in her call and in his plan. */
+test('her bias is weighed rather than failed on disagreement, for her call and his plan', () => {
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  assert.match(system, /HOW THE THREE BIAS CHARTS ADD UP IS YOURS TO JUDGE\. .*?charts that disagree are something to weigh, never a failed step on their own\. Say which chart your bias rests on and why/,
+    'charts that disagree read as a failed step again, so she makes no call');
+  assert.match(system, /The bias on the higher timeframes, weighed as it is for your own call\./,
+    'his plan\'s bias is failed on a rule her own call is not held to');
+});
+
+/* A CAUSE WITH ITS EVIDENCE MISSING IS A GUESS. On 22 October, with the odds
+   unread and the ten-year and the dollar both easing, the briefing put an 1
+   fall down to fear of what the Fed would do next. */
+test('a move rates and the dollar do not explain is never put on an unread Fed', () => {
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  assert.match(system, /THEN SAY WHAT IS CARRYING IT, FROM WHAT YOU CAN SEE, OR SAY YOU CANNOT SEE IT\. get_around holds what investors and the speculators are doing\./,
+    'a move the chain does not explain is left without where to look');
+  assert.match(system, /Never fill the gap with the Fed's path when the futures pricing was not read/,
+    'a move rates and the dollar do not explain is put down to the Fed with the odds unread');
+});
+
 test('the briefing opens on the weeks, in the writer and in the critic', () => {
   /* THE SCALE IS STATED TWICE, because the critic runs last and rewrites: a
      writer told to open on the big picture under a critic that tests the opening

@@ -41,13 +41,18 @@ export const MODEL = {
 /* ─── What she is asked, path by path ────────────────────────────────────────
    Each mirrors its call site in index.ts: converse for a reply, critique() and
    trim() for the gates, postTradeEvent for the trade look, postReview for the
-   Saturday review's draft. agree.test.mjs holds
+   Saturday review's draft, postBriefing for the weekday briefing's. agree.test.mjs holds
    the gates' two markers against the function's. `prompts` is a parameter so
    a planted defect can hand in a broken copy. A case whose prompt tells her to
    read a section names it as `strategy`, and is handed the section itself,
    read from the module get_strategy serves. */
 const context = (c) => (c.context ?? '') +
   (c.strategy ? `\n\nWhat get_strategy returned for §${c.strategy}:\n\n${SECTIONS[c.strategy]}` : '');
+
+/* The weekday briefing's draft, asked as postBriefing asks it: the request,
+   then what it was handed. With no tools, so a case hands her what a search
+   or get_around would have. */
+export const BRIEF_ASKED = "Today's briefing, please.";
 
 export const PATHS = {
   reply:  (c) => ({ model: MODEL.opus, effort: 'medium',
@@ -59,6 +64,7 @@ export const PATHS = {
   trade:  (c, p) => ({ model: MODEL.opus, effort: 'medium',
                        content: `${p.TRADE_EVENT}\n\n${c.situation}${context(c)}` }),
   review: (c, p) => ({ model: MODEL.opus, effort: 'high', content: `${p.REVIEW}${context(c)}` }),
+  brief:  (c) => ({ model: MODEL.opus, effort: 'high', content: `${BRIEF_ASKED}${context(c)}` }),
 };
 
 export const PROMPTS = { SYSTEM, CRITIC, TRIM, TRADE_EVENT, REVIEW };
@@ -232,6 +238,26 @@ export const PLANTS = [
         .replace(/THE BRIEFING IS THE WEEKS BEHIND HIS CHART, NOT THE HOURS ON IT\.[\s\S]*?the story that leads\.\n\n/, '')
         .replace(/THE MAP OF HIS CHARTS IS THE HOURS ON IT,[\s\S]*?a call you file\.\n\n/, ''),
       CRITIC: p.CRITIC.replace(/Is the map of his charts in the prose\?[\s\S]*?it comes out\.\n\n/, ''),
+    }) },
+  /* The writer states R-20's caution once, and the critic runs under the
+     writer's prompt, so both copies go. On 15 October the writer tied the
+     08:30 prints to the position opened that morning and the critic, with no
+     check for it, sent it. */
+  { why: 'a print beside a position he opened knowingly left to him, gone from the critic and the writer',
+    cases: ['critic-print-beside-his-position'],
+    breaks: (p) => ({
+      ...p,
+      CRITIC: p.CRITIC.replace(/Is a print put beside a position he opened this session\?[\s\S]*?said with the rule\.\n\n/, ''),
+      SYSTEM: p.SYSTEM.replace(/ A print due beside a position he opened knowing\s+it was there is R-20's,[\s\S]*?adds nothing he did not have\./, ''),
+    }) },
+  /* From 15 to 22 October she failed the bias step whenever the three charts
+     disagreed. The plan check points at the call's rule, so both go. */
+  { why: 'the bias weighed rather than failed on disagreement, gone from the writer',
+    cases: ['bias-weighed'],
+    breaks: (p) => ({
+      ...p,
+      SYSTEM: p.SYSTEM.replace(/HOW THE THREE BIAS CHARTS ADD UP IS YOURS TO JUDGE\.[\s\S]*?then say that is what failed\.\n\n/, '')
+        .replace(/, weighed as it is for your own call\./, '.'),
     }) },
 ];
 

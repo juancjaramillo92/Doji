@@ -1815,6 +1815,13 @@ does it obey his standing instructions. It returns the briefing, not notes about
 them.** Without the map, the mechanism sitting in the paragraph reads as a
 redefinition, and the build-up `PITCH` required is cut — last, fluently.
 
+**It takes out a print tied to a position he opened that session.** That is
+R-20's caution, his to weigh, and the calendar already names the print; on 15
+October the briefing told him both 08:30 prints landed on the position he had
+opened that morning, and the critic, with no check for it, sent it. A print
+landing on a position from an earlier session is R-19's collision and stays.
+`SYSTEM` and `CRITIC` say it alike, and `agree.test.mjs` holds the pair.
+
 **It cannot make things worse, and that is enforced.** A revision that comes back
 empty, apologetic or past `keepDraft`'s bound is a critic that failed, and the
 draft goes.
@@ -2199,6 +2206,12 @@ you.
   or low off the bigger charts on the map, its setup the one his rules name for where the level sits, its stop
   where the idea is wrong beyond it. A call whose level is not on the map is a
   guess, and one that needs a chart the map says was not read is not made.
+  **How the three bias charts add up is hers to judge**, his decision of 22
+  October: his step 1 names the daily, 4H and 1H and not how they combine, and
+  §4.2 says the bias does not gate Support & Resistance. Read as needing all
+  three to agree, it left one call in five free sessions; charts that disagree
+  are now weighed, and she says which chart decided. His plan's bias is weighed
+  the same way.
 - **A call can wait for its setup.** In the morning the setup is usually not
   there yet, so the call says what it waits for — *if price comes back to 4,000
   and a fifteen-minute candle closes above it, buy at 4,002*. The condition is
@@ -2300,7 +2313,11 @@ rather than searched for, his rules to hold them to, and a meter on each half.
   **no capture here says which hours these use**, so the first live run's
   figures are the check — a dollar index that tracks gold at nearly zero for
   weeks is the sign of a pairing a day out. Every read she gives is filed with the channel its chain ran
-  down.
+  down. **A move the chain does not explain is said as unexplained**: she
+  names what she can see carrying it, `get_around` holding what investors and
+  the speculators are doing, and never puts it on the Fed's path with the
+  futures pricing unread — on 22 October she put an $81 fall the ten-year and
+  the dollar did not explain down to fear of the next hike.
 - **How a change is proved.** The map's readings by `scripts/calibrate.mjs`,
   her reading of a chart by `scripts/replay.mjs` over the same past mornings
   before and after, her calls by their record, her reads by theirs, counted per channel, and any
