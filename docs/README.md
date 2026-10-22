@@ -3306,7 +3306,10 @@ way to add one, and Replace for either key, checked before the old one goes. She
 keeps four networks: a fifth is refused until one is removed, never swapped in
 silently. Finishing ends on "All set", since the page cannot close itself.
 Everything is kept in her own flash (NVS, namespace `charm`), and finishing
-restarts her as herself. The addresses of the two doors are the repository's —
+restarts her as herself. So does ten minutes with no phone on her network, once
+she is set up: BOOT held in a pocket does not leave her network and her code
+up until the battery is gone. A board never set up has nothing else to be, and
+waits. The addresses of the two doors are the repository's —
 in `charm/main/net.h`, which `agree.test.mjs` reads with every other caller —
 and only the keys are secret, so a lost charm is cut off by changing them in
 Supabase.

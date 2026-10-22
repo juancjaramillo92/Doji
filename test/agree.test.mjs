@@ -1705,6 +1705,21 @@ test('an empty sleep screen is the panel held in reset, not drawn', () => {
   assert.match(source('charm/main/sleep.c'), /HELD\[\] = \{[^}]*BSP_LCD_RST/, 'the panel\'s reset is no longer held through sleep');
 });
 
+/* The setup ran until something restarted her, so BOOT held in a pocket left
+   her network up and a white code lit on her screen until the battery went.
+   Set up already and left alone, she restarts as herself; setup.c is the
+   board's, so the loop is read. */
+test('a charm already set up gives the setup up when no phone comes', () => {
+  const setup = source('charm/main/setup.c');
+  const run = bodyOf(setup, 'void setup_run(void) {', 'setup.c has no setup_run()');
+  const alone = Number(setup.match(/^#define ALONE_MS\s+(\d+)/m)?.[1]);
+  assert.ok(alone >= 60_000 && alone <= 30 * 60_000, `the setup gives up after ${alone} ms alone, or no longer says when`);
+  assert.match(run, /if \(esp_wifi_ap_get_sta_list\(&phones\) == ESP_OK && phones\.num\) seen = xTaskGetTickCount\(\);/,
+    'a phone on her network no longer keeps the setup up');
+  assert.match(run, /if \(config_ready\(\) && xTaskGetTickCount\(\) - seen >= pdMS_TO_TICKS\(ALONE_MS\)\) esp_restart\(\);/,
+    'the setup no longer gives up on its own, or gives up on a board never set up');
+});
+
 /* At the end of a charge her radio sags the battery and the chip resets as
    a brownout, which is no sleep wake, so it woke her — screen and radio —
    into the next reset. Off the cable that reset switches the board off, before
