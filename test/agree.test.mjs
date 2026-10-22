@@ -1586,6 +1586,21 @@ test('the charm asks for the briefing in the hours it is written', () => {
 });
 
 
+/* The charm asks Gladys seldom while the market is shut, from its own copy
+   of the market's week. Read out of errand.c beside marketOpen's hours and
+   index.ts's roll; charm.test.mjs walks what the copy does. */
+test('the charm keeps the market\'s week the server keeps', () => {
+  const c = source('charm/main/errand.c');
+  const roll = Number(c.match(/^#define ROLL_HOUR\s+(\d+)/m)?.[1]);
+  const open = bodyOf(source('supabase/functions/_shared/edge.ts'), 'export function marketOpen(');
+  const close = Number(open.match(/wd === 5 && hour >= (\d+)/)?.[1]), opens = Number(open.match(/wd === 0 && hour < (\d+)/)?.[1]);
+  assert.ok(roll && close && opens, 'errand.c or marketOpen no longer states the week as this test reads it');
+  assert.deepEqual([roll, roll], [close, opens], 'the charm keeps a market week the server does not');
+  assert.equal(Number(EUGENIA_TS.match(/^export const ROLL_HOUR = (\d+);/m)?.[1]), roll, 'the charm\'s roll is not doji-eugenia\'s');
+  assert.match(c, /\(t->tm_wday == 5 && t->tm_hour >= ROLL_HOUR \+ GRACE_H\) \|\| t->tm_wday == 6 \|\|\s*\(t->tm_wday == 0 && t->tm_hour < ROLL_HOUR\)/,
+    'errand.c no longer gives the weekend its days as marketOpen does');
+});
+
 /* Asking ota_due spends the night's look, so the battery is asked before it:
    asked after, a low battery at the hour's first errand would spend the night
    though the cable went in minutes later. */

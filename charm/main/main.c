@@ -144,7 +144,7 @@ static void sleep_now(void) {
         }
         drawn = marks;
     }
-    errand_at = time(NULL) + errand_wait(charge >= 0, away);
+    errand_at = time(NULL) + errand_wait(time(NULL), charge >= 0, trade_waits, away);
     sound_stop();
     motion_arm();
     sleep_until(errand_at, true);

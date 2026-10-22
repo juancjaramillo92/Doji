@@ -12,7 +12,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { briefDue, retryDue, charmFrame, FRAME } from '../supabase/functions/doji-eugenia/index.ts';
-import { nyDate } from '../supabase/functions/_shared/edge.ts';
+import { nyDate, marketOpen } from '../supabase/functions/_shared/edge.ts';
 
 const MAIN = 'charm/main';
 
@@ -20,7 +20,8 @@ const MAIN = 'charm/main';
 // `lift <six readings in g>`, `hold <six readings in g>`, `dns <a message in
 // hex>` (- for no answer), `ogg <room> <packet sizes…> 0` (the file in hex, or
 // - when a packet did not fit), `frames <read size> <a stream in hex>` (the
-// volume, -1 for none, then each sample), `wait <charging> <away>` (seconds).
+// volume, -1 for none, then each sample), `wait <epoch> <charging> <trade>
+// <away>` (seconds).
 const DRIVER = `
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,8 +45,9 @@ int main(int argc, char **argv) {
     static int16_t voice[512];
     while (scanf("%15s", op) == 1) {
         if (!strcmp(op, "due") && scanf("%lld", &t) == 1) printf("%d\\n", briefing_due((time_t)t));
-        int charging, away;
-        if (!strcmp(op, "wait") && scanf("%d %d", &charging, &away) == 2) printf("%d\\n", errand_wait(charging, away));
+        int charging, trade, away;
+        if (!strcmp(op, "wait") && scanf("%lld %d %d %d", &t, &charging, &trade, &away) == 4)
+            printf("%d\\n", errand_wait((time_t)t, charging, trade, away));
         if (!strcmp(op, "announce") && scanf("%lld", &t) == 1) { briefing_announced((time_t)t); printf("ok\\n"); }
         if (!strcmp(op, "today") && scanf("%lld", &t) == 1) printf("%d\\n", briefing_today((time_t)t));
         if (!strcmp(op, "lift") && scanf("%f %f %f %f %f %f", a, a + 1, a + 2, b, b + 1, b + 2) == 6)
@@ -162,9 +164,38 @@ test('she never asks before the internet has set her clock', () => {
    one answers there is nothing to ask, and none is ever an hour away, so the
    night's look for an update always has one. On the cable, often. */
 test('she sleeps longer between errands that find no network, never an hour', () => {
-  const waits = charm([0, 1, 2, 3, 4, 50].map(away => `wait 0 ${away}`)).map(Number);
+  const tuesday = epoch(new Date(Date.UTC(2026, 7, 18, 14)));
+  const waits = charm([0, 1, 2, 3, 4, 50].map(away => `wait ${tuesday} 0 0 ${away}`)).map(Number);
   assert.deepEqual(waits, [300, 600, 1200, 1800, 1800, 1800]);
-  assert.deepEqual(charm(['wait 1 0', 'wait 1 9']), ['120', '120'], 'on the cable she waits other than two minutes');
+  assert.deepEqual(charm([`wait ${tuesday} 1 0 0`, `wait ${tuesday} 1 0 9`]), ['120', '120'],
+    'on the cable she waits other than two minutes');
+});
+
+/* Nothing new can come in for Gladys while the market is shut, so from an
+   hour after the Friday close — a trade's row can trail it — to the Sunday
+   open she asks every half hour, waking at the open itself; unless a trade
+   already waits, whose ring Telegram may clear. Walked every five minutes of
+   both weeks the clocks change in, against the server's own marketOpen. */
+test('over the weekend she asks seldom, and wakes for the open', () => {
+  const moments = [];
+  for (const start of [Date.UTC(2026, 2, 4), Date.UTC(2026, 9, 28)]) {
+    for (let t = start; t < start + 7 * 86_400_000; t += 300_000) moments.push(new Date(t));
+  }
+  const quiet = charm(moments.map(m => `wait ${epoch(m)} 0 0 0`)).map(Number);
+  const busy = charm(moments.map(m => `wait ${epoch(m)} 0 1 0`)).map(Number);
+  const wrong = moments.filter((m, i) => {
+    const w = quiet[i], shut = !marketOpen(m) && !marketOpen(new Date(m.getTime() - 3_600_000));
+    if (busy[i] !== 300) return true;
+    if (!shut) return w !== 300;
+    const woken = new Date(m.getTime() + w * 1000);
+    return !(w > 0 && w <= 1800) || marketOpen(new Date(woken.getTime() - 1000)) ||
+      (w < 1800 && !marketOpen(woken));
+  });
+  assert.deepEqual(wrong.slice(0, 5).map(m => m.toISOString()), [],
+    `${wrong.length} moments where her errands and the market's week disagree`);
+  assert.ok(quiet.filter(w => w === 1800).length > 400, 'the weekend never came — the walk has gone blind');
+  // A clock the internet has not set reads 1970: a Saturday there decides nothing.
+  assert.deepEqual(charm([`wait ${epoch(new Date(Date.UTC(1970, 0, 3, 12)))} 0 0 0`]), ['300']);
 });
 
 test('a lift is him looking only when the screen faces up and is held still', () => {
