@@ -2765,7 +2765,11 @@ read, and a door that kept refusing would leave its last answer standing. A
 pass that fails leaves the copy as it was. Only the job writes the table, a
 quarter hour apart, so the market's read-then-write has no second writer. His
 charts ride the same pass (`storeStructure`) from the poller's `?structure=1`,
-stored as the folded map (*Her map of his charts*).
+stored as the folded map (*Her map of his charts*). While the market is shut
+they are folded once: the first pass after the close, which has Friday's daily
+bar closed, folds the finished week, and the rest skip on a copy read after
+it — by Saturday morning the 5m chart's twelve hours held no bar, and every
+pass metered it as unread.
 
 **Each door reads three charts at a time, inside `DOOR_MS`, 35 seconds.** One by
 one, fourteen did not fit at a slow morning's pace; all at once is the burst

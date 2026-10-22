@@ -1320,14 +1320,14 @@ test('his charts are read ahead by the job, and the map a failed pass leaves sta
     const charts = Object.fromEntries(Object.entries(MAP_CHARTS));
     world.doors.structure = [{ ok: true, symbol: 41, at: MAP_NOW, charts,
                                missing: [{ period: 'H_4', error: 'MCP get_trendbars: bad period' }] }, 200];
-    await storeStructure();
+    await storeStructure(new Date(MAP_NOW));
     assert.match(await structureBlock(), /4023 — turned both ways/);
 
     // A door that fails, or serves no chart, leaves the map as it was.
     world.doors.structure = [{ ok: false, error: 'not configured' }, 503];
-    await storeStructure();
+    await storeStructure(new Date(MAP_NOW));
     world.doors.structure = [{ ok: true, charts: {}, missing: [] }, 200];
-    await storeStructure();
+    await storeStructure(new Date(MAP_NOW));
     assert.match(await structureBlock(), /4023 — turned both ways/);
   });
   assert.deepEqual(world.rows.map(r => r.detail), [
@@ -1336,6 +1336,35 @@ test('his charts are read ahead by the job, and the map a failed pass leaves sta
     'structure: HTTP 503',
     'structure: no chart served',
   ]);
+});
+
+/* THE WEEKEND FOLDS ONCE. Every pass from Friday's close to Sunday's open
+   re-read bars that had stopped, and from Saturday morning metered the 5m
+   chart, twelve hours deep, as unread. */
+test('his charts are folded once after the close, and not again until the open', async () => {
+  const world = marketWorld();
+  const read = [];
+  const shut = (iso) => ({ answer: { last: null }, read_at: iso });
+  await stubbed(async () => {
+    globalThis.fetch = async (url, init) => {
+      if (url.includes('structure=1')) read.push(url);
+      return world.fetch(url, init);
+    };
+    world.doors.structure = [{ ok: true, charts: {}, missing: [] }, 200];
+    // Friday 17:00 New York, the close: the copy is from 16:45, so this pass reads.
+    world.stored.set('structure', shut('2026-10-23T20:45:00Z'));
+    await storeStructure(new Date('2026-10-23T21:00:00Z'));
+    // Saturday, on a copy read after the close: nothing to read.
+    world.stored.set('structure', shut('2026-10-23T21:00:00Z'));
+    await storeStructure(new Date('2026-10-24T15:00:00Z'));
+    // Saturday, on a copy read shut a week ago: this closure has not been read.
+    world.stored.set('structure', shut('2026-10-17T15:00:00Z'));
+    await storeStructure(new Date('2026-10-24T15:00:00Z'));
+    // Sunday at the open, on Saturday's copy: the bars move again.
+    world.stored.set('structure', shut('2026-10-24T15:00:00Z'));
+    await storeStructure(new Date('2026-10-25T21:00:00Z'));
+  });
+  assert.equal(read.length, 3, 'a pass read bars that had not moved, or skipped a closure never read');
 });
 
 /* ONE SLOW CALL LEAVES NO GAP: a symbol this pass missed keeps the last pass's

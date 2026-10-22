@@ -3255,11 +3255,22 @@ export async function storeRates(): Promise<void> {
 /* His charts come from his broker, through the poller for get_market's
    reason, and are folded here rather than there: the poller serves bars, and
    what a bar means to his rules is hers. Stored as folded, so every reader
-   gets the same map; a chart the door did not read is named in it. */
+   gets the same map; a chart the door did not read is named in it.
+
+   While the market is shut the bars stand still, so the first pass after the
+   close — the Friday daily bar closed with it — folds the finished week and
+   the rest are skipped: they only emptied the 5m window and metered it as
+   unread all weekend. The closure is 48 hours, so a copy read shut within that
+   was read in this one. */
 const STRUCTURE_URL = `${SB_URL}/functions/v1/doji-mcp-sync?structure=1`;
 
-export async function storeStructure(): Promise<void> {
+export async function storeStructure(now = new Date()): Promise<void> {
   try {
+    if (!marketOpen(now)) {
+      const kept = await readStored("structure");
+      const at = kept ? new Date(kept.read_at) : null;
+      if (at && !marketOpen(at) && now.getTime() - at.getTime() < 2 * 86_400_000) return;
+    }
     const res = await fetch(STRUCTURE_URL, { headers: { "x-doji-key": CRON_SECRET },
                                              signal: AbortSignal.timeout(READ_MS) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
