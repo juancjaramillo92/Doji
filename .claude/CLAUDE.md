@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 821 tests, eight suites
+npm test      # 823 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -360,9 +360,10 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   `tradingview-abroad.json`, and `CALENDAR_COUNTRIES` asks for nothing else.
   Every rated read filters on `HOME` but the Sunday week — `agree.test.mjs`
   finds them rather than listing them.
-- **The market, its weeks and the Fed's odds are read ahead** by the
-  quarter-hourly job into `eugenia_market`, and the blocks read the copy:
-  nothing that runs on a writer's clock reads those three doors. One writer, so the market's
+- **The market, its weeks, the Fed's odds, the flows and the speculators' count
+  are read ahead** by the quarter-hourly job into `eugenia_market`, as
+  `readsDue` spends TradingView's daily quota, and the blocks read the copy:
+  nothing that runs on a writer's clock reads those doors. One writer, so the market's
   read-then-write cannot race; `agree.test.mjs` holds it and the census of
   market reads.
 - **Her map of his charts is folded in `structure.ts`**, from bars the poller

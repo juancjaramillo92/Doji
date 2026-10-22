@@ -712,14 +712,21 @@ read off the weeks behind the market, and the thesis carries which way the
 story is going; a scoreboard would be a third place saying it.
 **Revisit if:** the thesis keeps naming a force the weeks do not show moving.
 
-### R-76 — the flows read ahead into `eugenia_market`
-**Why refused:** the reserves are quarterly and months behind, and the funds'
-windows are a month and longer, so a copy kept fresh every quarter hour would
-be the same answer refetched. They reach two paths, the Sunday briefing and
-`get_around`, neither on a writer's clock that a slow read could cost, so
-`flowsBlock` reads the door directly, as `positioningBlock` does.
-**Revisit if:** the flows reach a weekday briefing, or the door is seen
-outrunning `DOOR_MS` from a path that waits on it.
+### R-76 — the flows read ahead into `eugenia_market`, every quarter hour
+**Built once a New York day instead, October 2026.** The refusal stands for the
+quarter hour: the reserves are quarterly and months behind, and the funds'
+windows are a month and longer, so a copy kept fresh that often would be the
+same answer refetched. What reopened it was the revisit condition met: on 22
+October the weekday briefing reached for the flows through `get_around`, and
+TradingView's daily quota, spent by the job, refused it. Read once a day by
+`storeFlows`, as the weeks are, the copy costs six calls a day where every
+`get_around` cost six, and no reader waits on the door. The speculators' count
+rides beside it (`storePositioning`); the CFTC has no quota, but a reader then
+waits on nothing either. Neither reaches the weekday briefing as a block:
+`SYSTEM` says they come on Sunday and from `get_around`, and moving that line is
+a prompt change, made only through the eval.
+**Revisit if:** a day's copy is seen to miss a release that mattered the same
+day.
 
 ### R-77 — a database test for the reads' channel key
 **Why refused:** `eugenia_reads.channel` references `eugenia_channels` as a

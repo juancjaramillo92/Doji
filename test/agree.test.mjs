@@ -6365,7 +6365,7 @@ test('every market read she goes without writes a row', () => {
     .map((m, i) => [m[1], EUGENIA_TS.slice(m.index, starts[i + 1]?.index)])
     .filter(([, body]) => new RegExp(`tvRead\\("|fetch\\((${MARKET_URLS})`).test(uncomment(body)));
   assert.deepEqual(readers.map(([name]) => name).sort(),
-    ['flowsBlock', 'headlinesBlock', 'marketQuote', 'positioningBlock', 'readTvCalendar', 'storeMarket', 'storeRates',
+    ['headlinesBlock', 'marketQuote', 'readTvCalendar', 'storeFlows', 'storeMarket', 'storePositioning', 'storeRates',
      'storeStructure', 'storeTrend', 'volumeBlock'],
     'the market reads have changed — declare the new one, and give it the meter');
   for (const [name, body] of readers) {
@@ -6374,7 +6374,7 @@ test('every market read she goes without writes a row', () => {
       `${name}'s failure reaches the console and no row`);
   }
   // In part, too, where the door names what it did not read.
-  for (const name of ['storeMarket', 'storeRates', 'storeTrend']) {
+  for (const name of ['storeFlows', 'storeMarket', 'storeRates', 'storeTrend']) {
     assert.match(bodyOf(EUGENIA_TS, `export async function ${name}(`),
       /if \(answer\.missing\.length\) await unread\(/, `${name} keeps a partial read to itself`);
   }
@@ -6386,21 +6386,22 @@ test('every market read she goes without writes a row', () => {
    briefing that reads TradingView itself pays for it out of its own clock, as
    on 13 and 14 October; a second writer to the store races the market's
    read-then-write. The census above catches a block reading the door again;
-   this holds the job's half and the store's one way in. */
+   this holds the job's half, gated by readsDue, and the store's one way in. */
 test('the quarter-hourly job reads the market ahead, and nothing else writes the copy', () => {
   const run = bodyOf(EUGENIA_TS, 'async function postScheduled(');
   const door = run.slice(run.indexOf('get("calendar") === "1"'));
   assert.match(door.slice(0, door.indexOf('return json')),
-    /await filed\(\);\s*await Promise\.all\(\[storeMarket\(\), storeRates\(\), storeTrend\(\), storeStructure\(\)\]\);/,
-    'the quarter-hourly job no longer reads the market ahead, so every copy goes stale');
-  for (const name of ['aroundBlock', 'ratesBlock', 'trendBlock', 'structureBlock']) {
+    /await filed\(\);\s*const \{ market, rates \} = readsDue\(new Date\(\)\);\s*await Promise\.all\(\[market && storeMarket\(\), rates && storeRates\(\), storeTrend\(\), storeStructure\(\),\s*storeFlows\(\), storePositioning\(\)\]\);/,
+    'the quarter-hourly job no longer reads the market ahead as readsDue budgets it, so a copy goes stale or the quota runs out');
+  for (const name of ['aroundBlock', 'ratesBlock', 'trendBlock', 'structureBlock', 'flowsBlock', 'positioningBlock']) {
     assert.match(bodyOf(EUGENIA_TS, `export async function ${name}(`), /readStored\("/,
       `${name} no longer reads the copy the job keeps`);
   }
   assert.equal([...uncomment(EUGENIA_TS).matchAll(/eugenia_market\?/g)].length, 2,
     'eugenia_market is addressed somewhere other than readStored and store');
   const writers = [...uncomment(EUGENIA_TS).matchAll(/await store\("(\w+)"/g)].map(m => m[1]).sort();
-  assert.deepEqual(writers, ['market', 'rates', 'structure', 'trend'], 'the copy has a writer other than the job\'s four');
+  assert.deepEqual(writers, ['flows', 'market', 'positioning', 'rates', 'structure', 'trend'],
+    'the copy has a writer other than the job\'s six');
   // The weeks ride inside the market's block, so no reader of the one goes without the other.
   assert.match(bodyOf(EUGENIA_TS, 'export async function aroundBlock('), /trendBlock\(\)/,
     'the market around gold is handed over without the weeks behind it');

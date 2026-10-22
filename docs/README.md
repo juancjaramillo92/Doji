@@ -1093,7 +1093,9 @@ at least fifteen minutes old. It reaches the briefing and `get_around`.
 
 **Where the speculators stand is read straight from the CFTC** — the weekly
 Commitments of Traders count for COMEX gold (dataset `72hh-3qpy`, code
-`088691`), which needs no credential, so she reads it herself. `positioningList`
+`088691`), which needs no credential, so she reads it herself — read ahead once a
+New York day by the quarter-hourly job (`storePositioning`), and kept only once
+it folds, so a report that will not read leaves the last one standing. `positioningList`
 gives the managed-money net, its sides, the week's change, the net's range over
 52 weeks (crowded means something only against its own past), the open interest
 with its change from the week before (a move with it rising is new money, with
@@ -1117,10 +1119,13 @@ read them in dollars (GLD $141.3B). Each economy and the funds' batch is its own
 call and its own failure, named in `missing`. The batch goes first and the
 economies three at a time, inside `DOOR_MS`: one economic read took eleven
 seconds on that probe, and five in a row at that pace outran it. `flowsList`
-gives levels on dates and computes no change, and `flowsBlock` reads the door
-directly, as the speculators' count is read, for the Sunday briefing and
-`get_around` alone: a quarter of central-bank buying is the story, and five
-weekday briefings repeating it are not.
+gives levels on dates and computes no change. The job reads the door once a
+New York day (`storeFlows`) and `flowsBlock` reads the copy, as the speculators'
+count is read, for the Sunday briefing and `get_around` alone: a quarter of
+central-bank buying is the story, and five weekday briefings repeating it are
+not. Read live, every `get_around` spent six of TradingView's daily calls on the
+same answer, and on 22 October the briefing's own `get_around` found the quota
+gone.
 `test/fixtures/tradingview-reserves.json` is the 15 October capture.
 
 **`?volume=1` is what COMEX gold futures traded** — the exchange's own volume in
@@ -1324,9 +1329,12 @@ redelivers anything else, and a failed write is better retried by his second tap
 
 ## Eugenia — the market bot
 
-A daily XAU/USD briefing, a quieter look later in the morning, a look at any
-number that actually lands, a word when a position opens into one, and a
-conversation about any of it. **Weekdays at 08:00 ET, Sunday at 17:00 ET** — the
+A daily XAU/USD briefing, a word when a close takes his day past its limit, a
+review of his week on Saturday, and a conversation about any of it. **A print
+that lands after the briefing gets no message of its own**: its actual is on
+the calendar within a quarter hour for when he asks, and the next morning opens
+on how it landed — his instruction is the weeks behind the chart, not the
+hours on it, and a look per print spends the quota the briefing reads on. **Weekdays at 08:00 ET, Sunday at 17:00 ET** — the
 gold open, so the week's first briefing lands with the market. She says hello
 her own way, Spanish or English, inside the first paragraph, and goes straight to
 the number. Reply and she answers — typed, by voice, or to a chart. And she
@@ -1581,7 +1589,8 @@ hourly predicates all test `hour ===` and a `*/15` job would run four briefings.
 Every filing is an `eugenia_runs` row under `calendar`, failed or not, since a
 calendar that stopped moving looks like a quiet week. After it files, the same
 job reads the market around gold and the Fed's odds ahead into `eugenia_market`
-(see *The market and the Fed's odds are read ahead*).
+as TradingView's daily quota allows (see *The market and the Fed's odds are read
+ahead*).
 
 **One release is one row, whatever it is called**, because the key is
 TradingView's id and nothing she can call creates a row. Keyed on a name the
@@ -2233,8 +2242,9 @@ you.
 - **Her calls' record** — a month of outcomes, what the triggered ones made an
   ounce, the losses counted by the step they failed on, the newest losses with
   what she misread, and any call still standing — goes where her read record
-  goes: the briefing, a reply, the pass and the review, never the trade
-  look.
+  goes. A call still on at its roll is said as that, never as `open`, which
+  she once read as a scoring that had failed and reported to you. It goes to
+  the briefing, a reply, the pass and the review, never the trade look.
   `/notes` shows it to you. She gives it straight when you ask, losses first, and
   never uses it to talk you into a trade.
 
@@ -2317,7 +2327,7 @@ closes; and the calendar and her record are the datasets here that compound.
 | `eugenia_reads` | every read she gave, with a verdict on the test she stated | the last 30 days | her `record_read` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
 | `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar` |
-| `eugenia_market` | the market around gold, the weeks behind it, the Fed's odds and her map of his charts, read ahead | 1 row per door, rewritten | the quarter-hourly job, `storeMarket`, `storeTrend`, `storeRates` and `storeStructure` |
+| `eugenia_market` | the market around gold, the weeks behind it, the Fed's odds, the flows, the speculators' count and her map of his charts, read ahead | 1 row per door, rewritten | the quarter-hourly job, `storeMarket`, `storeTrend`, `storeRates`, `storeFlows`, `storePositioning` and `storeStructure` |
 | `eugenia_feedback` | his verdict on a briefing, one row per day | the last two days | a tap on the keyboard under it, read by the nightly pass |
 | `eugenia_rewrites` | what the thesis and the portrait said before each rewrite | never handed to her | a trigger on both, `eugenia_keep_rewrite` |
 | `eugenia_calls` | every call she made, and how price scored it | the last 30 days | her `make_call` tool; scored by the nightly pass |
@@ -2763,16 +2773,28 @@ it kept six lines of fourteen. Now the quarter-hourly job reads both after it
 files the calendar (`storeMarket`, `storeRates`), and the weeks behind the market
 once a day (`storeTrend`), and keeps the answers in `eugenia_market`, one row per
 door; `aroundBlock`, `trendBlock` and `ratesBlock` read that row, so a briefing
-or a reply never waits on TradingView for them. The hourly copy is a quarter
-hour old at most, of hourly and daily bars. **A symbol a pass misses
+or a reply never waits on TradingView for them.
+
+**TradingView's daily quota decides how often** (`readsDue`). From 18 October
+every UTC day was refused by about four in the morning New York, some thirty
+passes in at thirty calls a pass, and each briefing after went without the
+odds and the market. So the hourly bars are read on the last pass of each hour
+while the market is open, the odds every other hour, and both on the pass
+before a briefing, whatever the hour, so Sunday's has them with the market
+shut: about seven hundred calls a weekday, the calendar's ninety-six and the
+weeks included. A test walks a week of passes and counts them against 750. The
+market copy is an hour old at most; the odds say when they were read and that
+nothing printed since is in them. **A symbol a pass misses
 keeps the line the last pass read** (`keptMarket`), with that pass's bar times
 on it, so one slow call leaves no gap; one never read is still named. The odds
 are replaced whole once a pass prices a meeting, since a fold does not merge,
 and **odds read more than two hours ago are not handed to her** (`ODDS_HOURS`):
 each market line carries its own times, but the odds carry only when they were
-read, and a door that kept refusing would leave its last answer standing. A
-pass that fails leaves the copy as it was. Only the job writes the table, a
-quarter hour apart, so the market's read-then-write has no second writer. His
+read, and a door that kept refusing would leave its last answer standing; a
+read every other hour fits inside it, and one that fails costs the odds until
+the next. A pass that fails leaves the copy as it was. Only the job writes the
+table, a quarter hour apart, so the market's read-then-write has no second
+writer. His
 charts ride the same pass (`storeStructure`) from the poller's `?structure=1`,
 stored as the folded map (*Her map of his charts*). While the market is shut
 they are folded once: the first pass after the close, which has Friday's daily
@@ -2852,10 +2874,10 @@ every night nobody spoke. The census stays after the pass, the only thing that
 can move a rung.
 
 **A market read that came back short is a row**, `caller: 'market read'`, `ok:
-false`, the read and the reason in `detail`: the broker's price, the headlines,
-the speculators' count, the flows and COMEX volume as a briefing or a reply reads them;
-the market around gold and the rate odds as the job reads them ahead, whole or
-— those two doors name a `missing` list — in part, a pass refused whole naming
+false`, the read and the reason in `detail`: the broker's price, the headlines
+and COMEX volume as a briefing or a reply reads them; the market around gold,
+the rate odds and the flows as the job reads them ahead, whole or — those three
+doors name a `missing` list — in part, and the speculators' count as it reads it, a pass refused whole naming
 each refusal rather than one bare *no symbol served*; and a copy a block could not
 hand her, not yet read or odds too old. The briefing or the reply still goes
 out and its own row reads ok, so on 12 October the Edge log was the only place

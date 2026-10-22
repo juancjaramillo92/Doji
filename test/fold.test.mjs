@@ -31,7 +31,7 @@ import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, u
   readMarket, readRates, readTrend, foldTrend, BACK, FITS, fitOf, foldReserves, foldFunds, FUNDS, readFlows, RESERVES,
 } from '../supabase/functions/doji-tradingview/index.ts';
 import {
-  briefDue, retryDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
+  briefDue, retryDue, readsDue, briefKind, dueNow, isSilent, briefingMarker, briefedQuery,
   chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
   notesList, channelsList, searchList, readStrategy, dayQuery, repliedQuery, spokenQuery,
   spokenBriefing, ask,
@@ -49,7 +49,7 @@ import {
   releaseName, printsQuery, printsList, RELEASE_PRINTS,
   sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
   volumeList, volumeBlock, keptMarket, storeMarket, storeRates, storeTrend, trendList, trendBlock,
-  flowsList, flowsBlock,
+  flowsList, flowsBlock, storeFlows, storePositioning,
   structureList, structureBlock, storeStructure,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
@@ -873,7 +873,7 @@ test('the market is read ahead by the job, and a briefing reads the copy a faile
     await Promise.all([storeMarket(), storeRates(), storeTrend()]);
     // The weeks ride with the market, so every reader of the one gets the other.
     assert.match(await aroundBlock(), /Dollar index 102\.16[\s\S]*The weeks behind it[\s\S]*· Dollar index 101\.2 on 8 Oct/);
-    assert.match(await ratesBlock(), /read at \d\d:\d\d ET:\n· 28 Oct: 73% no change/);
+    assert.match(await ratesBlock(), /read at \d\d:\d\d ET, so nothing that printed after that is in them:\n· 28 Oct: 73% no change/);
 
     // A pass that fails, or serves nothing, leaves the copy as it was.
     world.doors.market = [{ ok: false, error: 'not connected' }, 500];
@@ -1587,7 +1587,7 @@ test('odds read more than two hours ago are not handed to her', async () => {
   world.stored.set('rates', { door: 'rates', answer: { ok: true, ...RATES, missing: [] }, read_at });
   await stubbed(async () => {
     globalThis.fetch = world.fetch;
-    assert.match(await ratesBlock(Date.parse(read_at) + 2 * 3600_000), /08:00 ET:\n· 28 Oct/);
+    assert.match(await ratesBlock(Date.parse(read_at) + 2 * 3600_000), /08:00 ET, so nothing that printed after that is in them:\n· 28 Oct/);
     assert.match(await ratesBlock(Date.parse(read_at) + 2 * 3600_000 + 1), /could not be read just now/);
   });
   assert.equal(world.rows.length, 1, 'odds too old to hand her left no row');
@@ -1759,7 +1759,7 @@ test('the first meeting is said as odds and the later ones as what is priced by 
   assert.doesNotMatch(out, /76%|37%/, 'a later meeting is said as its own odds, which FedWatch does not show');
   assert.match(out, /at least\s+fifteen minutes behind/, 'the block does not say the bars are delayed');
   // Read ahead, so the block says when; the odds carry no other time.
-  assert.match(out, /read at 18:00 ET:/);
+  assert.match(out, /read at 18:00 ET, so nothing that printed after that is in them:/);
 
   const cut = ratesList({ meetings: [{ ...RATES.meetings[0], odds: [{ bp: -25, chance: 60 }, { bp: -50, chance: 40 }] },
     { ...RATES.meetings[1], total_bp: -30.4 }], unread: ['2027-01-27'], read_at: RATES.read_at });
@@ -1819,6 +1819,47 @@ test('positioning that will not read is a sentence, and never takes the briefing
     globalThis.fetch = async () => new Response('[]', { status: 200 });
     assert.match(await positioningBlock(), /could not be read just now; do not quote it from a search/);
   });
+});
+
+/* THE FLOWS AND THE COUNT ARE READ AHEAD TOO, ONCE A NEW YORK DAY. Read live,
+   get_around spent six of TradingView's calls on the flows, and on 22 October
+   the briefing's own get_around found the quota gone. The reserves are
+   quarterly and the count weekly, so yesterday's copy is read again and
+   today's is kept; a report that will not read leaves the last one standing. */
+test('the flows and the speculators\' count are read once a New York day, and the blocks read the copy', async () => {
+  const world = marketWorld();
+  let asked = 0, counted = 0;
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString();
+  const flows = { ok: true, reserves: [{ country: 'CN', name: 'China', points: foldReserves(RESERVES_READ.CN) }],
+                  funds: [], missing: [{ name: 'AMEX:GLD, AMEX:IAU', symbol: 'AMEX:GLD, AMEX:IAU', error: 'not served' }] };
+  world.doors.flows = [flows, 200];
+  let report = COT;
+  const fetch = async (url, init) => {
+    if (url.includes('?flows=1')) asked++;
+    if (url.startsWith('https://publicreporting.cftc.gov/')) { counted++; return Response.json(report); }
+    return world.fetch(url, init);
+  };
+  await stubbed(async () => {
+    globalThis.fetch = fetch;
+    assert.match(await flowsBlock(), /could not be read just now/, 'a copy never read reads as one');
+    assert.match(await positioningBlock(), /could not be read just now/);
+    world.stored.set('flows', { door: 'flows', answer: flows, read_at: yesterday });
+    world.stored.set('positioning', { door: 'positioning', answer: COT, read_at: yesterday });
+    await Promise.all([storeFlows(), storePositioning()]);
+    assert.deepEqual([asked, counted], [1, 1], 'a copy from yesterday was not read again');
+    await Promise.all([storeFlows(), storePositioning()]);
+    assert.deepEqual([asked, counted], [1, 1], 'a copy read today was read again');
+    assert.match(await flowsBlock(), /· China: 2346 t in Jun 2026/);
+    assert.match(await positioningBlock(), /Net long 127,389 contracts/);
+    // A report that will not fold is never stored over the one that did.
+    world.stored.set('positioning', { door: 'positioning', answer: COT, read_at: yesterday });
+    report = [{ ...COT[0], m_money_positions_long_all: 'n/a' }];
+    await storePositioning();
+    assert.match(await positioningBlock(), /Net long 127,389 contracts/, 'an unreadable report replaced a readable one');
+  });
+  assert.deepEqual(world.rows.map(r => r.detail),
+    ['flows: not read yet', 'positioning: not read yet', 'flows: AMEX:GLD, AMEX:IAU: not served',
+     'positioning: no readable report']);
 });
 
 /* ─── What COMEX gold futures traded ─────────────────────────────────────────
@@ -2324,6 +2365,42 @@ test('the timetable holds its New York hours in winter too', () => {
   }
   // 03:00 UTC on the 14th is 22:00 ET on the 13th — the previous night's pass.
   assert.deepEqual(owed, ['03:00 consolidate', '13:00 weekday']);
+});
+
+/* TRADINGVIEW'S DAILY BUDGET IS THE JOB'S TO SPEND. From 18 October every UTC
+   day was refused some thirty passes in, at about a thousand calls, and the
+   briefing went without the odds. Walked over a week of the job's passes as
+   cron fires them, counting what each door costs as the doors are written: the
+   calendar every pass, the weeks and the flows once a New York day, the market
+   list and the contracts when readsDue says. */
+const TV_SOURCE = readFileSync(new URL('../supabase/functions/doji-tradingview/index.ts', import.meta.url), 'utf8');
+const EUGENIA_SOURCE = readFileSync(new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
+
+test('the job spends TradingView\'s daily budget, and the pass before a briefing reads it all', () => {
+  const list = TV_SOURCE.slice(TV_SOURCE.indexOf('const MARKET = ['));
+  const symbols = list.slice(0, list.indexOf('];')).match(/symbol: "/g).length;
+  const oddsHours = Number(EUGENIA_SOURCE.match(/const ODDS_HOURS = (\d+);/)[1]);
+  const calls = new Map();
+  let rates = null;
+  for (let q = 0; q < 7 * 96; q++) {
+    const at = new Date(Date.UTC(2026, 7, 16, 0, 5 + 15 * q));
+    const due = readsDue(at);
+    const firstOfDay = nyClock(at).hour === 0 && at.getUTCMinutes() === 5;
+    const spent = 1 + (firstOfDay ? symbols + 1 + 1 + RESERVES.length : 0) + (due.market ? symbols : 0) +
+      (due.rates ? contractMonths(nyDate(at)).length + 1 : 0);
+    const day = at.toISOString().slice(0, 10);
+    calls.set(day, (calls.get(day) ?? 0) + spent);
+    if (due.rates) rates = at;
+    if (briefDue(new Date(at.getTime() + 15 * 60_000)) && at.getUTCMinutes() === 50) {
+      assert.deepEqual(due, { market: true, rates: true }, `the pass before ${at.toISOString()}'s briefing reads both`);
+    }
+    if (rates) assert.ok(at - rates <= oddsHours * 3_600_000, `${at.toISOString()}: the odds outlive ODDS_HOURS`);
+  }
+  for (const [day, n] of calls) assert.ok(n <= 750, `${day} spends ${n} TradingView calls`);
+  // The weekend reads no market but before Sunday's briefing.
+  assert.equal(readsDue(new Date('2026-08-22T18:50:00Z')).market, false, 'a shut market is read on Saturday');
+  assert.deepEqual(readsDue(new Date('2026-08-16T20:50:00Z')), { market: true, rates: true },
+    'Sunday\'s briefing goes without the market it opens on');
 });
 
 test('silence is the word she was told to use, and nothing else', () => {
@@ -4824,7 +4901,11 @@ test('her calls say how they ended, what they made, and which still stands', () 
     { ...CALL, id: 1, made_at: '2026-10-12T13:00:00Z', expires_at: '2026-10-12T21:00:00Z', outcome: 'won', result: 30 },
     { ...CALL, id: 0, made_at: '2026-10-09T13:00:00Z', expires_at: '2026-10-09T21:00:00Z', outcome: 'untriggered' },
   ], now);
-  assert.match(out, /4 made; 1 won, 1 lost, 0 scratch, 0 open, 1 untriggered, 0 unread\./);
+  assert.match(out, /4 made; 1 won, 1 lost, 0 scratch, 0 still on at the 17:00 roll and marked at its close, 1 untriggered, 0 unread\./);
+  // A call still on at its roll is scored, and says so, or it reads as one the night never reached.
+  const rolled = callsList([{ ...CALL, id: 4, expires_at: '2026-10-13T21:00:00Z', outcome: 'open', result: 8.99 }], now);
+  assert.match(rolled, /1 still on at the 17:00 roll and marked at its close/);
+  assert.doesNotMatch(rolled, /\d open\b|not yet scored/, 'a call marked at its roll reads as left unscored');
   assert.match(out, /The 2 that triggered made \+\$15\.00 an ounce/);
   assert.match(out, /Standing until the 17:00 roll: buy 4000, stop 3985, target 4030, if a retest of 4,000/,
     'the call still standing is not named, so she would make a second');
