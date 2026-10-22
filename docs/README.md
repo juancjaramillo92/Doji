@@ -1329,9 +1329,12 @@ redelivers anything else, and a failed write is better retried by his second tap
 
 ## Eugenia — the market bot
 
-A daily XAU/USD briefing, a quieter look later in the morning, a look at any
-number that actually lands, a word when a position opens into one, and a
-conversation about any of it. **Weekdays at 08:00 ET, Sunday at 17:00 ET** — the
+A daily XAU/USD briefing, a word when a close takes his day past its limit, a
+review of his week on Saturday, and a conversation about any of it. **A print
+that lands after the briefing gets no message of its own**: its actual is on
+the calendar within a quarter hour for when he asks, and the next morning opens
+on how it landed — his instruction is the weeks behind the chart, not the
+hours on it, and a look per print spends the quota the briefing reads on. **Weekdays at 08:00 ET, Sunday at 17:00 ET** — the
 gold open, so the week's first briefing lands with the market. She says hello
 her own way, Spanish or English, inside the first paragraph, and goes straight to
 the number. Reply and she answers — typed, by voice, or to a chart. And she
