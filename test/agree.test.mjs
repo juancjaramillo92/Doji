@@ -644,7 +644,7 @@ test('the columns schema.sql grants are exactly the columns the app writes', asy
 
   // The revoke has to name PUBLIC as well as both roles. Revoking from one is
   // not revoking from the others — the lesson `eugenia_search` once cost.
-  assert.match(grants, /revoke insert, update, delete on public\.trades\s+from public, anon, authenticated;/,
+  assert.match(grants, /revoke insert, update, delete, truncate on public\.trades\s+from public, anon, authenticated;/,
     'schema.sql revokes from fewer than all three of PUBLIC, anon and authenticated, so ' +
     'the privilege survives under whichever name was left out');
 });

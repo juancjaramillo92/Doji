@@ -155,11 +155,14 @@ comment on column public.trades.best_price is
 -- agree.test.mjs holds the list against both. To roll back to Supabase's
 -- defaults, with RLS still behind them:
 --
---     grant insert, update, delete on public.trades to anon, authenticated;
+--     grant select, insert, update, delete, truncate on public.trades to anon, authenticated;
 
--- SELECT is untouched: the app and realtime read every column. PUBLIC and both
--- roles by name, for eugenia_search's reason.
-revoke insert, update, delete on public.trades from public, anon, authenticated;
+-- A signed-in session keeps SELECT: the app and realtime read every column.
+-- TRUNCATE goes from both, the one verb RLS does not govern; the signed-out key
+-- loses SELECT, since the app reads only once signed in and RLS would hand it
+-- no row anyway. PUBLIC and both roles by name, for eugenia_search's reason.
+revoke insert, update, delete, truncate on public.trades from public, anon, authenticated;
+revoke select on public.trades from public, anon;
 
 -- The four journal answers and the soft-delete flag.
 grant update (setup, followed_rules, followed_sl, followed_tp, deleted)

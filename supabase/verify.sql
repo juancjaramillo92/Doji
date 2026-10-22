@@ -106,11 +106,14 @@ from (values
      where has_column_privilege('authenticated', 'public.trades', col, 'UPDATE')),
    '5'),
 
-  ('the publishable key can neither insert nor delete a trade',
-   (select count(*)::text from unnest(array['INSERT','DELETE']) priv
-     where has_table_privilege('anon', 'public.trades', priv)
-        or has_table_privilege('authenticated', 'public.trades', priv)),
-   '0'),
+  -- Named, so a grant that came back says which. TRUNCATE bypasses RLS.
+  ('the publishable key cannot insert, delete or truncate a trade, nor read one signed out',
+   (select coalesce(string_agg(r || ':' || priv, ',' order by r, priv), 'none')
+      from (values ('anon', 'INSERT'), ('anon', 'DELETE'), ('anon', 'TRUNCATE'), ('anon', 'SELECT'),
+                   ('authenticated', 'INSERT'), ('authenticated', 'DELETE'),
+                   ('authenticated', 'TRUNCATE')) v(r, priv)
+     where has_table_privilege(r, 'public.trades', priv)),
+   'none'),
 
   -- Without a policy the card reads an empty list and hides itself.
   ('the app can read the three tables its card draws',

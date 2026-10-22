@@ -463,15 +463,17 @@ only the lists: no broker column may appear in `Data.OWNED` or `COLUMNS`.
 
 **The database holds that guarantee too.** RLS on `trades` scopes rows to their
 owner and says nothing about columns, so `schema.sql` revokes insert,
-update and delete and grants back update on exactly five columns —
-`Data.OWNED`'s four and `deleted`. The threat it stops is a client already
+update, delete and truncate and grants back update on exactly five columns —
+`Data.OWNED`'s four and `deleted`. TRUNCATE matters because RLS does not govern
+it, and the signed-out key keeps no SELECT either: the app reads only once
+signed in. The threat it stops is a client already
 holding the session token, a narrow one; it is done because the test above made
 it cheap. `updated_at` needs no grant: column privileges are checked against the
 SET list, and `trades_touch` is a BEFORE trigger assigning `NEW`.
 `test/db/schema.test.mjs` runs it: a journal save as `authenticated` succeeds
-and moves `updated_at`; a write to `net_pnl`, an insert and a hard delete are
-refused; soft delete and undo pass; another owner's row is neither read nor
-written.
+and moves `updated_at`; a write to `net_pnl`, an insert, a hard delete and a
+truncate are refused, and so is a read signed out; soft delete and undo pass;
+another owner's row is neither read nor written.
 
 ---
 
