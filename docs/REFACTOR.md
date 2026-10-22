@@ -869,9 +869,9 @@ states each table's size, so the growth is watched, not guessed.
 storage. Then the inputs move to their own artifact, taken once a week and kept
 as long as the others, rather than any row being dropped.
 
-These five were turned down by a database audit in October 2026, each on a
+R-93 to R-97 were turned down by a database audit in October 2026, each on a
 read of the live database rather than an argument, so the figures are the
-reason.
+reason. R-98 was deferred by the same audit's closing review.
 
 ### R-93 — dropping `trades_user_open_day`, `eugenia_turns_id_desc` and `eugenia_calendar_ticker`
 **Why refused:** read as code, none is needed. Every trade is his, so
@@ -883,7 +883,7 @@ the live counters showed 2,054 scans of the first and 1,486 of the second,
 against none of the turns' primary key: at 132 trades and 312 turns the
 planner picks between equal plans. A drop is an `upgrade.sql` step and a
 `verify.sql` edit for nothing that can be measured.
-**Revisit if:** a write to either table is ever seen to cost, or `ticker`
+**Revisit if:** a write to any of the three tables is ever seen to cost, or `ticker`
 stays unread when the calendar passes ten thousand rows.
 
 ### R-94 — a reach line on the stop history read
@@ -917,6 +917,17 @@ folds, and the rows from before it carry a day.
 stall every trade behind them. The live table held no closed trade waiting.
 **Revisit if:** the poller's `excursions` reads 0 while a closed trade a minute
 or longer carries no `best_price`.
+
+### R-98 — TRUNCATE revoked from the publishable key on her tables
+**Deferred, not refused.** `trades` lost TRUNCATE for `anon` and
+`authenticated`, the one verb RLS does not govern, because the file was wider
+there than the live database. Her tables and the ledger still carry
+Supabase's default grant of it, file and live alike, and no API the key
+reaches serves TRUNCATE: PostgREST and realtime have no such verb, and both
+roles are `nologin`. Revoking it everywhere is one statement and a
+`verify.sql` row, for a door nothing opens.
+**Revisit if:** anything comes to run SQL as `anon` or `authenticated`, or a
+table of hers is ever found readable by the key.
 
 ---
 

@@ -90,7 +90,8 @@ from (values
 
   /* ─── The journal/broker boundary ────────────────────────────────────────
      Three rows, because they fail differently: no broker column writable,
-     the app's five still writable, and no insert or delete at all. */
+     the app's five still writable, and no insert, delete or truncate at all,
+     nor a read signed out. */
   ('no broker column of trades is writable by the publishable key',
    (select count(*)::text from information_schema.columns c
      where c.table_schema = 'public' and c.table_name = 'trades'

@@ -114,10 +114,10 @@ test('upgrade.sql changes nothing a fresh apply built, however often it runs', (
 
 test('verify.sql passes every check against the database schema.sql builds', () => {
   // The live project holds one account; the second is this suite's, for the
-  // tests of another owner's row, and goes back once the file has run.
-  sql(SECRETS + `delete from auth.users where id = '${V}';`);
-  const rows = sql(file('supabase/verify.sql')).split('\n');
-  sql(`insert into auth.users values ('${V}');`);
+  // tests of another owner's row, so it is out only inside the run.
+  sql(SECRETS);
+  const rows = sql(`begin; delete from auth.users where id = '${V}';\n` +
+                   file('supabase/verify.sql') + '\nrollback;').split('\n');
   assert.ok(rows.length > 1, 'verify.sql returned no rows');
   assert.deepEqual(rows.filter(r => !r.endsWith('|t')), [],
     'verify.sql fails against the database schema.sql builds — one of the two files is wrong');
@@ -186,7 +186,7 @@ test('a missing secret costs the message, never the write', () => {
 
 /* ─── What the app may write ────────────────────────────────────────────── */
 
-test('the app writes its four answers and the soft delete, on its own rows, and nothing else, and signed out reads nothing', () => {
+test('the app writes its four answers and the soft delete on its own rows, nothing else, and reads nothing signed out', () => {
   sql(RESET + trade('PID6') + `insert into public.trades (id, user_id, direction) values ('PID7', '${V}', 'BUY');`);
   const as = (stmt) => sql(`set role authenticated; set request.jwt.claim.sub = '${U}'; ${stmt}`);
 

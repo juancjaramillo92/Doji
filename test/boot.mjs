@@ -97,7 +97,7 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
   /* PostgREST answers at most its Max rows, whatever is asked — Supabase's
      default is 1000 — and a range picks the slice. Without the cap a read that
      forgets to page is handed the whole table here and nowhere else. */
-  db.maxRows = 1000;
+  const MAX_ROWS = 1000;
   db.orders = [];
 
   const bind = (name) => {
@@ -107,7 +107,7 @@ export async function boot({ now, auth = {}, snapshot } = {}) {
       const all = rows(), [from, to] = span ?? [0, all.length - 1];
       span = null;
       return Promise.resolve(db.error ? { data: null, error: db.error }
-        : { data: all.slice(from, Math.min(to + 1, from + db.maxRows)), error: null });
+        : { data: all.slice(from, Math.min(to + 1, from + MAX_ROWS)), error: null });
     };
     const t = {
       select: () => t,
