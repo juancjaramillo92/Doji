@@ -2239,8 +2239,9 @@ you.
 - **Her calls' record** — a month of outcomes, what the triggered ones made an
   ounce, the losses counted by the step they failed on, the newest losses with
   what she misread, and any call still standing — goes where her read record
-  goes: the briefing, a reply, the pass and the review, never the trade
-  look.
+  goes. A call still on at its roll is said as that, never as `open`, which
+  she once read as a scoring that had failed and reported to you. It goes to
+  the briefing, a reply, the pass and the review, never the trade look.
   `/notes` shows it to you. She gives it straight when you ask, losses first, and
   never uses it to talk you into a trade.
 

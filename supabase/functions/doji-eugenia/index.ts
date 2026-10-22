@@ -2914,6 +2914,10 @@ export function callsQuery(now = Date.now()): string {
     `&made_at=gte.${new Date(now - RECORD_DAYS * 86_400_000).toISOString()}&order=id.desc&limit=60`;
 }
 
+/* `open` is an outcome, not a call left unscored: on 22 October she read
+   "1 open" two days after its roll as a scoring that had failed, and told him. */
+const OPEN_AT_ROLL = "still on at the 17:00 roll and marked at its close";
+
 const callLine = (c: Call) =>
   `${c.direction} ${c.entry}, stop ${c.stop}, target ${c.target}, if ${c.condition}`;
 
@@ -2930,7 +2934,7 @@ export function callsList(rows: Call[], now = Date.now(), to = "Your"): string {
   const step = (c: Call) => c.misread === 'none' ? " — kept every step"
     : c.misread ? ` — misread the ${c.misread}: ${c.lesson}` : "";
   return `\n\n${to} calls over the last ${RECORD_DAYS} days, scored on price by his rules: ` +
-    `${rows.length} made; ${CALL_OUTCOMES.map(o => `${by(o)} ${o}`).join(", ")}` +
+    `${rows.length} made; ${CALL_OUTCOMES.map(o => `${by(o)} ${o === 'open' ? OPEN_AT_ROLL : o}`).join(", ")}` +
     (rows.length > scored.length + standing.length ? `, ${rows.length - scored.length - standing.length} not yet scored` : "") + `.` +
     (traded.length ? ` The ${traded.length} that triggered made ${net >= 0 ? "+" : "-"}$${Math.abs(net).toFixed(2)} an ounce.` : "") +
     (standing.length ? `\nStanding until the 17:00 roll: ${standing.map(callLine).join("; ")}.` : "") +

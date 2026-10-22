@@ -4901,7 +4901,11 @@ test('her calls say how they ended, what they made, and which still stands', () 
     { ...CALL, id: 1, made_at: '2026-10-12T13:00:00Z', expires_at: '2026-10-12T21:00:00Z', outcome: 'won', result: 30 },
     { ...CALL, id: 0, made_at: '2026-10-09T13:00:00Z', expires_at: '2026-10-09T21:00:00Z', outcome: 'untriggered' },
   ], now);
-  assert.match(out, /4 made; 1 won, 1 lost, 0 scratch, 0 open, 1 untriggered, 0 unread\./);
+  assert.match(out, /4 made; 1 won, 1 lost, 0 scratch, 0 still on at the 17:00 roll and marked at its close, 1 untriggered, 0 unread\./);
+  // A call still on at its roll is scored, and says so, or it reads as one the night never reached.
+  const rolled = callsList([{ ...CALL, id: 4, expires_at: '2026-10-13T21:00:00Z', outcome: 'open', result: 8.99 }], now);
+  assert.match(rolled, /1 still on at the 17:00 roll and marked at its close/);
+  assert.doesNotMatch(rolled, /\d open\b|not yet scored/, 'a call marked at its roll reads as left unscored');
   assert.match(out, /The 2 that triggered made \+\$15\.00 an ounce/);
   assert.match(out, /Standing until the 17:00 roll: buy 4000, stop 3985, target 4030, if a retest of 4,000/,
     'the call still standing is not named, so she would make a second');
