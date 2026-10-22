@@ -32,10 +32,9 @@
    lighting the screen, to ask Gladys's door what waits, with a soft double
    tick when something new does, and in the briefing's hours (briefing.c)
    Eugenia's whether it has landed; when it has, her face lights and she says
-   so. The screen is started
-   only when its marks must change: the panel keeps its picture while the chip
-   sleeps, so most errands never touch it. Once a night an errand also looks
-   for a new app from main (ota.c).
+   so. The screen is started only when its marks must change: the panel keeps
+   its picture while the chip sleeps, so most errands never touch it. Once a
+   night an errand also looks for a new app from main (ota.c).
 
    PWR is also the power chip's (power.c): off, a press switches her on, and
    held three seconds she says goodnight and switches off. */
