@@ -2313,7 +2313,11 @@ rather than searched for, his rules to hold them to, and a meter on each half.
   **no capture here says which hours these use**, so the first live run's
   figures are the check — a dollar index that tracks gold at nearly zero for
   weeks is the sign of a pairing a day out. Every read she gives is filed with the channel its chain ran
-  down.
+  down. **A move the chain does not explain is said as unexplained**: she
+  names what she can see carrying it, `get_around` holding what investors and
+  the speculators are doing, and never puts it on the Fed's path with the
+  futures pricing unread — on 22 October she put an $81 fall the ten-year and
+  the dollar did not explain down to fear of the next hike.
 - **How a change is proved.** The map's readings by `scripts/calibrate.mjs`,
   her reading of a chart by `scripts/replay.mjs` over the same past mornings
   before and after, her calls by their record, her reads by theirs, counted per channel, and any

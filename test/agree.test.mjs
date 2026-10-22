@@ -6486,6 +6486,17 @@ test('her bias is weighed rather than failed on disagreement, for her call and h
     'his plan\'s bias is failed on a rule her own call is not held to');
 });
 
+/* A CAUSE WITH ITS EVIDENCE MISSING IS A GUESS. On 22 October, with the odds
+   unread and the ten-year and the dollar both easing, the briefing put an 1
+   fall down to fear of what the Fed would do next. */
+test('a move rates and the dollar do not explain is never put on an unread Fed', () => {
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  assert.match(system, /THEN SAY WHAT IS CARRYING IT, FROM WHAT YOU CAN SEE, OR SAY YOU CANNOT SEE IT\. get_around holds what investors and the speculators are doing\./,
+    'a move the chain does not explain is left without where to look');
+  assert.match(system, /Never fill the gap with the Fed's path when the futures pricing was not read/,
+    'a move rates and the dollar do not explain is put down to the Fed with the odds unread');
+});
+
 test('the briefing opens on the weeks, in the writer and in the critic', () => {
   /* THE SCALE IS STATED TWICE, because the critic runs last and rewrites: a
      writer told to open on the big picture under a critic that tests the opening
