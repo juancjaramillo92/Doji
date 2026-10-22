@@ -999,6 +999,18 @@ her recording, a concurrency the firmware does not have today.
 serial log's `lit` and `listening` lines put the panel's start at most of a
 press's wait, for the second.
 
+### R-106 — a planted defect for the unexplained-move sentence
+**Deferred, not refused, his decision of 22 October.** `SYSTEM`'s *THEN SAY
+WHAT IS CARRYING IT* paragraph ships without a plant that proves its case can
+see it go. With the paragraph removed, `brief-move-without-a-cause` caught the
+removal 1 of 3, 1 of 3 and 0 of 3 in three runs: without web search the eval
+cannot hand her the pull the live morning had, so she seldom blames the Fed
+either way. A plant caught that rarely stops most eval runs and proves little,
+so it is out; the case stays, and passes, as a check that the rule's presence
+does no harm. `agree.test.mjs` holds the sentences.
+**Revisit if:** the eval can hand the briefing what a search returned, or a
+briefing is seen putting an unexplained move on an unread Fed again.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED
