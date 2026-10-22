@@ -1238,7 +1238,7 @@ grammar.
 
 **Her charm journals a trade on its own screen.** It sleeps, wakes every few
 minutes to ask what waits — every half hour while the market is shut and
-nothing waits already — and shows a still near-white dot
+nothing waits already — and shows a still near-white ring on its sleep screen
 while anything does. A `GET` with `x-charm-key: <GLADYS_CHARM_SECRET>` answers
 `{ waiting, trade }`: his trades from the last week (`WAITING_DAYS`) with any of
 the four answers missing, not deleted, oldest first so they are journalled in
@@ -3431,9 +3431,11 @@ once, in a tap's own grammar (*Her charm journals a trade on its own screen*),
 and her door answers with what waits next, so the next trade follows without a
 pause. Done, the journal's own screen: the four dots fill, a tick draws itself
 in and the ring sweeps round once — the tick light purple and the ring at full
-strength when every answer was a yes. Whatever ends it — done, a minute without
-a tap, PWR, nothing waiting after all because it was journaled in Telegram, her
-door out of reach — the journal gives way to the dark: the sleep screen is put
+strength when every answer was a yes. An answer her door does not take, the
+network still up, leaves the question where it was to be tapped again — the
+screen not moving on is the sign it was not saved. Whatever ends it — done, a
+minute without a tap, PWR, nothing waiting after all because it was journaled
+in Telegram, the network gone — the journal gives way to the dark: the sleep screen is put
 up under it before it leaves. Taps, not swipes: a swipe moves
 the whole screen, which this chip may not draw smoothly. The words are Doji's
 typeface, Hanken Grotesk, made into the charm's four fonts by

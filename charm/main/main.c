@@ -303,8 +303,10 @@ static void life(void *arg) {
     // A battery too low for her radio resets the chip as its voltage sags,
     // and every waking would only reset it again, the screen and the radio
     // drawing the cell down past where it should stop. Off the cable, the
-    // board switches off instead, as the goodnight does.
-    if (esp_reset_reason() == ESP_RST_BROWNOUT && power_charge() < 0) power_off();
+    // board switches off instead, as the goodnight does. A power chip that
+    // cannot be read reads as no cable and no battery alike, so it is a
+    // battery seen that makes this off the cable.
+    if (esp_reset_reason() == ESP_RST_BROWNOUT && power_battery() >= 0 && power_charge() < 0) power_off();
     // A lift that was not him: back to sleep at once, the sensor resting.
     if (woke == ESP_SLEEP_WAKEUP_EXT1 && (esp_sleep_get_ext1_wakeup_status() & (1ULL << MOTION_PIN)) && !motion_looked()) {
         time_t rest = time(NULL) + LIFT_REST_S;

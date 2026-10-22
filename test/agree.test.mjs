@@ -423,6 +423,19 @@ test('a trade\'s questions wait for the conversation to end, and PWR on them goe
   assert.doesNotMatch(ask, /ulTaskNotifyTake/, 'a question takes the press that closed it, so she never hears it');
 });
 
+/* An answer her door did not take ended the journal on the dark, with nothing
+   to say it was not saved. While the network is up the question stays to be
+   tapped again — knock() leaves the trade as it was, so the loop asks the
+   same one — and only the network gone ends it. gladys.c is the board's, so
+   the line is read. */
+test('a journal answer her door does not take is asked again while the network is up', () => {
+  const journal = bodyOf(source('charm/main/gladys.c'), 'int gladys_journal(void) {', 'gladys.c has no gladys_journal()');
+  assert.match(journal, /reached = knock\(body, &t\) \|\| net_wait\(0\);/,
+    'a refused answer ends the journal with the network still up, and nothing says it was not saved');
+  assert.match(bodyOf(source('charm/main/gladys.c'), 'static bool knock(const char *body, trade_t *t) {'),
+    /return ok && read_answer\(got, t\);/, 'a refused answer now changes the trade, so the same question is not asked again');
+});
+
 /* The charm's manifest asks for ranges, so a build resolves its components
    afresh unless dependencies.lock names them: a new board package would
    change the firmware under a commit that never touched it. The lock is
@@ -1736,12 +1749,14 @@ test('a charm already set up gives the setup up when no phone comes', () => {
 /* At the end of a charge her radio sags the battery and the chip resets as
    a brownout, which is no sleep wake, so it woke her — screen and radio —
    into the next reset. Off the cable that reset switches the board off, before
-   anything is lit or joined. life() is the board's, so it is read. */
+   anything is lit or joined — off the cable as a battery seen says, since a
+   power chip read that fails answers 0, no cable and no battery alike, and
+   would switch her off charging. life() is the board's, so it is read. */
 test('a battery too low for her radio switches her off rather than waking her again', () => {
   const life = bodyOf(source('charm/main/main.c'), 'static void life(void *arg) {', 'main.c has no life()');
-  const off = life.indexOf('if (esp_reset_reason() == ESP_RST_BROWNOUT && power_charge() < 0) power_off();');
+  const off = life.indexOf('if (esp_reset_reason() == ESP_RST_BROWNOUT && power_battery() >= 0 && power_charge() < 0) power_off();');
   assert.ok(off > life.indexOf('power_start(') && off < life.indexOf('errand()') && off < life.indexOf('awake()'),
-    'a brownout no longer switches her off before she wakes into the radio again');
+    'a brownout no longer switches her off before she wakes into the radio again, or does on a power chip it could not read');
   assert.match(bodyOf(source('charm/main/power.c'), 'void power_off(void) {'), /set\(COMMON, get\(COMMON\) \| 1\);/,
     'power_off() no longer switches the board off through the power chip');
 });
