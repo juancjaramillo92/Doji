@@ -3,7 +3,7 @@
 -- ───────────────────────────────────────────────────────────────────────────
 -- The schema is applied by hand on purpose, which makes schema.sql a claim
 -- about the database. This tests the claim. It writes nothing: run the
--- whole file after any manual change and read the `ok` column — all 102 checks.
+-- whole file after any manual change and read the `ok` column — all 103 checks.
 --
 -- One statement, because a SQL editor shows only the last statement's result.
 -- The listings that say which object, grant or schedule are diagnose.sql.
@@ -122,6 +122,15 @@ from (values
        and tablename in ('eugenia_calendar','eugenia_thesis','eugenia_loops')
        and cmd = 'SELECT'),
    '3'),
+
+  -- Those three policies read for any signed-in account, so there must be one.
+  -- Whether sign-ups are open is a dashboard setting no query can read; an
+  -- account they let in is one this counts.
+  ('one account, his',
+   (select (xpath('/row/c/text()', query_to_xml(
+             'select count(*) as c from auth.users', false, true, '')))[1]::text
+     where to_regclass('auth.users') is not null),
+   '1'),
 
   -- Expected zero: catches a policy added to the wrong table.
   ('her notes and turns stay closed to the app',

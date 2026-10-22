@@ -922,7 +922,8 @@ create or replace trigger trades_eugenia_closed
 -- The three tables the dashboard card draws: the calendar, the story, the open
 -- threads. Never her notes or turns, which stay denied to the publishable key.
 -- They hold no user_id, so `using (true)` for a signed-in session is the honest
--- policy; the grants below keep the verb to SELECT.
+-- policy while his is the only account — sign-ups stay off, README Setup from
+-- scratch. The grants below keep the verb to SELECT.
 do $$
 begin
   if not exists (select 1 from pg_policies

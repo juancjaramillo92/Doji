@@ -113,8 +113,11 @@ test('upgrade.sql changes nothing a fresh apply built, however often it runs', (
 /* ─── verify.sql asks what schema.sql builds ────────────────────────────── */
 
 test('verify.sql passes every check against the database schema.sql builds', () => {
-  sql(SECRETS);
+  // The live project holds one account; the second is this suite's, for the
+  // tests of another owner's row, and goes back once the file has run.
+  sql(SECRETS + `delete from auth.users where id = '${V}';`);
   const rows = sql(file('supabase/verify.sql')).split('\n');
+  sql(`insert into auth.users values ('${V}');`);
   assert.ok(rows.length > 1, 'verify.sql returned no rows');
   assert.deepEqual(rows.filter(r => !r.endsWith('|t')), [],
     'verify.sql fails against the database schema.sql builds — one of the two files is wrong');

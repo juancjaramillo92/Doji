@@ -3134,8 +3134,10 @@ Three things are worth a glance on the screen he opens every morning — what la
 today, the story she is carrying, what is still open — and none is private to
 her. **Not her notes or turns**: those stay denied to the publishable key, and his
 window into them is `/notes`. The three tables the card reads carry no `user_id`,
-so `using (true)` for `authenticated` is the honest policy; a test asserts the
-card reads only those three and that `schema.sql` opens nothing on the other two.
+so `using (true)` for `authenticated` is the honest policy **while his is the
+only account**, which is why sign-ups stay off (**Setup from scratch**); a test
+asserts the card reads only those three and that `schema.sql` opens nothing on
+the other two.
 
 **The calendar on it is the US releases alone**: what is filed from abroad is
 context for her, and a night of European and Asian rows would push the morning's
@@ -3646,6 +3648,10 @@ the jobs, and `agree.test.mjs` holds that count against `schema.sql`.
 ## Setup from scratch
 
 1. Put the project URL and publishable key in `SUPABASE` in `index.html`.
+   Create your account under Authentication → Users — its id is `DOJI_USER_ID`
+   below — and then **turn off "Allow new users to sign up"** (Authentication →
+   Sign In / Providers). The publishable key is public, Supabase leaves sign-ups
+   on, and any account it signs up reads the dashboard card's three tables.
 2. Let the deploy workflow ship the functions (see **Deployment**), and set
    `CTRADER_MCP_TOKEN`, `DOJI_USER_ID` and **`SB_SECRET_KEY`** in Edge Function
    secrets. `SB_SECRET_KEY` holds an `sb_secret_` key; Supabase owns the
