@@ -259,6 +259,15 @@ export const PLANTS = [
       SYSTEM: p.SYSTEM.replace(/HOW THE THREE BIAS CHARTS ADD UP IS YOURS TO JUDGE\.[\s\S]*?then say that is what failed\.\n\n/, '')
         .replace(/, weighed as it is for your own call\./, '.'),
     }) },
+  /* On 24 October, checking a Wednesday plan with Thursday's 08:30 pending, she
+     wrote that the stop has to move before it lands: R-19 rightly cited, said
+     as an order about a trade he was weighing. */
+  { why: 'R-19 said as his rule on a plan he would hold into a later session, gone from the writer',
+    cases: ['plan-r19-said-as-rule'],
+    breaks: (p) => ({
+      ...p,
+      SYSTEM: p.SYSTEM.replace(/ One that lands in a later\s+session, were he to hold it, is R-19's,[\s\S]*?those\s+are\s+orders\./, ''),
+    }) },
 ];
 
 /* ─── The run ────────────────────────────────────────────────────────────── */

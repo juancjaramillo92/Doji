@@ -3234,10 +3234,10 @@ call, a level beside a direction is a call nobody scores.
 **She checks a plan you have not taken, when you ask, two ways.** Against the
 rules a row can answer: the stop and target distances (R-01, R-02), reward
 against risk at entry against R-08's 1:1.5, any high-rated US release due while
-it would be on, whether the day already rules out an entry (R-03, R-11,
-R-12, R-16), something already open (R-10), the Friday close (R-15). And against
-your pre-trade sequence, which no row can see and which you decided in October
-2026 she should judge: R-08's four steps in order — the bias, the level (R-05's
+it would be on, whether the day already rules out an entry (R-03, R-11, R-12,
+R-16), something already open (R-10), the Friday close (R-15). And against your
+pre-trade sequence, which no row can see and which you decided in October 2026
+she should judge: R-08's four steps in order — the bias, the level (R-05's
 interior for Break & Retest, R-06's outer extreme for Support & Resistance), the
 confirmation rather than the touch (R-07), the ratio — reading §4 and §6 first
 so she holds you to what you wrote, and naming any step she cannot see. **Then
@@ -3246,8 +3246,13 @@ is your own probe for the touch, asked before the fact: what you will wait for
 at the level before you click. **The levels stay yours**: she never suggests a
 different entry, stop or target and never turns "the ratio is 1:1.1" into the
 target that would fix it; `TRIM` removes a level she offers in place of yours.
-Her own trades are calls she files, never edits of yours. A test holds the two
-halves to the kinds of rule §7 says they are.
+**A release you would carry into a later session is R-19's, said as your rule**:
+"R-19 puts the stop at break-even before the print if you are in profit, and
+tightens it if you are losing", never "the stop has to move" or "you tighten
+it", which about a trade you are weighing are orders; on 24 October, checking a
+Wednesday plan with Thursday's 08:30 pending, she said the second. Her own
+trades are calls she files, never edits of yours. A test holds the two halves to
+the kinds of rule §7 says they are.
 
 **She judges trades — the decision, never the result** — against your rules and the
 plan you entered with. A loss inside your rules was a good trade; a win that broke

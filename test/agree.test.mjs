@@ -6461,6 +6461,15 @@ test('the writing rules are stated once and read by all three', () => {
    and looks one step ahead for a briefing, so it holds the calendar job's
    minutes as a copy: moved in schema.sql alone, the market would be read on no
    pass, or on two an hour, and the briefing would go without the odds. */
+/* HIS RULE, NOT HER ORDER. A plan he would hold into a later session's print is
+   R-19's, and on 24 October she said what it does as "the stop has to move",
+   an instruction about a trade he was weighing. Issue #269. */
+test('a plan held into a later session says R-19 as his rule, never as an order', () => {
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  assert.match(system, /One that lands in a later session, were he to hold it, is R-19's, and what it does to the stop is his rule, said as his: "R-19 puts the stop at break-even before the print if you are in profit, and tightens it if you are losing", never "the stop has to move" or "you tighten it"\./,
+    'a plan carried into a later session\'s print is left without R-19 said as his rule');
+});
+
 test('readsDue reads on the calendar job\'s last pass of each hour, as its cron fires', () => {
   const minutes = SCHEMA_SQL.match(/'doji-eugenia-calendar',\s*'([\d,]+) \* \* \* \*'/)[1].split(',').map(Number);
   const last = Math.max(...minutes);
