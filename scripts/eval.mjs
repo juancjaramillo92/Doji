@@ -193,6 +193,8 @@ export const PLANT_TRIES = 3;
 
 // MECHANISM's second half restates the ban, in the writer and the critic both.
 const MECHANISM_BAN = / A\s+view says which way you think gold goes from here,[\s\S]*?take out the view\./;
+// And the one thing about his trade the ban keeps: R-19's collision.
+const R19_KEPT = / His own rule landing on it is not a view:[\s\S]*?said with the rule\./;
 
 export const PLANTS = [
   /* A reply case cannot see this plant: without the ban she walks the chain to
@@ -243,15 +245,19 @@ export const PLANTS = [
      writer's prompt, so both copies go. Its R-20 half cannot be seen going:
      CRITIC's ban on anything about his trade also cuts a print tied to a
      position he opened this session, and runs 39 to 51 caught it 2, 1, 2, 1
-     and 0 of 3. Its R-19 half is what nothing else says: a collision with a
-     position from an earlier session stays, said with the rule, where that
-     ban would cut it. */
-  { why: 'R-19\'s collision kept, said with the rule, gone from the critic and the writer',
+     and 0 of 3. Its R-19 half is what the ban would cut: a collision with a
+     position from an earlier session stays, said with the rule. MECHANISM,
+     where the ban is, says so too, since in run 53 the ban won; so the plant
+     takes that sentence from every prompt that interpolates it. */
+  { why: 'R-19\'s collision kept, said with the rule, gone from the critic, the writer and MECHANISM',
     cases: ['critic-keeps-r19-collision'],
     breaks: (p) => ({
       ...p,
-      CRITIC: p.CRITIC.replace(/Is a print put beside a position he opened this session\?[\s\S]*?said with the rule\.\n\n/, ''),
-      SYSTEM: p.SYSTEM.replace(/ A print due beside a position he opened knowing\s+it was there is R-20's,[\s\S]*?adds nothing he did not have\./, ''),
+      CRITIC: p.CRITIC.replace(/Is a print put beside a position he opened this session\?[\s\S]*?said with the rule\.\n\n/, '')
+        .replace(R19_KEPT, ''),
+      SYSTEM: p.SYSTEM.replace(/ A print due beside a position he opened knowing\s+it was there is R-20's,[\s\S]*?adds nothing he did not have\./, '')
+        .replace(R19_KEPT, ''),
+      TRIM: p.TRIM.replace(R19_KEPT, ''),
     }) },
   /* From 15 to 22 October she failed the bias step whenever the three charts
      disagreed. The plan check points at the call's rule, so both go. */

@@ -1823,6 +1823,8 @@ October the briefing told him both 08:30 prints landed on the position he had
 opened that morning, and the critic, with no check for it, sent it. A print
 landing on a position from an earlier session is R-19's collision and stays.
 `SYSTEM` and `CRITIC` say it alike, and `agree.test.mjs` holds the pair.
+`MECHANISM`, where the ban on anything about his trade lives, says the same,
+since in run 53 the ban cut the collision anyway.
 
 **It cannot make things worse, and that is enforced.** A revision that comes back
 empty, apologetic or past `keepDraft`'s bound is a critic that failed, and the

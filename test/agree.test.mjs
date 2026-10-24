@@ -6511,6 +6511,9 @@ test('a print beside a position he opened knowingly is his, in the writer and in
     'the critic no longer takes a print tied to his position out of the briefing');
   assert.match(flat('CRITIC'), /landing on a position opened in an earlier session is R-19's collision, and it stays/,
     'the critic takes R-19\'s collision out with R-20\'s caution');
+  // The ban on anything about his trade lives in MECHANISM, and in run 53 it cut the collision anyway.
+  assert.match(EUGENIA_PROMPT.match(/export const MECHANISM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' '), /anything about his trade\. His own rule landing on it is not a view: R-19's collision, a print rated high landing on a position from an earlier session, stays, said with the rule\./,
+    'the ban on anything about his trade cuts R-19\'s collision, which the critic is told to keep');
 });
 
 /* HER TECHNICAL HALF WAS MUTE ON A RULE NOBODY WROTE. From 15 to 22 October she
