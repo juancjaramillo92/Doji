@@ -270,12 +270,15 @@ export const PLANTS = [
     }) },
   /* On 24 October, checking a Wednesday plan with Thursday's 08:30 pending, she
      wrote that the stop has to move before it lands: R-19 rightly cited, said
-     as an order about a trade he was weighing. */
-  { why: 'R-19 said as his rule on a plan he would hold into a later session, gone from the writer',
+     as an order about a trade he was weighing. MECHANISM's R-19 sentence says
+     the same of a position held, and in run 54, with only the plan's copy
+     gone, she said it as his rule all three times; so both go. */
+  { why: 'R-19 said as his rule on a plan he would hold into a later session, gone from the writer and MECHANISM',
     cases: ['plan-r19-said-as-rule'],
     breaks: (p) => ({
       ...p,
-      SYSTEM: p.SYSTEM.replace(/ One that lands in a later\s+session, were he to hold it, is R-19's,[\s\S]*?those\s+are\s+orders\./, ''),
+      SYSTEM: p.SYSTEM.replace(/ One that lands in a later\s+session, were he to hold it, is R-19's,[\s\S]*?those\s+are\s+orders\./, '')
+        .replace(R19_KEPT, ''),
     }) },
 ];
 

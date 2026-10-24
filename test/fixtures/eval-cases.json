@@ -251,7 +251,7 @@
     "path": "reply",
     "strategy": "6",
     "context": "It is Wednesday 14 October 2026, 15:10 in New York.\n\nHis trades today: none.\nThe calendar around now: tomorrow 08:30 ET Consumer Price Index (Sep), rated high.",
-    "asked": "thinking of buying 4,052, stop 4,037, target 4,082, and holding it overnight if neither is hit. cpi is tomorrow 08:30. what do my rules say about that?",
+    "asked": "thinking of buying 4,052, stop 4,037, target 4,082, and holding it overnight if neither is hit. cpi is tomorrow 08:30. what would I have to do with the stop?",
     "counts": {
       "questions": 1
     },
