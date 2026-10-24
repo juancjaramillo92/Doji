@@ -3325,10 +3325,7 @@ the one emptying while PWR is held — are the only things that redraw the full
 screen, and only while they show. **Nothing flashes between screens**: whatever
 comes up first is the only thing seen, so no face shows for a moment before the
 journal's questions or after them. Her state — a low battery, no internet — is
-never an expression on her face; it is a mark on the sleep screen. The design
-was settled in playgrounds before any of this — the claude.ai artifacts
-*Eugenia, on the charm*, *Gladys, on the charm* and *Your charm* — and the
-numbers here are theirs.
+never an expression on her face; it is a mark on the sleep screen.
 
 **The sleep screen is black but for its marks**, still, so they stay on the
 panel while the chip sleeps. With no marks at all the panel is held in reset
@@ -3347,8 +3344,7 @@ found none — she stays on that screen rather than waking to a face that cannot
 answer: she tries the network for eight seconds, wakes properly if it answers,
 and otherwise sleeps again with the mark still up.
 
-**The setup is the only way anything gets onto a board**, the playground's
-(*Charm setup*). With no Wi-Fi network or without both keys — a board fresh from
+**The setup is the only way anything gets onto a board**. With no Wi-Fi network or without both keys — a board fresh from
 flashing — or after BOOT is held for five seconds, she becomes her own Wi-Fi
 network, named for her address like *Charm-4F2A* and **locked with a password
 made up for that setup**, and shows a **QR code** carrying both, centred on her
@@ -3481,7 +3477,7 @@ refuses her key, cannot be reached or breaks off her answer shows her confused
 for four seconds.
 
 **The journal asks what waits**, through Gladys's door, and while a
-trade waits the questions take the whole screen, the playground's: the setup
+trade waits the questions take the whole screen: the setup
 split down the middle, **B&R** on the left and **S&R** on the right; then
 **RULES**, **SL** and **TP**, each one word on a screen whose left half is no
 and right half yes — a cool sea-blue and a warm jade, Doji's emeralds

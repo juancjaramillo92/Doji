@@ -1,5 +1,4 @@
-/* The journal on her screen, the playgrounds' (claude.ai artifacts "Gladys,
-   on the charm" and "Your charm"): each question owns the whole screen, split
+/* The journal on her screen: each question owns the whole screen, split
    down the middle, with one word in Doji's typeface and nothing else to read.
    Right is yes and left is no. Tapping a half rather than swiping: a swipe
    moves the whole screen, which this chip may not draw smoothly, so taps first
@@ -28,7 +27,7 @@ static const char *const SHORT[2] = { "B&R", "S&R" };
 /* The halves, in Doji's emeralds rather than a win's teal and a loss's red:
    no is the cool sea-blue on the left, yes the warm jade on the right, each a
    gradient, top to bottom, that brightens when tapped. The setup's two halves
-   share one. As the playground ("Your charm") has them. */
+   share one. */
 static const uint32_t HALVES[3][2][2] = {
     //            resting               lit
     /* setup */ { { 0x0b2a22, 0x113a2f }, { DEEP,     GLOW     } },

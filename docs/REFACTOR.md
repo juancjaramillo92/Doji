@@ -407,7 +407,7 @@ documents.
 ### R-40 — naming the charm's screen centre and size
 **Why refused:** 233 and 466 recur in every file that draws, but they are two
 of some hundred coordinates measured in the same pixels — the render is bytes
-for this panel, and every position is the playgrounds' number on it. Naming
+for this panel, and every position is a number measured on it. Naming
 two leaves the rest literal in the same space and makes no decision movable.
 **Revisit if:** a second panel size is ever driven.
 

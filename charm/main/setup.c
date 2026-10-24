@@ -1,8 +1,8 @@
-/* The setup, the playground's ("Charm setup"). The charm becomes its own
-   Wi-Fi network, locked with a password made up for this setup, and shows a
-   QR code that carries both: a phone's camera joins it in one tap, and the
-   page opens by itself, because every name the phone asks for resolves to the
-   charm and every page but its own redirects there.
+/* The setup. The charm becomes its own Wi-Fi network, locked with a password
+   made up for this setup, and shows a QR code that carries both: a phone's
+   camera joins it in one tap, and the page opens by itself, because every name
+   the phone asks for resolves to the charm and every page but its own
+   redirects there.
 
    The page (setup.html) asks for her Wi-Fi networks and the two keys, and
    each is tried before it is saved: a network by joining it, a key by asking

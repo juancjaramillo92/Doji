@@ -1,8 +1,7 @@
-/* The volume dial, the playground's (claude.ai artifact "Eugenia, on the
-   charm"): the screen dims, and round the rim a faint track, the level in
-   Doji's emeralds, a white knob at its end, and the number under VOLUME. Gone
-   a moment after the finger lifts. It sits on LVGL's top layer, over her
-   face, and draws only while it shows. */
+/* The volume dial: the screen dims, and round the rim a faint track, the
+   level in Doji's emeralds, a white knob at its end, and the number under
+   VOLUME. Gone a moment after the finger lifts. It sits on LVGL's top layer,
+   over her face, and draws only while it shows. */
 #include "dial.h"
 
 #include <math.h>
