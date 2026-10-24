@@ -2010,7 +2010,7 @@ radio off, so nothing can be pushed to it: after the briefing's hour it wakes
 and asks **`?briefing=ready`** (a `GET` with the same key), which answers with
 her line *"Your briefing is ready, jefe."* in the same frames, or a `204` while
 no briefing is stored for today. Writing takes up to six minutes, so the charm
-asks again every few minutes until it lands. Then it shows a still purple dot
+asks again every few minutes until it lands. Then it shows a still emerald dot
 until he presses, and asks **`?briefing=today`** for the briefing itself; at
 midnight in New York the dot goes (`briefing_today`), as the door's today does. Both
 read today's briefing through `storedBriefing`, the speaking worker's own
@@ -3318,7 +3318,7 @@ blinks, glances, the mouth following the loudness of what plays; thinking, she
 looks up and away from one side to the other under three thought dots; when
 something goes wrong, her eyes go uneven and her smile turns down; going to
 sleep, her eyes close slowly. Only the face's own patch is redrawn on a frame;
-the rings round the rim — Doji's purples turning slowly while she listens, and
+the rings round the rim — Doji's emeralds turning slowly while she listens, and
 the one emptying while PWR is held — are the only things that redraw the full
 screen, and only while they show. **Nothing flashes between screens**: whatever
 comes up first is the only thing seen, so no face shows for a moment before the
@@ -3326,12 +3326,13 @@ journal's questions or after them. Her state — a low battery, no internet — 
 never an expression on her face; it is a mark on the sleep screen. The design
 was settled in playgrounds before any of this — the claude.ai artifacts
 *Eugenia, on the charm*, *Gladys, on the charm* and *Your charm* — and the
-numbers here are theirs.
+numbers here are theirs, but for the colours: the playgrounds are in Doji's old
+purples, and the charm has turned emerald with the app.
 
 **The sleep screen is black but for its marks**, still, so they stay on the
 panel while the chip sleeps. With no marks at all the panel is held in reset
 instead: the same black, without the panel running to show it. Low on the screen, **one mark for what waits**:
-a purple dot with a glow while a briefing does, a white ring while a trade
+an emerald dot with a glow while a briefing does, a white ring while a trade
 does, and the dot inside the ring when both do — one place and one size each,
 so nothing moves or shrinks when the other arrives, and shape tells them apart
 at a glance. At the top, a small battery when she is at 15% or below and off the
@@ -3482,13 +3483,13 @@ for four seconds.
 trade waits the questions take the whole screen, the playground's: the setup
 split down the middle, **B&R** on the left and **S&R** on the right; then
 **RULES**, **SL** and **TP**, each one word on a screen whose left half is no
-and right half yes — a cool blue-violet and a warm magenta, Doji's purples
-rather than a win's green and a loss's red, each brightening when tapped. Four
+and right half yes — a cool sea-blue and a warm jade, Doji's emeralds
+rather than a win's teal and a loss's red, each brightening when tapped. Four
 dots at the top say what is answered. A tap on a half sends that one answer at
 once, in a tap's own grammar (*Her charm journals a trade on its own screen*),
 and her door answers with what waits next, so the next trade follows without a
 pause. Done, the journal's own screen: the four dots fill, a tick draws itself
-in and the ring sweeps round once — the tick light purple and the ring at full
+in and the ring sweeps round once — the tick light emerald and the ring at full
 strength when every answer was a yes. An answer her door does not take, the
 network still up, leaves the question where it was to be tapped again — the
 screen not moving on is the sign it was not saved. Whatever ends it — done, a
@@ -3501,7 +3502,7 @@ typeface, Hanken Grotesk, made into the charm's four fonts by
 
 **A finger round the rim is the volume**: one full turn from silent to
 loudest, from a press at least 160 px from the centre. The screen dims, and
-round the rim a faint track, the level in Doji's purples, a white knob at its
+round the rim a faint track, the level in Doji's emeralds, a white knob at its
 end, and the number under *VOLUME*; it fades a moment after the finger lifts,
 and the volume is saved in her flash with the rest.
 
@@ -3543,7 +3544,9 @@ floating in sleep, is quiet. That a battery run down resets her as a brownout
 and so switches her off, and whether a cable alone switches her back on. How
 long a press from sleep takes to reach the listening notes: the serial log's
 `lit` and `listening` lines are timestamped from boot, and the board package's
-panel start alone waits 1.2 s.
+panel start alone waits 1.2 s. That the emeralds read on the panel as they
+were chosen on a screen: the ring, the journal's halves, the dial and the sleep
+marks, where a dark green in RGB565 may band or go muddy.
 
 ---
 

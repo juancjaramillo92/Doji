@@ -134,7 +134,7 @@ static void dot(lv_layer_t *layer, float cx, float cy, float rx, float ry,
 }
 
 // Short arcs, each the colour of its place: LVGL draws no conic gradient.
-static const uint32_t RING[] = { DEEP, ACCENT, GLOW, VIOLET, DEEP };
+static const uint32_t RING[] = { DEEP, ACCENT, GLOW, TEAL, DEEP };
 #define RING_STEPS 36
 
 void face_ring(lv_layer_t *layer, int32_t radius, int32_t width, float part, float turn, float opa) {
@@ -265,7 +265,7 @@ static void draw_face(lv_event_t *e) {
 }
 
 /* The sleep screen, still, so it stays on the panel while the chip sleeps.
-   Low on the screen, one mark for what waits: Eugenia's purple dot with a
+   Low on the screen, one mark for what waits: Eugenia's emerald dot with a
    glow for a briefing, a white ring for a trade, the dot inside the ring for
    both — one place and one size each, so nothing moves or shrinks when the
    other arrives, and shape tells them apart. At the top, a small battery when
@@ -281,7 +281,7 @@ static void draw_night(lv_event_t *e) {
         lv_draw_arc_dsc_init(&a);
         a.center.x = x; a.center.y = y;
         a.radius = 19; a.width = 3; a.start_angle = 0; a.end_angle = 360;
-        a.color = lv_color_hex(0xeeecf4);
+        a.color = lv_color_hex(0xecf4ef);
         lv_draw_arc(layer, &a);
     }
     if (briefing_waits) {

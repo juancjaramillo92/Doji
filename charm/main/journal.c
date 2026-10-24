@@ -25,15 +25,15 @@ LV_FONT_DECLARE(hanken_16);
 static const char *const WORDS[4] = { "SETUP", "RULES", "SL", "TP" };
 static const char *const SHORT[2] = { "B&R", "S&R" };
 
-/* The halves, in Doji's purples rather than a win's green and a loss's red:
-   no is the cool blue-violet on the left, yes the warm magenta on the right,
-   each a gradient, top to bottom, that brightens when tapped. The setup's two
-   halves share one. As the playground ("Your charm") has them. */
+/* The halves, in Doji's emeralds rather than a win's teal and a loss's red:
+   no is the cool sea-blue on the left, yes the warm jade on the right, each a
+   gradient, top to bottom, that brightens when tapped. The setup's two halves
+   share one. The playground ("Your charm") has them in its purples. */
 static const uint32_t HALVES[3][2][2] = {
     //            resting               lit
-    /* setup */ { { 0x16123a, 0x221a4e }, { DEEP,     GLOW     } },
-    /* no    */ { { 0x120f33, 0x1d1a4a }, { 0x3a3aa8, VIOLET   } },
-    /* yes   */ { { 0x22103a, 0x34184f }, { ACCENT,   0xd26ce6 } },
+    /* setup */ { { 0x0b2a22, 0x113a2f }, { DEEP,     GLOW     } },
+    /* no    */ { { 0x0a2430, 0x0f3340 }, { 0x1f6f8a, TEAL     } },
+    /* yes   */ { { 0x0d2a17, 0x153d22 }, { ACCENT,   0x5fe08a } },
 };
 
 #define ASK_MS   60000  // then she goes back to sleep, the rest left waiting
@@ -87,7 +87,7 @@ static lv_obj_t *text(lv_obj_t *parent, const lv_font_t *font, uint32_t color, i
 
 /* The tick in two strokes, its box centred on the screen's centre, drawn in
    over TICK_MS; the ring swept round over SWEEP_MS, brighter, and the tick
-   light purple, when every answer was a yes. */
+   light emerald, when every answer was a yes. */
 static void draw_done(lv_event_t *e) {
     lv_layer_t *layer = lv_event_get_layer(e);
     uint32_t t = lv_tick_elaps(done_at);
@@ -148,7 +148,7 @@ static void build(void) {
     lv_timer_pause(drawing);
 }
 
-// Where the four dots sit: answered purple, this one larger.
+// Where the four dots sit: answered emerald, this one larger.
 static void place_dots(int q, const bool missing[4]) {
     for (int i = 0; i < 4; i++) {
         int r = i == q ? 5 : 4;

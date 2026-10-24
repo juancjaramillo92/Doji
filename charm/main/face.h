@@ -35,7 +35,7 @@ void face_set_level(float level);
 // PWR held toward switching off, 0 to 1: a ring empties round the rim.
 void face_set_hold(float hold);
 
-/* What the sleep screen shows. Low on it, one mark for what waits: a purple
+/* What the sleep screen shows. Low on it, one mark for what waits: an emerald
    dot while a briefing does, a white ring while a trade does, the dot inside
    the ring for both. At the top, a small battery when it is `low` and nothing
    charges it, and the no-internet mark when `offline`. While the cable
@@ -47,7 +47,7 @@ void face_set_marks(bool briefing, bool trade, bool low, bool offline, int charg
    what the sleep screen redraws on, and what main.c compares across sleep. */
 int face_marks(bool briefing, bool trade, bool low, bool offline, int charge);
 
-/* Doji's purples round the rim, from the top for `part` of a turn, `turn`
+/* Doji's emeralds round the rim, from the top for `part` of a turn, `turn`
    spinning the colours: her listening ring, the charge, the journal's done. */
 #define FACE_RING_TURN_MS 1800  // one turn of the colours, where they spin
 void face_ring(lv_layer_t *layer, int32_t radius, int32_t width, float part, float turn, float opa);

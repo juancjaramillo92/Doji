@@ -1,6 +1,6 @@
 /* The volume dial, the playground's (claude.ai artifact "Eugenia, on the
    charm"): the screen dims, and round the rim a faint track, the level in
-   Doji's purples, a white knob at its end, and the number under VOLUME. Gone
+   Doji's emeralds, a white knob at its end, and the number under VOLUME. Gone
    a moment after the finger lifts. It sits on LVGL's top layer, over her
    face, and draws only while it shows. */
 #include "dial.h"
@@ -49,7 +49,7 @@ static void draw(lv_event_t *e) {
     a.opa = (lv_opa_t)(0.12f * k);
     lv_draw_arc(layer, &a);
 
-    // The level, from the top, lightening to the light purple at its end.
+    // The level, from the top, lightening to the light emerald at its end.
     int steps = (int)ceilf(STEPS * volume / 100);
     a.opa = k;
     for (int i = 0; i < steps; i++) {

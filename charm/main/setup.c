@@ -130,7 +130,7 @@ static void build_screen(void) {
     lv_obj_set_size(s, 74, 74);
     lv_obj_set_pos(s, 196, 177);
     lv_obj_set_style_arc_width(s, 6, LV_PART_MAIN);
-    lv_obj_set_style_arc_color(s, lv_color_hex(0x1a1528), LV_PART_MAIN);
+    lv_obj_set_style_arc_color(s, lv_color_hex(0x102a20), LV_PART_MAIN);
     lv_obj_set_style_arc_width(s, 6, LV_PART_INDICATOR);
     lv_obj_set_style_arc_color(s, lv_color_hex(GLOW), LV_PART_INDICATOR);
     busy = text(screens[SHOW_BUSY], SAY[2], INK, 270);
