@@ -6461,6 +6461,24 @@ test('the writing rules are stated once and read by all three', () => {
    and looks one step ahead for a briefing, so it holds the calendar job's
    minutes as a copy: moved in schema.sql alone, the market would be read on no
    pass, or on two an hour, and the briefing would go without the odds. */
+/* HIS RULE, NOT HER ORDER. A plan he would hold into a later session's print is
+   R-19's, and on 24 October she said what it does as "the stop has to move",
+   an instruction about a trade he was weighing. Issue #269. */
+/* HIS FOUR STEPS IN HIS ORDER. In run 53 she could not see the 1H, took the
+   level, the candle and the ratio, and judged the bias last. A step she cannot
+   see is said where it falls. */
+test('a step she cannot see is said in its place, so his sequence keeps its order', () => {
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  assert.match(system, /Where you cannot see a step, say so in its place, rather than passing it or moving it to the end\./,
+    'a step she cannot see can be moved to the end of his sequence');
+});
+
+test('a plan held into a later session says R-19 as his rule, never as an order', () => {
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  assert.match(system, /One that lands in a later session, were he to hold it, is R-19's, and what it does to the stop is his rule, said as his: "R-19 puts the stop at break-even before the print if you are in profit, and tightens it if you are losing", never "the stop has to move" or "you tighten it"\./,
+    'a plan carried into a later session\'s print is left without R-19 said as his rule');
+});
+
 test('readsDue reads on the calendar job\'s last pass of each hour, as its cron fires', () => {
   const minutes = SCHEMA_SQL.match(/'doji-eugenia-calendar',\s*'([\d,]+) \* \* \* \*'/)[1].split(',').map(Number);
   const last = Math.max(...minutes);
@@ -6502,6 +6520,9 @@ test('a print beside a position he opened knowingly is his, in the writer and in
     'the critic no longer takes a print tied to his position out of the briefing');
   assert.match(flat('CRITIC'), /landing on a position opened in an earlier session is R-19's collision, and it stays/,
     'the critic takes R-19\'s collision out with R-20\'s caution');
+  // The ban on anything about his trade lives in MECHANISM, and in run 53 it cut the collision anyway.
+  assert.match(EUGENIA_PROMPT.match(/export const MECHANISM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' '), /anything about his trade\. His own rule landing on it is not a view: R-19's collision, a print rated high landing on a position from an earlier session, stays, said with the rule\./,
+    'the ban on anything about his trade cuts R-19\'s collision, which the critic is told to keep');
 });
 
 /* HER TECHNICAL HALF WAS MUTE ON A RULE NOBODY WROTE. From 15 to 22 October she
@@ -6525,6 +6546,8 @@ test('a move rates and the dollar do not explain is never put on an unread Fed',
     'a move the chain does not explain is left without where to look');
   assert.match(system, /Never fill the gap with the Fed's path when the futures pricing was not read/,
     'a move rates and the dollar do not explain is put down to the Fed with the odds unread');
+  assert.match(system, /When the wires tell that story, it is theirs: say so, and say in the same sentence that the futures were not read, so you cannot check it\./,
+    'the wires\' Fed story is reported with the unread futures said somewhere else, so it is heard as the cause');
 });
 
 test('the briefing opens on the weeks, in the writer and in the critic', () => {

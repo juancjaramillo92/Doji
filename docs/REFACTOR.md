@@ -1010,7 +1010,10 @@ the Fed story told in full: even with the live morning's pull in front of her,
 she seldom blames the Fed either way. A plant caught that rarely stops most
 eval runs and proves little, so it is out; the case stays, and passes, as a
 check that the rule's presence does no harm. `agree.test.mjs` holds the
-sentences.
+sentences. The sentence after it, that the wires' Fed story is reported as
+theirs with the unread futures in the same sentence, ships the same way: run 52
+failed the case on it, the caveat two paragraphs from the story, once in the
+four runs before it was written, and a plant that rare would stop every run.
 **Revisit if:** a briefing is seen putting an unexplained move on an unread
 Fed again; that briefing's own inputs are the case to try.
 
@@ -1042,14 +1045,19 @@ earns its place in the next morning's story. Adding medium works against the
 simpler briefing he asked for the same week.
 **Revisit if:** he asks for a release by name on its day.
 
-### R-110 — the R-20 critic case's plant
-**Deferred.** The plant that removes the critic's R-20 paragraph was caught 3
-of 3 in runs 31, 32 and 37, then 2 of 3 and 1 of 3 in runs 39 and 40, after
-its criterion was clarified to pass a sentence taken out with nothing in its
-place. The rule is live and the case passes; what weakened is the proof that
-the case would see the rule go. Firming it changes no behaviour of hers, so it
-waits for him.
-**Revisit if:** a run catches it 0 of 3, or he asks.
+### R-110 — a planted defect for the critic's R-20 paragraph
+**Refused: no case can see it go.** The plant that removed the paragraph was
+caught 3 of 3 in runs 31, 32 and 37, then 2, 1, 2, 1 and 0 of 3 in runs 39 to
+51. Its R-20 half is done anyway: `MECHANISM`'s ban on anything about his
+trade cuts a print tied to a position he opened this session with or without
+it, so `critic-print-beside-his-position` stays a case. Its R-19 half is a coin
+the critic tosses: a collision stated and cited, as `SYSTEM` says it, came
+through 3 of 3 with the paragraph and `MECHANISM`'s R-19 sentence gone in run
+57, and was cut with both there in run 58. A case that fails at random fails
+one full run in two, so it is out, and the defect is issue #270. `MECHANISM`'s
+sentence stays because without it the ban, read whole, contradicts `SYSTEM`'s
+permission to name the collision: a reason by reading, not by the eval.
+**Revisit if:** #270 gives the collision a place the critic keeps.
 
 ### R-111 — the eval showing her her own tools, uncallable
 **Why refused:** tried in run 43. Offered each call site's tools with
@@ -1060,6 +1068,14 @@ measured the harness, not her. A tool's description stays outside what the
 eval asks (*What no test reaches*).
 **Revisit if:** the eval serves her tools from fixtures, each case handing
 the answer a call would return, rather than handing it in the context.
+
+### R-112 — a planted defect for the step said in its place
+**Deferred.** `SYSTEM` says a step of his sequence she cannot see is said in
+its place, never moved to the end, since in run 53 she judged the bias last
+for want of the 1H. `setup-judged-take-or-skip` failed on the order that once
+in the eight runs before the sentence, and a plant caught that rarely would
+stop most runs; `agree.test.mjs` holds the sentence.
+**Revisit if:** she is seen moving a step again.
 
 ---
 

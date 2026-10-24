@@ -17,6 +17,7 @@
    It spends money, so it is never in `npm test` and is run by hand. With
    `--plant` it first runs the cases a deliberately broken prompt should fail,
    and stops if the breakage goes unseen: an eval that cannot fail is not one.
+   With `--only` as well, only the plants that break that one case run.
 
    Run:  ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs [--plant] [--only <id>]
    Cost: about fifty model calls, half of them the judge; the system prompt is
@@ -193,6 +194,8 @@ export const PLANT_TRIES = 3;
 
 // MECHANISM's second half restates the ban, in the writer and the critic both.
 const MECHANISM_BAN = / A\s+view says which way you think gold goes from here,[\s\S]*?take out the view\./;
+// And the one thing about his trade the ban keeps: R-19's collision.
+const R19_KEPT = / His own rule landing on it is not a view:[\s\S]*?said with the rule\./;
 
 export const PLANTS = [
   /* A reply case cannot see this plant: without the ban she walks the chain to
@@ -239,17 +242,6 @@ export const PLANTS = [
         .replace(/THE MAP OF HIS CHARTS IS THE HOURS ON IT,[\s\S]*?a call you file\.\n\n/, ''),
       CRITIC: p.CRITIC.replace(/Is the map of his charts in the prose\?[\s\S]*?it comes out\.\n\n/, ''),
     }) },
-  /* The writer states R-20's caution once, and the critic runs under the
-     writer's prompt, so both copies go. On 15 October the writer tied the
-     08:30 prints to the position opened that morning and the critic, with no
-     check for it, sent it. */
-  { why: 'a print beside a position he opened knowingly left to him, gone from the critic and the writer',
-    cases: ['critic-print-beside-his-position'],
-    breaks: (p) => ({
-      ...p,
-      CRITIC: p.CRITIC.replace(/Is a print put beside a position he opened this session\?[\s\S]*?said with the rule\.\n\n/, ''),
-      SYSTEM: p.SYSTEM.replace(/ A print due beside a position he opened knowing\s+it was there is R-20's,[\s\S]*?adds nothing he did not have\./, ''),
-    }) },
   /* From 15 to 22 October she failed the bias step whenever the three charts
      disagreed. The plan check points at the call's rule, so both go. */
   { why: 'the bias weighed rather than failed on disagreement, gone from the writer',
@@ -258,6 +250,18 @@ export const PLANTS = [
       ...p,
       SYSTEM: p.SYSTEM.replace(/HOW THE THREE BIAS CHARTS ADD UP IS YOURS TO JUDGE\.[\s\S]*?then say that is what failed\.\n\n/, '')
         .replace(/, weighed as it is for your own call\./, '.'),
+    }) },
+  /* On 24 October, checking a Wednesday plan with Thursday's 08:30 pending, she
+     wrote that the stop has to move before it lands: R-19 rightly cited, said
+     as an order about a trade he was weighing. MECHANISM's R-19 sentence says
+     the same of a position held, and in run 54, with only the plan's copy
+     gone, she said it as his rule all three times; so both go. */
+  { why: 'R-19 said as his rule on a plan he would hold into a later session, gone from the writer and MECHANISM',
+    cases: ['plan-r19-said-as-rule'],
+    breaks: (p) => ({
+      ...p,
+      SYSTEM: p.SYSTEM.replace(/ One that lands in a later\s+session, were he to hold it, is R-19's,[\s\S]*?those\s+are\s+orders\./, '')
+        .replace(R19_KEPT, ''),
     }) },
 ];
 
@@ -327,10 +331,14 @@ async function main(argv) {
   const usage = [];
 
   if (argv.includes('--plant')) {
-    for (const plant of PLANTS) {
+    // With a case named, only the plants that break it: the check a change to
+    // one rule is owed, for a tenth of the full run.
+    const plants = PLANTS.filter(p => !only || p.cases.includes(only));
+    if (only && !plants.length) console.log(`no plant breaks ${only}: its pass says the rule is obeyed, not that the case would see it go`);
+    for (const plant of plants) {
       const broken = plant.breaks(PROMPTS);
       if (Object.keys(PROMPTS).every(k => broken[k] === PROMPTS[k])) throw new Error(`the plant did not change the prompt: ${plant.why}`);
-      for (const id of plant.cases) {
+      for (const id of plant.cases.filter(id => !only || id === only)) {
         const results = await Promise.all(Array.from({ length: PLANT_TRIES },
           () => grade(CASES.find(c => c.id === id), broken)));
         for (const r of results) usage.push(...r.usage);

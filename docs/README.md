@@ -1823,6 +1823,8 @@ October the briefing told him both 08:30 prints landed on the position he had
 opened that morning, and the critic, with no check for it, sent it. A print
 landing on a position from an earlier session is R-19's collision and stays.
 `SYSTEM` and `CRITIC` say it alike, and `agree.test.mjs` holds the pair.
+`MECHANISM`, where the ban on anything about his trade lives, says the same,
+since in run 53 the ban cut the collision anyway.
 
 **It cannot make things worse, and that is enforced.** A revision that comes back
 empty, apologetic or past `keepDraft`'s bound is a critic that failed, and the
@@ -2319,7 +2321,10 @@ rather than searched for, his rules to hold them to, and a meter on each half.
   names what she can see carrying it, `get_around` holding what investors and
   the speculators are doing, and never puts it on the Fed's path with the
   futures pricing unread — on 22 October she put an $81 fall the ten-year and
-  the dollar did not explain down to fear of the next hike.
+  the dollar did not explain down to fear of the next hike. The wires telling
+  that story are reported as theirs, with the unread futures said in the same
+  sentence: in run 52 the caveat came two paragraphs after the story, where he
+  hears the story as the cause.
 - **How a change is proved.** The map's readings by `scripts/calibrate.mjs`,
   her reading of a chart by `scripts/replay.mjs` over the same past mornings
   before and after, her calls by their record, her reads by theirs, counted per channel, and any
@@ -3234,20 +3239,26 @@ call, a level beside a direction is a call nobody scores.
 **She checks a plan you have not taken, when you ask, two ways.** Against the
 rules a row can answer: the stop and target distances (R-01, R-02), reward
 against risk at entry against R-08's 1:1.5, any high-rated US release due while
-it would be on, whether the day already rules out an entry (R-03, R-11,
-R-12, R-16), something already open (R-10), the Friday close (R-15). And against
-your pre-trade sequence, which no row can see and which you decided in October
-2026 she should judge: R-08's four steps in order — the bias, the level (R-05's
+it would be on, whether the day already rules out an entry (R-03, R-11, R-12,
+R-16), something already open (R-10), the Friday close (R-15). And against your
+pre-trade sequence, which no row can see and which you decided in October 2026
+she should judge: R-08's four steps in order — the bias, the level (R-05's
 interior for Break & Retest, R-06's outer extreme for Support & Resistance), the
 confirmation rather than the touch (R-07), the ratio — reading §4 and §6 first
-so she holds you to what you wrote, and naming any step she cannot see. **Then
-she says whether she would take it**, as hers, and you decide. Her one question
+so she holds you to what you wrote, and naming any step she cannot see in its
+place, never moved to the end. **Then she says whether she would take it**, as
+hers, and you decide. Her one question
 is your own probe for the touch, asked before the fact: what you will wait for
 at the level before you click. **The levels stay yours**: she never suggests a
 different entry, stop or target and never turns "the ratio is 1:1.1" into the
 target that would fix it; `TRIM` removes a level she offers in place of yours.
-Her own trades are calls she files, never edits of yours. A test holds the two
-halves to the kinds of rule §7 says they are.
+**A release you would carry into a later session is R-19's, said as your rule**:
+"R-19 puts the stop at break-even before the print if you are in profit, and
+tightens it if you are losing", never "the stop has to move" or "you tighten
+it", which about a trade you are weighing are orders; on 24 October, checking a
+Wednesday plan with Thursday's 08:30 pending, she said the second. Her own
+trades are calls she files, never edits of yours. A test holds the two halves to
+the kinds of rule §7 says they are.
 
 **She judges trades — the decision, never the result** — against your rules and the
 plan you entered with. A loss inside your rules was a good trade; a win that broke
@@ -3846,13 +3857,15 @@ ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs --plant
 ```
 
 Or from GitHub: **Actions → eval → Run workflow**, with `ANTHROPIC_API_KEY` as a
-repository secret, and a case id in `only` to re-run that case alone, without
-the plants, for cents — a recheck after a fix, never the green a prompt change
-is owed; the verdicts and the cost are in the run's log, with what
-she wrote wherever a case or a plant failed and, for a pattern, where in it the
-pattern matched, and a failed case fails the run. Nothing runs it unasked, so `test.yml` says when it is owed:
-a push to a branch whose prompts, cases or eval differ from main's carries the
-warning *The eval is owed*, and a branch is run through it before it is merged.
+repository secret, and a case id in `only` to run that case alone, for cents:
+without `plant`, a recheck after a fix; with `plant`, the plants that break it
+first, which is the check a change to that one rule is owed and a tenth of the
+full run; the verdicts and the cost are in the run's log, with what she wrote
+wherever a case or a plant failed and, for a pattern, where in it the pattern
+matched, and a failed case fails the run. Nothing runs it unasked, so `test.yml`
+says when it is owed: a push to a branch whose prompts, cases or eval differ
+from main's carries the warning *The eval is owed*, and a branch is run through
+it before it is merged.
 `index.ts` is outside that list though the eval reads its model names: a warning
 on every change to the function is one nobody reads.
 
