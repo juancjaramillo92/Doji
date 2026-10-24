@@ -1919,7 +1919,7 @@ const WEB_FETCH  = { type: "web_fetch_20260209",  name: "web_fetch",  max_uses: 
    request and it is an option that should not be taken. The pass has nothing
    to research but needs search to supersede rather than duplicate; the trade
    look gets only his strategy and journal. */
-export const CHAT_TOOLS = [
+const CHAT_TOOLS = [
   WEB_SEARCH,
   WEB_FETCH,
   MARKET_TOOL,
@@ -1937,7 +1937,7 @@ export const CHAT_TOOLS = [
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, PORTRAIT_TOOL, CLOSE_TOOL,
                            RECORD_TOOL, EXPLAIN_TOOL, CHECK_TOOL, STATS_TOOL];
-export const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
+const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
 /* No tools: the gates read a draft and return one. Sharing the briefing's
    array to ride its cache does not work — the array starts the key and the
    effort differs, which invalidates the rest; measured, the critic wrote
@@ -4213,7 +4213,7 @@ export async function postSpeak(due: string): Promise<Response> {
 export const reviewMarker = '[saturday review]';
 
 // His journal and his rules, to look at one trade or read why a rule exists.
-export const REVIEW_TOOLS = [TRADES_TOOL, STRATEGY_TOOL];
+const REVIEW_TOOLS = [TRADES_TOOL, STRATEGY_TOOL];
 
 async function postReview(): Promise<Response> {
   const [history, notes, portrait, stats, rules, calls, record, desk, story] = await Promise.all([

@@ -25,7 +25,6 @@
 import { readFileSync } from 'node:fs';
 import { SYSTEM, CRITIC, TRIM, TRADE_EVENT, REVIEW } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts';
-import { CHAT_TOOLS, TRADE_TOOLS, REVIEW_TOOLS } from '../supabase/functions/doji-eugenia/index.ts';
 
 const file = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 
@@ -51,40 +50,33 @@ const context = (c) => (c.context ?? '') +
   (c.strategy ? `\n\nWhat get_strategy returned for §${c.strategy}:\n\n${SECTIONS[c.strategy]}` : '');
 
 /* The weekday briefing's draft, asked as postBriefing asks it: the request,
-   then what it was handed. She may call no tool, so a case hands her what a
-   search or get_around would have. */
+   then what it was handed. With no tools, so a case hands her what a search
+   or get_around would have. */
 export const BRIEF_ASKED = "Today's briefing, please.";
 
 export const PATHS = {
-  reply:  (c) => ({ model: MODEL.opus, effort: 'medium', tools: CHAT_TOOLS,
+  reply:  (c) => ({ model: MODEL.opus, effort: 'medium',
                     content: `${context(c)}\n\n${c.asked}` }),
   critic: (c, p) => ({ model: MODEL.opus, effort: 'medium',
                        content: `${p.CRITIC}${context(c)}\n\nTHE BRIEFING:\n\n${c.draft}` }),
   trim:   (c, p) => ({ model: MODEL.sonnet, effort: 'medium',
                        content: `${p.TRIM}${context(c)}\n\nTHE MESSAGE:\n\n${c.draft}` }),
-  trade:  (c, p) => ({ model: MODEL.opus, effort: 'medium', tools: TRADE_TOOLS,
+  trade:  (c, p) => ({ model: MODEL.opus, effort: 'medium',
                        content: `${p.TRADE_EVENT}\n\n${c.situation}${context(c)}` }),
-  review: (c, p) => ({ model: MODEL.opus, effort: 'high', tools: REVIEW_TOOLS,
-                       content: `${p.REVIEW}${context(c)}` }),
-  brief:  (c) => ({ model: MODEL.opus, effort: 'high', tools: CHAT_TOOLS,
-                    content: `${BRIEF_ASKED}${context(c)}` }),
+  review: (c, p) => ({ model: MODEL.opus, effort: 'high', content: `${p.REVIEW}${context(c)}` }),
+  brief:  (c) => ({ model: MODEL.opus, effort: 'high', content: `${BRIEF_ASKED}${context(c)}` }),
 };
 
 export const PROMPTS = { SYSTEM, CRITIC, TRIM, TRADE_EVENT, REVIEW };
 
-/* The request body, as ask() sends it. Her own tools are offered as her call
-   site offers them, so their descriptions are part of what she is asked, and
-   none may be called: a case hands her what a tool would have returned, so the
-   answer depends on what she was told alone. Web search and fetch are left
-   out, being Anthropic's descriptions rather than hers. */
+/* The request body, as ask() sends it but for the tools: a case hands her what
+   a tool would have returned, so the answer depends on the prompt alone. */
 export function request(c, prompts = PROMPTS) {
-  const { model, effort, content, tools = [] } = PATHS[c.path](c, prompts);
-  const own = tools.filter(t => t.input_schema);
+  const { model, effort, content } = PATHS[c.path](c, prompts);
   return {
     model, max_tokens: 16000,
     system: [{ type: 'text', text: prompts.SYSTEM + ALWAYS, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content }],
-    ...(own.length ? { tools: own, tool_choice: { type: 'none' } } : {}),
     thinking: { type: 'adaptive' },
     output_config: { effort },
   };
@@ -123,8 +115,8 @@ export const COUNTERS = {
   },
 };
 
-/* Every counted check and every pattern, as a list of what failed. She may
-   call no tool, so one she reaches for comes back as text: that is not a
+/* Every counted check and every pattern, as a list of what failed. She is sent
+   no tools, so a tool she reaches for comes back as text: that is not a
    message, and a judge told to pass what a criterion does not touch passed it.
    It fails whatever else the case checks, and says the case is short of an
    answer, not that the prompt is wrong. */

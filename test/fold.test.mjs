@@ -50,7 +50,7 @@ import {
   sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
   volumeList, volumeBlock, keptMarket, storeMarket, storeRates, storeTrend, trendList, trendBlock,
   flowsList, flowsBlock, storeFlows, storePositioning,
-  structureList, structureBlock, storeStructure, CHAT_TOOLS, TRADE_TOOLS, REVIEW_TOOLS,
+  structureList, structureBlock, storeStructure,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -6829,23 +6829,6 @@ test('each eval path asks what its call site asks, of the model it runs on', () 
   assert.match(fn, /`\$\{REVIEW\}\\n\\nHis week, computed from the rows:/,
     'postReview no longer opens on REVIEW, so the eval\'s review asks something else');
   assert.ok(at('reply').system[0].text.startsWith(EVAL.PROMPTS.SYSTEM), 'the eval asks under a different system prompt');
-  // Each path is shown the tools its call site offers, her own and none callable; the gates are offered none.
-  const sets = { CHAT_TOOLS, TRADE_TOOLS, REVIEW_TOOLS };
-  const offered = {
-    reply:  fn.match(/tools: unknown\[\] = (\w+),/)[1],
-    brief:  fn.match(/'\w+', `\$\{due\} briefing`, (\w+),/)[1],
-    trade:  fn.match(/'medium', 'trade look', (\w+)\)/)[1],
-    review: fn.match(/'high', 'saturday review', (\w+)\)/)[1],
-  };
-  assert.match(fn, /await ask\(\[\{ role: 'user', content: asked \}\], 'medium', label, CRITIC_TOOLS, budget\)/,
-    'a gate is offered tools in the function and none here');
-  const names = (tools) => (tools ?? []).map(t => t.name);
-  for (const [path, set] of Object.entries(offered)) {
-    assert.deepEqual(names(at(path).tools), names(sets[set].filter(t => t.input_schema)),
-      `the ${path} is offered ${set} in the function and other tools here`);
-    assert.deepEqual(at(path).tool_choice, { type: 'none' }, `the ${path} may call a tool it should only be shown`);
-  }
-  for (const path of ['critic', 'trim']) assert.equal(at(path).tools, undefined, `the ${path} is offered tools here`);
   // The gates' markers are the function's own.
   assert.match(fn, /\\n\\nTHE BRIEFING:\\n\\n\$\{draft\}/);
   assert.match(fn, /\\n\\nTHE MESSAGE:\\n\\n\$\{draft\}/);
