@@ -3811,15 +3811,17 @@ its own CI job, and `agree.test.mjs` holds that both still name it.
 matters most about her is a sentence, and no suite can say whether the model
 still obeys it. The eval sends the cases in `test/fixtures/eval-cases.json` —
 the failures this README records and the rules his decisions added — through her
-real prompts, built as the reply, both gates, the trade look and the Saturday
-review's draft build them, and
-grades the answer: what is countable in code (em-dashes, sentences a paragraph,
-words, questions, patterns that must or must not appear), the rest by an Opus
-judge against a criterion written per case, answered as JSON a schema fixes.
-She is sent no tools: a case hands her what a tool would have returned, a
-strategy section read from the module `get_strategy` serves, and an answer that
-reaches for a tool anyway fails, because it is not a message and a judge once
-passed one.
+real prompts, built as the reply, both gates, the trade look, the Saturday
+review's draft and the weekday briefing's draft build them, and grades the
+answer: what is countable in code (em-dashes, sentences a paragraph, words,
+questions, patterns that must or must not appear), the rest by an Opus judge
+against a criterion written per case, answered as JSON a schema fixes. **She is
+shown her own tools and may call none** (`tool_choice: none`), the set each call
+site offers, so a tool's description is part of what she is asked; web search
+and fetch are Anthropic's and left out. A case hands her what a tool would have
+returned, a strategy section read from the module `get_strategy` serves, and an
+answer that reaches for a tool anyway fails, because it is not a message and a
+judge once passed one.
 **Three cases ask whether she reads her own map** — a 4H sequence the last
 close has broken, a Break & Retest level at the edge of the week's range, and
 what the 15m candles did at a quarter — each handed the map as `structureList`
