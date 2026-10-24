@@ -6824,7 +6824,8 @@ test('each eval path asks what its call site asks, of the model it runs on', () 
   // The weekday briefing is asked in the function's words, at its effort, with what it was handed after.
   assert.ok(fn.includes(`: "${EVAL.BRIEF_ASKED}")`), 'postBriefing asks for the weekday briefing in other words than the eval');
   assert.equal(at('brief', { context: ' C' }).messages[0].content, `${EVAL.BRIEF_ASKED} C`);
-  assert.equal(at('brief').output_config.effort, 'high', 'the briefing runs at high effort and the eval asks it at another');
+  const briefEffort = fn.match(/\{ role: 'user', content: asked \}\],\s*'(\w+)', `\$\{due\} briefing`/)[1];
+  assert.equal(at('brief').output_config.effort, briefEffort, 'the eval asks the briefing at another effort than the function');
   assert.match(fn, /`\$\{REVIEW\}\\n\\nHis week, computed from the rows:/,
     'postReview no longer opens on REVIEW, so the eval\'s review asks something else');
   assert.ok(at('reply').system[0].text.startsWith(EVAL.PROMPTS.SYSTEM), 'the eval asks under a different system prompt');

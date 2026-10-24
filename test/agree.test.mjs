@@ -22,7 +22,7 @@ import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
-         READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_CONFIRMS, CALL_STEPS, CALL_MAX, RR_MIN, CONFIRM_MS, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, FRAME }
+         READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_CONFIRMS, CALL_STEPS, CALL_MAX, RR_MIN, CONFIRM_MS, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, readsDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH, REVIEW } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, sessionOf, isJournalled,
@@ -6454,6 +6454,26 @@ test('the writing rules are stated once and read by all three', () => {
     assert.match(body, /\$\{WRITING\}/,
       `${reader} no longer reads WRITING, so it is working from its own older ` +
       `idea of how she writes and nothing says the three have parted`);
+  }
+});
+
+/* THE QUOTA'S SCHEDULE IS THE CRON'S. readsDue reads on the hour's last pass
+   and looks one step ahead for a briefing, so it holds the calendar job's
+   minutes as a copy: moved in schema.sql alone, the market would be read on no
+   pass, or on two an hour, and the briefing would go without the odds. */
+test('readsDue reads on the calendar job\'s last pass of each hour, as its cron fires', () => {
+  const minutes = SCHEMA_SQL.match(/'doji-eugenia-calendar',\s*'([\d,]+) \* \* \* \*'/)[1].split(',').map(Number);
+  const last = Math.max(...minutes);
+  // A Tuesday in August, 11:00 New York, the market open.
+  for (const m of minutes) {
+    assert.equal(readsDue(new Date(Date.UTC(2026, 7, 18, 15, m))).market, m === last,
+      `the market is read on the :${m} pass, where the cron's last pass of the hour is :${last}`);
+  }
+  // The 08:00 briefing's: the hour's last pass before it reads both.
+  for (const m of minutes) {
+    assert.deepEqual(readsDue(new Date(Date.UTC(2026, 7, 18, 11, m))),
+      m === last ? { market: true, rates: true } : { market: false, rates: false },
+      `the :${m} pass before the briefing reads what the last pass should`);
   }
 });
 

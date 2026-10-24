@@ -2914,10 +2914,6 @@ export function callsQuery(now = Date.now()): string {
     `&made_at=gte.${new Date(now - RECORD_DAYS * 86_400_000).toISOString()}&order=id.desc&limit=60`;
 }
 
-/* `open` is an outcome, not a call left unscored: on 22 October she read
-   "1 open" two days after its roll as a scoring that had failed, and told him. */
-const OPEN_AT_ROLL = "still on at the 17:00 roll and marked at its close";
-
 const callLine = (c: Call) =>
   `${c.direction} ${c.entry}, stop ${c.stop}, target ${c.target}, if ${c.condition}`;
 
@@ -2933,8 +2929,11 @@ export function callsList(rows: Call[], now = Date.now(), to = "Your"): string {
   const explained = losses.filter(c => c.misread);
   const step = (c: Call) => c.misread === 'none' ? " — kept every step"
     : c.misread ? ` — misread the ${c.misread}: ${c.lesson}` : "";
+  // `open` is an outcome, not a call left unscored: on 22 October she read
+  // "1 open" two days after its roll as a scoring that had failed, and told him.
   return `\n\n${to} calls over the last ${RECORD_DAYS} days, scored on price by his rules: ` +
-    `${rows.length} made; ${CALL_OUTCOMES.map(o => `${by(o)} ${o === 'open' ? OPEN_AT_ROLL : o}`).join(", ")}` +
+    `${rows.length} made; ${CALL_OUTCOMES.map(o =>
+      `${by(o)} ${o === 'open' ? "still on at the 17:00 roll and marked at its close" : o}`).join(", ")}` +
     (rows.length > scored.length + standing.length ? `, ${rows.length - scored.length - standing.length} not yet scored` : "") + `.` +
     (traded.length ? ` The ${traded.length} that triggered made ${net >= 0 ? "+" : "-"}$${Math.abs(net).toFixed(2)} an ounce.` : "") +
     (standing.length ? `\nStanding until the 17:00 roll: ${standing.map(callLine).join("; ")}.` : "") +
@@ -3212,10 +3211,10 @@ export function keptMarket<T extends { symbol: string }>(fresh: { market: T[]; m
 /* TradingView's daily budget, which the job spends. From 18 October every UTC
    day was refused by four in the morning New York, some thirty passes in at
    thirty calls a pass, so each briefing after went without the odds and the
-   market. So the hourly bars are read once an hour, on its last pass, while
-   the market is open; the odds every other hour, which ODDS_HOURS allows; and
-   both on the pass before a briefing, whatever the hour, so Sunday's has them
-   with the market still shut. About seven hundred calls a weekday, the
+   market. So the hourly bars are read once an hour, on the hour's last pass,
+   while the market is open; the odds every other hour, which ODDS_HOURS
+   allows; and both on the pass before a briefing, whatever the hour, so
+   Sunday's has them with the market still shut. About seven hundred calls a weekday, the
    calendar's ninety-six and the weeks' and the flows' once a day included.
    Pure, so a week of passes is walked and counted. */
 export function readsDue(now: Date): { market: boolean; rates: boolean } {
@@ -3889,7 +3888,7 @@ async function postScheduled(url: URL): Promise<Response> {
     if (url.searchParams.get("consolidate") === "1") { job = 'consolidate'; return await postConsolidation(); }
     // The calendar, on its own quarter-hourly job, so an actual lands within
     // one, and the market, its weeks and his charts read ahead after it, as
-    // TradingView's budget allows; none of the five throws.
+    // TradingView's budget allows; none of them throws.
     if (url.searchParams.get("calendar") === "1") {
       await filed();
       const { market, rates } = readsDue(new Date());

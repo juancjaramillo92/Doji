@@ -3,10 +3,10 @@
    ───────────────────────────────────────────────────────────────────────────
    Every rule that matters most about her is a sentence in prompt.ts, and no
    other test can say whether the model still obeys it. This sends fixed cases
-   through her real prompts — the reply, both gates and the trade look, built
-   the way index.ts builds them — and grades what comes back: what can be
-   counted is counted here, and what needs judgement goes to a judge with a
-   written criterion per case.
+   through her real prompts — the reply, both gates, the trade look, the
+   Saturday review and the weekday briefing, built the way index.ts builds them
+   — and grades what comes back: what can be counted is counted here, and what
+   needs judgement goes to a judge with a written criterion per case.
 
    The cases are the failures the README records, and the rules his decisions
    added: a later meeting given a percentage, a cut in a hike week, a read
@@ -41,11 +41,11 @@ export const MODEL = {
 /* ─── What she is asked, path by path ────────────────────────────────────────
    Each mirrors its call site in index.ts: converse for a reply, critique() and
    trim() for the gates, postTradeEvent for the trade look, postReview for the
-   Saturday review's draft, postBriefing for the weekday briefing's. agree.test.mjs holds
-   the gates' two markers against the function's. `prompts` is a parameter so
-   a planted defect can hand in a broken copy. A case whose prompt tells her to
-   read a section names it as `strategy`, and is handed the section itself,
-   read from the module get_strategy serves. */
+   Saturday review's draft, postBriefing for the weekday briefing's.
+   agree.test.mjs holds the gates' two markers against the function's. `prompts`
+   is a parameter so a planted defect can hand in a broken copy. A case whose
+   prompt tells her to read a section names it as `strategy`, and is handed the
+   section itself, read from the module get_strategy serves. */
 const context = (c) => (c.context ?? '') +
   (c.strategy ? `\n\nWhat get_strategy returned for §${c.strategy}:\n\n${SECTIONS[c.strategy]}` : '');
 
