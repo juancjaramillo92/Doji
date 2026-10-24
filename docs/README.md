@@ -453,7 +453,7 @@ single-sourced at run time:
 | each function's **gateway setting** | `config.toml`'s stanza and the deploy command's flag |
 | her **map's grid and candle count** | `GRID` and `CANDLES` in `structure.ts`, said in words by `get_structure`'s description and by `SYSTEM`; the grid is §4's, in `strategy.ts` |
 | the **review's length** | `REVIEW`'s ceiling and the count it cuts past, in words, the figures the README gives, and the ceiling `review-process-over-pnl` counts against |
-| **what the eval reads** | `scripts/eval.mjs`'s imports and `file()` reads, and the paths `test.yml`'s eval-owed job compares with main |
+| **what the eval reads** | `scripts/eval.mjs`'s imports and `file()` reads, and the paths `test.yml`'s test job compares with main |
 | the **page both journal walks read** | `CONFIG.READ_PAGE` in `index.html`, `PAGE` in `scripts/backup.mjs`, and the Max rows floor the backup paragraph states — each walk stops on a short page, so a Max rows below the page ends it after one |
 | the **tables the backup holds** | `TABLES` in `scripts/backup.mjs`, the tables `schema.sql` creates less the ones `agree.test.mjs` declares not backed up, and the count the README's backup paragraph gives |
 

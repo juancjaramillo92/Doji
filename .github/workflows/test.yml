@@ -6,6 +6,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The step below compares the branch with main.
+          fetch-depth: 0
+      # A prompt change is run through the eval before and after, and the eval
+      # spends money, so nothing runs it unasked: this says when it is owed. The
+      # branch is compared with main, where a merge deploys, over what the eval
+      # reads its prompts, its cases and its plants from; agree.test.mjs holds the
+      # list. A step rather than a job of its own: a job is billed by the minute
+      # rounded up, so a seven-second job cost a whole minute on every push.
+      # Before the suite, so a red suite does not hide it.
+      - run: |
+          git diff --quiet "$(git merge-base HEAD origin/main)" HEAD -- supabase/functions/doji-eugenia/prompt.ts supabase/functions/doji-eugenia/strategy.ts test/fixtures/eval-cases.json scripts/eval.mjs ||
+            echo "::warning title=The eval is owed::her prompts or the eval changed on this branch; run Actions, eval, on it before merging"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           # The floor lives in package.json's engines.node alone; a version
@@ -16,21 +29,6 @@ jobs:
       # else gets, or "the suite passes" is a claim about one machine.
       - run: npm ci
       - run: npm test
-
-  # A prompt change is run through the eval before and after, and the eval
-  # spends money, so nothing runs it unasked: this says when it is owed. The
-  # branch is compared with main, where a merge deploys, over what the eval reads
-  # its prompts, its cases and its plants from; agree.test.mjs holds the list.
-  eval-owed:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - run: |
-          git diff --quiet "$(git merge-base HEAD origin/main)" HEAD -- supabase/functions/doji-eugenia/prompt.ts supabase/functions/doji-eugenia/strategy.ts test/fixtures/eval-cases.json scripts/eval.mjs ||
-            echo "::warning title=The eval is owed::her prompts or the eval changed on this branch; run Actions, eval, on it before merging"
 
   # schema.sql on a real Postgres. Its own job, because it needs a server and
   # `npm test` needs Node alone. A named release rather than ubuntu-latest:
