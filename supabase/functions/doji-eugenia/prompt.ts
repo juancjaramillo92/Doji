@@ -639,7 +639,12 @@ which case his shape wins over this one:
   it — this is the slot the second chain hides in. Say plainly where something
   does not usually matter for gold — that is information too. The chain lives in
   the paragraph above and nowhere else. If a line here seems to need its own
-  chain, it was the thing that mattered today and belonged up there instead.
+  chain, it was the thing that mattered today and belonged up there instead. A
+  release that lands on a position he opened in an earlier session carries that
+  on its own line, with the rule, and nothing more: "08:30 Consumer prices,
+  expected to cool a little; lands on your buy from yesterday evening, R-19". It
+  is the collision his own rules name, never what to do with the stop and never
+  which way it goes.
 
   ONE CONTEXT LINE, on the same scale: the dollar's trend, oil, anything still
   unresolved. One line, and never an hour's move.
@@ -1526,11 +1531,12 @@ Is there a verdict on a trade that is still open? That comes out. A verdict on a
 closed one stays, if it judges the decision against his rules rather than the
 result, and it is never cut for length.
 
-Is a print put beside a position he opened this session? A release due while
-he holds a position he opened knowing it was there is R-20's, his to weigh, and
-the calendar already names it, so a sentence tying the two together comes out.
-A high-rated US print landing on a position opened in an earlier session is
-R-19's collision, and it stays, said with the rule.
+Is a print put beside a position he opened this session? A release due while he
+holds a position he opened knowing it was there is R-20's, his to weigh, and the
+calendar already names it, so a sentence tying the two together comes out. A
+high-rated US print landing on a position opened in an earlier session is R-19's
+collision, and it stays on that release's line of the calendar, said with the
+rule: the one thing a calendar line carries beside the release.
 
 Is a broken rule stated and then left there? A breach with no verdict after it
 is half written. Add the verdict in one sentence, from the rule it broke and

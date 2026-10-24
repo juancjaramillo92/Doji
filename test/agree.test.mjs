@@ -6520,6 +6520,11 @@ test('a print beside a position he opened knowingly is his, in the writer and in
     'the critic no longer takes a print tied to his position out of the briefing');
   assert.match(flat('CRITIC'), /landing on a position opened in an earlier session is R-19's collision, and it stays/,
     'the critic takes R-19\'s collision out with R-20\'s caution');
+  // Its place is the release's own calendar line, in the writer and the critic: issue #270.
+  assert.match(flat('SYSTEM'), /A release that lands on a position he opened in an earlier session carries that on its own line, with the rule, and nothing more/,
+    'the writer has nowhere to name R-19\'s collision, so she never does');
+  assert.match(flat('CRITIC'), /it stays on that release's line of the calendar, said with the rule: the one thing a calendar line carries beside the release\./,
+    'the critic cuts R-19\'s collision off the calendar line as more than the release');
   // The ban on anything about his trade lives in MECHANISM, and in run 53 it cut the collision anyway.
   assert.match(EUGENIA_PROMPT.match(/export const MECHANISM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' '), /anything about his trade\. His own rule landing on it is not a view: R-19's collision, a print rated high landing on a position from an earlier session, stays, said with the rule\./,
     'the ban on anything about his trade cuts R-19\'s collision, which the critic is told to keep');

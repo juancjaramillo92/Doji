@@ -242,6 +242,17 @@ export const PLANTS = [
         .replace(/THE MAP OF HIS CHARTS IS THE HOURS ON IT,[\s\S]*?a call you file\.\n\n/, ''),
       CRITIC: p.CRITIC.replace(/Is the map of his charts in the prose\?[\s\S]*?it comes out\.\n\n/, ''),
     }) },
+  /* Issue #270: a collision with a position from an earlier session had no
+     place in the briefing's shape. The writer never named it, 2 of 2, and the
+     critic cut it off the release's calendar line, 3 of 3, before the slot
+     said where it goes. */
+  { why: 'R-19\'s collision on its calendar line, gone from the writer and the critic',
+    cases: ['brief-names-r19-collision', 'critic-keeps-r19-collision'],
+    breaks: (p) => ({
+      ...p,
+      SYSTEM: p.SYSTEM.replace(/ A\s+release that lands on a position he opened in an earlier session[\s\S]*?never\s+which way it goes\./, ''),
+      CRITIC: p.CRITIC.replace(/ on that release's line of the calendar, said with the\s+rule: the one thing a calendar line carries beside the release\./, ', said with the rule.'),
+    }) },
   /* From 15 to 22 October she failed the bias step whenever the three charts
      disagreed. The plan check points at the call's rule, so both go. */
   { why: 'the bias weighed rather than failed on disagreement, gone from the writer',

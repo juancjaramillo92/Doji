@@ -1821,10 +1821,14 @@ redefinition, and the build-up `PITCH` required is cut — last, fluently.
 R-20's caution, his to weigh, and the calendar already names the print; on 15
 October the briefing told him both 08:30 prints landed on the position he had
 opened that morning, and the critic, with no check for it, sent it. A print
-landing on a position from an earlier session is R-19's collision and stays.
-`SYSTEM` and `CRITIC` say it alike, and `agree.test.mjs` holds the pair.
-`MECHANISM`, where the ban on anything about his trade lives, says the same,
-since in run 53 the ban cut the collision anyway.
+landing on a position from an earlier session is R-19's collision and stays, on
+that release's line of the calendar with the rule and nothing more (*08:30
+Consumer prices, expected to cool a little; lands on your buy from yesterday
+evening, R-19*): with no place in the briefing's shape, the writer never named
+it and the critic cut it off the line (issue #270). `SYSTEM` and `CRITIC` say it
+alike, and `agree.test.mjs` holds the pair. `MECHANISM`, where the ban on
+anything about his trade lives, says the same, since in run 53 the ban cut the
+collision anyway.
 
 **It cannot make things worse, and that is enforced.** A revision that comes back
 empty, apologetic or past `keepDraft`'s bound is a critic that failed, and the
