@@ -21,8 +21,8 @@
 
    Run:  ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs [--plant] [--only <id>]
    Cost: about ninety model calls with the plants, half of them the judge; the
-         system prompt is cached across them. Stated in each run's output:
-         $4.95 for the full run of 24 October, cents for one case alone.
+         system prompt is cached across them. A few dollars for the full run,
+         cents for one case alone, and each run states its own.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { readFileSync } from 'node:fs';
 import { SYSTEM, CRITIC, TRIM, TRADE_EVENT, REVIEW } from '../supabase/functions/doji-eugenia/prompt.ts';
@@ -344,7 +344,7 @@ async function main(argv) {
 
   if (argv.includes('--plant')) {
     // With a case named, only the plants that break it: the check a change to
-    // one rule is owed, for a tenth of the full run.
+    // one rule is owed, for cents.
     const plants = PLANTS.filter(p => !only || p.cases.includes(only));
     if (only && !plants.length) console.log(`no plant breaks ${only}: its pass says the rule is obeyed, not that the case would see it go`);
     for (const plant of plants) {
@@ -353,8 +353,8 @@ async function main(argv) {
       for (const id of plant.cases.filter(id => !only || id === only)) {
         // A broken SYSTEM is a prefix nothing has cached, and a cache entry is
         // readable only once the call that writes it has answered: asked
-        // together, all three tries paid the write, at 1.25× a prompt of some
-        // twenty thousand tokens. The first asks alone and the rest read it.
+        // together, every try would pay the write, at 1.25× a prompt of some
+        // twenty thousand tokens. So the first asks alone and the rest read it.
         const c = CASES.find(c => c.id === id);
         const first = await grade(c, broken);
         const results = [first, ...await Promise.all(Array.from({ length: PLANT_TRIES - 1 }, () => grade(c, broken)))];
