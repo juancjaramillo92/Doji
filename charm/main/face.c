@@ -5,10 +5,8 @@
 
    The sleep screen is a layer over her: black but for its marks.
 
-   The face's numbers are measured from the drawing of her face over this
-   render, in pixels of the 466 x 466 screen; the motion's are the
-   playgrounds' (claude.ai artifacts "Eugenia, on the charm" and "Your
-   charm"). */
+   The numbers are measured from the drawing of her face over the render, in
+   pixels of the 466 x 466 screen. */
 #include "face.h"
 
 #include <math.h>
@@ -34,7 +32,7 @@ static const face_geometry_t F = {
     -10.0f,
 };
 
-// Tunings from the playground's defaults.
+// How she moves, tuned by eye.
 #define BLINK_EVERY_MS  4000
 #define LOOK_RANGE      6.0f
 #define SHIFT_X         8     // how far the sleep screen's marks wander, so none burns in
@@ -89,7 +87,7 @@ static float ease(float v, float t, float rate, float dt) {
 
 /* A smile through its two ends and its lowest point, as an arc of the circle
    those three points lie on — LVGL draws arcs anti-aliased, and at this size
-   the arc and the playground's quadratic curve are the same line. A frown is
+   the arc and a quadratic curve are the same line. A frown is
    the same circle below; a straight mouth is a line. Turned through F.tilt
    about (cx, y), with her head. */
 static void draw_curve(lv_layer_t *layer, float cx, float y, float half, float sag,

@@ -1,5 +1,4 @@
-/* The journal on her screen, the playgrounds' (claude.ai artifacts "Gladys,
-   on the charm" and "Your charm"): each question owns the whole screen, split
+/* The journal on her screen: each question owns the whole screen, split
    down the middle, with one word in Doji's typeface and nothing else to read.
    Right is yes and left is no. Tapping a half rather than swiping: a swipe
    moves the whole screen, which this chip may not draw smoothly, so taps first
