@@ -16,6 +16,15 @@ on:
       - '.github/workflows/charm.yml'
   workflow_dispatch:
 
+# A build takes about eight minutes, and a branch is often pushed again inside
+# them: only its newest commit's firmware is the one anyone flashes, so a newer
+# push cancels the build before it. On main it is also the order the update is
+# published in, so an older build cannot finish last and publish its firmware
+# over the newer one.
+concurrency:
+  group: charm-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
