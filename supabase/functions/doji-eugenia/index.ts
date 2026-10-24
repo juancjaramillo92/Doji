@@ -162,10 +162,14 @@ const TRADES_TOOL = {
     "The trader's own journal for the last N days, newest first. Use it whenever " +
     "he asks about his trades, his discipline, or a pattern in how he has been " +
     "trading. Returns one object per trade: id, direction, entry and exit price, " +
-    "entry and fill time (UTC), pnl, size_oz, open_day, setup, and the three discipline " +
-    "answers. A discipline answer of null means unanswered, which is NOT 'no'. " +
-    "size_oz is the position size in ounces; lots are oz / 100. It is written by " +
-    "the poller alone, so a trade it never reached has none.",
+    "entry and fill time (UTC), pnl, net_pnl, size_oz, open_day, setup, the three discipline " +
+    "answers, planned_sl, planned_tp and best_price. A discipline answer of null means " +
+    "unanswered, which is NOT 'no'. pnl is the figure to read: net_pnl is the broker's " +
+    "own, null where no close alert came, and pnl is it where it exists. " +
+    "size_oz is the position size in ounces; lots are oz / 100. planned_sl and planned_tp " +
+    "are the stop and target as first seen on the open position, and best_price the best " +
+    "price it reached while open. These four are written by the poller alone, so a trade " +
+    "it never reached has none.",
   input_schema: {
     type: "object",
     properties: {
