@@ -25,6 +25,7 @@ any change that touches it.
 | the Apps Script's Gmail half | `gs.mjs` reaches the parser only |
 | an Edge Function path no test can drive | `types.test.mjs` for the names in it; the rest by reading |
 | whether a prompt still behaves | `scripts/eval.mjs`, run by hand with his key — nothing in `npm test` calls the model |
+| whether a tool's description still says what she needs | reading it against the column or door it describes — the eval sends no tools (R-111) |
 | the charm's firmware beyond its pure C | `charm.test.mjs`'s census for the names in it; the charm workflow's build for the rest of its code; the board itself for what it does |
 
 ---
@@ -1049,6 +1050,16 @@ place. The rule is live and the case passes; what weakened is the proof that
 the case would see the rule go. Firming it changes no behaviour of hers, so it
 waits for him.
 **Revisit if:** a run catches it 0 of 3, or he asks.
+
+### R-111 — the eval showing her her own tools, uncallable
+**Why refused:** tried in run 43. Offered each call site's tools with
+`tool_choice: none`, so a description would be part of what she is asked, she
+answered six of 23 cases with no text at all: where her prompt says to read the
+strategy or his trades before judging, she ends the turn instead. The run
+measured the harness, not her. A tool's description stays outside what the
+eval asks (*What no test reaches*).
+**Revisit if:** the eval serves her tools from fixtures, each case handing
+the answer a call would return, rather than handing it in the context.
 
 ---
 
