@@ -3576,15 +3576,16 @@ through `cssToken()` into a module constant.
 
 | Token | Value | Used for |
 |---|---|---|
-| `--p` | `#8b35b8` | the accent. Selected states, focus, the sync dot |
-| `--bg` | `#070611` | page background — near-black with a faint purple hue |
-| `--s2` | `#141022` | the layer above the page |
-| `--glass` | `#0a0813` | card surfaces. Solid, not translucent |
+| `--p` | `#0c8650` | the accent, emerald. Selected states, focus, the sync dot |
+| `--pend` | `#8b35b8` | unfinished: a trade waiting on its journal, in the banner, the calendar and the trade log. Violet, because an emerald pending day would read as a won one |
+| `--bg` | `#04100b` | page background — near-black with a faint emerald hue |
+| `--s2` | `#0c1f15` | the layer above the page |
+| `--glass` | `#07130d` | card surfaces. Solid, not translucent |
 | `--cell-bg` | `rgba(8,8,10,.55)` | a calendar day with no result, so it recedes |
-| `--bd` / `--bd2` | `#251d39` / `#342948` | borders, dim and dimmer |
-| `--tx` | `#e8e6f0` | body text |
-| `--mt` / `--mt2` | `#6f6788` / `#9a92b0` | muted, and muted-but-readable |
-| `--tx-hi` / `--tx-max` | `#f0eeff` / `#fff` | on an accent fill, and on solid `--p` |
+| `--bd` / `--bd2` | `#1e3829` / `#2a4a37` | borders, dim and dimmer |
+| `--tx` | `#e6f0ea` | body text |
+| `--mt` / `--mt2` | `#678873` / `#92b09d` | muted, and muted-but-readable |
+| `--tx-hi` / `--tx-max` | `#eefaf3` / `#fff` | on an accent fill, and on solid `--p` |
 | `--win` | `#3ba585` | a winning trade |
 | `--loss` | `#d63d5a` | a losing trade |
 | `--warn` | `#d9a441` | "notice this", one step short of `--loss`. Only the offline sync dot |
@@ -3600,8 +3601,9 @@ small tile reads cool rather than mauve.
 
 **Neutral surfaces come from seven alphas of white**: `--fill-0` (`.02`) through
 `--fill-3` (`.08`), plus `--row-hv` (`.03`), `--hair-2` (`.07`) and `--bd-hi`
-(`.30`). The accent has the same ladder — `--p-gl` at `.07` through `--p-gl4` at
-`.42`, and `--p-hair` at `.04`. **Type** is `--ui` and `--mono`. **Radii** are
+(`.30`). The accent has the same ladder — `--p-gl` at `.07` through `--p-gl3` at
+`.30`, and `--p-hair` at `.04` — and unfinished its own, `--pend-gl` at `.07`
+through `--pend-gl4` at `.42`. **Type** is `--ui` and `--mono`. **Radii** are
 `--r-sm` 10px, `--r-md` 14px, `--r-lg` 18px, `--r-full`, and `--r-cell` 5px for
 calendar tiles, which at the card radius each read as their own card.
 
