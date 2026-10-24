@@ -20,8 +20,9 @@
    With `--only` as well, only the plants that break that one case run.
 
    Run:  ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs [--plant] [--only <id>]
-   Cost: about fifty model calls, half of them the judge; the system prompt is
-         cached across them. Measured on the first run and stated in its output.
+   Cost: about ninety model calls with the plants, half of them the judge; the
+         system prompt is cached across them. Stated in each run's output:
+         $4.95 for the full run of 24 October, cents for one case alone.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { readFileSync } from 'node:fs';
 import { SYSTEM, CRITIC, TRIM, TRADE_EVENT, REVIEW } from '../supabase/functions/doji-eugenia/prompt.ts';
@@ -350,8 +351,13 @@ async function main(argv) {
       const broken = plant.breaks(PROMPTS);
       if (Object.keys(PROMPTS).every(k => broken[k] === PROMPTS[k])) throw new Error(`the plant did not change the prompt: ${plant.why}`);
       for (const id of plant.cases.filter(id => !only || id === only)) {
-        const results = await Promise.all(Array.from({ length: PLANT_TRIES },
-          () => grade(CASES.find(c => c.id === id), broken)));
+        // A broken SYSTEM is a prefix nothing has cached, and a cache entry is
+        // readable only once the call that writes it has answered: asked
+        // together, all three tries paid the write, at 1.25× a prompt of some
+        // twenty thousand tokens. The first asks alone and the rest read it.
+        const c = CASES.find(c => c.id === id);
+        const first = await grade(c, broken);
+        const results = [first, ...await Promise.all(Array.from({ length: PLANT_TRIES - 1 }, () => grade(c, broken)))];
         for (const r of results) usage.push(...r.usage);
         const caught = results.filter(r => r.failed.length).length;
         console.log(`${caught ? 'caught' : 'NOT CAUGHT'} ${caught} of ${PLANT_TRIES} — ${plant.why} (${id})`);
