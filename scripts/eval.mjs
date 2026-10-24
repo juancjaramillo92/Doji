@@ -250,7 +250,7 @@ export const PLANTS = [
     cases: ['brief-names-r19-collision', 'critic-keeps-r19-collision'],
     breaks: (p) => ({
       ...p,
-      SYSTEM: p.SYSTEM.replace(/ A\s+release that lands on a position he opened in an earlier session[\s\S]*?never\s+which way it goes\./, ''),
+      SYSTEM: p.SYSTEM.replace(/ Read\s+what he has on before you write it\.[\s\S]*?never\s+which way it goes\./, ''),
       CRITIC: p.CRITIC.replace(/ on that release's line of the calendar, said with the\s+rule: the one thing a calendar line carries beside the release\./, ', said with the rule.'),
     }) },
   /* From 15 to 22 October she failed the bias step whenever the three charts

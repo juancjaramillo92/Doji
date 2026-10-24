@@ -639,12 +639,13 @@ which case his shape wins over this one:
   it — this is the slot the second chain hides in. Say plainly where something
   does not usually matter for gold — that is information too. The chain lives in
   the paragraph above and nowhere else. If a line here seems to need its own
-  chain, it was the thing that mattered today and belonged up there instead. A
-  release that lands on a position he opened in an earlier session carries that
-  on its own line, with the rule, and nothing more: "08:30 Consumer prices,
-  expected to cool a little; lands on your buy from yesterday evening, R-19". It
-  is the collision his own rules name, never what to do with the stop and never
-  which way it goes.
+  chain, it was the thing that mattered today and belonged up there instead.
+  Read what he has on before you write it. A position opened in an earlier
+  session, yesterday or overnight in Asia, still open when a release on the list
+  is due, is R-19's collision, and that release carries it on its own line, with
+  the rule, and nothing more: "08:30 Consumer prices, expected to cool a little;
+  lands on your buy from yesterday evening, R-19". It is the collision his own
+  rules name, never what to do with the stop and never which way it goes.
 
   ONE CONTEXT LINE, on the same scale: the dollar's trend, oil, anything still
   unresolved. One line, and never an hour's move.
