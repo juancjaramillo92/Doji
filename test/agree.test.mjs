@@ -6464,6 +6464,15 @@ test('the writing rules are stated once and read by all three', () => {
 /* HIS RULE, NOT HER ORDER. A plan he would hold into a later session's print is
    R-19's, and on 24 October she said what it does as "the stop has to move",
    an instruction about a trade he was weighing. Issue #269. */
+/* HIS FOUR STEPS IN HIS ORDER. In run 53 she could not see the 1H, took the
+   level, the candle and the ratio, and judged the bias last. A step she cannot
+   see is said where it falls. */
+test('a step she cannot see is said in its place, so his sequence keeps its order', () => {
+  const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
+  assert.match(system, /Where you cannot see a step, say so in its place, rather than passing it or moving it to the end\./,
+    'a step she cannot see can be moved to the end of his sequence');
+});
+
 test('a plan held into a later session says R-19 as his rule, never as an order', () => {
   const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
   assert.match(system, /One that lands in a later session, were he to hold it, is R-19's, and what it does to the stop is his rule, said as his: "R-19 puts the stop at break-even before the print if you are in profit, and tightens it if you are losing", never "the stop has to move" or "you tighten it"\./,

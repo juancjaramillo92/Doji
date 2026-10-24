@@ -3245,8 +3245,9 @@ pre-trade sequence, which no row can see and which you decided in October 2026
 she should judge: R-08's four steps in order — the bias, the level (R-05's
 interior for Break & Retest, R-06's outer extreme for Support & Resistance), the
 confirmation rather than the touch (R-07), the ratio — reading §4 and §6 first
-so she holds you to what you wrote, and naming any step she cannot see. **Then
-she says whether she would take it**, as hers, and you decide. Her one question
+so she holds you to what you wrote, and naming any step she cannot see in its
+place, never moved to the end. **Then she says whether she would take it**, as
+hers, and you decide. Her one question
 is your own probe for the touch, asked before the fact: what you will wait for
 at the level before you click. **The levels stay yours**: she never suggests a
 different entry, stop or target and never turns "the ratio is 1:1.1" into the

@@ -1068,6 +1068,14 @@ eval asks (*What no test reaches*).
 **Revisit if:** the eval serves her tools from fixtures, each case handing
 the answer a call would return, rather than handing it in the context.
 
+### R-112 — a planted defect for the step said in its place
+**Deferred.** `SYSTEM` says a step of his sequence she cannot see is said in
+its place, never moved to the end, since in run 53 she judged the bias last
+for want of the 1H. `setup-judged-take-or-skip` failed on the order that once
+in the eight runs before the sentence, and a plant caught that rarely would
+stop most runs; `agree.test.mjs` holds the sentence.
+**Revisit if:** she is seen moving a step again.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED
