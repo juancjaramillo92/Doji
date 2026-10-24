@@ -28,7 +28,7 @@ static const char *const SHORT[2] = { "B&R", "S&R" };
 /* The halves, in Doji's emeralds rather than a win's teal and a loss's red:
    no is the cool sea-blue on the left, yes the warm jade on the right, each a
    gradient, top to bottom, that brightens when tapped. The setup's two halves
-   share one. */
+   share one. As the playground ("Your charm") has them. */
 static const uint32_t HALVES[3][2][2] = {
     //            resting               lit
     /* setup */ { { 0x0b2a22, 0x113a2f }, { DEEP,     GLOW     } },

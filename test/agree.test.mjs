@@ -525,6 +525,20 @@ test('the charm and its setup page draw in the app\'s own colours', () => {
   }
 });
 
+/* A meta tag and a data URI cannot read a custom property, so the browser's
+   chrome and the favicon carry copies of the page's ground and its accent. */
+test('the theme colour and the favicon are the page\'s own tokens', () => {
+  const html = source('index.html');
+  const token = name => html.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})\\b`, 'i'))[1].toLowerCase();
+  const theme = html.match(/<meta name="theme-color" content="(#[0-9a-f]{6})">/i);
+  assert.ok(theme, 'index.html no longer declares a theme-color as this test reads it');
+  assert.equal(theme[1].toLowerCase(), token('--bg'), 'the theme-color is not --bg');
+  const icon = html.match(/<link rel="icon".*/);
+  assert.ok(icon, 'index.html no longer declares a favicon');
+  const fills = [...icon[0].matchAll(/fill='%23([0-9a-f]{6})'/gi)].map(m => `#${m[1].toLowerCase()}`);
+  assert.deepEqual(fills, [token('--bg'), token('--p')], 'the favicon is not --p on --bg');
+});
+
 test('a setup the app offers can actually be written, and one it does not cannot', async () => {
   const { app, close } = await boot();
   try {

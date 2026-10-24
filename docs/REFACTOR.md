@@ -1109,6 +1109,23 @@ cache the first had not written yet.
 **Revisit if:** the API's limits on his key are known, and then in small
 batches after one case has warmed the cache.
 
+### R-117 — one pulse for the working dots and the pending flag
+**Why refused:** `busyPulse` and `brokerPulse` are the same two keyframes in
+different colours, the accent's glow and `--warn`'s. One keyframe reading a
+custom property each user sets is an indirection for four lines, and the two
+are separate decisions: working is not waiting on him, which is why they once
+shared a colour and no longer do.
+**Revisit if:** a third pulse arrives.
+
+### R-118 — holding the charm's own colours where a second file shares them
+**Deferred.** `GLOW` in `palette.h` is `--glow` in `setup.html`, the cross in
+`setup.c` is the page's `--bad`, and the page's `--sheen` is drawn from `DEEP`
+and `ACCENT`. Only the copies of the app's tokens are read by `agree.test.mjs`,
+through the token named beside each; these pairs name nothing, so the emerald
+pass had to move each by hand. R-41's revisit condition, read at its letter,
+is met for the cross.
+**Revisit if:** one of the pairs drifts, or the charm's palette changes again.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

@@ -396,6 +396,7 @@ single-sourced at run time:
 | the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check`, and her charm's `SETUPS` in `charm/main/gladys.c` |
 | the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns, and twice in `trades_telegram_on_answer` — the `is distinct from` list and the `before` object — and her charm's `ANSWERS`, keys and columns in `COLUMNS`' order |
 | the **app's colours on the charm** | `index.html`'s tokens, and their copies in `charm/main/palette.h`, each beside the token it copies, and in `charm/main/setup.html`'s `:root` under the app's own names |
+| the **page's ground and accent outside its sheet** | `--bg` and `--p` in `index.html`'s `:root`, and their copies in its `theme-color` meta and its favicon's SVG, neither of which can read a custom property |
 | the **disconnect that is the charm's own** | each charm file that joins a network — `charm/main/net.c` and `charm/main/setup.c` — skipping `WIFI_REASON_ASSOC_LEAVE` where it marks a refusal, so leaving a failed attempt cannot end the next |
 | the **letters the charm's fonts hold** | the `--symbols` in `charm/tools/fonts.sh`, as each generated font records them, and the words drawn in `charm/main/journal.c`, `charm/main/dial.c`, `charm/main/face.c` and `charm/main/setup.c` — found as the files that declare a font, so a fifth is held too |
 | the **five columns the app may WRITE** | the `grant update (…)` in `schema.sql` and both lists in `verify.sql`. Four are `Data.OWNED`; the fifth is `deleted`, which no tap or save names but `remove()` and `undo()` write — a grant built from `Data.OWNED` alone takes soft delete out |
@@ -3313,10 +3314,10 @@ anyone.
 **A face is a render plus a drawing.** Eugenia's render is a still 466 × 466
 image, embedded as the RGB565 bytes the screen draws (`charm/tools/art.py` makes
 them from `charm/art/eugenia.png`), so nothing is decoded at boot. Her eyes,
-highlight and smile are drawn live on top, measured from the drawing of her
-face over the render, her head tilted ten degrees:
-blinks, glances, the mouth following the loudness of what plays; thinking, she
-looks up and away from one side to the other under three thought dots; when
+highlight and smile are drawn live on top, where the drawing of her face over
+the render puts them, her head leaning ten degrees. Then they move: blinks,
+glances, the mouth following the loudness of what plays; thinking, she looks up
+and away from one side to the other under three thought dots; when
 something goes wrong, her eyes go uneven and her smile turns down; going to
 sleep, her eyes close slowly. Only the face's own patch is redrawn on a frame;
 the rings round the rim — Doji's emeralds turning slowly while she listens, and
@@ -3327,8 +3328,7 @@ journal's questions or after them. Her state — a low battery, no internet — 
 never an expression on her face; it is a mark on the sleep screen. The design
 was settled in playgrounds before any of this — the claude.ai artifacts
 *Eugenia, on the charm*, *Gladys, on the charm* and *Your charm* — and the
-numbers here are theirs but for the colours and her face, which are the
-charm's own.
+numbers here are theirs.
 
 **The sleep screen is black but for its marks**, still, so they stay on the
 panel while the chip sleeps. With no marks at all the panel is held in reset
@@ -3588,7 +3588,7 @@ through `cssToken()` into a module constant.
 | `--bd` / `--bd2` | `#1c2922` / `#273830` | borders, dim and dimmer |
 | `--tx` | `#e6ece9` | body text |
 | `--mt` / `--mt2` | `#6b7d73` / `#96a89e` | muted, and muted-but-readable |
-| `--tx-hi` / `--tx-max` | `#eef5f1` / `#fff` | on an accent fill, and on solid `--p` |
+| `--tx-hi` / `--tx-max` | `#eef5f1` / `#fff` | on a tinted fill, the accent's or `--warn`'s, and on solid `--p` |
 | `--win` | `#3ba585` | a winning trade |
 | `--loss` | `#d63d5a` | a losing trade |
 | `--warn` | `#d9a441` | "notice this", one step short of `--loss`: the offline sync dot, and a trade waiting on its journal — in the banner, the calendar and the trade log — which in emerald would read as a won one |
@@ -3637,8 +3637,7 @@ the **strength of the fill** is the day's `|net|` against the largest **in the
 month on show**, floored so the quietest day is still coloured — one property,
 `--hm-i`, mixed in CSS. Break-even is not scaled: there is no size to show. Today
 is marked on the day **number**, because emerald would read as a win and amber
-already means unfinished. The
-**dashed border** on the week rail says derived rather than recorded, which is
+already means unfinished. The **dashed border** on the week rail says derived rather than recorded, which is
 also why it carries no `--sh-2`.
 
 ### Sync model

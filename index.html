@@ -25,8 +25,9 @@
    DESIGN TOKENS
    ═══════════════════════════════════════════════════════════════════════════ */
 :root {
-  /* Emerald accent. Deep enough that --tx-max on solid --p clears 4.5:1, and
-     yellower than --win so the two do not read as one colour. */
+  /* Emerald accent. Deep enough that --tx-max on solid --p clears 4.5:1;
+     deeper and yellower than --win, and still near enough to it that
+     unfinished wears --warn instead. */
   --p:#0c8650;
   --p-gl:rgba(12,134,80,.07); --p-gl2:rgba(12,134,80,.16); --p-gl3:rgba(12,134,80,.30);
   --p-hair:rgba(12,134,80,.04);  /* table row rule */
@@ -101,14 +102,13 @@
   --row-hv:rgba(255,255,255,.03);   /* table row hover                         */
   --hair-2:rgba(255,255,255,.07);   /* equity-curve grid lines                 */
   --bd-hi:rgba(255,255,255,.30);    /* pill border on hover                    */
-  /* The only two tones lighter than --tx. --tx-hi sits on an accent fill, --tx-
-     max only on solid --p. */
+  /* The only two tones lighter than --tx. --tx-hi sits on a tinted fill, the
+     accent's or --warn's; --tx-max only on solid --p. */
   --tx-hi:#eef5f1; --tx-max:#fff;
   --pill-tx:rgba(255,255,255,.75);
   /* "Notice this", one step short of --loss: the sync dot offline — a cached
      copy is a state, not a failure — and a trade waiting on its journal, which
-     in the accent's emerald would read as a won one. Its ladder takes the
-     accent's steps. */
+     in the accent's emerald would read as a won one. */
   --warn:#d9a441;
   --warn-gl:rgba(217,164,65,.07); --warn-gl2:rgba(217,164,65,.16);
   --warn-gl3:rgba(217,164,65,.30); --warn-gl4:rgba(217,164,65,.42);

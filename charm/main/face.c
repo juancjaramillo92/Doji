@@ -5,10 +5,9 @@
 
    The sleep screen is a layer over her: black but for its marks.
 
-   The face's numbers are measured from the drawing of her face over this
-   render, in pixels of the 466 x 466 screen; the motion's are the
-   playgrounds' (claude.ai artifacts "Eugenia, on the charm" and "Your
-   charm"). */
+   The numbers are the playgrounds' (claude.ai artifacts "Eugenia, on the
+   charm" and "Your charm"), measured from the drawing of her face over the
+   render, in pixels of the 466 x 466 screen. */
 #include "face.h"
 
 #include <math.h>
