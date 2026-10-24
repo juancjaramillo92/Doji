@@ -240,11 +240,14 @@ export const PLANTS = [
       CRITIC: p.CRITIC.replace(/Is the map of his charts in the prose\?[\s\S]*?it comes out\.\n\n/, ''),
     }) },
   /* The writer states R-20's caution once, and the critic runs under the
-     writer's prompt, so both copies go. On 15 October the writer tied the
-     08:30 prints to the position opened that morning and the critic, with no
-     check for it, sent it. */
-  { why: 'a print beside a position he opened knowingly left to him, gone from the critic and the writer',
-    cases: ['critic-print-beside-his-position'],
+     writer's prompt, so both copies go. Its R-20 half cannot be seen going:
+     CRITIC's ban on anything about his trade also cuts a print tied to a
+     position he opened this session, and runs 39 to 51 caught it 2, 1, 2, 1
+     and 0 of 3. Its R-19 half is what nothing else says: a collision with a
+     position from an earlier session stays, said with the rule, where that
+     ban would cut it. */
+  { why: 'R-19\'s collision kept, said with the rule, gone from the critic and the writer',
+    cases: ['critic-keeps-r19-collision'],
     breaks: (p) => ({
       ...p,
       CRITIC: p.CRITIC.replace(/Is a print put beside a position he opened this session\?[\s\S]*?said with the rule\.\n\n/, ''),

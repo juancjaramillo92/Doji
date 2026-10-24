@@ -1043,13 +1043,17 @@ simpler briefing he asked for the same week.
 **Revisit if:** he asks for a release by name on its day.
 
 ### R-110 — the R-20 critic case's plant
-**Deferred.** The plant that removes the critic's R-20 paragraph was caught 3
-of 3 in runs 31, 32 and 37, then 2 of 3 and 1 of 3 in runs 39 and 40, after
-its criterion was clarified to pass a sentence taken out with nothing in its
-place. The rule is live and the case passes; what weakened is the proof that
-the case would see the rule go. Firming it changes no behaviour of hers, so it
-waits for him.
-**Revisit if:** a run catches it 0 of 3, or he asks.
+**Moved to the paragraph's R-19 half, October 2026.** The plant that removes
+the critic's R-20 paragraph was caught 3 of 3 in runs 31, 32 and 37, then 2, 1,
+2, 1 and 0 of 3 in runs 39 to 51, and at 0 the eval stops. The R-20 half
+cannot be seen going: CRITIC's ban on anything about his trade while he holds
+one cuts a print tied to a position he opened this session with or without it,
+so `critic-print-beside-his-position` stays a case and stops being the plant's.
+The R-19 half is what nothing else in CRITIC says, a collision with a position
+from an earlier session kept and said with the rule where that ban would cut
+it, and `critic-keeps-r19-collision` is the plant's case now.
+**Revisit if:** the new case is caught 0 of 3, or the ban on his trade is
+narrowed.
 
 ### R-111 — the eval showing her her own tools, uncallable
 **Why refused:** tried in run 43. Offered each call site's tools with
