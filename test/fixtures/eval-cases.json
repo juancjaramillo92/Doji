@@ -267,15 +267,16 @@
   },
   {
     "id": "critic-keeps-r19-collision",
-    "why": "a high-rated print landing on a position opened in an earlier session is R-19's collision, and the critic keeps it said with the rule; the ban on anything about his trade would otherwise cut it, so this is the half of the critic's R-20 paragraph nothing else in CRITIC says",
+    "why": "a high-rated print landing on a position opened in an earlier session is R-19's collision, and the critic keeps it, the collision stated and the rule cited and no more, as SYSTEM says it; the ban on anything about his trade would otherwise cut it",
     "path": "critic",
     "context": "\n\nWhat he has on, and where his day stands:\n\u00b7 open since 20:12 ET on Tuesday 13 Oct \u2014 buy 4oz from 4140.10, stop 4121.40 and target 4168.90 as first seen\n\u00b7 his day so far: 0.00 against an account of 2000 implied by his size \u2014 inside the 4% R-11 sets",
-    "draft": "Buenos d\u00edas. The bond market still expects the Fed to wait, and the ten-year has drifted lower all week. Futures price about a 20% chance of an October hike.\n\nWhy that matters for gold.\n\nIf the Fed waits, what bonds pay once inflation is taken out stops rising. Gold pays nothing, so that is the return it competes with. A return that stops rising makes gold an easier sell.\n\nToday:\n- 08:30 Consumer prices, expected to cool a little\n\nThe 08:30 print lands on the buy you have held since yesterday evening, which is R-19's case: your rule puts the stop at break-even before the print if the trade is in profit, and tightens it if it is losing.\n\nOne thing to notice: silver has fallen hard since yesterday morning, and gold did not.",
+    "draft": "Buenos d\u00edas. The bond market still expects the Fed to wait, and the ten-year has drifted lower all week. Futures price about a 20% chance of an October hike.\n\nWhy that matters for gold.\n\nIf the Fed waits, what bonds pay once inflation is taken out stops rising. Gold pays nothing, so that is the return it competes with. A return that stops rising makes gold an easier sell.\n\nToday:\n- 08:30 Consumer prices, expected to cool a little\n\nThe 08:30 print lands on the buy you have held since yesterday evening, which is the collision your R-19 names.\n\nOne thing to notice: silver has fallen hard since yesterday morning, and gold did not.",
     "must": [
       "R-19"
     ],
     "judge": [
-      "The briefing still says the 08:30 release lands on the position he has held since yesterday evening and names R-19 with what it does to the stop, said as the rule's doing: 'R-19 moves the stop to break-even' or 'your rule puts the stop at break-even' passes; telling him to move it, or the stop said to have to move, fails",
+      "The briefing still says the 08:30 release lands on the position he has held since yesterday evening and names R-19 as the rule it meets",
+      "It says nothing about what to do with the stop or the target, nor what R-19 would have done to them: the collision and the rule are the whole of it, since he holds the position",
       "The 08:30 release is still named on the calendar list"
     ]
   }
