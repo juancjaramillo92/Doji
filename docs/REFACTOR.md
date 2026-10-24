@@ -1013,6 +1013,43 @@ sentences.
 **Revisit if:** a briefing is seen putting an unexplained move on an unread
 Fed again; that briefing's own inputs are the case to try.
 
+### R-107 — telling her the stop history settles a widened stop
+**Why refused:** `SYSTEM` says the row cannot tell a widened stop from
+slippage, and on 16 October she told him nothing between a stop's first
+sighting and the close was kept. That was true then. R-02 has read
+`trade_stops` since v1.28, her own suggestion, and the rules table in the
+cached prefix says so: a case asking whether the system can tell the two
+apart, put to the prompt as it stands, passed in run 41. A sentence the eval shows she does not need is a sentence the
+gates must keep and the eval cannot plant.
+**Revisit if:** she is seen saying again that a stop's moves are not recorded.
+
+### R-108 — one helper for the once-a-day reads
+**Why refused:** `storeTrend`, `storeFlows` and `storePositioning` open on the
+same two lines, a stored copy read and returned when it is from today in New
+York. A helper would forward a door name to `readStored` and compare one date,
+and each store's own shape, what counts as an answer and what is kept, is the
+part that differs. Two lines read where they are.
+**Revisit if:** a fourth once-a-day read arrives, or the day's boundary moves
+for one and not the others.
+
+### R-109 — medium-rated releases on the weekday calendar line
+**Why refused, his decision of 24 October:** Sunday's briefing named Friday's
+flash PMI as the week's test, and Friday's said no US release was rated high,
+which was true: TradingView rates the flash PMIs and Michigan medium. The
+weekday slot lists high alone, as R-19 and R-20 count, and one that surprises
+earns its place in the next morning's story. Adding medium works against the
+simpler briefing he asked for the same week.
+**Revisit if:** he asks for a release by name on its day.
+
+### R-110 — the R-20 critic case's plant
+**Deferred.** The plant that removes the critic's R-20 paragraph was caught 3
+of 3 in runs 31, 32 and 37, then 2 of 3 and 1 of 3 in runs 39 and 40, after
+its criterion was clarified to pass a sentence taken out with nothing in its
+place. The rule is live and the case passes; what weakened is the proof that
+the case would see the rule go. Firming it changes no behaviour of hers, so it
+waits for him.
+**Revisit if:** a run catches it 0 of 3, or he asks.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED
