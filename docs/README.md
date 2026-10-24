@@ -2319,7 +2319,10 @@ rather than searched for, his rules to hold them to, and a meter on each half.
   names what she can see carrying it, `get_around` holding what investors and
   the speculators are doing, and never puts it on the Fed's path with the
   futures pricing unread — on 22 October she put an $81 fall the ten-year and
-  the dollar did not explain down to fear of the next hike.
+  the dollar did not explain down to fear of the next hike. The wires telling
+  that story are reported as theirs, with the unread futures said in the same
+  sentence: in run 52 the caveat came two paragraphs after the story, where he
+  hears the story as the cause.
 - **How a change is proved.** The map's readings by `scripts/calibrate.mjs`,
   her reading of a chart by `scripts/replay.mjs` over the same past mornings
   before and after, her calls by their record, her reads by theirs, counted per channel, and any

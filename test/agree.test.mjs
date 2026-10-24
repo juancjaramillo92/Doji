@@ -6534,6 +6534,8 @@ test('a move rates and the dollar do not explain is never put on an unread Fed',
     'a move the chain does not explain is left without where to look');
   assert.match(system, /Never fill the gap with the Fed's path when the futures pricing was not read/,
     'a move rates and the dollar do not explain is put down to the Fed with the odds unread');
+  assert.match(system, /When the wires tell that story, it is theirs: say so, and say in the same sentence that the futures were not read, so you cannot check it\./,
+    'the wires\' Fed story is reported with the unread futures said somewhere else, so it is heard as the cause');
 });
 
 test('the briefing opens on the weeks, in the writer and in the critic', () => {

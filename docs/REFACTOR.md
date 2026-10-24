@@ -1010,7 +1010,10 @@ the Fed story told in full: even with the live morning's pull in front of her,
 she seldom blames the Fed either way. A plant caught that rarely stops most
 eval runs and proves little, so it is out; the case stays, and passes, as a
 check that the rule's presence does no harm. `agree.test.mjs` holds the
-sentences.
+sentences. The sentence after it, that the wires' Fed story is reported as
+theirs with the unread futures in the same sentence, ships the same way: run 52
+failed the case on it, the caveat two paragraphs from the story, once in the
+four runs before it was written, and a plant that rare would stop every run.
 **Revisit if:** a briefing is seen putting an unexplained move on an unread
 Fed again; that briefing's own inputs are the case to try.
 
