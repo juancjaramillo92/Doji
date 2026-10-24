@@ -1093,15 +1093,15 @@ at least fifteen minutes old. It reaches the briefing and `get_around`.
 
 **Where the speculators stand is read straight from the CFTC** — the weekly
 Commitments of Traders count for COMEX gold (dataset `72hh-3qpy`, code
-`088691`), which needs no credential, so she reads it herself — read ahead once a
-New York day by the quarter-hourly job (`storePositioning`), and kept only once
-it folds, so a report that will not read leaves the last one standing. `positioningList`
-gives the managed-money net, its sides, the week's change, the net's range over
-52 weeks (crowded means something only against its own past), the open interest
-with its change from the week before (a move with it rising is new money, with
-it falling one side leaving), and the Tuesday it was taken. Only the Sunday
-briefing and `get_around` get it: a weekday briefing would repeat it five times,
-and a weekly count cannot cause a quarter-hour move.
+`088691`), which needs no credential, so she reads it herself — read ahead once
+a New York day by the quarter-hourly job (`storePositioning`), and kept only
+once it folds, so a report that will not read leaves the last one standing.
+`positioningList` gives the managed-money net, its sides, the week's change, the
+net's range over 52 weeks (crowded means something only against its own past),
+the open interest with its change from the week before (a move with it rising is
+new money, with it falling one side leaving), and the Tuesday it was taken. Only
+the Sunday briefing and `get_around` get it: a weekday briefing would repeat it
+five times, and a weekly count cannot cause a quarter-hour move.
 Background, in one sentence at most, never a reason to trade.
 
 **`?flows=1` is what central banks and the gold funds hold** — the two flows
@@ -1331,14 +1331,15 @@ redelivers anything else, and a failed write is better retried by his second tap
 
 A daily XAU/USD briefing, a word when a close takes his day past its limit, a
 review of his week on Saturday, and a conversation about any of it. **A print
-that lands after the briefing gets no message of its own**: its actual is on
-the calendar within a quarter hour for when he asks, and the next morning opens
-on how it landed — his instruction is the weeks behind the chart, not the
-hours on it, and a look per print spends the quota the briefing reads on. **Weekdays at 08:00 ET, Sunday at 17:00 ET** — the
-gold open, so the week's first briefing lands with the market. She says hello
-her own way, Spanish or English, inside the first paragraph, and goes straight to
-the number. Reply and she answers — typed, by voice, or to a chart. And she
-trades beside you on paper, on your rules, scored on price — *Her own calls*.
+that lands after the briefing gets no message of its own**: its actual is on the
+calendar within a quarter hour for when he asks, and the next morning opens on
+how it landed — his instruction is the weeks behind the chart, not the hours on
+it, and a look per print spends the quota the briefing reads on. **Weekdays at
+08:00 ET, Sunday at 17:00 ET** — the gold open, so the week's first briefing
+lands with the market. She says hello her own way, Spanish or English, inside
+the first paragraph, and goes straight to the number. Reply and she answers —
+typed, by voice, or to a chart. And she trades beside you on paper, on your
+rules, scored on price — *Her own calls*.
 
 `schema.sql` holds her memory and her read of the journal, her meters,
 calendar and the trigger that tells her about a trade, and her clock; `prompt.ts` holds who she is,
@@ -2794,30 +2795,29 @@ or a reply never waits on TradingView for them.
 
 **TradingView's daily quota decides how often** (`readsDue`). From 18 October
 every UTC day was refused by about four in the morning New York, some thirty
-passes in at thirty calls a pass, and each briefing after went without the
-odds and the market. So the hourly bars are read on the last pass of each hour
-while the market is open, the odds every other hour, and both on the pass
-before a briefing, whatever the hour, so Sunday's has them with the market
-shut: about seven hundred calls a weekday, the calendar's ninety-six and the
-weeks included. A test walks a week of passes and counts them against 750. The
-market copy is an hour old at most; the odds say when they were read and that
-nothing printed since is in them. **A symbol a pass misses
-keeps the line the last pass read** (`keptMarket`), with that pass's bar times
-on it, so one slow call leaves no gap; one never read is still named. The odds
-are replaced whole once a pass prices a meeting, since a fold does not merge,
-and **odds read more than two hours ago are not handed to her** (`ODDS_HOURS`):
-each market line carries its own times, but the odds carry only when they were
-read, and a door that kept refusing would leave its last answer standing; a
-read every other hour fits inside it, and one that fails costs the odds until
-the next. A pass that fails leaves the copy as it was. Only the job writes the
-table, a quarter hour apart, so the market's read-then-write has no second
-writer. His
-charts ride the same pass (`storeStructure`) from the poller's `?structure=1`,
-stored as the folded map (*Her map of his charts*). While the market is shut
-they are folded once: the first pass after the close, which has Friday's daily
-bar closed, folds the finished week, and the rest skip on a copy read after
-it — by Saturday morning the 5m chart's twelve hours held no bar, and every
-pass metered it as unread.
+passes in at thirty calls a pass, and each briefing after went without the odds
+and the market. So the hourly bars are read on the last pass of each hour while
+the market is open, the odds every other hour, and both on the pass before a
+briefing, whatever the hour, so Sunday's has them with the market shut: about
+seven hundred calls a weekday, the calendar's ninety-six and the weeks' and the
+flows' once a day included. A test walks a week of passes and counts them
+against 750. While the market is open the market copy is an hour old at most;
+the odds say when they were read and that nothing printed since is in them. **A
+symbol a pass misses keeps the line the last pass read** (`keptMarket`), with
+that pass's bar times on it, so one slow call leaves no gap; one never read is
+still named. The odds are replaced whole once a pass prices a meeting, since a
+fold does not merge, and **odds read more than two hours ago are not handed to
+her** (`ODDS_HOURS`): each market line carries its own times, but the odds carry
+only when they were read, and a door that kept refusing would leave its last
+answer standing; a read every other hour fits inside it, and one that fails
+costs the odds until the next. A pass that fails leaves the copy as it was. Only
+the job writes the table, a quarter hour apart, so the market's read-then-write
+has no second writer. His charts ride the same pass (`storeStructure`) from the
+poller's `?structure=1`, stored as the folded map (*Her map of his charts*).
+While the market is shut they are folded once: the first pass after the close,
+which has Friday's daily bar closed, folds the finished week, and the rest skip
+on a copy read after it — by Saturday morning the 5m chart's twelve hours held
+no bar, and every pass metered it as unread.
 
 **Each door reads three charts at a time, inside `DOOR_MS`, 35 seconds.** One by
 one, fourteen did not fit at a slow morning's pace; all at once is the burst
@@ -2896,14 +2896,15 @@ can move a rung.
 **A market read that came back short is a row**, `caller: 'market read'`, `ok:
 false`, the read and the reason in `detail`: the broker's price, the headlines
 and COMEX volume as a briefing or a reply reads them; the market around gold,
-the rate odds and the flows as the job reads them ahead, whole or — those three
-doors name a `missing` list — in part, and the speculators' count as it reads it, a pass refused whole naming
-each refusal rather than one bare *no symbol served*; and a copy a block could not
-hand her, not yet read or odds too old. The briefing or the reply still goes
-out and its own row reads ok, so on 12 October the Edge log was the only place
-a briefing written without the dollar and the Fed showed. Failures only: a row for every read that answered would be several
-a briefing saying nothing. The calendar's reads are left to `filed()` and
-`filedWeek()`, which already write both outcomes.
+the rate odds, the flows and the speculators' count as the job reads them ahead,
+whole or — the first three name a `missing` list — in part, a pass refused whole
+naming each refusal rather than one bare *no symbol served*; and a copy a block
+could not hand her, not yet read or odds too old. The briefing or the reply
+still goes out and its own row reads ok, so on 12 October the Edge log was the
+only place a briefing written without the dollar and the Fed showed. Failures
+only: a row for every read that answered would be several a briefing saying
+nothing. The calendar's reads are left to `filed()` and `filedWeek()`, which
+already write both outcomes.
 
 **A job that dies before its first model call leaves a row too.**
 `postScheduled`'s catch writes `caller: '<job> job'` **before** the apology,
