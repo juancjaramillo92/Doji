@@ -409,6 +409,7 @@ single-sourced at run time:
 | the **`eugenia_trades` column list** | the view in `schema.sql`, §8's inventory of a row, and `TradeRow` in `adherence.ts` — the only description of what `readDesk`'s `select=*` returns |
 | the **kinds an open thread may have** | `LOOP_KINDS` in `index.ts` and the check constraint in `schema.sql` |
 | each **job's query flag** | the cron job's URL in `schema.sql` and the branch in `postScheduled` — held in both directions, so a rename and a door with no job both fail |
+| the **calendar job's minutes** | the `doji-eugenia-calendar` cron in `schema.sql`, and `readsDue`, which reads the market on the hour's last pass and looks one pass ahead for a briefing |
 | each **flag one function calls another with** | every `/functions/v1/<name>?flag=value` a function or a script sends, and the callee's own read of it; every `tvRead` name, and the door `doji-tradingview` opens |
 | what **a door answers another function** | the keys the poller's and `doji-tradingview`'s doors answer with, and the keys Eugenia reads off them — held by `serve.test.mjs` driving her readers off the real handlers, not by a list; the quote by its `Spot` and `Quote` |
 | the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `schema.sql`, and the cast inside the search |
