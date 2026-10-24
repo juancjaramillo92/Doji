@@ -1,13 +1,14 @@
-/* The face: Eugenia as one still render, her eyes, mouth and cheeks drawn
-   live on top of it. Only the face's own patch of screen is redrawn on a
+/* The face: Eugenia as one still render, her eyes and mouth drawn live on
+   top of it. Only the face's own patch of screen is redrawn on a
    frame, which is what keeps it smooth on this chip — the ring is the only
    thing that redraws the full screen, and only while it shows.
 
    The sleep screen is a layer over her: black but for its marks.
 
-   The numbers are the playgrounds' (claude.ai artifacts "Eugenia, on the
-   charm" and "Your charm"), measured from each render, in pixels of the
-   466 x 466 screen. */
+   The face's numbers are measured from the drawing of her face over this
+   render, in pixels of the 466 x 466 screen; the motion's are the
+   playgrounds' (claude.ai artifacts "Eugenia, on the charm" and "Your
+   charm"). */
 #include "face.h"
 
 #include <math.h>
@@ -23,35 +24,27 @@ typedef struct {
     float eye_l[2], eye_r[2], rx, ry;
     float hl[3];                      // highlight dx, dy, radius
     float mouth[2], mouth_w, sag, stroke;
-    float blush_l[2], blush_r[2];
+    float tilt;                       // degrees; her head leans, the right side higher
 } face_geometry_t;
 
 static const face_geometry_t F = {
-    {168.9f, 230.0f}, {292.7f, 230.0f}, 12.59f, 13.5f,
-    {7.8f, -7.3f, 2.7f},
-    {231.9f, 254.6f}, 38.0f, 6.9f, 3.2f,
-    {164.3f, 262.6f}, {301.7f, 262.6f},
+    {188.8f, 162.0f}, {286.7f, 146.6f}, 8.8f, 9.0f,
+    {4.3f, -2.6f, 1.8f},
+    {244.3f, 176.2f}, 51.0f, 9.4f, 3.4f,
+    -10.0f,
 };
 
 // Tunings from the playground's defaults.
 #define BLINK_EVERY_MS  4000
 #define LOOK_RANGE      6.0f
-#define BLUSH           0.55f
 #define SHIFT_X         8     // how far the sleep screen's marks wander, so none burns in
 #define SHIFT_Y         4
 
 extern const uint8_t eugenia_rgb565_start[] asm("_binary_eugenia_rgb565_start");
-extern const uint8_t blush_argb_start[]     asm("_binary_blush_argb_start");
 
 static lv_image_dsc_t art_dsc = {
     .header = { .magic = LV_IMAGE_HEADER_MAGIC, .cf = LV_COLOR_FORMAT_RGB565, .w = 466, .h = 466, .stride = 466 * 2 },
     .data_size = 466 * 466 * 2,
-};
-
-static lv_image_dsc_t blush_dsc = {
-    .header = { .magic = LV_IMAGE_HEADER_MAGIC, .cf = LV_COLOR_FORMAT_ARGB8888,
-                .w = 52, .h = 44, .stride = 52 * 4 },
-    .data_size = 52 * 44 * 4,
 };
 
 static lv_obj_t *card, *night;
@@ -62,7 +55,7 @@ static volatile bool briefing_waits, trade_waits, low, offline;
 static volatile int charge = -1;
 
 // What is on screen, eased toward what the mode asks for.
-static struct { float open, gx, gy, mouth, smile, blush, ring, dots, confused; } V = { .open = 0, .smile = 1 };
+static struct { float open, gx, gy, mouth, smile, ring, dots, confused; } V = { .open = 0, .smile = 1 };
 static float gaze[2];
 static uint32_t next_glance, next_blink, blink_at;
 static float lid = 1;  // the blink, on top of how open the mode wants the eyes
@@ -97,26 +90,28 @@ static float ease(float v, float t, float rate, float dt) {
 /* A smile through its two ends and its lowest point, as an arc of the circle
    those three points lie on — LVGL draws arcs anti-aliased, and at this size
    the arc and the playground's quadratic curve are the same line. A frown is
-   the same circle below; a straight mouth is a line. */
+   the same circle below; a straight mouth is a line. Turned through F.tilt
+   about (cx, y), with her head. */
 static void draw_curve(lv_layer_t *layer, float cx, float y, float half, float sag,
                        float width, lv_color_t color) {
+    float t = F.tilt * (float)M_PI / 180.0f, c = cosf(t), sn = sinf(t);
     if (fabsf(sag) < 0.6f) {
         lv_draw_line_dsc_t d;
         lv_draw_line_dsc_init(&d);
-        d.p1.x = cx - half; d.p1.y = y; d.p2.x = cx + half; d.p2.y = y;
+        d.p1.x = cx - half * c; d.p1.y = y - half * sn; d.p2.x = cx + half * c; d.p2.y = y + half * sn;
         d.width = width; d.round_start = 1; d.round_end = 1; d.color = color;
         lv_draw_line(layer, &d);
         return;
     }
     float s = fabsf(sag), r = (half * half + s * s) / (2 * s);
-    float cy = sag > 0 ? y + sag - r : y + sag + r;
-    float a_r = atan2f(y - cy, half) * 180.0f / (float)M_PI;
-    float a_l = atan2f(y - cy, -half) * 180.0f / (float)M_PI;
+    float dy = sag > 0 ? sag - r : sag + r;  // the circle's centre below (cx, y), untilted
+    float a_r = atan2f(-dy, half) * 180.0f / (float)M_PI + F.tilt;
+    float a_l = atan2f(-dy, -half) * 180.0f / (float)M_PI + F.tilt;
     if (a_r < 0) a_r += 360;
     if (a_l < 0) a_l += 360;
     lv_draw_arc_dsc_t d;
     lv_draw_arc_dsc_init(&d);
-    d.center.x = (int32_t)lroundf(cx); d.center.y = (int32_t)lroundf(cy);
+    d.center.x = (int32_t)lroundf(cx - dy * sn); d.center.y = (int32_t)lroundf(y + dy * c);
     d.radius = (uint16_t)lroundf(r);
     d.start_angle = sag > 0 ? a_r : a_l;
     d.end_angle = sag > 0 ? a_l : a_r;
@@ -134,7 +129,7 @@ static void dot(lv_layer_t *layer, float cx, float cy, float rx, float ry,
 }
 
 // Short arcs, each the colour of its place: LVGL draws no conic gradient.
-static const uint32_t RING[] = { DEEP, ACCENT, GLOW, VIOLET, DEEP };
+static const uint32_t RING[] = { DEEP, ACCENT, GLOW, TEAL, DEEP };
 #define RING_STEPS 36
 
 void face_ring(lv_layer_t *layer, int32_t radius, int32_t width, float part, float turn, float opa) {
@@ -204,16 +199,6 @@ static void draw_face(lv_event_t *e) {
     float open = V.open * lid;
     const lv_color_t ink = lv_color_hex(0x0d0c0b);
 
-    for (int i = 0; i < 2; i++) {
-        const float *b = i ? F.blush_r : F.blush_l;
-        lv_draw_image_dsc_t d;
-        lv_draw_image_dsc_init(&d);
-        d.src = &blush_dsc;
-        d.opa = (lv_opa_t)(255 * 0.62f * V.blush);
-        lv_area_t a = { lroundf(b[0] - 26), lroundf(b[1] - 22), lroundf(b[0] + 25), lroundf(b[1] + 21) };
-        lv_draw_image(layer, &d, &a);
-    }
-
     // Eyes, a line when shut, with the highlight once open enough to hold it.
     // Confused, one is smaller and they sit at a tilt.
     for (int i = 0; i < 2; i++) {
@@ -265,7 +250,7 @@ static void draw_face(lv_event_t *e) {
 }
 
 /* The sleep screen, still, so it stays on the panel while the chip sleeps.
-   Low on the screen, one mark for what waits: Eugenia's purple dot with a
+   Low on the screen, one mark for what waits: Eugenia's emerald dot with a
    glow for a briefing, a white ring for a trade, the dot inside the ring for
    both — one place and one size each, so nothing moves or shrinks when the
    other arrives, and shape tells them apart. At the top, a small battery when
@@ -281,7 +266,7 @@ static void draw_night(lv_event_t *e) {
         lv_draw_arc_dsc_init(&a);
         a.center.x = x; a.center.y = y;
         a.radius = 19; a.width = 3; a.start_angle = 0; a.end_angle = 360;
-        a.color = lv_color_hex(0xeeecf4);
+        a.color = lv_color_hex(0xecf4ef);
         lv_draw_arc(layer, &a);
     }
     if (briefing_waits) {
@@ -363,7 +348,6 @@ static void tick(lv_timer_t *t) {
     }
 
     float t_open = 1, t_mouth = 0, t_smile = 1, t_ring = 0, t_dots = 0, t_confused = 0, glance = 1;
-    float t_blush = BLUSH;
     const float *fixed = NULL;
     static const float up[2] = { 0, -2 }, puzzled[2] = { 3, -2.5f }, rest[2] = { 0, 1 };
     // Thinking looks up to one side, then the other, every 1.7 seconds.
@@ -399,7 +383,6 @@ static void tick(lv_timer_t *t) {
     V.gy = ease(V.gy, gaze[1], 22, dt);
     V.mouth = ease(V.mouth, t_mouth, 28, dt);
     V.smile = ease(V.smile, t_smile, 10, dt);
-    V.blush = ease(V.blush, t_blush, 4, dt);
     V.ring = ease(V.ring, t_ring, 18, dt);
     V.dots = ease(V.dots, t_dots, 5, dt);
     V.confused = ease(V.confused, t_confused, 8, dt);
@@ -409,7 +392,7 @@ static void tick(lv_timer_t *t) {
     bool ring_on = V.ring > 0.02f;
     if (ring_on || ring_was_on) lv_obj_invalidate(lv_screen_active());
     else {
-        static const lv_area_t patches[] = { { 110, 175, 356, 300 }, { 195, 30, 272, 62 } };
+        static const lv_area_t patches[] = { { 150, 108, 326, 232 }, { 195, 30, 272, 62 } };
         for (size_t i = 0; i < sizeof patches / sizeof *patches; i++) lv_obj_invalidate_area(card, &patches[i]);
     }
     ring_was_on = ring_on;
@@ -425,7 +408,6 @@ static lv_obj_t *plain(lv_obj_t *parent) {
 
 void face_start(void) {
     art_dsc.data = eugenia_rgb565_start;
-    blush_dsc.data = blush_argb_start;
 
     lv_obj_t *screen = lv_screen_active();
     lv_obj_set_style_bg_color(screen, lv_color_black(), 0);

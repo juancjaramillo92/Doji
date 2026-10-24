@@ -87,7 +87,7 @@ charm/                                  firmware for the charm — see The charm
   main/ota.c                            her updates over Wi-Fi, from main
   main/hanken_64.c                      Doji's typeface for the journal's words; _16, _18, _36 the rest
   art/HankenGrotesk.ttf                 that typeface, with its licence beside it
-  art/eugenia.png                       a render; art/*.rgb565 and art/blush.argb the bytes drawn
+  art/eugenia.png                       a render; art/eugenia.rgb565 the bytes drawn
   tools/art.py                          turns a render into those bytes
   tools/fonts.sh                        turns the typeface into the charm's fonts and the page's
 scripts/backup.mjs                      the paged read behind the daily copy
@@ -496,7 +496,7 @@ the shared definitions in **What is derived, not stored**:
 | Watch card | Eugenia's thesis, open loops and calendar — **What she is watching, on the dashboard** |
 
 **Trades appear on their own.** Enter a position and it shows within about two
-minutes — correct day, correct session, purple and pending, P&L blank until it
+minutes — correct day, correct session, amber and pending, P&L blank until it
 closes. Open it and fill in the setup and the three discipline answers.
 
 **There is no manual entry, and no import.** A hand-made row carries no position
@@ -2010,7 +2010,7 @@ radio off, so nothing can be pushed to it: after the briefing's hour it wakes
 and asks **`?briefing=ready`** (a `GET` with the same key), which answers with
 her line *"Your briefing is ready, jefe."* in the same frames, or a `204` while
 no briefing is stored for today. Writing takes up to six minutes, so the charm
-asks again every few minutes until it lands. Then it shows a still purple dot
+asks again every few minutes until it lands. Then it shows a still emerald dot
 until he presses, and asks **`?briefing=today`** for the briefing itself; at
 midnight in New York the dot goes (`briefing_today`), as the door's today does. Both
 read today's briefing through `storedBriefing`, the speaking worker's own
@@ -3313,12 +3313,13 @@ anyone.
 **A face is a render plus a drawing.** Eugenia's render is a still 466 × 466
 image, embedded as the RGB565 bytes the screen draws (`charm/tools/art.py` makes
 them from `charm/art/eugenia.png`), so nothing is decoded at boot. Her eyes,
-highlight, smile and cheeks are drawn live on top, measured from the render:
+highlight and smile are drawn live on top, measured from the drawing of her
+face over the render, her head tilted ten degrees:
 blinks, glances, the mouth following the loudness of what plays; thinking, she
 looks up and away from one side to the other under three thought dots; when
 something goes wrong, her eyes go uneven and her smile turns down; going to
 sleep, her eyes close slowly. Only the face's own patch is redrawn on a frame;
-the rings round the rim — Doji's purples turning slowly while she listens, and
+the rings round the rim — Doji's emeralds turning slowly while she listens, and
 the one emptying while PWR is held — are the only things that redraw the full
 screen, and only while they show. **Nothing flashes between screens**: whatever
 comes up first is the only thing seen, so no face shows for a moment before the
@@ -3326,12 +3327,13 @@ journal's questions or after them. Her state — a low battery, no internet — 
 never an expression on her face; it is a mark on the sleep screen. The design
 was settled in playgrounds before any of this — the claude.ai artifacts
 *Eugenia, on the charm*, *Gladys, on the charm* and *Your charm* — and the
-numbers here are theirs.
+numbers here are theirs but for the colours and her face, which are the
+charm's own.
 
 **The sleep screen is black but for its marks**, still, so they stay on the
 panel while the chip sleeps. With no marks at all the panel is held in reset
 instead: the same black, without the panel running to show it. Low on the screen, **one mark for what waits**:
-a purple dot with a glow while a briefing does, a white ring while a trade
+an emerald dot with a glow while a briefing does, a white ring while a trade
 does, and the dot inside the ring when both do — one place and one size each,
 so nothing moves or shrinks when the other arrives, and shape tells them apart
 at a glance. At the top, a small battery when she is at 15% or below and off the
@@ -3482,13 +3484,13 @@ for four seconds.
 trade waits the questions take the whole screen, the playground's: the setup
 split down the middle, **B&R** on the left and **S&R** on the right; then
 **RULES**, **SL** and **TP**, each one word on a screen whose left half is no
-and right half yes — a cool blue-violet and a warm magenta, Doji's purples
-rather than a win's green and a loss's red, each brightening when tapped. Four
+and right half yes — a cool sea-blue and a warm jade, Doji's emeralds
+rather than a win's teal and a loss's red, each brightening when tapped. Four
 dots at the top say what is answered. A tap on a half sends that one answer at
 once, in a tap's own grammar (*Her charm journals a trade on its own screen*),
 and her door answers with what waits next, so the next trade follows without a
 pause. Done, the journal's own screen: the four dots fill, a tick draws itself
-in and the ring sweeps round once — the tick light purple and the ring at full
+in and the ring sweeps round once — the tick light emerald and the ring at full
 strength when every answer was a yes. An answer her door does not take, the
 network still up, leaves the question where it was to be tapped again — the
 screen not moving on is the sign it was not saved. Whatever ends it — done, a
@@ -3501,7 +3503,7 @@ typeface, Hanken Grotesk, made into the charm's four fonts by
 
 **A finger round the rim is the volume**: one full turn from silent to
 loudest, from a press at least 160 px from the centre. The screen dims, and
-round the rim a faint track, the level in Doji's purples, a white knob at its
+round the rim a faint track, the level in Doji's emeralds, a white knob at its
 end, and the number under *VOLUME*; it fades a moment after the finger lifts,
 and the volume is saved in her flash with the rest.
 
@@ -3543,7 +3545,9 @@ floating in sleep, is quiet. That a battery run down resets her as a brownout
 and so switches her off, and whether a cable alone switches her back on. How
 long a press from sleep takes to reach the listening notes: the serial log's
 `lit` and `listening` lines are timestamped from boot, and the board package's
-panel start alone waits 1.2 s.
+panel start alone waits 1.2 s. That the emeralds read on the panel as they
+were chosen on a screen: the ring, the journal's halves, the dial, the sleep
+marks and her blob, where a dark green in RGB565 may band or go muddy.
 
 ---
 
@@ -3576,32 +3580,33 @@ through `cssToken()` into a module constant.
 
 | Token | Value | Used for |
 |---|---|---|
-| `--p` | `#8b35b8` | the accent. Selected states, focus, the sync dot |
-| `--bg` | `#070611` | page background — near-black with a faint purple hue |
-| `--s2` | `#141022` | the layer above the page |
-| `--glass` | `#0a0813` | card surfaces. Solid, not translucent |
+| `--p` | `#0c8650` | the accent, emerald. Selected states, focus, the sync dot |
+| `--bg` | `#040807` | page background — near-black with a faint emerald hue |
+| `--s2` | `#0f1814` | the layer above the page |
+| `--glass` | `#070c0a` | card surfaces. Solid, not translucent |
 | `--cell-bg` | `rgba(8,8,10,.55)` | a calendar day with no result, so it recedes |
-| `--bd` / `--bd2` | `#251d39` / `#342948` | borders, dim and dimmer |
-| `--tx` | `#e8e6f0` | body text |
-| `--mt` / `--mt2` | `#6f6788` / `#9a92b0` | muted, and muted-but-readable |
-| `--tx-hi` / `--tx-max` | `#f0eeff` / `#fff` | on an accent fill, and on solid `--p` |
+| `--bd` / `--bd2` | `#1c2922` / `#273830` | borders, dim and dimmer |
+| `--tx` | `#e6ece9` | body text |
+| `--mt` / `--mt2` | `#6b7d73` / `#96a89e` | muted, and muted-but-readable |
+| `--tx-hi` / `--tx-max` | `#eef5f1` / `#fff` | on an accent fill, and on solid `--p` |
 | `--win` | `#3ba585` | a winning trade |
 | `--loss` | `#d63d5a` | a losing trade |
-| `--warn` | `#d9a441` | "notice this", one step short of `--loss`. Only the offline sync dot |
-| `--be-tx` | `#9aa4c0` | break-even text — cool, because a break-even is a result |
-| `--seg-be-bg` / `--seg-be-bd` | `#0e1020` / `#333f63` | break-even fill and border |
+| `--warn` | `#d9a441` | "notice this", one step short of `--loss`: the offline sync dot, and a trade waiting on its journal — in the banner, the calendar and the trade log — which in emerald would read as a won one |
+| `--be-tx` | `#9eadb5` | break-even text — cool, because a break-even is a result |
+| `--seg-be-bg` / `--seg-be-bd` | `#0e1316` / `#36434c` | break-even fill and border |
 
 **Results have a house treatment**: a flat 12% fill against a full-strength
 border — `--seg-win-bg` and `--seg-loss-bg` are `--win` and `--loss` at `.12`, the
 hover pair `--seg-win-hv` / `--seg-loss-hv` at `.22`. Break-even is a solid colour
 instead, because a translucent fill hazes on a 58px calendar cell, and the darkest
-of the three because nothing happened; its green runs at or above its red so a
-small tile reads cool rather than mauve.
+of the three because nothing happened; a blue-grey slate, so a small tile reads
+cool without joining the emeralds or going indigo.
 
 **Neutral surfaces come from seven alphas of white**: `--fill-0` (`.02`) through
 `--fill-3` (`.08`), plus `--row-hv` (`.03`), `--hair-2` (`.07`) and `--bd-hi`
-(`.30`). The accent has the same ladder — `--p-gl` at `.07` through `--p-gl4` at
-`.42`, and `--p-hair` at `.04`. **Type** is `--ui` and `--mono`. **Radii** are
+(`.30`). The accent has the same ladder — `--p-gl` at `.07` through `--p-gl3` at
+`.30`, and `--p-hair` at `.04` — and `--warn` its own, `--warn-gl` at `.07`
+through `--warn-gl4` at `.42`. **Type** is `--ui` and `--mono`. **Radii** are
 `--r-sm` 10px, `--r-md` 14px, `--r-lg` 18px, `--r-full`, and `--r-cell` 5px for
 calendar tiles, which at the card radius each read as their own card.
 
@@ -3631,7 +3636,8 @@ blocks are `flex:1` with `space-between`, so a dropped row stretches the rest.
 the **strength of the fill** is the day's `|net|` against the largest **in the
 month on show**, floored so the quietest day is still coloured — one property,
 `--hm-i`, mixed in CSS. Break-even is not scaled: there is no size to show. Today
-is marked on the day **number**, because purple already means unfinished. The
+is marked on the day **number**, because emerald would read as a win and amber
+already means unfinished. The
 **dashed border** on the week rail says derived rather than recorded, which is
 also why it carries no `--sh-2`.
 

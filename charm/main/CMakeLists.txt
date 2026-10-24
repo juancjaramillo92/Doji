@@ -4,6 +4,6 @@ idf_component_register(
     INCLUDE_DIRS .
     # The art, embedded as the bytes the screen draws (charm/tools/art.py), and
     # the setup page's typeface (charm/tools/fonts.sh).
-    EMBED_FILES ../art/eugenia.rgb565 ../art/blush.argb setup.woff2
+    EMBED_FILES ../art/eugenia.rgb565 setup.woff2
     # The setup's page, served as written.
     EMBED_TXTFILES setup.html)
