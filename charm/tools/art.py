@@ -3,13 +3,10 @@
 
 The screen is drawn in RGB565, so Eugenia's 466 x 466 render becomes
 434,312 bytes in LVGL's native little-endian order, embedded as it is: no
-decoder runs at boot and nothing is decompressed into memory. The blush is a
-small ARGB8888 image, a pink radial falloff the face draws over each cheek at
-whatever strength the mood asks for.
+decoder runs at boot and nothing is decompressed into memory.
 
     python3 charm/tools/art.py      # after changing a render in charm/art/
 """
-import math
 import pathlib
 from PIL import Image
 
@@ -24,13 +21,3 @@ for i in range(0, len(px), 3):
     out += (((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)).to_bytes(2, "little")
 (ART / "eugenia.rgb565").write_bytes(bytes(out))
 
-# A cheek: 52 x 44, the playground's pink at full strength in the middle,
-# falling to nothing at the edge. LVGL's ARGB8888 is B, G, R, A in memory.
-W, H = 52, 44
-blush = bytearray()
-for y in range(H):
-    for x in range(W):
-        d = math.hypot((x + 0.5 - W / 2) / (W / 2), (y + 0.5 - H / 2) / (H / 2))
-        a = round(255 * max(0.0, 1.0 - d) ** 1.2)
-        blush += bytes((116, 118, 238, a))
-(ART / "blush.argb").write_bytes(bytes(blush))

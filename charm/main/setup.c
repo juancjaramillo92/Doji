@@ -130,7 +130,7 @@ static void build_screen(void) {
     lv_obj_set_size(s, 74, 74);
     lv_obj_set_pos(s, 196, 177);
     lv_obj_set_style_arc_width(s, 6, LV_PART_MAIN);
-    lv_obj_set_style_arc_color(s, lv_color_hex(0x102a20), LV_PART_MAIN);
+    lv_obj_set_style_arc_color(s, lv_color_hex(0x16211b), LV_PART_MAIN);
     lv_obj_set_style_arc_width(s, 6, LV_PART_INDICATOR);
     lv_obj_set_style_arc_color(s, lv_color_hex(GLOW), LV_PART_INDICATOR);
     busy = text(screens[SHOW_BUSY], SAY[2], INK, 270);
@@ -139,7 +139,7 @@ static void build_screen(void) {
     static const lv_point_precise_t ticked[] = { { 203, 237 }, { 223, 257 }, { 263, 209 } };
     static const lv_point_precise_t crossed[] = { { 209, 209 }, { 257, 257 }, { 233, 233 }, { 257, 209 }, { 209, 257 } };
     screens[SHOW_TICK] = mark(ticked, 3, GLOW);
-    screens[SHOW_CROSS] = mark(crossed, 5, 0xf3a2e4);
+    screens[SHOW_CROSS] = mark(crossed, 5, 0xf4a38f);
     bsp_display_unlock();
 }
 

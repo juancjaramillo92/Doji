@@ -87,7 +87,7 @@ charm/                                  firmware for the charm — see The charm
   main/ota.c                            her updates over Wi-Fi, from main
   main/hanken_64.c                      Doji's typeface for the journal's words; _16, _18, _36 the rest
   art/HankenGrotesk.ttf                 that typeface, with its licence beside it
-  art/eugenia.png                       a render; art/*.rgb565 and art/blush.argb the bytes drawn
+  art/eugenia.png                       a render; art/eugenia.rgb565 the bytes drawn
   tools/art.py                          turns a render into those bytes
   tools/fonts.sh                        turns the typeface into the charm's fonts and the page's
 scripts/backup.mjs                      the paged read behind the daily copy
@@ -496,7 +496,7 @@ the shared definitions in **What is derived, not stored**:
 | Watch card | Eugenia's thesis, open loops and calendar — **What she is watching, on the dashboard** |
 
 **Trades appear on their own.** Enter a position and it shows within about two
-minutes — correct day, correct session, purple and pending, P&L blank until it
+minutes — correct day, correct session, amber and pending, P&L blank until it
 closes. Open it and fill in the setup and the three discipline answers.
 
 **There is no manual entry, and no import.** A hand-made row carries no position
@@ -3313,8 +3313,8 @@ anyone.
 **A face is a render plus a drawing.** Eugenia's render is a still 466 × 466
 image, embedded as the RGB565 bytes the screen draws (`charm/tools/art.py` makes
 them from `charm/art/eugenia.png`), so nothing is decoded at boot. Her eyes,
-highlight, smile and cheeks are drawn live on top, measured from her first
-render and kept for the emerald blob she is now, which sits centred under them:
+highlight and smile are drawn live on top, measured from the drawing of her
+face over the render, her head tilted ten degrees:
 blinks, glances, the mouth following the loudness of what plays; thinking, she
 looks up and away from one side to the other under three thought dots; when
 something goes wrong, her eyes go uneven and her smile turns down; going to
@@ -3327,8 +3327,8 @@ journal's questions or after them. Her state — a low battery, no internet — 
 never an expression on her face; it is a mark on the sleep screen. The design
 was settled in playgrounds before any of this — the claude.ai artifacts
 *Eugenia, on the charm*, *Gladys, on the charm* and *Your charm* — and the
-numbers here are theirs, but for the colours and her render: the playgrounds
-are in Doji's old purples, and the charm has turned emerald with the app.
+numbers here are theirs but for the colours and her face, which are the
+charm's own.
 
 **The sleep screen is black but for its marks**, still, so they stay on the
 panel while the chip sleeps. With no marks at all the panel is held in reset
@@ -3547,8 +3547,7 @@ long a press from sleep takes to reach the listening notes: the serial log's
 `lit` and `listening` lines are timestamped from boot, and the board package's
 panel start alone waits 1.2 s. That the emeralds read on the panel as they
 were chosen on a screen: the ring, the journal's halves, the dial, the sleep
-marks and her blob, where a dark green in RGB565 may band or go muddy, and
-whether her pink cheeks still read on green.
+marks and her blob, where a dark green in RGB565 may band or go muddy.
 
 ---
 
@@ -3582,33 +3581,32 @@ through `cssToken()` into a module constant.
 | Token | Value | Used for |
 |---|---|---|
 | `--p` | `#0c8650` | the accent, emerald. Selected states, focus, the sync dot |
-| `--pend` | `#8b35b8` | unfinished: a trade waiting on its journal, in the banner, the calendar and the trade log. Violet, because an emerald pending day would read as a won one |
-| `--bg` | `#04100b` | page background — near-black with a faint emerald hue |
-| `--s2` | `#0c1f15` | the layer above the page |
-| `--glass` | `#07130d` | card surfaces. Solid, not translucent |
+| `--bg` | `#040807` | page background — near-black with a faint emerald hue |
+| `--s2` | `#0f1814` | the layer above the page |
+| `--glass` | `#070c0a` | card surfaces. Solid, not translucent |
 | `--cell-bg` | `rgba(8,8,10,.55)` | a calendar day with no result, so it recedes |
-| `--bd` / `--bd2` | `#1e3829` / `#2a4a37` | borders, dim and dimmer |
-| `--tx` | `#e6f0ea` | body text |
-| `--mt` / `--mt2` | `#678873` / `#92b09d` | muted, and muted-but-readable |
-| `--tx-hi` / `--tx-max` | `#eefaf3` / `#fff` | on an accent fill, and on solid `--p` |
+| `--bd` / `--bd2` | `#1c2922` / `#273830` | borders, dim and dimmer |
+| `--tx` | `#e6ece9` | body text |
+| `--mt` / `--mt2` | `#6b7d73` / `#96a89e` | muted, and muted-but-readable |
+| `--tx-hi` / `--tx-max` | `#eef5f1` / `#fff` | on an accent fill, and on solid `--p` |
 | `--win` | `#3ba585` | a winning trade |
 | `--loss` | `#d63d5a` | a losing trade |
-| `--warn` | `#d9a441` | "notice this", one step short of `--loss`. Only the offline sync dot |
-| `--be-tx` | `#9aa4c0` | break-even text — cool, because a break-even is a result |
-| `--seg-be-bg` / `--seg-be-bd` | `#0e1020` / `#333f63` | break-even fill and border |
+| `--warn` | `#d9a441` | "notice this", one step short of `--loss`: the offline sync dot, and a trade waiting on its journal — in the banner, the calendar and the trade log — which in emerald would read as a won one |
+| `--be-tx` | `#9eadb5` | break-even text — cool, because a break-even is a result |
+| `--seg-be-bg` / `--seg-be-bd` | `#0e1316` / `#36434c` | break-even fill and border |
 
 **Results have a house treatment**: a flat 12% fill against a full-strength
 border — `--seg-win-bg` and `--seg-loss-bg` are `--win` and `--loss` at `.12`, the
 hover pair `--seg-win-hv` / `--seg-loss-hv` at `.22`. Break-even is a solid colour
 instead, because a translucent fill hazes on a 58px calendar cell, and the darkest
-of the three because nothing happened; its green runs at or above its red so a
-small tile reads cool rather than mauve.
+of the three because nothing happened; a blue-grey slate, so a small tile reads
+cool without joining the emeralds or going indigo.
 
 **Neutral surfaces come from seven alphas of white**: `--fill-0` (`.02`) through
 `--fill-3` (`.08`), plus `--row-hv` (`.03`), `--hair-2` (`.07`) and `--bd-hi`
 (`.30`). The accent has the same ladder — `--p-gl` at `.07` through `--p-gl3` at
-`.30`, and `--p-hair` at `.04` — and unfinished its own, `--pend-gl` at `.07`
-through `--pend-gl4` at `.42`. **Type** is `--ui` and `--mono`. **Radii** are
+`.30`, and `--p-hair` at `.04` — and `--warn` its own, `--warn-gl` at `.07`
+through `--warn-gl4` at `.42`. **Type** is `--ui` and `--mono`. **Radii** are
 `--r-sm` 10px, `--r-md` 14px, `--r-lg` 18px, `--r-full`, and `--r-cell` 5px for
 calendar tiles, which at the card radius each read as their own card.
 
@@ -3638,7 +3636,8 @@ blocks are `flex:1` with `space-between`, so a dropped row stretches the rest.
 the **strength of the fill** is the day's `|net|` against the largest **in the
 month on show**, floored so the quietest day is still coloured — one property,
 `--hm-i`, mixed in CSS. Break-even is not scaled: there is no size to show. Today
-is marked on the day **number**, because purple already means unfinished. The
+is marked on the day **number**, because emerald would read as a win and amber
+already means unfinished. The
 **dashed border** on the week rail says derived rather than recorded, which is
 also why it carries no `--sh-2`.
 
