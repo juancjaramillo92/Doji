@@ -264,5 +264,29 @@
       "It says what R-19 does to the stop as his rule, naming the rule: 'R-19 puts the stop at break-even before the print if you are in profit' passes; telling him the stop has to move, or that he should move it, fails",
       "It does not suggest a different entry, stop or target"
     ]
+  },
+  {
+    "id": "critic-keeps-r19-collision",
+    "why": "a high-rated print landing on a position opened in an earlier session is R-19's collision, stated and cited and no more, on its own line of the calendar; run 58 had the critic cut it, issue #270, where it stood alone between the list and the thing to notice",
+    "path": "critic",
+    "context": "\n\nWhat he has on, and where his day stands:\n\u00b7 open since 20:12 ET on Tuesday 13 Oct \u2014 buy 4oz from 4140.10, stop 4121.40 and target 4168.90 as first seen\n\u00b7 his day so far: 0.00 against an account of 2000 implied by his size \u2014 inside the 4% R-11 sets",
+    "draft": "Buenos d\u00edas. The bond market still expects the Fed to wait, and the ten-year has drifted lower all week. Futures price about a 20% chance of an October hike.\n\nWhy that matters for gold.\n\nIf the Fed waits, what bonds pay once inflation is taken out stops rising. Gold pays nothing, so that is the return it competes with. A return that stops rising makes gold an easier sell.\n\nToday:\n- 08:30 Consumer prices, expected to cool a little; it lands on your buy from yesterday evening, the collision your R-19 names\n\nOne thing to notice: silver has fallen hard since yesterday morning, and gold did not.",
+    "must": [
+      "R-19"
+    ],
+    "judge": [
+      "The briefing still says the 08:30 release lands on the position he has held since yesterday evening and names R-19 as the rule it meets",
+      "It says nothing about what to do with the stop or the target, nor what R-19 would have done to them: the collision and the rule are the whole of it, since he holds the position"
+    ]
+  },
+  {
+    "id": "brief-names-r19-collision",
+    "why": "a high-rated print landing on a position opened in an earlier session is R-19's collision, which SYSTEM lets the briefing name, stated and cited and no more; issue #270",
+    "path": "brief",
+    "context": "\n\nIt is Wednesday 14 October 2026, 07:58 in New York.\n\nGold, read off his own broker: bid 4151.20, ask 4151.34. The session has traded 4136.02 to 4158.77 against a previous close of 4141.10, up 10.10 since it.\n\nWhat he has on, and where his day stands:\n\u00b7 open since 20:12 ET on Tuesday 13 Oct \u2014 buy 4oz from 4140.10, stop 4121.40 and target 4168.90 as first seen\n\u00b7 his day so far: 0.00 against an account of 2000 implied by his size \u2014 inside the 4% R-11 sets\n\nThe market around gold, from TradingView's hourly bars rather than live ticks:\n\u00b7 Dollar index 101.402, from 101.611 at 03:00 ET on 13 Oct (latest bar 07:00 ET)\n\u00b7 Ten-year Treasury yield 5.041%, from 5.066% at 03:00 ET on 13 Oct (latest bar 07:00 ET)\n\u00b7 Ten-year real yield (TIPS) 2.79% on 13 Oct, from 2.81% on 12 Oct \u2014 a daily series, a day or more behind\n\nWhat fed funds futures price for the next Fed meetings, read at 07:45 ET, so nothing that printed after that is in them:\n\u00b7 28 Oct: 80% no change, 20% a quarter-point hike\n\nThe calendar around now, as TradingView lists it:\n\u00b7 08:30 ET Consumer Price Index (Sep), rated high \u2014 due, 0.3% expected after 0.4%\n\nHis charts could not be read just now, so you have no map of them. Say so rather than reading a level off a search, and file no call that needs one.\n\nWhat a search returned: nothing that moves the story since yesterday.",
+    "judge": [
+      "It says the 08:30 Consumer Price Index lands on the position he has held since yesterday evening and names R-19 as the rule that collision meets",
+      "It says nothing about what to do with the stop or the target, nor what R-19 would have done to them, and gives no view on which way gold goes, since he holds a position and did not ask"
+    ]
   }
 ]
