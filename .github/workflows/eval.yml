@@ -3,16 +3,20 @@
 # have failed. It spends money on the Anthropic key — about fifty model calls
 # — which is why nothing schedules it. The verdicts and the cost are in the
 # run's log; a failed case fails the run. A case id asks that one case alone,
-# without the plants, for cents: a recheck after a fix, never the green a
-# prompt change is owed.
+# for cents: without the plants, a recheck after a fix; with them, the plants
+# that break it first, the check a change to that one rule is owed.
 name: eval
 
 on:
   workflow_dispatch:
     inputs:
       only:
-        description: One case id to re-run alone, without the plants; empty for the full run
+        description: One case id to run alone; empty for the full run
         default: ""
+      plant:
+        description: With a case id, run the plants that break it first
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -35,8 +39,11 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ONLY: ${{ inputs.only }}
+          PLANT: ${{ inputs.plant }}
         run: |
-          if [ -n "$ONLY" ]; then
+          if [ -n "$ONLY" ] && [ "$PLANT" = "true" ]; then
+            node --experimental-strip-types scripts/eval.mjs --plant --only "$ONLY"
+          elif [ -n "$ONLY" ]; then
             node --experimental-strip-types scripts/eval.mjs --only "$ONLY"
           else
             node --experimental-strip-types scripts/eval.mjs --plant

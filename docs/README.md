@@ -3857,13 +3857,15 @@ ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs --plant
 ```
 
 Or from GitHub: **Actions → eval → Run workflow**, with `ANTHROPIC_API_KEY` as a
-repository secret, and a case id in `only` to re-run that case alone, without
-the plants, for cents — a recheck after a fix, never the green a prompt change
-is owed; the verdicts and the cost are in the run's log, with what
-she wrote wherever a case or a plant failed and, for a pattern, where in it the
-pattern matched, and a failed case fails the run. Nothing runs it unasked, so `test.yml` says when it is owed:
-a push to a branch whose prompts, cases or eval differ from main's carries the
-warning *The eval is owed*, and a branch is run through it before it is merged.
+repository secret, and a case id in `only` to run that case alone, for cents:
+without `plant`, a recheck after a fix; with `plant`, the plants that break it
+first, which is the check a change to that one rule is owed and a tenth of the
+full run; the verdicts and the cost are in the run's log, with what she wrote
+wherever a case or a plant failed and, for a pattern, where in it the pattern
+matched, and a failed case fails the run. Nothing runs it unasked, so `test.yml`
+says when it is owed: a push to a branch whose prompts, cases or eval differ
+from main's carries the warning *The eval is owed*, and a branch is run through
+it before it is merged.
 `index.ts` is outside that list though the eval reads its model names: a warning
 on every change to the function is one nobody reads.
 

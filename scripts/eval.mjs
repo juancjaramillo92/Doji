@@ -17,6 +17,7 @@
    It spends money, so it is never in `npm test` and is run by hand. With
    `--plant` it first runs the cases a deliberately broken prompt should fail,
    and stops if the breakage goes unseen: an eval that cannot fail is not one.
+   With `--only` as well, only the plants that break that one case run.
 
    Run:  ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs [--plant] [--only <id>]
    Cost: about fifty model calls, half of them the judge; the system prompt is
@@ -330,10 +331,14 @@ async function main(argv) {
   const usage = [];
 
   if (argv.includes('--plant')) {
-    for (const plant of PLANTS) {
+    // With a case named, only the plants that break it: the check a change to
+    // one rule is owed, for a tenth of the full run.
+    const plants = PLANTS.filter(p => !only || p.cases.includes(only));
+    if (only && !plants.length) console.log(`no plant breaks ${only}: its pass says the rule is obeyed, not that the case would see it go`);
+    for (const plant of plants) {
       const broken = plant.breaks(PROMPTS);
       if (Object.keys(PROMPTS).every(k => broken[k] === PROMPTS[k])) throw new Error(`the plant did not change the prompt: ${plant.why}`);
-      for (const id of plant.cases) {
+      for (const id of plant.cases.filter(id => !only || id === only)) {
         const results = await Promise.all(Array.from({ length: PLANT_TRIES },
           () => grade(CASES.find(c => c.id === id), broken)));
         for (const r of results) usage.push(...r.usage);
