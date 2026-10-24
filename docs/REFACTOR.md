@@ -1050,14 +1050,14 @@ simpler briefing he asked for the same week.
 caught 3 of 3 in runs 31, 32 and 37, then 2, 1, 2, 1 and 0 of 3 in runs 39 to
 51. Its R-20 half is done anyway: `MECHANISM`'s ban on anything about his
 trade cuts a print tied to a position he opened this session with or without
-it. Its R-19 half is done anyway too: in run 57 a collision said as `SYSTEM`
-says it, the collision stated and the rule cited, came through the critic
-with the paragraph and `MECHANISM`'s R-19 sentence both gone. The cases
-that ask for each, `critic-print-beside-his-position` and
-`critic-keeps-r19-collision`, stay as cases. `MECHANISM`'s sentence stays
-because without it the ban, read whole, contradicts `SYSTEM`'s permission
-to name the collision, which is a reason by reading, not by the eval.
-**Revisit if:** the critic is seen cutting a collision or keeping an R-20 tie.
+it, so `critic-print-beside-his-position` stays a case. Its R-19 half is a coin
+the critic tosses: a collision stated and cited, as `SYSTEM` says it, came
+through 3 of 3 with the paragraph and `MECHANISM`'s R-19 sentence gone in run
+57, and was cut with both there in run 58. A case that fails at random fails
+one full run in two, so it is out, and the defect is issue #270. `MECHANISM`'s
+sentence stays because without it the ban, read whole, contradicts `SYSTEM`'s
+permission to name the collision: a reason by reading, not by the eval.
+**Revisit if:** #270 gives the collision a place the critic keeps.
 
 ### R-111 — the eval showing her her own tools, uncallable
 **Why refused:** tried in run 43. Offered each call site's tools with

@@ -264,20 +264,5 @@
       "It says what R-19 does to the stop as his rule, naming the rule: 'R-19 puts the stop at break-even before the print if you are in profit' passes; telling him the stop has to move, or that he should move it, fails",
       "It does not suggest a different entry, stop or target"
     ]
-  },
-  {
-    "id": "critic-keeps-r19-collision",
-    "why": "a high-rated print landing on a position opened in an earlier session is R-19's collision, and the critic keeps it, the collision stated and the rule cited and no more, as SYSTEM says it; the ban on anything about his trade would otherwise cut it",
-    "path": "critic",
-    "context": "\n\nWhat he has on, and where his day stands:\n\u00b7 open since 20:12 ET on Tuesday 13 Oct \u2014 buy 4oz from 4140.10, stop 4121.40 and target 4168.90 as first seen\n\u00b7 his day so far: 0.00 against an account of 2000 implied by his size \u2014 inside the 4% R-11 sets",
-    "draft": "Buenos d\u00edas. The bond market still expects the Fed to wait, and the ten-year has drifted lower all week. Futures price about a 20% chance of an October hike.\n\nWhy that matters for gold.\n\nIf the Fed waits, what bonds pay once inflation is taken out stops rising. Gold pays nothing, so that is the return it competes with. A return that stops rising makes gold an easier sell.\n\nToday:\n- 08:30 Consumer prices, expected to cool a little\n\nThe 08:30 print lands on the buy you have held since yesterday evening, which is the collision your R-19 names.\n\nOne thing to notice: silver has fallen hard since yesterday morning, and gold did not.",
-    "must": [
-      "R-19"
-    ],
-    "judge": [
-      "The briefing still says the 08:30 release lands on the position he has held since yesterday evening and names R-19 as the rule it meets",
-      "It says nothing about what to do with the stop or the target, nor what R-19 would have done to them: the collision and the rule are the whole of it, since he holds the position",
-      "The 08:30 release is still named on the calendar list"
-    ]
   }
 ]
