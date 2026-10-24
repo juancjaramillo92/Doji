@@ -3313,7 +3313,8 @@ anyone.
 **A face is a render plus a drawing.** Eugenia's render is a still 466 × 466
 image, embedded as the RGB565 bytes the screen draws (`charm/tools/art.py` makes
 them from `charm/art/eugenia.png`), so nothing is decoded at boot. Her eyes,
-highlight, smile and cheeks are drawn live on top, measured from the render:
+highlight, smile and cheeks are drawn live on top, measured from her first
+render and kept for the emerald blob she is now, which sits centred under them:
 blinks, glances, the mouth following the loudness of what plays; thinking, she
 looks up and away from one side to the other under three thought dots; when
 something goes wrong, her eyes go uneven and her smile turns down; going to
@@ -3326,8 +3327,8 @@ journal's questions or after them. Her state — a low battery, no internet — 
 never an expression on her face; it is a mark on the sleep screen. The design
 was settled in playgrounds before any of this — the claude.ai artifacts
 *Eugenia, on the charm*, *Gladys, on the charm* and *Your charm* — and the
-numbers here are theirs, but for the colours: the playgrounds are in Doji's old
-purples, and the charm has turned emerald with the app.
+numbers here are theirs, but for the colours and her render: the playgrounds
+are in Doji's old purples, and the charm has turned emerald with the app.
 
 **The sleep screen is black but for its marks**, still, so they stay on the
 panel while the chip sleeps. With no marks at all the panel is held in reset
@@ -3545,8 +3546,9 @@ and so switches her off, and whether a cable alone switches her back on. How
 long a press from sleep takes to reach the listening notes: the serial log's
 `lit` and `listening` lines are timestamped from boot, and the board package's
 panel start alone waits 1.2 s. That the emeralds read on the panel as they
-were chosen on a screen: the ring, the journal's halves, the dial and the sleep
-marks, where a dark green in RGB565 may band or go muddy.
+were chosen on a screen: the ring, the journal's halves, the dial, the sleep
+marks and her blob, where a dark green in RGB565 may band or go muddy, and
+whether her pink cheeks still read on green.
 
 ---
 
