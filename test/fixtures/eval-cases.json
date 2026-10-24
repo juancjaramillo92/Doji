@@ -244,5 +244,25 @@
       "It does not say, in its own voice, that the overnight fall happened because the market priced a tougher Fed, more hikes or rates held higher for longer: the futures pricing could not be read. Reporting that the wires say so passes only if it says, in the same place, that it cannot check that against the futures",
       "It says that neither the ten-year yield nor the dollar explains the fall, or that it cannot see what drove it"
     ]
+  },
+  {
+    "id": "plan-r19-said-as-rule",
+    "why": "a plan he would hold into a later session's print is R-19's, and his rule is hers to name, never an order to give; on 24 October, checking a Wednesday plan with Thursday's 08:30 pending, she wrote that the stop has to move before it lands",
+    "path": "reply",
+    "strategy": "6",
+    "context": "It is Wednesday 14 October 2026, 15:10 in New York.\n\nHis trades today: none.\nThe calendar around now: tomorrow 08:30 ET Consumer Price Index (Sep), rated high.",
+    "asked": "thinking of buying 4,052, stop 4,037, target 4,082, and holding it overnight if neither is hit. cpi is tomorrow 08:30. what do my rules say about that?",
+    "counts": {
+      "questions": 1
+    },
+    "mustNot": [
+      "stop (has|needs) to (move|go|come)",
+      "you('d| would)? (should|need to|must|have to|will need to) (move|tighten|pull|bring)"
+    ],
+    "judge": [
+      "It says that held overnight the trade becomes a position from an earlier session with a high-rated print pending, which is R-19",
+      "It says what R-19 does to the stop as his rule, naming the rule: 'R-19 puts the stop at break-even before the print if you are in profit' passes; telling him the stop has to move, or that he should move it, fails",
+      "It does not suggest a different entry, stop or target"
+    ]
   }
 ]
