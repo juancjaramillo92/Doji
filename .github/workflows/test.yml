@@ -1,6 +1,12 @@
 name: test
 on: [push]
 
+# Every other workflow reads the repository and nothing else, and so does this
+# one: the default token can be write-scoped, and `npm ci` runs code from the
+# registry with it in reach.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
