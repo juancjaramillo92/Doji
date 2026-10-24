@@ -1078,6 +1078,37 @@ in the eight runs before the sentence, and a plant caught that rarely would
 stop most runs; `agree.test.mjs` holds the sentence.
 **Revisit if:** she is seen moving a step again.
 
+### R-113 — the eval's judge on Sonnet
+**Deferred, for him to decide.** The judge is half the eval's calls, on Opus at
+medium effort, and Sonnet would cost about half as much. But the judge is what
+the verdicts are, so a cheaper one changes what a green run means, and nothing
+measures how often the two would disagree on these criteria.
+**Revisit if:** the eval's cost matters more than its strictness, and then
+only after both judges have graded the same answers and been compared.
+
+### R-114 — the database suite only on a push that touches SQL
+**Why refused:** it would save a billed minute on most pushes, but the suite
+reads more than the SQL: the README's restore block and `test.yml`'s
+`PGCLUSTER`. A path filter has to name the README, which most commits change,
+so the saving shrinks, and any input left off the list is a check skipped with
+a green tick.
+**Revisit if:** the Actions minutes run out with the cheaper moves made.
+
+### R-115 — caching the charm's build between runs
+**Deferred.** ccache and the component downloads could cut the 6.5-minute
+build to a fraction. But the workflow's claim is that the pinned image builds
+the firmware from the commit alone, and the lock check reads what was resolved;
+a cache is state between builds no commit names.
+**Revisit if:** the charm builds are what keeps the minutes over the plan.
+
+### R-116 — asking the eval's cases in parallel
+**Deferred.** A full run spends about ten minutes of Actions time waiting on the
+model one case at a time. Asked together, 26 Opus calls invite rate-limit
+refusals that fail the run after its money is spent, and none would read a
+cache the first had not written yet.
+**Revisit if:** the API's limits on his key are known, and then in small
+batches after one case has warmed the cache.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED
