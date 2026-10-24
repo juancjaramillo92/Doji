@@ -1,7 +1,7 @@
 # Whether Eugenia still obeys her prompts, run by hand from the Actions tab:
 # scripts/eval.mjs with --plant first, so a green run means the eval could
-# have failed. It spends money on the Anthropic key — about fifty model calls
-# — which is why nothing schedules it. The verdicts and the cost are in the
+# have failed. It spends money on the Anthropic key — about ninety model calls
+# and five dollars for the full run — which is why nothing schedules it. The verdicts and the cost are in the
 # run's log; a failed case fails the run. A case id asks that one case alone,
 # for cents: without the plants, a recheck after a fix; with them, the plants
 # that break it first, the check a change to that one rule is owed.
