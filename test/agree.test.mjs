@@ -6497,7 +6497,7 @@ test('her bias is weighed rather than failed on disagreement, for her call and h
 });
 
 /* A CAUSE WITH ITS EVIDENCE MISSING IS A GUESS. On 22 October, with the odds
-   unread and the ten-year and the dollar both easing, the briefing put an 1
+   unread and the ten-year and the dollar both easing, the briefing put an $81
    fall down to fear of what the Fed would do next. */
 test('a move rates and the dollar do not explain is never put on an unread Fed', () => {
   const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
