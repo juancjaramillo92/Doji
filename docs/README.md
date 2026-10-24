@@ -1827,8 +1827,8 @@ Consumer prices, expected to cool a little; lands on your buy from yesterday
 evening, R-19*): with no place in the briefing's shape, the writer never named
 it and the critic cut it off the line (issue #270). `SYSTEM` and `CRITIC` say it
 alike, and `agree.test.mjs` holds the pair. `MECHANISM`, where the ban on
-anything about his trade lives, says the same, since in run 53 the ban cut the
-collision anyway.
+anything about his trade lives, says the same, since read whole the ban would
+forbid naming the collision at all.
 
 **It cannot make things worse, and that is enforced.** A revision that comes back
 empty, apologetic or past `keepDraft`'s bound is a critic that failed, and the
@@ -3251,18 +3251,17 @@ interior for Break & Retest, R-06's outer extreme for Support & Resistance), the
 confirmation rather than the touch (R-07), the ratio — reading §4 and §6 first
 so she holds you to what you wrote, and naming any step she cannot see in its
 place, never moved to the end. **Then she says whether she would take it**, as
-hers, and you decide. Her one question
-is your own probe for the touch, asked before the fact: what you will wait for
-at the level before you click. **The levels stay yours**: she never suggests a
-different entry, stop or target and never turns "the ratio is 1:1.1" into the
-target that would fix it; `TRIM` removes a level she offers in place of yours.
-**A release you would carry into a later session is R-19's, said as your rule**:
-"R-19 puts the stop at break-even before the print if you are in profit, and
-tightens it if you are losing", never "the stop has to move" or "you tighten
-it", which about a trade you are weighing are orders; on 24 October, checking a
-Wednesday plan with Thursday's 08:30 pending, she said the second. Her own
-trades are calls she files, never edits of yours. A test holds the two halves to
-the kinds of rule §7 says they are.
+hers, and you decide. Her one question is your own probe for the touch, asked
+before the fact: what you will wait for at the level before you click. **The
+levels stay yours**: she never suggests a different entry, stop or target and
+never turns "the ratio is 1:1.1" into the target that would fix it; `TRIM`
+removes a level she offers in place of yours. **A release you would carry into a
+later session is R-19's, said as your rule**: "R-19 puts the stop at break-even
+before the print if you are in profit, and tightens it if you are losing", never
+"the stop has to move" or "you tighten it", which about a trade you are weighing
+are orders; on 24 October, checking a Wednesday plan with Thursday's 08:30
+pending, she said the second. Her own trades are calls she files, never edits of
+yours. A test holds the two halves to the kinds of rule §7 says they are.
 
 **She judges trades — the decision, never the result** — against your rules and the
 plan you entered with. A loss inside your rules was a good trade; a win that broke

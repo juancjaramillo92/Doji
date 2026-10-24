@@ -6457,13 +6457,6 @@ test('the writing rules are stated once and read by all three', () => {
   }
 });
 
-/* THE QUOTA'S SCHEDULE IS THE CRON'S. readsDue reads on the hour's last pass
-   and looks one step ahead for a briefing, so it holds the calendar job's
-   minutes as a copy: moved in schema.sql alone, the market would be read on no
-   pass, or on two an hour, and the briefing would go without the odds. */
-/* HIS RULE, NOT HER ORDER. A plan he would hold into a later session's print is
-   R-19's, and on 24 October she said what it does as "the stop has to move",
-   an instruction about a trade he was weighing. Issue #269. */
 /* HIS FOUR STEPS IN HIS ORDER. In run 53 she could not see the 1H, took the
    level, the candle and the ratio, and judged the bias last. A step she cannot
    see is said where it falls. */
@@ -6473,12 +6466,19 @@ test('a step she cannot see is said in its place, so his sequence keeps its orde
     'a step she cannot see can be moved to the end of his sequence');
 });
 
+/* HIS RULE, NOT HER ORDER. A plan he would hold into a later session's print is
+   R-19's, and on 24 October she said what it does as "the stop has to move",
+   an instruction about a trade he was weighing. Issue #269. */
 test('a plan held into a later session says R-19 as his rule, never as an order', () => {
   const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
   assert.match(system, /One that lands in a later session, were he to hold it, is R-19's, and what it does to the stop is his rule, said as his: "R-19 puts the stop at break-even before the print if you are in profit, and tightens it if you are losing", never "the stop has to move" or "you tighten it"\./,
     'a plan carried into a later session\'s print is left without R-19 said as his rule');
 });
 
+/* THE QUOTA'S SCHEDULE IS THE CRON'S. readsDue reads on the hour's last pass
+   and looks one step ahead for a briefing, so it holds the calendar job's
+   minutes as a copy: moved in schema.sql alone, the market would be read on no
+   pass, or on two an hour, and the briefing would go without the odds. */
 test('readsDue reads on the calendar job\'s last pass of each hour, as its cron fires', () => {
   const minutes = SCHEMA_SQL.match(/'doji-eugenia-calendar',\s*'([\d,]+) \* \* \* \*'/)[1].split(',').map(Number);
   const last = Math.max(...minutes);
@@ -6525,7 +6525,7 @@ test('a print beside a position he opened knowingly is his, in the writer and in
     'the writer has nowhere to name R-19\'s collision, so she never does');
   assert.match(flat('CRITIC'), /it stays on that release's line of the calendar, said with the rule: the one thing a calendar line carries beside the release\./,
     'the critic cuts R-19\'s collision off the calendar line as more than the release');
-  // The ban on anything about his trade lives in MECHANISM, and in run 53 it cut the collision anyway.
+  // The ban on anything about his trade lives in MECHANISM, and read whole it would forbid naming the collision.
   assert.match(EUGENIA_PROMPT.match(/export const MECHANISM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' '), /anything about his trade\. His own rule landing on it is not a view: R-19's collision, a print rated high landing on a position from an earlier session, stays, said with the rule\./,
     'the ban on anything about his trade cuts R-19\'s collision, which the critic is told to keep');
 });

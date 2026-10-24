@@ -1046,18 +1046,19 @@ simpler briefing he asked for the same week.
 **Revisit if:** he asks for a release by name on its day.
 
 ### R-110 — a planted defect for the critic's R-20 paragraph
-**Refused: no case can see it go.** The plant that removed the paragraph was
-caught 3 of 3 in runs 31, 32 and 37, then 2, 1, 2, 1 and 0 of 3 in runs 39 to
-51. Its R-20 half is done anyway: `MECHANISM`'s ban on anything about his
-trade cuts a print tied to a position he opened this session with or without
-it, so `critic-print-beside-his-position` stays a case. Its R-19 half is a coin
-the critic tosses: a collision stated and cited, as `SYSTEM` says it, came
-through 3 of 3 with the paragraph and `MECHANISM`'s R-19 sentence gone in run
-57, and was cut with both there in run 58. A case that fails at random fails
-one full run in two, so it is out, and the defect is issue #270. `MECHANISM`'s
-sentence stays because without it the ban, read whole, contradicts `SYSTEM`'s
-permission to name the collision: a reason by reading, not by the eval.
-**Revisit if:** #270 gives the collision a place the critic keeps.
+**Refused for its R-20 half; its R-19 half has one since #270.** The plant that
+removed the paragraph was caught 3 of 3 in runs 31, 32 and 37, then 2, 1, 2, 1
+and 0 of 3 in runs 39 to 51. The R-20 half is done anyway: `MECHANISM`'s ban
+on anything about his trade cuts a print tied to a position he opened this
+session with or without it, so `critic-print-beside-his-position` stays a case
+with no plant. The R-19 half was a coin the critic tossed while the collision
+stood alone between the calendar list and the thing to notice, kept with its
+rules gone in run 57 and cut with them in run 58. Given that release's own
+calendar line, the critic cut it 3 of 3 before `CRITIC` said it stays there,
+and the plant that takes the sentence out is caught 3 of 3: issue #270.
+`MECHANISM`'s R-19 sentence stays for a reason by reading, not by the eval:
+read whole, the ban would forbid naming the collision at all.
+**Revisit if:** the critic is seen keeping an R-20 tie.
 
 ### R-111 — the eval showing her her own tools, uncallable
 **Why refused:** tried in run 43. Offered each call site's tools with
