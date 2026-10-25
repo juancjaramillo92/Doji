@@ -152,7 +152,6 @@ static void follow(void *arg) {
 }
 
 void motion_follow(void) {
-    if (following) return;
     start_reading();
     following = true;
     xTaskCreate(follow, "follow", 3072, NULL, 2, NULL);

@@ -16,8 +16,9 @@ From art/eugenia.png, 466 x 466, her glass on black:
                          quarter pixel GLASS_PHASES gives, so one gliding
                          slowly never steps
   main/art.c             that patch, the point she squashes about, each
-                         render's squash, her outline at rest row by row, and
-                         the bubbles' radii and sprite sides
+                         render's squash and the stretch it draws her at, her
+                         outline at rest row by row, and the bubbles' radii
+                         and sprite sides
 
 GLASS_FRAMES, GLASS_SIZES and GLASS_PHASES are read out of main/glass.h, so
 the renders and the firmware cannot disagree on how many there are.
@@ -70,6 +71,9 @@ left, right = min(outline[y][0] for y in rows), max(outline[y][1] for y in rows)
 top, bottom = rows[0], rows[-1]
 anchor = ((left + right) / 2, bottom)
 
+# A render's stretch across and down: wider and shorter as it squashes, by one
+# over the other, so she keeps her volume. Written into art.c beside the
+# renders, so her face is placed on each by the stretch it was drawn at.
 def scale(s):
     return 1 + s, 1 / (1 + s)
 
@@ -83,21 +87,17 @@ x0, y0 = max(0, math.floor(min(xs)) - 1), max(0, math.floor(min(ys)) - 1)
 x1, y1 = min(SIZE, math.ceil(max(xs)) + 1), min(SIZE, math.ceil(max(ys)) + 1)
 w, h = x1 - x0, y1 - y0
 
-def rgb565(image):
-    px, out = image.tobytes(), bytearray()
-    for i in range(0, len(px), 3):
-        r, g, b = px[i], px[i + 1], px[i + 2]
-        out += (((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)).to_bytes(2, "little")
-    return out
-
 body = bytearray()
 for s in SQUASH:
     sx, sy = scale(s)
     # Each pixel of the patch, back to where it came from in the render; at
     # rest, the render itself.
     coeffs = (1 / sx, 0, anchor[0] + (x0 - anchor[0]) / sx, 0, 1 / sy, anchor[1] + (y0 - anchor[1]) / sy)
-    body += rgb565(im.crop((x0, y0, x1, y1)) if s == 0 else
-                   im.transform((w, h), Image.AFFINE, coeffs, Image.BICUBIC, fillcolor=(0, 0, 0)))
+    px = (im.crop((x0, y0, x1, y1)) if s == 0 else
+          im.transform((w, h), Image.AFFINE, coeffs, Image.BICUBIC, fillcolor=(0, 0, 0))).tobytes()
+    for i in range(0, len(px), 3):
+        r, g, b = px[i], px[i + 1], px[i + 2]
+        body += (((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)).to_bytes(2, "little")
 (ART / "body.rgb565").write_bytes(bytes(body))
 
 # The light inside her: her glass drawn in from its edge and softened, falling
@@ -108,48 +108,43 @@ inner = ImageChops.multiply(inner.point(lambda v: round(255 * (v / peak) ** 2)),
 (ART / "glow.a8").write_bytes(inner.crop((x0, y0, x1, y1)).tobytes())
 
 # A bubble: a faint body, a lighter rim and a highlight up and to the left,
-# drawn eight times over each pixel and averaged.
+# sampled 8 x 8 times a pixel and averaged, its middle moved by each quarter
+# pixel. LVGL takes ARGB8888 as blue, green, red, alpha.
 RIM, BODY, SHINE = (0xcf, 0xee, 0xe0), (0xa8, 0xe6, 0xc8), (0xff, 0xff, 0xff)
 SIDES = [2 * math.ceil(r) + 4 for r in RADII]
 
-def bubble(r, side, fx, fy):
-    out = bytearray()
-    cx, cy = side / 2 + fx, side / 2 + fy
-    for py in range(side):
-        for px in range(side):
-            a = [0.0, 0.0, 0.0, 0.0]
-            for sy in range(8):
-                for sx in range(8):
-                    x, y = px + (sx + 0.5) / 8 - cx, py + (sy + 0.5) / 8 - cy
-                    d = math.hypot(x, y)
-                    hx, hy = x + 0.35 * r, y + 0.35 * r
-                    if math.hypot(hx, hy) <= 0.3 * r + 0.5:
-                        c, alpha = SHINE, 0.9
-                    elif r - 1.2 <= d <= r:
-                        c, alpha = RIM, 0.85
-                    elif d < r:
-                        c, alpha = BODY, 0.2
-                    else:
-                        continue
-                    for i in range(3):
-                        a[i] += c[i] * alpha
-                    a[3] += alpha
-            if a[3]:
-                b, g, rr = (round(a[i] / a[3]) for i in (2, 1, 0))
-                out += bytes((b, g, rr, round(255 * a[3] / 64)))
-            else:
-                out += bytes(4)
-    return out
-
 bubbles = bytearray()
 for r, side in zip(RADII, SIDES):
-    for py in range(PHASES):
-        for px in range(PHASES):
-            bubbles += bubble(r, side, px / PHASES, py / PHASES)
+    for fy in range(PHASES):
+        for fx in range(PHASES):
+            cx, cy = side / 2 + fx / PHASES, side / 2 + fy / PHASES
+            for py in range(side):
+                for px in range(side):
+                    a = [0.0, 0.0, 0.0, 0.0]
+                    for sy in range(8):
+                        for sx in range(8):
+                            x, y = px + (sx + 0.5) / 8 - cx, py + (sy + 0.5) / 8 - cy
+                            d = math.hypot(x, y)
+                            if math.hypot(x + 0.35 * r, y + 0.35 * r) <= 0.3 * r + 0.5:
+                                c, alpha = SHINE, 0.9
+                            elif r - 1.2 <= d <= r:
+                                c, alpha = RIM, 0.85
+                            elif d < r:
+                                c, alpha = BODY, 0.2
+                            else:
+                                continue
+                            for i in range(3):
+                                a[i] += c[i] * alpha
+                            a[3] += alpha
+                    bubbles += bytes((*(round(a[i] / a[3]) for i in (2, 1, 0)), round(255 * a[3] / 64))) if a[3] else bytes(4)
 (ART / "bubbles.argb8888").write_bytes(bytes(bubbles))
 
 def floats(values):
     return ", ".join(f"{v:.6f}f" for v in values)
+
+# In full: nine digits are every bit of a float.
+def exact(*values):
+    return ", ".join(f"{v:#.9g}f" for v in values)
 
 rows_c = ",\n".join("    " + ", ".join(f"{{ {l}, {r} }}" for l, r in outline[y:y + 8]) for y in range(0, SIZE, 8))
 (MAIN / "art.c").write_text(f"""/* Made by charm/tools/art.py from art/eugenia.png, with the renders it
@@ -159,6 +154,7 @@ rows_c = ",\n".join("    " + ", ".join(f"{{ {l}, {r} }}" for l, r in outline[y:y
 const int16_t GLASS_CROP[4] = {{ {x0}, {y0}, {w}, {h} }};
 const float GLASS_ANCHOR[2] = {{ {floats(anchor)} }};
 const float GLASS_SQUASH[GLASS_FRAMES] = {{ {floats(SQUASH)} }};
+const float GLASS_SCALE[GLASS_FRAMES][2] = {{ {", ".join(f"{{ {exact(*scale(s))} }}" for s in SQUASH)} }};
 const float GLASS_RADIUS[GLASS_SIZES] = {{ {floats(RADII)} }};
 const uint8_t GLASS_SIDE[GLASS_SIZES] = {{ {", ".join(map(str, SIDES))} }};
 const int16_t GLASS_OUTLINE[466][2] = {{
