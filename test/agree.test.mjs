@@ -525,6 +525,30 @@ test('the charm and its setup page draw in the app\'s own colours', () => {
   }
 });
 
+/* The setup page draws some of the charm's own colours too, and is served as
+   written, so it holds copies: each named in palette.h beside the page's name
+   for it, and the page's --sheen begun with DEEP and ACCENT. The firmware
+   draws each by its name, never as a literal a pass could miss. */
+test('the setup page draws the charm\'s own colours as palette.h has them', () => {
+  const palette = source('charm/main/palette.h');
+  const root = source('charm/main/setup.html').match(/:root \{([^}]+)\}/)?.[1];
+  assert.ok(root, 'setup.html no longer declares its colours in :root');
+  const page = new Map([...root.matchAll(/(--[\w-]+):\s*(#[0-9a-f]{6})\b/gi)].map(([, name, value]) => [name, value.toLowerCase()]));
+  const named = [...palette.matchAll(/^#define (\w+)\s+0x([0-9a-f]{6})\s+\/\/ the page's (--[\w-]+)\b/gim)];
+  assert.ok(named.length >= 2, `palette.h names only ${named.length} of the page's colours — the reader has gone blind`);
+  for (const [, name, hex, token] of named) {
+    assert.equal(page.get(token), `#${hex.toLowerCase()}`, `palette.h's ${name} is not the setup page's ${token}`);
+  }
+  const hex = (name) => `#${palette.match(new RegExp(`^#define ${name}\\s+0x([0-9a-f]{6})`, 'mi'))?.[1].toLowerCase()}`;
+  const sheen = root.match(/--sheen: linear-gradient\(\d+deg, (#[0-9a-f]{6}), (#[0-9a-f]{6})/i);
+  assert.ok(sheen, 'setup.html no longer draws --sheen as this test reads it');
+  assert.deepEqual(sheen.slice(1).map(c => c.toLowerCase()), [hex('DEEP'), hex('ACCENT')],
+    'the setup page\'s --sheen no longer begins with palette.h\'s DEEP and ACCENT');
+  const literals = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n').filter(f => f.endsWith('.c'))
+    .flatMap(f => named.filter(([, , h]) => new RegExp(`0x${h}\\b`, 'i').test(source(f))).map(([, name]) => `${f}: ${name}`));
+  assert.deepEqual(literals, [], 'the firmware draws one of the page\'s colours as a literal, where a change to palette.h misses it');
+});
+
 /* A meta tag and a data URI cannot read a custom property, so the browser's
    chrome and the favicon carry copies of the page's ground and its accent. */
 test('the theme colour and the favicon are the page\'s own tokens', () => {

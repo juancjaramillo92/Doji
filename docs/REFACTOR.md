@@ -413,9 +413,8 @@ two leaves the rest literal in the same space and makes no decision movable.
 
 ### R-41 — the charm's single-use colours into `palette.h`
 **Why refused:** `palette.h` holds a colour the app or a second file shares.
-The render's ink, highlight and mouth in `face.c`, the journal's resting
-halves and the setup screen's cross are each drawn by one function, beside
-which they are read — the reason §3 gives for leaving each CSS rule beside its
+The render's ink, highlight and mouth in `face.c` and the journal's resting
+halves are each drawn by one function, beside which they are read — the reason §3 gives for leaving each CSS rule beside its
 component.
 **Revisit if:** a second file draws one of them.
 
@@ -1116,15 +1115,6 @@ custom property each user sets is an indirection for four lines, and the two
 are separate decisions: working is not waiting on him, which is why they once
 shared a colour and no longer do.
 **Revisit if:** a third pulse arrives.
-
-### R-118 — holding the charm's own colours where a second file shares them
-**Deferred.** `GLOW` in `palette.h` is `--glow` in `setup.html`, the cross in
-`setup.c` is the page's `--bad`, and the page's `--sheen` is drawn from `DEEP`
-and `ACCENT`. Only the copies of the app's tokens are read by `agree.test.mjs`,
-through the token named beside each; these pairs name nothing, so the emerald
-pass had to move each by hand. R-41's revisit condition, read at its letter,
-is met for the cross.
-**Revisit if:** one of the pairs drifts, or the charm's palette changes again.
 
 ### R-119 — a crossfade between renders, for a breath with no steps at all
 **Why refused:** blending the next render over the last by how far the breath
