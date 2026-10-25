@@ -7,7 +7,7 @@
    draws what it says.
 
    The body is a set of renders along one axis, from stretched to squashed
-   (charm/tools/art.py, which reads the three numbers below): a breath walks
+   (charm/tools/art.py, which reads the first three numbers below): a breath walks
    gently up and down it, a wobble bounces along it and settles, so one set
    of renders is both. A render is drawn as it is, never transformed, and the
    face rides it through glass_place. The bubbles live in the body at rest,
@@ -19,13 +19,16 @@
 
 /* Measured off the render and made with the art, by charm/tools/art.py, in
    art.c: the patch every render is cut to (x, y, width, height), the point
-   the body squashes about, each render's squash, her outline at rest — each
+   the body squashes about, each render's squash and its stretch across and
+   down — wider and shorter as it squashes, by one over the other, so she
+   keeps her volume — her outline at rest — each
    row of the screen, the first and last column of her glass, {0, -1} where
    she does not reach — and the bubbles' radii and the side of their
    sprites. */
 extern const int16_t GLASS_CROP[4];
 extern const float GLASS_ANCHOR[2];
 extern const float GLASS_SQUASH[GLASS_FRAMES];
+extern const float GLASS_SCALE[GLASS_FRAMES][2];
 extern const int16_t GLASS_OUTLINE[466][2];
 extern const float GLASS_RADIUS[GLASS_SIZES];
 extern const uint8_t GLASS_SIDE[GLASS_SIZES];
@@ -70,13 +73,9 @@ void glass_step(glass_t *g, const glass_mood_t *m, float dt);
 // The render nearest the squash showing.
 int glass_frame(const glass_t *g);
 
-/* A render's stretch across and down: wider and shorter as it squashes, by
-   one over the other, so she keeps her volume. */
-void glass_scale(int frame, float scale[2]);
-
 // A point of the body at rest, where a render shows it.
 void glass_place(int frame, float x, float y, float at[2]);
 
 /* The chord of her through (x, y) along (dx, dy), `margin` inside her edge:
-   its two ends, or false when (x, y) is not inside. The sheen's streak. */
+   its two ends, or false when (x, y) is not inside. The glint's streak. */
 bool glass_chord(float x, float y, float dx, float dy, float margin, float ends[4]);

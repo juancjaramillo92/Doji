@@ -139,7 +139,7 @@ static void build_screen(void) {
     static const lv_point_precise_t ticked[] = { { 203, 237 }, { 223, 257 }, { 263, 209 } };
     static const lv_point_precise_t crossed[] = { { 209, 209 }, { 257, 257 }, { 233, 233 }, { 257, 209 }, { 209, 257 } };
     screens[SHOW_TICK] = mark(ticked, 3, GLOW);
-    screens[SHOW_CROSS] = mark(crossed, 5, 0xf4a38f);
+    screens[SHOW_CROSS] = mark(crossed, 5, CORAL);
     bsp_display_unlock();
 }
 

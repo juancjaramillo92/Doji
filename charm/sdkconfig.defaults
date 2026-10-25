@@ -1,6 +1,8 @@
 # From Waveshare's own LVGL example for this board, less its demos.
 # Flash is stated as 16 MB, the size the plain 1.75 documents; the example says
 # 32 MB for the C. The first serial log prints what the chip actually has.
+# QIO, though the build's flash arguments say dio: ESP-IDF writes dio into the
+# image header and its bootloader switches the flash to quad itself.
 CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 CONFIG_PARTITION_TABLE_CUSTOM=y

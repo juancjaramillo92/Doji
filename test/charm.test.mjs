@@ -312,8 +312,8 @@ const insideHer = (x, y, r) => {
 };
 
 /* A run of her glass, a step a line: the render showing, and each bubble. */
-function glass({ seed = 7, steps = 900, up = [0, -0.9], rise = 26, every = 1.6, most = 6, stir = 0, depth = 0,
-                 period = 4.2, at = -1, poke = 0, after = depth } = {}) {
+function glass({ seed = 7, steps = 900, up = [0, -0.9], rise = 9, every = 2.5, most = 6, stir = 0, depth = 0,
+                 period = 5, at = -1, poke = 0, after = depth } = {}) {
   return charm([`glass ${seed} ${steps} ${up.join(' ')} ${rise} ${every} ${most} ${stir} ${depth} ${period} ${at} ${poke} ${after}`])
     .map(line => {
       const n = line.split(' ').map(Number);
@@ -378,7 +378,7 @@ test('her renders are the ones art.c describes, and her outline is the one they 
 test('a bubble is only ever drawn inside her glass', () => {
   let seen = 0;
   for (const mood of [{}, { up: [0.85, 0] }, { up: [-0.7, 0.2] }, { up: [0, 0.9] }, { stir: 1, most: 8 },
-                      { rise: 48, every: 0.35, most: 12 }, { up: [0, 0] }]) {
+                      { rise: 16, every: 0.7, most: 12 }, { up: [0, 0] }]) {
     for (const [step, { bubbles }] of glass({ ...mood, steps: 600 }).entries()) {
       for (const b of bubbles) {
         if (b.shown <= 0) continue;
@@ -402,20 +402,40 @@ test('her bubbles rise the way up is, come and go, and never more than her mood 
     }
     return d;
   };
-  const upright = glass(), right = glass({ up: [0.85, 0] }), down = glass({ up: [0, 0.9] });
+  const upright = glass({ steps: 2700 }), right = glass({ up: [0.85, 0] }), down = glass({ up: [0, 0.9] });
   const [ux, uy] = drift(upright), [rx, ry] = drift(right), [, dy] = drift(down);
   assert.ok(uy < -5 * Math.abs(ux), `held upright they drift (${ux}, ${uy}), not up`);
   assert.ok(rx > 5 * Math.abs(ry), `on her side they drift (${rx}, ${ry}), not toward her new top`);
   assert.ok(dy > 0, 'upside down they still rise toward the screen\'s top');
   const most = Math.max(...upright.map(s => s.bubbles.length));
   assert.equal(most, 6, `at most ${most} bubbles at once, where her mood asks six`);
-  // They pop as they reach her top, so new ones keep coming: over thirty
+  // They pop as they reach her top, so new ones keep coming: over ninety
   // seconds, far more starts than there is room for at once.
   let starts = 0;
   for (let s = 1; s < upright.length; s++) {
     starts += upright[s].bubbles.filter(b => !upright[s - 1].bubbles.some(o => Math.hypot(o.x - b.x, o.y - b.y) < 3)).length;
   }
-  assert.ok(starts > 12, `only ${starts} bubbles started in thirty seconds — they are stuck, not rising and popping`);
+  assert.ok(starts > 12, `only ${starts} bubbles started in ninety seconds — they are stuck, not rising and popping`);
+});
+
+/* She is thick, so her bubbles drift: smoothness over speed. Idle, a bubble
+   moves under half a pixel a frame, where its quarter-pixel sprites keep it
+   gliding; in her quickest mood, thinking and shaken, still under one. */
+test('her bubbles drift, never dart: under a pixel a frame even thinking and shaken', () => {
+  const fastest = (run) => {
+    let most = 0;
+    for (let s = 1; s < run.length; s++) {
+      for (const b of run[s].bubbles) {
+        const was = run[s - 1].bubbles.map(o => Math.hypot(o.x - b.x, o.y - b.y)).sort((x, y) => x - y)[0];
+        if (was !== undefined && was < 3) most = Math.max(most, was);
+      }
+    }
+    return most;
+  };
+  const idle = fastest(glass({ steps: 1800, depth: 0.009 }));
+  const quickest = fastest(glass({ steps: 1800, up: [0, -1], rise: 16, every: 0.7, most: 12, stir: 1 }));
+  assert.ok(idle > 0.1 && idle < 0.5, `idle, her bubbles move ${idle.toFixed(2)} pixels a frame at the fastest`);
+  assert.ok(quickest < 1, `thinking and shaken, a bubble moves ${quickest.toFixed(2)} pixels a frame`);
 });
 
 /* A tap or a jolt wobbles her: squashed and stretched both, then still, at

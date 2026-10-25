@@ -2,16 +2,17 @@
 
 #include <math.h>
 
-/* How she moves, tuned by eye until the real board says otherwise. */
-#define BOUNCE_HZ 2.2f    // the wobble's own frequency
-#define DAMPING   0.18f   // of critical: a few bounces, then rest
+/* How she moves, tuned by eye until the real board says otherwise. She is
+   thick, so everything in her is slow and eased: smoothness over speed. */
+#define BOUNCE_HZ 1.4f    // the wobble's own frequency, a slow one
+#define DAMPING   0.35f   // of critical: one gooey rebound, then rest
 #define POKE      1.1f    // squash a second, from a full poke: enough, past the damping, to reach the furthest render
 #define DEEPEN    2.0f    // how fast a breath's depth eases toward the mood's, a second
-#define SWAY_PX   7.0f    // how fast a bubble sways, in pixels a second, still
-#define STIR_PX   40.0f   // and more when stirred
-#define FOLLOW    3.0f    // how fast a bubble's speed eases toward its rise, a second
-#define FADE_IN   3.0f    // shown a second, as it starts
-#define FADE_OUT  6.0f    // and as it pops
+#define SWAY_PX   3.0f    // how fast a bubble sways, in pixels a second, still
+#define STIR_PX   14.0f   // and more when stirred
+#define FOLLOW    1.2f    // how fast a bubble's speed eases toward its rise, a second: it drifts, never darts
+#define FADE_IN   1.0f    // shown a second, as it starts
+#define FADE_OUT  2.5f    // and as it melts into her surface
 #define TRIES     12      // places tried for a new bubble
 
 // Her middle at rest: a new bubble starts below it, as up has it.
@@ -36,6 +37,7 @@ static bool inside(float x, float y, float m) {
 }
 
 void glass_start(glass_t *g, uint32_t seed) {
+    // A xorshift seeded with zero stays zero.
     *g = (glass_t){ .seed = seed ? seed : 1, .next = 0.2f };
     float area = 0, sum[2] = { 0, 0 };
     for (int row = 0; row < 466; row++) {
@@ -50,7 +52,7 @@ void glass_start(glass_t *g, uint32_t seed) {
 }
 
 void glass_poke(glass_t *g, float strength) {
-    g->give += POKE * fminf(1, fmaxf(0, strength));
+    g->give += POKE * strength;
 }
 
 // A new bubble, the biggest least often, somewhere in her lower half.
@@ -81,10 +83,11 @@ void glass_step(glass_t *g, const glass_mood_t *m, float dt) {
     float breath = -g->deep * (0.5f - 0.5f * cosf(2 * (float)M_PI * g->breath));
     g->shape = fminf(GLASS_SQUASH[GLASS_FRAMES - 1], fmaxf(GLASS_SQUASH[0], g->wobble + breath));
 
-    // Up, as a direction; held flat it is the screen's own.
-    float len = hypotf(m->up[0], m->up[1]), u[2] = { 0, -1 };
-    if (len > 0.15f) { u[0] = m->up[0] / len; u[1] = m->up[1] / len; }
-    float upright = fminf(1, len), across[2] = { -u[1], u[0] };
+    // Up, as a direction, and how upright she is held; held flat, up is the
+    // screen's own.
+    float upright = hypotf(m->up[0], m->up[1]), u[2] = { 0, -1 };
+    if (upright > 0.15f) { u[0] = m->up[0] / upright; u[1] = m->up[1] / upright; }
+    float across[2] = { -u[1], u[0] };
 
     int live = 0;
     for (int i = 0; i < GLASS_BUBBLES; i++) live += g->bubbles[i].state != GLASS_NONE;
@@ -104,12 +107,12 @@ void glass_step(glass_t *g, const glass_mood_t *m, float dt) {
         if (b->state != GLASS_RISING) continue;
         b->shown = fminf(1, b->shown + FADE_IN * dt);
         // Rising the way up is, bigger ones faster, swaying across it.
-        b->sway += dt * (1.6f + 8 * m->stir);
+        b->sway += dt * (0.9f + 2.5f * m->stir);
         float rise = m->rise * (0.25f + 0.75f * upright) * (0.75f + 0.25f * b->size);
         float side = cosf(b->sway) * (SWAY_PX + STIR_PX * m->stir);
         b->vx += (u[0] * rise + across[0] * side - b->vx) * k;
         b->vy += (u[1] * rise + across[1] * side - b->vy) * k;
-        // At her edge it keeps rising if it can, and pops where it cannot.
+        // At her edge it keeps rising if it can, and melts away where it cannot.
         float r = GLASS_RADIUS[b->size], dx = b->vx * dt, dy = b->vy * dt, along = dx * u[0] + dy * u[1];
         if (inside(b->x + dx, b->y + dy, r)) {
             b->x += dx;
@@ -131,16 +134,9 @@ int glass_frame(const glass_t *g) {
     return best;
 }
 
-void glass_scale(int frame, float scale[2]) {
-    scale[0] = 1 + GLASS_SQUASH[frame];
-    scale[1] = 1 / scale[0];
-}
-
 void glass_place(int frame, float x, float y, float at[2]) {
-    float s[2];
-    glass_scale(frame, s);
-    at[0] = GLASS_ANCHOR[0] + (x - GLASS_ANCHOR[0]) * s[0];
-    at[1] = GLASS_ANCHOR[1] + (y - GLASS_ANCHOR[1]) * s[1];
+    at[0] = GLASS_ANCHOR[0] + (x - GLASS_ANCHOR[0]) * GLASS_SCALE[frame][0];
+    at[1] = GLASS_ANCHOR[1] + (y - GLASS_ANCHOR[1]) * GLASS_SCALE[frame][1];
 }
 
 bool glass_chord(float x, float y, float dx, float dy, float margin, float ends[4]) {

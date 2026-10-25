@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 840 tests, eight suites
+npm test      # 842 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -501,9 +501,9 @@ What a change most often breaks:
   commit — R-33 is the tick that looks foldable and is not.
 - **Her art is one run of `tools/art.py`, never an edit**: `art.c`, the
   renders, her light and the bubbles' sprites are made together, and
-  `charm.test.mjs` holds each to the others and to `glass.h`'s counts. What
-  her glass does follows her mood, never the market or his trades — an
-  animation is a signal too.
+  `charm.test.mjs` holds each to the others and to `glass.h`'s counts. How a
+  render stretches her is `art.py`'s alone, written into `art.c` as
+  `GLASS_SCALE`; the firmware never recomputes it.
 - **Only `RTC_DATA_ATTR` survives sleep**; every waking runs `app_main` again.
   State that must outlive a sleep is declared so, and nothing else is assumed
   to.

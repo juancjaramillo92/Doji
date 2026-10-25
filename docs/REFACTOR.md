@@ -413,9 +413,8 @@ two leaves the rest literal in the same space and makes no decision movable.
 
 ### R-41 — the charm's single-use colours into `palette.h`
 **Why refused:** `palette.h` holds a colour the app or a second file shares.
-The render's ink, highlight and mouth in `face.c`, the journal's resting
-halves and the setup screen's cross are each drawn by one function, beside
-which they are read — the reason §3 gives for leaving each CSS rule beside its
+The render's ink, highlight and mouth in `face.c` and the journal's resting
+halves are each drawn by one function, beside which they are read — the reason §3 gives for leaving each CSS rule beside its
 component.
 **Revisit if:** a second file draws one of them.
 
@@ -1117,14 +1116,52 @@ are separate decisions: working is not waiting on him, which is why they once
 shared a colour and no longer do.
 **Revisit if:** a third pulse arrives.
 
-### R-118 — holding the charm's own colours where a second file shares them
-**Deferred.** `GLOW` in `palette.h` is `--glow` in `setup.html`, the cross in
-`setup.c` is the page's `--bad`, and the page's `--sheen` is drawn from `DEEP`
-and `ACCENT`. Only the copies of the app's tokens are read by `agree.test.mjs`,
-through the token named beside each; these pairs name nothing, so the emerald
-pass had to move each by hand. R-41's revisit condition, read at its letter,
-is met for the cross.
-**Revisit if:** one of the pairs drifts, or the charm's palette changes again.
+### R-119 — a crossfade between renders, for a breath with no steps at all
+**Why refused:** blending the next render over the last by how far the breath
+has gone would move her edge continuously, but it redraws the whole of her
+glass every frame she breathes, two images blended where one is copied, and
+she breathes whenever she idles. The renders are spaced instead so a breath's
+step moves her top under a pixel, and `charm.test.mjs` holds that.
+**Revisit if:** the board shows a breath stepping.
+
+### R-120 — her body transformed live instead of thirteen renders
+**Why refused:** LVGL can scale an image as it draws, which would cost no
+flash, but a software transform of her 398 × 351 patch is a resample of every
+pixel every frame on this chip, against a copy for a render. The renders cost
+3.6 MB of a slot with 1.7 MB left over.
+**Revisit if:** the app outgrows its slot.
+
+### R-121 — the glint clipped by a mask of her
+**Why refused:** a streak drawn and clipped to her silhouette by LVGL's bitmap
+mask would run edge to edge, but the mask renders the streak into a layer of
+its own each frame. A chord walked inside her outline (`glass_chord`) is three
+anti-aliased lines, stopping short of her edge as a reflection on curved glass
+does.
+**Revisit if:** the glint reads as a scratch on the real panel.
+
+### R-122 — her light and the glint blended additively
+**Why refused:** additive blending is what light does, but LVGL's software
+renderer applies a blend mode to images and not to fills, so the glint's lines
+cannot take it, and her light, an alpha tinted as it draws, is a fill. Both are
+an ordinary blend of a light colour at low opacity.
+**Revisit if:** LVGL applies blend modes to fills.
+
+### R-123 — one reader of the motion sensor while she is awake
+**Deferred.** `motion_follow`'s task reads the sensor about twenty-five times a
+second for her face, and `motion_hold` still takes its own eight samples once a
+second for whether she is held; the two share the sensor through the I2C
+driver's lock. Having `motion_hold` judge the follow task's readings instead
+would be one reader, but its averaging is the reading `lift.c`'s thresholds were
+set by, so the merge is a behaviour change to tune on the board, not a tidy-up.
+**Revisit if:** the board shows the two readers interfering, or `lift.c`'s
+thresholds are tuned again.
+
+### R-124 — stepping her effects down when frames run slow
+**Deferred.** Her face could stop breathing or drop her light when a frame
+overruns its 33 ms, but that guards a symptom no one has seen. The serial log
+says how long frames take in each mood, and the board will say which, if any,
+is slow.
+**Revisit if:** the frame log shows a mood over its frame.
 
 ---
 
