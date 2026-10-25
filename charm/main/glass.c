@@ -2,16 +2,17 @@
 
 #include <math.h>
 
-/* How she moves, tuned by eye until the real board says otherwise. */
-#define BOUNCE_HZ 2.2f    // the wobble's own frequency
-#define DAMPING   0.18f   // of critical: a few bounces, then rest
+/* How she moves, tuned by eye until the real board says otherwise. She is
+   thick, so everything in her is slow and eased: smoothness over speed. */
+#define BOUNCE_HZ 1.4f    // the wobble's own frequency, a slow one
+#define DAMPING   0.35f   // of critical: one gooey rebound, then rest
 #define POKE      1.1f    // squash a second, from a full poke: enough, past the damping, to reach the furthest render
 #define DEEPEN    2.0f    // how fast a breath's depth eases toward the mood's, a second
-#define SWAY_PX   7.0f    // how fast a bubble sways, in pixels a second, still
-#define STIR_PX   40.0f   // and more when stirred
-#define FOLLOW    3.0f    // how fast a bubble's speed eases toward its rise, a second
-#define FADE_IN   3.0f    // shown a second, as it starts
-#define FADE_OUT  6.0f    // and as it pops
+#define SWAY_PX   3.0f    // how fast a bubble sways, in pixels a second, still
+#define STIR_PX   14.0f   // and more when stirred
+#define FOLLOW    1.2f    // how fast a bubble's speed eases toward its rise, a second: it drifts, never darts
+#define FADE_IN   1.0f    // shown a second, as it starts
+#define FADE_OUT  2.5f    // and as it melts into her surface
 #define TRIES     12      // places tried for a new bubble
 
 // Her middle at rest: a new bubble starts below it, as up has it.
@@ -104,7 +105,7 @@ void glass_step(glass_t *g, const glass_mood_t *m, float dt) {
         if (b->state != GLASS_RISING) continue;
         b->shown = fminf(1, b->shown + FADE_IN * dt);
         // Rising the way up is, bigger ones faster, swaying across it.
-        b->sway += dt * (1.6f + 8 * m->stir);
+        b->sway += dt * (0.9f + 2.5f * m->stir);
         float rise = m->rise * (0.25f + 0.75f * upright) * (0.75f + 0.25f * b->size);
         float side = cosf(b->sway) * (SWAY_PX + STIR_PX * m->stir);
         b->vx += (u[0] * rise + across[0] * side - b->vx) * k;

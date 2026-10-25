@@ -58,7 +58,7 @@ static const face_geometry_t F = {
 #define FOLLOW_ONE_IN   3     // of her glances while idle, one in this many follows a bubble
 #define FOLLOW_MS       2500
 #define FOLLOW_GAIN     0.05f // how far her eyes turn toward the bubble she follows, a pixel's worth per pixel away
-#define SHEEN_MS        1100  // a glint crossing her glass
+#define SHEEN_MS        1600  // a glint crossing her glass, slowly
 #define SHEEN_EVERY_MS  25000 // about how often, while she idles, after the one she wakes with
 #define BREATH          0.009f // her breath, as a squash toward stretched: her top rises three pixels
 #define GLOW_OPA        150   // her light at its brightest, inside her
@@ -495,7 +495,7 @@ static void tick(lv_timer_t *t) {
     // a jolt stirs the bubbles.
     if (tapped) {
         tapped = false;
-        glass_poke(&G, 0.7f);
+        glass_poke(&G, 0.6f);
         if (m == FACE_IDLE) happy_until = now + HAPPY_MS;
     }
     float jolt = jolted;
@@ -509,8 +509,8 @@ static void tick(lv_timer_t *t) {
     V.up[1] = ease(V.up[1], tilt[1], 5, dt);
 
     float t_open = 1, t_mouth = 0, t_smile = 1, t_ring = 0, t_dots = 0, t_confused = 0, t_happy = 0, t_glow = 0, glance = 1;
-    glass_mood_t mood = { .up = { V.up[0], V.up[1] }, .rise = 26, .every = 1.6f, .most = 6, .stir = V.stir,
-                          .depth = BREATH, .period = sleepy ? 5.5f : 4.2f };
+    glass_mood_t mood = { .up = { V.up[0], V.up[1] }, .rise = 9, .every = 2.5f, .most = 6, .stir = V.stir,
+                          .depth = BREATH, .period = sleepy ? 6.5f : 5 };
     const float *fixed = NULL;
     static const float up[2] = { 0, -2 }, puzzled[2] = { 3, -2.5f }, rest[2] = { 0, 1 };
     // Thinking looks up to one side, then the other, every 1.7 seconds.
@@ -518,26 +518,26 @@ static void tick(lv_timer_t *t) {
     // Listening, she holds her breath and his voice stirs her bubbles.
     if (m == FACE_LISTENING) {
         t_smile = 1.1f; t_ring = 0.25f + 0.75f * level; fixed = up;
-        mood.depth = 0; mood.stir = fmaxf(V.stir, level); mood.every = 1.2f; mood.most = 8;
+        mood.depth = 0; mood.stir = fmaxf(V.stir, level); mood.every = 1.8f; mood.most = 8;
     }
     // Speaking, her voice lights her and sends bubbles up as it swells.
     if (m == FACE_SPEAKING) {
         t_mouth = level; t_smile = 0.9f; glance = 0.4f; t_glow = 0.3f + 0.7f * level;
-        mood.depth = 0.0065f; mood.period = 3.4f; mood.every = 0.4f + 1.2f * (1 - level); mood.most = 9;
+        mood.depth = 0.0065f; mood.period = 4; mood.every = 0.9f + 1.6f * (1 - level); mood.most = 9;
     }
     // Thinking, a quick stream of them.
     if (m == FACE_THINKING) {
         t_open = 0.85f; t_smile = 0.25f; t_dots = 1; fixed = pondering;
-        mood.rise = 48; mood.every = 0.35f; mood.most = GLASS_BUBBLES; mood.depth = 0.0045f; mood.period = 2.6f;
+        mood.rise = 16; mood.every = 0.7f; mood.most = GLASS_BUBBLES; mood.depth = 0.0045f; mood.period = 3.4f;
     }
     if (m == FACE_CONFUSED) {
         t_smile = -0.35f; t_confused = 1; fixed = puzzled;
-        mood.rise = 14; mood.every = 2.5f; mood.most = 4; mood.depth = 0;
+        mood.rise = 5; mood.every = 4; mood.most = 4; mood.depth = 0;
     }
     // Going to sleep, the last bubbles drift up, and late she yawns first.
     if (m == FACE_ASLEEP) {
         t_open = 0; t_smile = 0.6f; fixed = rest;
-        mood.rise = 12; mood.every = 60; mood.depth = 0.003f; mood.period = 5.5f;
+        mood.rise = 4; mood.every = 60; mood.depth = 0.003f; mood.period = 6.5f;
         if (sleepy && now - since < YAWN_MS) t_mouth = 0.9f * sinf((float)M_PI * (now - since) / YAWN_MS);
     }
     if (m == FACE_IDLE) {
@@ -610,7 +610,7 @@ static void tick(lv_timer_t *t) {
     V.dots = ease(V.dots, t_dots, 5, dt);
     V.confused = ease(V.confused, t_confused, 8, dt);
     V.happy = ease(V.happy, t_happy, 12, dt);
-    V.glow = ease(V.glow, t_glow, 4, dt);
+    V.glow = ease(V.glow, t_glow, 2.5f, dt);
 
     // The glint: as she wakes, then now and then while she idles, never
     // over her light or a wobble. It sweeps across her, down to the right.

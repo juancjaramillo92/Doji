@@ -3332,15 +3332,18 @@ breaths slower, and her goodnight starts with a yawn.
 
 **Her glass is alive** (`charm/main/glass.c`). It breathes, drawing her up
 three pixels and back so slowly that a breath walks the renders one at a time,
-each step moving her top less than a pixel; listening, she holds it. A tap on
-her face or a jolt makes it wobble, squashed and stretched and still again
-within two seconds. Bubbles rise inside it the way up is, as the motion sensor
+each step moving her top less than a pixel; listening, she holds it. She is
+thick, and everything in her is slow and eased, smoothness over speed. A tap on
+her face or a jolt makes her wobble, one gooey rebound and still again within
+two seconds. Bubbles drift up inside her, a third of a pixel a frame while she
+idles and under one even at her quickest, the way up is, as the motion sensor
 reads her — tilt her and they drift to her new top, and her eyes drift
-downhill — and pop at her edge, never outside it: a few at a time while she
-idles, stirred by his voice while she listens, a stream while she thinks, sent
-up as her voice swells while she speaks, when it lights her from inside. Each
-is drawn at the quarter pixel it has reached, so a slow one glides. As she
-wakes, and now and then while she idles, a glint of light crosses her. None of
+downhill — and melt away at her edge, never outside it: a few at a time while
+she idles, stirred by his voice while she listens, a stream while she thinks,
+sent up as her voice swells while she speaks, when it lights her from inside.
+Each fades in and out rather than blinking, and is drawn at the quarter pixel
+it has reached, so it glides. As she wakes, and now and then while she idles, a
+glint of light crosses her, slowly. None of
 it moves with the market or with his trades: what her glass does follows her
 mood, never his position.
 
