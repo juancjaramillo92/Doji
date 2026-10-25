@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 831 tests, eight suites
+npm test      # 840 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -479,7 +479,8 @@ pinned image; the README's *The charms* says what it does. Three levels of
 proof, and a change says which it rests on:
 
 - **Pure, and driven in `npm test`.** `briefing.c`, `errand.c`, `lift.c`,
-  `dns.c`, `ogg.c` and `frames.c` include no ESP-IDF, so `charm.test.mjs` compiles
+  `dns.c`, `ogg.c`, `frames.c` and `glass.c` (with the `art.c` it reads) include
+  no ESP-IDF, so `charm.test.mjs` compiles
   them with the host's `cc -Wall -Werror`, `RTC_DATA_ATTR` stubbed to
   nothing, and drives them against the server's own functions and bytes. A decision that can be pure goes in one of these, or a
   new one added to that compile, so a test can drive it; one that cannot is
@@ -498,6 +499,11 @@ What a change most often breaks:
 
 - **A sample, a frame or a byte changed is a behaviour change**, its own
   commit — R-33 is the tick that looks foldable and is not.
+- **Her art is one run of `tools/art.py`, never an edit**: `art.c`, the
+  renders, her light and the bubbles' sprites are made together, and
+  `charm.test.mjs` holds each to the others and to `glass.h`'s counts. What
+  her glass does follows her mood, never the market or his trades — an
+  animation is a signal too.
 - **Only `RTC_DATA_ATTR` survives sleep**; every waking runs `app_main` again.
   State that must outlive a sleep is declared so, and nothing else is assumed
   to.

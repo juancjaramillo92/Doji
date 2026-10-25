@@ -86,12 +86,13 @@ static RTC_DATA_ATTR time_t errand_at;
 static esp_sleep_wakeup_cause_t woke;
 static bool lit;
 
-// A slide round the rim is the volume; a tap on a question is the journal's.
+// A slide round the rim is the volume, and a tap inside it is on her face; a
+// tap on a question is the journal's.
 static void on_touch(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     lv_point_t at;
     lv_indev_get_point(lv_indev_active(), &at);
-    if (code == LV_EVENT_PRESSED) dial_press(at);
+    if (code == LV_EVENT_PRESSED && !dial_press(at)) face_tap();
     if (code == LV_EVENT_PRESSING) dial_slide(at);
     if (code == LV_EVENT_RELEASED) dial_lift();
 }
@@ -254,6 +255,7 @@ static void awake(void) {
     static const lv_event_code_t codes[] = { LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED };
     for (size_t i = 0; i < sizeof codes / sizeof *codes; i++) lv_obj_add_event_cb(screen, on_touch, codes[i], NULL);
     bsp_display_unlock();
+    motion_follow();
 
     sound_start();
     sound_volume(cfg.volume);
