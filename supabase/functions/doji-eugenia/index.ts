@@ -509,8 +509,9 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
   // An unrecognised kind takes the quieter branch.
   const k = (NOTE_KINDS as readonly string[]).includes(String(kind)) ? String(kind) : 'fact';
   const kept = text.slice(0, NOTE_MAX);
+  const cut = kept.length < text.length;
 
-  // Only a retirement needs the new row back; an unread body holds its
+  // Only a retirement or a cut needs the new row back; an unread body holds its
   // connection open. Several ids is a merge; a lone number is taken too, since
   // this is where the model's arguments enter.
   const old = [supersedes ?? []].flat().map(n => Math.trunc(Number(n)))
@@ -522,15 +523,15 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
     // write; caught, because a lost vector must never read as a lost note.
     const [vec] = await embed([kept]).catch(() => null) ?? [];
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_notes`, {
-      method: "POST", headers: sbHeaders(retiring ? "return=representation" : "return=minimal"),
+      method: "POST", headers: sbHeaders(retiring || cut ? "return=representation" : "return=minimal"),
       body: JSON.stringify([{ note: kept, kind: k, ...(vec ? { embedding: vec } : {}) }]),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const [row] = retiring || cut ? await res.json() : [];
 
     // The new note is written before the old one is retired: a failed
     // retirement leaves two live notes, recoverably, never neither.
     if (retiring) {
-      const [row] = await res.json();
       const done = await fetch(
         `${SB_URL}/rest/v1/eugenia_notes?id=in.(${old.join(',')})&superseded_by=is.null`, {
           method: "PATCH", headers: sbHeaders("return=representation"),
@@ -547,11 +548,13 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
       }
     }
 
-    if (kept.length < text.length) {
-      return `Kept, but cut at ${NOTE_MAX} characters: "${kept}". ` +
-             (k !== 'fact'
-               ? 'Say it back to him shorter and check that is still what he meant.'
-               : 'Write it shorter next time.');
+    /* Written again now, every kind: "shorter next time" left a fact cut
+       mid-sentence in her window until he found it, note 37 on 28 October. Its
+       id is handed back so the rewrite retires it. */
+    if (cut) {
+      return `Kept, but cut at ${NOTE_MAX} characters: "${kept}". Write it again now, shorter, ` +
+             `with supersedes ${row.id} so the cut one is retired` +
+             (k !== 'fact' ? ', and say it back to him to check it is still what he meant.' : '.');
     }
     return "Remembered.";
   } catch (err) {

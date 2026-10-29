@@ -2669,7 +2669,10 @@ feature and fails silently**: without `superseded_by is null`
 on the read she is handed the correction *and* the thing it corrected, every
 turn. The column, the filter and the tool parameter are held together by a test.
 The row itself stays — findable by search and marked no longer true — and there
-is no delete path.
+is no delete path. **A note cut at its 200 characters is written again at once**,
+whatever its kind: `remember` keeps it cut, quotes it, and hands back its id for
+the rewrite to supersede. A fact was once told *shorter next time*, and note 37
+stayed cut mid-sentence in her window until he found it on 28 October.
 
 **She can search everything she ever said.** The windows are the newest slice of
 two append-only tables, and `search_memory` reaches the rest on demand rather

@@ -50,7 +50,7 @@ import {
   sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
   volumeList, volumeBlock, keptMarket, storeMarket, storeRates, storeTrend, trendList, trendBlock,
   flowsList, flowsBlock, storeFlows, storePositioning,
-  structureList, structureBlock, storeStructure, THESIS_MAX, PORTRAIT_MAX,
+  structureList, structureBlock, storeStructure, THESIS_MAX, PORTRAIT_MAX, NOTE_MAX,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -5418,6 +5418,31 @@ test('one note can retire several, and every id it could not retire is named', a
     const one = await serve('remember', { note: 'x', kind: 'fact', supersedes: 11 });
     assert.match(patched, /id=in\.\(11\)&/);
     assert.equal(one, 'Remembered.');
+  });
+});
+
+/* A NOTE CUT AT NOTE_MAX IS WRITTEN AGAIN NOW, whatever its kind. A fact was
+   told "shorter next time", and note 37 stayed cut mid-sentence in her window
+   until he found it on 28 October. The rewrite needs the cut note's id to
+   retire it, so the insert hands it back. */
+test('a note cut at its ceiling is to be written again now, retiring the cut one', async () => {
+  const prefer = [];
+  await stubbed(async () => {
+    globalThis.fetch = async (url, opts = {}) => {
+      prefer.push(new Headers(opts.headers).get('Prefer'));
+      return new Response(JSON.stringify([{ id: 37 }]), { status: 201 });
+    };
+    for (const kind of ['fact', 'instruction', 'commitment']) {
+      const said = await serve('remember', { note: 'a'.repeat(NOTE_MAX) + ' vault stocks', kind });
+      assert.match(said, /Write it again now, shorter, with supersedes 37 so the cut one is retired/,
+        `a cut ${kind} is left standing cut, or without the id that retires it`);
+      assert.doesNotMatch(said, /next time/, `a cut ${kind} waits for a next time`);
+      assert.equal(/say it back to him/.test(said), kind !== 'fact',
+        `a cut ${kind} is${kind === 'fact' ? '' : ' not'} checked with him`);
+    }
+    assert.ok(prefer.every(p => /return=representation/.test(p)), 'a cut note was written without its id coming back');
+    assert.equal(await serve('remember', { note: 'he trades the London open', kind: 'fact' }), 'Remembered.');
+    assert.match(prefer.at(-1), /return=minimal/, 'a whole note holds the row it never reads');
   });
 });
 
