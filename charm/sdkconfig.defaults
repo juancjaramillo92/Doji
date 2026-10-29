@@ -35,6 +35,9 @@ CONFIG_LV_USE_QRCODE=y
 # TLS for her door: its buffers in PSRAM, where the internal RAM the screen
 # needs is not.
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+# Wi-Fi's and lwIP's buffers in PSRAM too: on the first board they left so
+# little internal RAM that the setup's web server could not start.
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
 
 # An update that never reaches her Wi-Fi is rolled back by the bootloader.
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
