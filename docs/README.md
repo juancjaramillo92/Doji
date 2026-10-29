@@ -1416,13 +1416,20 @@ changed the bigger story. The live quote is still handed in, for knowing where
 gold stands rather than for opening on. Her map of his charts is handed in
 for her call and nothing else.
 
-Five slots: **where the big picture stands** — the Fed's path, the dollar's
-trend, inflation, central-bank buying, and which of them moved — in two or three
-sentences with the conclusion first, or one saying none did; **why that matters
-for gold**, walked link by link, one sentence per step; the calendar; one context
-line on the same scale; one thing worth noticing. Numbered sections with
-headings are a report whatever the vocabulary inside them, which is why there
-are none.
+**Four lines, because he asked for four.** On 26 October he said the briefings
+were not helping: they reached him when he was not trading, and he asked for
+something much simpler with the working done behind it. So: **where the big
+picture stands and which way it leans** — the Fed's path, the dollar's trend,
+inflation, central-bank buying, her read on them and what would prove it wrong —
+in one or two sentences; **why, in one line**, the one force and the one fact
+that shows it, with no chain; the calendar; her call. Nothing beside them but a
+verdict on a closed trade that broke a rule. The teaching moved to where he is
+listening — a conversation, above all one before a trade — and what she worked
+out and left out is what she answers from when he asks. His note alone did not
+do it: the writer obeyed and the critic, told to complete the chain, put 160 to
+240 characters back on 27 and 28 October; both copies now state the shape.
+Numbered sections with headings are a report whatever the vocabulary inside
+them, which is why there are none.
 
 **The calendar is the one place the prose rule is relaxed** — a plain `Today:`
 label and one line per item, times in ET, one fact each, on weekdays only. It is
@@ -1440,24 +1447,24 @@ whole week first (`filedWeek`, the nightly pass's own filing) and is handed ever
 US release TradingView rates high for the seven days ahead, and from abroad the
 central banks' decisions and headline inflation, in place of the rolling
 calendar — high only, since seven days of medium is a page and none of it moves
-gold alone. The first paragraph is where the story stands as the market opens,
-and the teaching block walks the release most likely to move it. **The week is
-told, not listed**: there is no calendar slot on Sunday. The release that carries
-the week is named with its day, and the rest is a sentence or two on which force
-the week tests and what it could change; the calendar is on his own screen, and
+gold alone. The first line is where the story stands as the market opens, and
+the why is the release most likely to move it. **The week is told, not listed**:
+there is no calendar slot on Sunday. The release that carries the week is named
+with its day, and one sentence says which force the week tests; the calendar is
+on his own screen, and
 each weekday morning lists that day's high-rated releases with their times. `CRITIC` holds
 the same rule, since it runs last.
 
 **Length is a rule, and what makes it safe is what sits beside it.** A ceiling
-with nothing saying what to lose cuts the teaching block, the longest thing on
-the page — and with channels at `unseen`, where §0 says build the term before
-using it, that is the part that matters. So the budget is 250–300 words, less on
-a day the picture did not move, 400 at the outside, and beside it a fixed order of what comes out: numbers he cannot act
-on, then levels he can read off his own screen, then any market sentence that
-could have been written on any morning. **Never the teaching block and never an
-event.** Still over means the briefing is about too many things. Four thousand
-characters is the separate mechanical bound, Telegram's. `agree.test.mjs` reads
-both the writer's copy and the critic's for the count **and** the protection.
+with nothing saying what to lose cuts whatever is longest on the page, which was
+once the teaching, every morning. So the budget is 80–120 words, less on a day
+the picture did not move, 150 at the outside, and beside it a fixed order of what
+comes out: numbers he cannot act on, then levels he can read off his own screen,
+then any sentence that is not one of the four lines. **Never the read or its
+test, never an event, never the call, never a verdict.** Still over means the
+briefing is about too many things. Four thousand characters is the separate
+mechanical bound, Telegram's. `agree.test.mjs` reads both the writer's copy and
+the critic's for the count **and** the protection.
 
 **The writing rules bound a sentence, not only a word.** Plain words alone still
 read as hard when one sentence carries three ideas. The rules, in `WRITING`:
@@ -1481,8 +1488,8 @@ read as hard when one sentence carries three ideas. The rules, in `WRITING`:
   of them. `CRITIC` and `TRIM` each COUNT this, and every em-dash, as
   their last step rather than reading for it among the rest.
 - **A number earns its place** by meaning something he can use; the briefing
-  holds two to four, one budget the writer and `CRITIC` both state and a test
-  holds equal.
+  holds one or two beside the call's levels and the calendar's times, one budget
+  the writer and `CRITIC` both state and a test holds equal.
 
 **The judgement rules carry worked examples.** The countable rules landed at once
 — a first briefing with no sentence over twenty words — while the same message
@@ -1501,12 +1508,13 @@ it: `WRITING` asks for the accents and the ñ, since the voice stresses off the
 spelling, and `TTS_STYLE` asks for native Latin American Spanish at speed, as
 code-switching in both directions, so no Spanish accent leaks onto the English.
 
-**She teaches, and that is a rule about depth rather than length.** The day's one
-thing is stated as a chain — *hot inflation, so the Fed waits, so the gap between
+**She teaches, and that is a rule about depth rather than length.** A mechanism
+is stated as a chain — *hot inflation, so the Fed waits, so the gap between
 rates and inflation widens, so gold is a harder sell* — because a cause named with
-no chain under it is something to memorise rather than understand. **One chain
-per briefing**: every scheduled thing still gets named, but only one gets its
-mechanism walked. A term explained this week is **used** the next time rather
+no chain under it is something to memorise rather than understand. **The chain
+lives in a conversation, not the briefing**: the briefing names its one force in
+one line, builds no term at any rung, and leaves the walk to when he asks or a
+trade he brings turns on it. A term explained this week is **used** the next time rather
 than redefined; a simplification is signposted in a clause (*that is the clean
 version*); and what he has shown he understands is recorded, since it is the
 only thing that says what **not** to explain.
@@ -1514,8 +1522,9 @@ only thing that says what **not** to explain.
 **One chain is exempt from the rung, the one under everything else.** Gold pays
 no interest, so it competes with what a bond pays once inflation is taken out.
 `PITCH` says a channel at `owns` gets its term bare — right for every term but
-this, which sits under nearly every briefing. Writer and critic are both told,
-the critic especially, since it decides what counts as a repetition.
+this, which sits under nearly every read. Writer and critic are both told, and
+in the briefing's one line of why it is said in plain words whenever it carries
+the argument.
 
 **She remembers yesterday.** The briefing reads the last twelve turns, so it
 opens with how yesterday's print landed rather than from nothing. What is stored
@@ -1665,7 +1674,7 @@ and `TRIM` holds the reply to no short length: a plan checked against his rules
 can be nine findings long.
 
 `TRIM` is **not `CRITIC` with a shorter prompt**. The briefing's checks — a first
-sentence true only today, a complete chain, one chain only, 250–300 words —
+sentence true only today, four lines, one line of why, 80–120 words —
 would ruin three sentences. `TRIM` asks the writing questions alone, off the same
 `WRITING` the writer was given; it gets no notes and no channel map, since it is
 not judging whether a term was built, but **is** handed what you have on now,
@@ -1813,13 +1822,14 @@ a sweep re-entry follows a close, and he trades one entry at a time.
 The briefing is researched and written in one generation, and its quality target
 lives on the far side of a model call. So `CRITIC` reads it once more before it
 goes, at `medium` effort with no tools: does the first sentence say where the
-big picture stands today, is a term built at a rung that no longer needs it, is
-a link missing from the chain, is there a forward call, is it inside the budget,
-does it obey his standing instructions. It returns the briefing, not notes about it.
+big picture stands today, is it the four lines, is a term built or a chain
+walked where one line of why belongs, is there a forward call, is it inside the
+budget, does it obey his standing instructions. It returns the briefing, not
+notes about it.
 
 **It is handed his notes and the channel map, because two of those checks read
-them.** Without the map, the mechanism sitting in the paragraph reads as a
-redefinition, and the build-up `PITCH` required is cut — last, fluently.
+them.** The map says how a term is said — plain words below `used`, the short
+name at `used` and `owns` — and the notes outrank the shape.
 
 **It takes out a print tied to a position he opened that session.** That is
 R-20's caution, his to weigh, and the calendar already names the print; on 15
@@ -1888,7 +1898,7 @@ refusing vendor does. **What is stored is untouched**: `remember()` writes the
 transcript whatever happened on the wire. The briefing's keyboard rides on the
 last voice note.
 
-**There is no length cap.** A briefing is 250–400 words by its own rule, and a
+**There is no length cap.** A briefing is 80–150 words by its own rule, and a
 cap decides that past some length a message is not worth hearing. A long message
 becomes *several* voice notes, split by `chunk()` with its paragraph preference
 so each part is a whole thought; the only number is what the vendor accepts per

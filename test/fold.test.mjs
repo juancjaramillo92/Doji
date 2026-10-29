@@ -6033,8 +6033,9 @@ test('nothing she writes is left unspoken for being long', () => {
 });
 
 test('a briefing is one voice note, not several', () => {
-  // 250–400 words is ~2,800 characters, one request; split, the teaching block
-  // would be cut across two notes.
+  // Her ceiling is 150 words, a verdict beside it included, well inside one
+  // request; 2,800 characters leaves room, and split, a call would be cut
+  // across two notes.
   assert.equal(chunk('x'.repeat(2800), 4000).length, 1);
 });
 
