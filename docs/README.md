@@ -3299,7 +3299,10 @@ which draws into PSRAM: the SPI driver will not send from there, so it copies
 each draw into internal RAM first, 46 KB at a time, which a board running Wi-Fi
 seldom has free, and the first board showed nothing but white. She draws twelve
 rows at a time in internal RAM, sent as they are (`light` in
-`charm/main/main.c`). The versions every build uses are the ones `charm/dependencies.lock` names, and the
+`charm/main/main.c`). Her task's 40 KB stack, the Opus encoder's, is in PSRAM,
+which left in internal RAM gave the codecs too little and rebooted her as her
+speaker started; deep sleep, which suspends the cache PSRAM is read through,
+is entered from a small task of its own (`charm/main/sleep.c`). The versions every build uses are the ones `charm/dependencies.lock` names, and the
 workflow fails a build that resolved any other, so a new release reaches the
 firmware only by a commit that changes the lock.
 The download is **`charm-full.bin`**, one image written at `0x0`: plug the

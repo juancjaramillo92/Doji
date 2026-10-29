@@ -69,6 +69,7 @@
 static const char *TAG = "charm";
 
 #define BRIGHTNESS    75     // percent
+#define LIFE_STACK    40960  // bytes
 #define DRAW_ROWS     12     // drawn at a time, twice over: 22 KB of internal RAM
 #define AWAKE_MS      30000
 #define LAST_FRAME_MS 200    // the sleep screen reaching the panel
@@ -389,8 +390,13 @@ void app_main(void) {
         light(FACE_DARK);
         setup_run();
     }
-    // The stack holds a TLS handshake, and the Opus encoder, which Espressif's
-    // codec README puts at about 40 KB. Internal RAM, as deep sleep requires
-    // of the task that starts it.
-    xTaskCreatePinnedToCore(life, "life", 40960, NULL, 5, NULL, 0);
+    /* The stack holds a TLS handshake, and the Opus encoder, which Espressif's
+       codec README puts at about 40 KB. In PSRAM: on the board, in internal
+       RAM beside the screen and Wi-Fi, it left the codecs too little for their
+       DMA and she rebooted as her speaker started. Her code runs from PSRAM,
+       so the cache stays on while she writes her flash, and deep sleep, which
+       suspends it, is entered from a task of its own (sleep.c). */
+    static StaticTask_t task;
+    xTaskCreateStaticPinnedToCore(life, "life", LIFE_STACK, NULL, 5,
+                                  heap_caps_malloc(LIFE_STACK, MALLOC_CAP_SPIRAM), &task, 0);
 }
