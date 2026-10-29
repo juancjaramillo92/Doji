@@ -6576,6 +6576,10 @@ test('the number budget is stated to the writer and to the critic, and is one bu
      writer told fewer is rewritten back up to the old count. */
   assert.deepEqual(critic.slice(1).map(w => w.toLowerCase()), writer.slice(1).map(w => w.toLowerCase()),
     'the writer and the critic hold different number budgets, and the critic runs last');
+  // And the README's copy, which the facts table lists.
+  assert.match(source('docs/README.md').replace(/\s+/g, ' '),
+    new RegExp(`the briefing holds ${writer[1].toLowerCase()} or ${writer[2].toLowerCase()} beside`),
+    'the README gives the briefing a number budget the prompt does not');
 });
 
 /* A PRINT BESIDE A POSITION HE OPENED KNOWING IT WAS THERE IS HIS. SYSTEM says
@@ -6653,11 +6657,24 @@ test('a word count never stands without what to cut instead: the briefing\'s two
      its verdict and its one thing to keep and one to change. */
   const writer = EUGENIA_PROMPT.slice(0, EUGENIA_PROMPT.indexOf('export const CRITIC'));
   const critic = EUGENIA_PROMPT.slice(EUGENIA_PROMPT.indexOf('export const CRITIC'));
+  const [, low, high] = writer.match(/(\d+) to (\d+) words/) ?? [];
+  const most = critic.match(/(\d+)\s+at the outside/)?.[1];
+  assert.ok(low && most, 'the briefing\'s word count and ceiling are no longer read where this test reads them');
   for (const [who, half] of [['writer', writer], ['critic', critic]]) {
-    assert.match(half, /80 to 120 words/, `the ${who} has lost the word count`);
+    assert.match(half, new RegExp(`${low} to ${high} words`), `the ${who} has lost the word count`);
     assert.match(half, /THE READ AND ITS\s+TEST ARE NOT A PLACE YOU CUT|Never the read or its\s+test/,
       `the ${who} holds a word count with nothing saying what to cut instead — ` +
       `which is the arrangement that stopped her teaching the first time`);
+  }
+  // One ceiling, the writer's in words and the critic's in figures, and the
+  // README's copies of both, which the facts table lists.
+  const SPOKEN = { 150: 'One hundred and fifty' };
+  assert.ok(writer.replace(/\s+/g, ' ').includes(`${SPOKEN[most]} is the ceiling`),
+    `the writer and the critic hold different ceilings, and the critic runs last`);
+  const told = source('docs/README.md').replace(/\s+/g, ' ');
+  for (const said of [`the budget is ${low}–${high} words`, `${most} at the outside`,
+                      `A briefing is ${low}–${most} words by its own rule`, `one line of why, ${low}–${high} words`]) {
+    assert.ok(told.includes(said), `the README no longer gives the briefing's budget as the prompt does: "${said}"`);
   }
   const review = REVIEW.replace(/\s+/g, ' ');
   assert.match(review, /Under two hundred and fifty words/, 'the review has lost its word count');

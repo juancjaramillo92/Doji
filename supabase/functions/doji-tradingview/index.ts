@@ -641,7 +641,7 @@ async function readHeadlines() {
    test/fixtures/tradingview-alerts.json. */
 export function foldAlerts(answer: any) {
   return (answer.alerts ?? []).map((a: any) => ({
-    id: a.alert_id, symbol: a.symbol, condition: a.condition_type,
+    symbol: a.symbol, condition: a.condition_type,
     level: typeof a.threshold === "number" ? a.threshold : null,
     set: a.create_time, fired: a.last_fire_time ?? null,
   }));
@@ -953,8 +953,8 @@ const PROBES: Record<string, () => Call[]> = {
     ["mcp-tv-get-ohlcv", { symbol: GOLD[0], interval: "1m", count: 3 }],
   ],
   news: () => FEEDS.map((f): Call => ["mcp-tv-get-news", { symbol: f.symbol, limit: f.limit }]),
-  // His alerts as TradingView keeps them, and the last week of their firing
-  // with the message he wrote: what a reader of them would fold.
+  // His alerts as TradingView keeps them, what `foldAlerts` reads, and the last
+  // week of their firing with the message he wrote, which nothing reads yet.
   alerts: () => [
     ["mcp-tv-list-alerts", { active: true }],
     ["mcp-tv-get-alerts-log", { days: 7, limit: 20 }],

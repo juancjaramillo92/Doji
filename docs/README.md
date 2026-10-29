@@ -448,6 +448,7 @@ single-sourced at run time:
 | the **columns of `eugenia_runs`** | the table, the object literals `recordRun` is called with, and the `verify.sql` row on the cache-write columns |
 | **which rules a row can answer** | §7's `Evaluable` column, the twelve predicates in `adherence.ts`, and the lists and counts in `check_rules`' description, the prompt and the paragraph below |
 | the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union, and `pace_line`'s `owed \|\| ' briefing delivered'` |
+| the **briefing's budgets** | the words, their ceiling and the count of numbers, in `SYSTEM` and in `CRITIC`, and as this README gives them |
 | the **number of scheduled jobs** | the `cron.schedule` calls in `schema.sql` and the count `verify.sql` asserts |
 | a **long door's deadline** | `DOOR_MS` in `doji-tradingview` and `READ_MS` in `doji-eugenia`, ten seconds apart for the boot, the sign-in and the wire |
 | the **paid worker wall clock** | `ceiling_ms` in `pace_line` and the sentence in `CLAUDE.md` on why the cron half answers first; its three-quarter share, `speak_at` in `pace_line` and `TURN_MS` in `doji-eugenia`; `WRITER_MS` beneath it |
@@ -1454,18 +1455,18 @@ it, and `CRITIC` takes a lower-rated line off the list, since it runs last. The
 list holds times and names, `NAMED AND NOTHING MORE`: no mechanism goes in it,
 because that slot is where a second chain hides.
 
-**On Sunday the briefing is about the week it opens** (`weekBlock`). It files the
-whole week first (`filedWeek`, the nightly pass's own filing) and is handed every
-US release TradingView rates high for the seven days ahead, and from abroad the
-central banks' decisions and headline inflation, in place of the rolling
-calendar — high only, since seven days of medium is a page and none of it moves
-gold alone. The first line is where the story stands as the market opens, and
-the why is the release most likely to move it. **The week is told, not listed**:
-there is no calendar slot on Sunday. The release that carries the week is named
-with its day, and one sentence says which force the week tests; the calendar is
-on his own screen, and
-each weekday morning lists that day's high-rated releases with their times. `CRITIC` holds
-the same rule, since it runs last.
+**On Sunday the briefing is about the week it opens** (`weekBlock`). It files
+the whole week first (`filedWeek`, the nightly pass's own filing) and is handed
+every US release TradingView rates high for the seven days ahead, and from
+abroad the central banks' decisions and headline inflation, in place of the
+rolling calendar — high only, since seven days of medium is a page and none of
+it moves gold alone. The first line is where the story stands as the market
+opens, and the why is the release most likely to move it. **The week is told,
+not listed**: there is no calendar slot on Sunday. The release that carries the
+week is named with its day, and one sentence says which force the week tests;
+the calendar is on his own screen, and each weekday morning lists that day's
+high-rated releases with their times. `CRITIC` holds the same rule, since it
+runs last.
 
 **Length is a rule, and what makes it safe is what sits beside it.** A ceiling
 with nothing saying what to lose cuts whatever is longest on the page, which was
@@ -1522,14 +1523,14 @@ code-switching in both directions, so no Spanish accent leaks onto the English.
 
 **She teaches, and that is a rule about depth rather than length.** A mechanism
 is stated as a chain — *hot inflation, so the Fed waits, so the gap between
-rates and inflation widens, so gold is a harder sell* — because a cause named with
-no chain under it is something to memorise rather than understand. **The chain
-lives in a conversation, not the briefing**: the briefing names its one force in
-one line, builds no term at any rung, and leaves the walk to when he asks or a
-trade he brings turns on it. A term explained this week is **used** the next time rather
-than redefined; a simplification is signposted in a clause (*that is the clean
-version*); and what he has shown he understands is recorded, since it is the
-only thing that says what **not** to explain.
+rates and inflation widens, so gold is a harder sell* — because a cause named
+with no chain under it is something to memorise rather than understand. **The
+chain lives in a conversation, not the briefing**: the briefing names its one
+force in one line, builds no term at any rung, and leaves the walk to when he
+asks or a trade he brings turns on it. A term explained this week is **used**
+the next time rather than redefined; a simplification is signposted in a clause
+(*that is the clean version*); and what he has shown he understands is recorded,
+since it is the only thing that says what **not** to explain.
 
 **One chain is exempt from the rung, the one under everything else.** Gold pays
 no interest, so it competes with what a bond pays once inflation is taken out.
@@ -1901,17 +1902,17 @@ charm.
 
 **The voice note is the message, and the text is the fallback.** Both together
 were two notifications for one thing she said. But an unset key, a refusing
-vendor or a format Telegram will not render would make audio alone a
-**missing** message, so `say()` fires whenever the audio did not land — in full,
-since three quarters heard is worse than either. That ordering lives once, in
+vendor or a format Telegram will not render would make audio alone a **missing**
+message, so `say()` fires whenever the audio did not land — in full, since three
+quarters heard is worse than either. That ordering lives once, in
 **`sayAloud`**, and a test reads it and counts the call sites; `fold.test.mjs`
 **drives** it, since with no TTS key every `speak()` answers why it could not,
-exactly as a refusing vendor does. **What is stored is untouched**: `remember()` writes the
-transcript whatever happened on the wire. The briefing's keyboard rides on the
-last voice note. **While she speaks, Telegram shows her recording**, sent again
-every few seconds and stopped before the text can go, as typing is shown while
-she writes: on 27 October the voice took two and a half minutes with nothing on
-his screen, and he asked whether she had answered.
+exactly as a refusing vendor does. **What is stored is untouched**: `remember()`
+writes the transcript whatever happened on the wire. The briefing's keyboard
+rides on the last voice note. **While she speaks, Telegram shows her
+recording**, sent again every few seconds and stopped before the text can go, as
+typing is shown while she writes: on 27 October the voice took two and a half
+minutes with nothing on his screen, and he asked whether she had answered.
 
 **There is no length cap.** A briefing is 80–150 words by its own rule, and a
 cap decides that past some length a message is not worth hearing. A long message
@@ -1934,13 +1935,12 @@ reached him — today's only.
 attempt.** The budget covers the whole message: **`SPEAK_MS`**, 150 seconds, on
 paths that write and speak in one worker; **`SPEAK_WORKER_MS`**, 330 seconds, on
 the speaking worker. **Each attempt gets half the budget** — a stall is one
-request, the next a fresh connection — so on every path a stall costs an
-attempt rather than the voice. Bounded at the whole budget, as it was, the
-stalls of 26 and 27 October each spent 150 seconds on one request with no time
-for a second, where every voice note that landed that week took 5 to 30 seconds
-and the slowest 90. A part that has not landed when the budget runs out fails
-like any other, and the full text goes. The Telegram upload carries the budget
-too.
+request, the next a fresh connection — so on every path a stall costs an attempt
+rather than the voice. The stalls of 26 and 27 October each held one request for
+the whole 150 seconds, where every voice note that landed that week took 5 to 30
+seconds and the slowest 90. A part that has not landed when the budget runs out
+fails like any other, and the full text goes. The Telegram upload carries the
+budget too.
 
 **The markdown is stripped on the way to the vendor.** No parse mode is sent, so
 she is asked for plain text, but the calendar slot is where a model writes a
@@ -2673,17 +2673,17 @@ never switches into the third person about him. A failed channel read costs the
 whole reply rather than being swallowed: an audit that silently omits half of
 what it audits is the defect it exists to prevent.
 
-**A note can be retired.** Every note reaches her with its number, and `remember`
-takes an optional `supersedes`, so a correction names what it replaces — or
-several, when one line merges notes that already said the same thing; every id
-the write could not retire is named back to her. **The filter is the whole
-feature and fails silently**: without `superseded_by is null`
-on the read she is handed the correction *and* the thing it corrected, every
-turn. The column, the filter and the tool parameter are held together by a test.
-The row itself stays — findable by search and marked no longer true — and there
-is no delete path. **A note cut at its 200 characters is written again at once**,
-whatever its kind: `remember` keeps it cut, quotes it, and hands back its id for
-the rewrite to supersede. A fact was once told *shorter next time*, and note 37
+**A note can be retired.** Every note reaches her with its number, and
+`remember` takes an optional `supersedes`, so a correction names what it
+replaces — or several, when one line merges notes that already said the same
+thing; every id the write could not retire is named back to her. **The filter is
+the whole feature and fails silently**: without `superseded_by is null` on the
+read she is handed the correction *and* the thing it corrected, every turn. The
+column, the filter and the tool parameter are held together by a test. The row
+itself stays — findable by search and marked no longer true — and there is no
+delete path. **A note cut at its ceiling is written again at once**, whatever
+its kind: `remember` keeps it cut, quotes it, and hands back its id for the
+rewrite to supersede. A fact was once told *shorter next time*, and note 37
 stayed cut mid-sentence in her window until he found it on 28 October.
 
 **She can search everything she ever said.** The windows are the newest slice of
