@@ -1918,11 +1918,14 @@ reached him — today's only.
 **Every request in `speak()` carries a budget, and a failed part gets a second
 attempt.** The budget covers the whole message: **`SPEAK_MS`**, 150 seconds, on
 paths that write and speak in one worker; **`SPEAK_WORKER_MS`**, 330 seconds, on
-the speaking worker. **`ATTEMPT_MS`** bounds each attempt at 150 seconds — a
-stall is one request, the next a fresh connection — so on the speaking worker a
-stall costs an attempt rather than the voice. A part that has not landed when
-the budget runs out fails like any other, and the full text goes. The Telegram
-upload carries the budget too.
+the speaking worker. **Each attempt gets half the budget** — a stall is one
+request, the next a fresh connection — so on every path a stall costs an
+attempt rather than the voice. Bounded at the whole budget, as it was, the
+stalls of 26 and 27 October each spent 150 seconds on one request with no time
+for a second, where every voice note that landed that week took 5 to 30 seconds
+and the slowest 90. A part that has not landed when the budget runs out fails
+like any other, and the full text goes. The Telegram upload carries the budget
+too.
 
 **The markdown is stripped on the way to the vendor.** No parse mode is sent, so
 she is asked for plain text, but the calendar slot is where a model writes a

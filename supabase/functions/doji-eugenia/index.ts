@@ -2476,11 +2476,6 @@ const TTS_SPEED = 1.3;
 const SPEAK_MS = 150_000;
 const SPEAK_WORKER_MS = 330_000;
 
-/* A part that does not land gets one more attempt, each bounded: a stall is
-   one request, and the next is a fresh connection. On SPEAK_MS only a quick
-   refusal gets its second try. */
-const ATTEMPT_MS = 150_000;
-
 /* One reading of her words. How she sounds is this request, whoever is
    listening; only the format is the listener's. */
 function reading(words: string, format: string, signal: AbortSignal): Promise<Response> {
@@ -2551,8 +2546,12 @@ export async function sayAloud(words: string, keyboard?: unknown, budget = SPEAK
   for (const [i, part] of parts.entries()) {
     const marked = i === parts.length - 1 ? keyboard : undefined;
     let landed = false, attempt = 0;
+    // Two attempts, each held to half the budget: a stall is one request, and
+    // the next is a fresh connection. Bounded at the whole budget, a stall on
+    // 26 and 27 October left no time for a second, where every voice note that
+    // landed that week took 5 to 30s and the slowest 90.
     for (; attempt < 2 && !landed && !signal.aborted; attempt++) {
-      const failed = await speak(part, marked, AbortSignal.any([signal, AbortSignal.timeout(ATTEMPT_MS)]));
+      const failed = await speak(part, marked, AbortSignal.any([signal, AbortSignal.timeout(budget / 2)]));
       if (failed) missed.add(failed);
       landed = failed === null;
     }

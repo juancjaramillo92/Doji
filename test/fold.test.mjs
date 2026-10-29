@@ -5927,7 +5927,8 @@ test('a speech vendor that never answers still leaves him the message, in time',
     console.error = realErr;
   }
 
-  assert.equal(asked.length, 1, 'the voice was never attempted, so this proves nothing about a hang');
+  // Twice: each attempt is held to half the budget, and both stall here.
+  assert.equal(asked.length, 2, 'the voice was not attempted twice, so this proves nothing about a hang');
   assert.match(how, /^sent as text \(.*timeout/i,
     'a voice that never landed is reported as heard, or without the stall that stopped it');
   const texts = sent.filter(r => r.url.includes('sendMessage'));
@@ -5968,6 +5969,51 @@ test('a speech vendor that refuses once is asked again before the text goes', as
   assert.equal(sent.filter(u => u.includes('sendVoice')).length, 1);
   assert.equal(sent.filter(u => u.includes('sendMessage')).length, 0,
     'the text went as well as the voice that landed — two bubbles for one message');
+});
+
+test('a speech request that stalls is asked again inside the same budget', async () => {
+  /* A STALL IS ONE REQUEST. Bounded at the whole budget, the first attempt took
+     all of it and the text went, on 26 and 27 October; each attempt gets half,
+     so the second is a fresh connection with time left. The budget is passed
+     short so the stall needs no waiting out. */
+  const realDeno = globalThis.Deno;
+  globalThis.Deno = { env: { get: (k) => (k === 'TTS_KEY' ? 'sk-test' : undefined) } };
+  const fresh = await import('../supabase/functions/doji-eugenia/index.ts?stall');
+  delete globalThis.Deno;
+  if (realDeno) globalThis.Deno = realDeno;
+
+  let asked = 0;
+  const sent = [];
+  const how = await stubbed(async () => {
+    globalThis.fetch = (url, init) => {
+      const u = String(url);
+      if (u.includes('/audio/speech')) {
+        // The first never answers unless aborted; the second answers at once.
+        return ++asked === 1
+          ? new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal.reason)))
+          : Promise.resolve({ ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(8) });
+      }
+      sent.push(u);
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true }) });
+    };
+    /* RACED AGAINST A DEADLINE OF ITS OWN, as the stall above is: the abort's
+       timer is unref'd, and this one stands in for the socket a real request
+       holds open. */
+    let timer;
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('sayAloud waited past its budget for a stalled request')), 3_000);
+    });
+    try {
+      return await Promise.race([
+        fresh.sayAloud('Gold is holding 4,410 into the close.', undefined, 200), deadline]);
+    } finally {
+      clearTimeout(timer);
+    }
+  });
+  assert.equal(asked, 2, 'a stalled request held the whole budget, so no second attempt was made');
+  assert.match(how, /^spoken on a second try \(.*timeout/i, 'the second attempt landed and the row does not say so');
+  assert.equal(sent.filter(u => u.includes('sendMessage')).length, 0,
+    'the text went although the second attempt landed');
 });
 
 /* THE BRIEFING'S SECOND WORKER, through the real sequence: the marker, its text
