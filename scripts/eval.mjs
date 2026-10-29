@@ -234,7 +234,9 @@ export const PLANTS = [
      runs under both, so both go. Its draft names no level off the map, and says
      the map in plain words: with the rule gone, the number budget cuts a level
      and the plain-words rule a trader's word, a sweep or a flip, and either way
-     the case cannot see the rule go. */
+     the case cannot see the rule go. It says it as the why, the one line the
+     four-line shape leaves it: in a paragraph of its own the shape cut it with
+     the rule gone, and the plant went uncaught. */
   { why: 'the map of his charts kept out of the briefing\'s prose, gone from the critic and the writer',
     cases: ['critic-keeps-map-out-of-prose'],
     breaks: (p) => ({
