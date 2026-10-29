@@ -39,6 +39,7 @@
    PWR is also the power chip's (power.c): off, a press switches her on, and
    held three seconds she says goodnight and switches off. */
 #include "bsp/esp-bsp.h"
+#include "bsp/touch.h"
 #include "esp_attr.h"
 #include "esp_flash.h"
 #include "esp_log.h"
@@ -67,6 +68,7 @@
 static const char *TAG = "charm";
 
 #define BRIGHTNESS    75     // percent
+#define DRAW_ROWS     20     // drawn at a time, twice over: 37 KB of internal RAM
 #define AWAKE_MS      30000
 #define LAST_FRAME_MS 200    // the sleep screen reaching the panel
 #define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
@@ -97,12 +99,56 @@ static void on_touch(lv_event_t *e) {
     if (code == LV_EVENT_RELEASED) dial_lift();
 }
 
-// The screen, started once, in `mode`.
+// The panel takes its coordinates in pairs, as the board package rounds them.
+static void even_area(lv_event_t *e) {
+    lv_area_t *a = lv_event_get_param(e);
+    a->x1 &= ~1;
+    a->y1 &= ~1;
+    a->x2 |= 1;
+    a->y2 |= 1;
+}
+
+/* The screen, started once, in `mode`. It is the board package's
+   bsp_display_start but for where she draws: the package's draws into PSRAM,
+   which the SPI driver will not send from, so each frame was copied into an
+   internal buffer as large as the draw, 46 KB, which a board running Wi-Fi
+   seldom has free, and nothing reached the panel. DRAW_ROWS rows at a time in
+   internal RAM is sent as it is. */
 static void light(face_mode_t mode) {
     if (lit) return;
     lit = true;
     sleep_release();
-    bsp_display_start();
+    bsp_display_cfg_t cfg = {
+        .lv_adapter_cfg = ESP_LV_ADAPTER_DEFAULT_CONFIG(),
+        .touch_flags = { .mirror_x = 1, .mirror_y = 1 },
+    };
+    const bsp_display_config_t whole = { .max_transfer_sz = BSP_LCD_H_RES * BSP_LCD_V_RES * BSP_LCD_BITS_PER_PIXEL / 8 };
+    esp_lcd_panel_handle_t panel;
+    esp_lcd_panel_io_handle_t io;
+    esp_lcd_touch_handle_t touch;
+    ESP_ERROR_CHECK(esp_lv_adapter_init(&cfg.lv_adapter_cfg));
+    ESP_ERROR_CHECK(bsp_display_new(&whole, &panel, &io));
+    const esp_lv_adapter_display_config_t screen = {
+        .panel = panel,
+        .panel_io = io,
+        .profile = {
+            .interface = ESP_LV_ADAPTER_PANEL_IF_OTHER,
+            .rotation = ESP_LV_ADAPTER_ROTATE_0,
+            .hor_res = BSP_LCD_H_RES,
+            .ver_res = BSP_LCD_V_RES,
+            .buffer_height = DRAW_ROWS,
+            .use_psram = false,
+            .require_double_buffer = true,
+        },
+        .tear_avoid_mode = ESP_LV_ADAPTER_TEAR_AVOID_MODE_NONE,
+    };
+    lv_display_t *display = esp_lv_adapter_register_display(&screen);
+    lv_display_add_event_cb(display, even_area, LV_EVENT_INVALIDATE_AREA, NULL);
+    ESP_ERROR_CHECK(bsp_touch_new(&cfg, &touch));
+    const esp_lv_adapter_touch_config_t finger = ESP_LV_ADAPTER_TOUCH_DEFAULT_CONFIG(display, touch);
+    esp_lv_adapter_register_touch(&finger);
+    ESP_ERROR_CHECK(bsp_display_brightness_init());
+    ESP_ERROR_CHECK(esp_lv_adapter_start());
     bsp_display_brightness_set(BRIGHTNESS);
     face_set_mode(mode);
     bsp_display_lock(-1);
