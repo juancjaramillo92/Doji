@@ -2874,7 +2874,13 @@ poller's `?structure=1`, stored as the folded map (*Her map of his charts*).
 While the market is shut they are folded once: the first pass after the close,
 which has Friday's daily bar closed, folds the finished week, and the rest skip
 on a copy read after it — by Saturday morning the 5m chart's twelve hours held
-no bar, and every pass metered it as unread.
+no bar, and every pass metered it as unread. **And the hour after the Sunday
+open keeps that copy until a new bar prints**: the broker's first bar comes
+after the 17:00 open, so the 15m and 5m charts read empty and the rest end where
+the week did. While nothing served is newer than the finished week's map, the
+map stands and nothing is metered — on 25 October four passes, 17:05 to 17:50,
+had replaced it with one missing its entry charts and written four unread rows.
+The first new bar is a read like any other.
 
 **Each door reads three charts at a time, inside `DOOR_MS`, 35 seconds.** One by
 one, fourteen did not fit at a slow morning's pace; all at once is the burst

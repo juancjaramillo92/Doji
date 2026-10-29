@@ -1367,6 +1367,32 @@ test('his charts are folded once after the close, and not again until the open',
   assert.equal(read.length, 3, 'a pass read bars that had not moved, or skipped a closure never read');
 });
 
+/* OPEN, AND NOT PRINTING YET. The broker's first bar comes after the Sunday
+   open, so from 17:05 to 17:50 on 25 October the 15m and 5m charts came back
+   empty, metered unread, and the finished week's map was replaced by one with
+   no entry charts. Until something newer than that copy prints, it stands. */
+test('the hour after the Sunday open keeps the week\'s map until a new bar prints', async () => {
+  const world = marketWorld();
+  const friday = Date.parse('2026-10-23T20:55:00Z');
+  const bar = (t) => ({ t, open: 4000, high: 4001, low: 3999, close: 4000 });
+  // Friday's map, folded at the close; the hour and daily charts end where the week did.
+  world.stored.set('structure', { answer: { last: bar(friday) }, read_at: '2026-10-23T21:00:00Z' });
+  const stale = { ok: true, charts: { H_1: [bar(friday - 3_300_000)], D1: [bar(friday - 86_400_000)] },
+                  missing: [{ period: 'M_15', error: 'no bars' }, { period: 'M_5', error: 'no bars' }] };
+  await stubbed(async () => {
+    globalThis.fetch = world.fetch;
+    world.doors.structure = [stale, 200];
+    await storeStructure(new Date('2026-10-25T21:05:00Z'));
+    assert.equal(world.stored.get('structure').read_at, '2026-10-23T21:00:00Z', 'the week\'s map was replaced by one with no entry charts');
+    // The first new bar is a read like any other, and a chart still missing then is metered.
+    world.doors.structure = [{ ...stale, charts: { ...stale.charts, H_1: [bar(Date.parse('2026-10-25T22:00:00Z'))] } }, 200];
+    await storeStructure(new Date('2026-10-25T22:05:00Z'));
+    assert.notEqual(world.stored.get('structure').read_at, '2026-10-23T21:00:00Z', 'a new bar printed and the map was not read');
+  });
+  assert.deepEqual(world.rows.map(r => r.detail), ['structure: M_15, M_5: no bars'],
+    'the hour before the broker prints was metered unread, or a chart missing after it was not');
+});
+
 /* ONE SLOW CALL LEAVES NO GAP: a symbol this pass missed keeps the last pass's
    line, with that pass's bar times, and one never read is still named. */
 test('a symbol the pass did not reach keeps the line the last pass read', () => {

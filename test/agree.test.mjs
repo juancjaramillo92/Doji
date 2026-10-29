@@ -6460,7 +6460,7 @@ test('every market read she goes without writes a row', () => {
       /if \(answer\.missing\.length\) await unread\(/, `${name} keeps a partial read to itself`);
   }
   assert.match(bodyOf(EUGENIA_TS, 'export async function storeStructure('),
-    /if \(served\.missing\.length\) \{\s*await unread\(/, 'storeStructure keeps a chart it did not read to itself');
+    /if \(served\.missing\.length\) \{[^}]*?return;\s*await unread\(/, 'storeStructure keeps a chart it did not read to itself');
 });
 
 /* THE MARKET IS READ AHEAD BY ONE WRITER, AND READ BACK BY EVERYONE ELSE. A
