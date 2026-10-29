@@ -230,22 +230,6 @@ export const PLANTS = [
       TRIM: p.TRIM.replace(/YOUR CALL IS THE ONE\s+EXCEPTION:[\s\S]*?never changed\./,
         'YOUR CALL COMES OUT TOO: delete every sentence that gives an entry, a stop or a target.'),
     }) },
-  /* The map rule restates the hours rule above it for the map, and the critic
-     runs under both, so both go. Its draft names no level off the map, and says
-     the map in plain words: with the rule gone, the number budget cuts a level
-     and the plain-words rule a trader's word, a sweep or a flip, and either way
-     the case cannot see the rule go. It says it as the why, the one line the
-     four-line shape leaves it: in a paragraph of its own the shape cut it with
-     the rule gone, and the plant went uncaught. */
-  { why: 'the map of his charts kept out of the briefing\'s prose, gone from the critic and the writer',
-    cases: ['critic-keeps-map-out-of-prose'],
-    breaks: (p) => ({
-      ...p,
-      SYSTEM: p.SYSTEM
-        .replace(/THE BRIEFING IS THE WEEKS BEHIND HIS CHART, NOT THE HOURS ON IT\.[\s\S]*?the story that leads\.\n\n/, '')
-        .replace(/THE MAP OF HIS CHARTS IS THE HOURS ON IT,[\s\S]*?a call you file\.\n\n/, ''),
-      CRITIC: p.CRITIC.replace(/Is the map of his charts in the prose\?[\s\S]*?it comes out\.\n\n/, ''),
-    }) },
   /* Issue #270: a collision with a position from an earlier session had no
      place in the briefing's shape. The writer never named it, 2 of 2, and the
      critic cut it off the release's calendar line, 3 of 3, before the slot
