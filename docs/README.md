@@ -3408,7 +3408,10 @@ Eugenia's with an empty recording, which a right key is refused with a `400`
 for, Gladys's with what waits — while her screen shows a spinner, then a tick or
 a cross. While she tests a network her radio moves to its channel, so the phone
 can drop off her network for a moment; the page says it is reconnecting and
-carries on by itself. Coming back later, the page shows what she has: her
+carries on by itself. A phone that does not find its way back — on the first
+board one did not, not knowing her password to rejoin — has the code again:
+whenever no phone is on her network, her screen shows the QR code rather than
+the step it was on, since the password is in nothing else. Coming back later, the page shows what she has: her
 networks in the order she tries them, each with Remove behind a second tap, a
 way to add one, and Replace for either key, checked before the old one goes. She
 keeps four networks: a fifth is refused until one is removed, never swapped in

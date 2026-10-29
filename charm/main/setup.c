@@ -152,11 +152,20 @@ static void show(show_t what, const char *doing) {
     bsp_display_unlock();
 }
 
+/* The phone's step while one is on her network; the code again when none is,
+   since its password is in nothing else. Testing a network moves her radio to
+   that network's channel, and a phone that falls off then may not know the
+   password to come back. */
+static show_t phone_step(void) {
+    wifi_sta_list_t on;
+    return esp_wifi_ap_get_sta_list(&on) == ESP_OK && on.num ? SHOW_JOINED : SHOW_CODE;
+}
+
 // A tick or a cross for a moment, then back to the phone's step.
 static void answer_shown(bool ok) {
     show(ok ? SHOW_TICK : SHOW_CROSS, NULL);
     vTaskDelay(pdMS_TO_TICKS(TICK_MS));
-    show(SHOW_JOINED, NULL);
+    show(phone_step(), NULL);
 }
 
 /* ─── The network and the answer to every name ────────────────────────────
@@ -184,6 +193,7 @@ static void dns_task(void *arg) {
 static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
     (void)arg;
     if (base == WIFI_EVENT && id == WIFI_EVENT_AP_STACONNECTED) show(SHOW_JOINED, NULL);
+    if (base == WIFI_EVENT && id == WIFI_EVENT_AP_STADISCONNECTED) show(phone_step(), NULL);
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED &&
         ((wifi_event_sta_disconnected_t *)data)->reason != WIFI_REASON_ASSOC_LEAVE) {
         online = false;
@@ -369,7 +379,7 @@ static esp_err_t api_key(httpd_req_t *req) {
     // Online on a saved network, if she is not already.
     for (int i = 0; i < cfg.n_nets && !online; i++) join(cfg.nets[i].ssid, cfg.nets[i].pass);
     if (!online) {
-        show(SHOW_JOINED, NULL);
+        show(phone_step(), NULL);
         return reply(req, "{\"ok\":false,\"why\":\"offline\"}");
     }
     esp_http_client_config_t c = {
