@@ -212,6 +212,7 @@ export const PLANTS = [
       SYSTEM: p.SYSTEM
         .replace(MECHANISM_BAN, '')
         .replace(/· No view on where price goes and no call while he has a position open,[\s\S]*?shows a position\.\n/, '')
+        .replace(/ While he holds a position, where it stands\s+and no read\./, '')
         .replace(/, or a view while he is in a position,/, ',')
         .replace(/ If he asks where you think price goes, you may[\s\S]*?and you say so\./, '')
         .replace(/ Read these rules before using it: this is the one thing you are given\s+where what you may SAY is narrower than what you can SEE\./, '')

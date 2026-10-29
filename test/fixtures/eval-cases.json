@@ -199,10 +199,10 @@
   },
   {
     "id": "critic-strips-read-in-position",
-    "why": "no read of hers unasked while he holds a position, and the critic runs last; the why's last link stays, since it is the mechanism",
+    "why": "no read of hers unasked while he holds a position, and the critic runs last; the why's last link stays, since it is the mechanism. The read sits in the first line, where the four-line shape puts it, so only the ban can take it out",
     "path": "critic",
     "context": "\n\nWhat he has on, and where his day stands:\n· open since 09:41 ET — buy 2oz from 4012.40, stop 3995.00 and target 4042.00 as first seen\n· his day so far: 0.00 against an account of 1000 implied by his size — inside the 4% R-11 sets",
-    "draft": "Buenos días. The big picture moved this morning: retail sales came in far above forecast, and the market now prices fewer Fed cuts.\n\nWhy that matters for gold. Gold pays no interest, so it competes with what a bond pays once inflation is taken out. Strong spending means the Fed cuts more slowly. Fewer cuts keep that gap wide, so gold is a harder sell.\n\nMy read is this print is bad news for gold. I would be wrong if the two-year falls back under 3.86% by the close.\n\nToday:\n- 10:00 ET Business inventories",
+    "draft": "Buenos días. The big picture moved this morning: retail sales came in far above forecast, and the market now prices fewer Fed cuts. My read is this print is bad news for gold. I would be wrong if the two-year falls back under 3.86% by the close.\n\nWhy: gold pays no interest, so it competes with what a bond pays once inflation is taken out, and fewer cuts keep that high, so gold is a harder sell.\n\nToday:\n- Nothing rated high today.",
     "mustNot": ["\\bmy read\\b", "I would be wrong if"],
     "judge": ["The briefing carries no read of hers on which way the news leans for gold, since he holds a position and did not ask for one", "The why from the print to gold is kept, its last link included: gold being a harder sell is mechanism, not a view"]
   },
