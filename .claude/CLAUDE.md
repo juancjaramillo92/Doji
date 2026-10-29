@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 843 tests, eight suites
+npm test      # 846 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -278,11 +278,12 @@ his to do and yours — so nothing open goes unsaid.
 - **The briefing is prose.** Numbered sections are a report however plain the
   words. The calendar slot is the one relaxation — times and names, `NAMED AND
   NOTHING MORE`.
-- **One chain per briefing** — a breadth rule. The round-up slot forbids mechanism
-  and `CRITIC` holds the same rule; `agree.test.mjs` reads both, since the critic
-  runs last.
-- **Length is safe only beside what to cut.** A ceiling alone cuts the teaching
-  block. `agree.test.mjs` reads the writer's copy and the critic's for the count
+- **The briefing is four lines, and its why is one line with no chain** — his
+  shape, of 26 October; the teaching lives in conversation. The calendar slot
+  forbids mechanism and `CRITIC` holds the same rules; `agree.test.mjs` reads
+  both, since the critic runs last and once grew every briefing back.
+- **Length is safe only beside what to cut.** A ceiling alone cuts whatever is
+  longest. `agree.test.mjs` reads the writer's copy and the critic's for the count
   AND the protection.
 - **`WRITING` holds the sentence rules, once, and three read it** — `SYSTEM`,
   `CRITIC`, `TRIM`; `agree.test.mjs` asserts all three interpolate it. Rules that

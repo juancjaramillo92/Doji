@@ -246,11 +246,12 @@ function r01(rows: TradeRow[]): RuleResult {
 
 /* ─── R-02 ─────────────────────────────────────────────────────────────────
    Stop never beyond $20 from entry, and never widened. §7: no loss with
-   |exit − entry| > 20, and no closed trade whose stop in trade_stops moved away
-   from entry. The second half reaches only a trade the poller saw carry a
-   stop, so without one a loss is judged on the cap alone and a win is not in
-   the population. An exit past a stop that never moved is slippage, and
-   passes.
+   |exit − entry| > 20, and no closed trade whose stop in trade_stops sat more
+   than $20 from entry or moved away from it. The history reaches only a trade
+   the poller saw carry a stop, so without one a loss is judged on the cap alone
+   and a win is not in the population. An exit past a stop that never moved is
+   slippage, and passes. A stop set past the cap is the breach on a win too: on
+   27 October a $22 stop won its target and the exit alone passed it.
 
    Each sighting is held against the last stop that rested, so a stop pulled
    and put back further out is caught. One pulled and never put back recorded
@@ -270,12 +271,14 @@ function r02(rows: TradeRow[], stops: Map<string, Stop[]>): RuleResult {
     const wider = rested.some((sl, i) =>
       i > 0 && (t.direction === 'BUY' ? sl < rested[i - 1] - CENT : sl > rested[i - 1] + CENT));
     const pulled = rested.length > 0 && seen[seen.length - 1] === null;
+    const past = t.entry_price != null && rested.some(sl =>
+      (t.direction === 'BUY' ? (t.entry_price as number) - sl : sl - (t.entry_price as number)) > FULL_STOP + CENT);
 
-    if ((loss && priced(t) && gap(t) > FULL_STOP + CENT) || wider) fail.push(t.id);
+    if ((loss && priced(t) && gap(t) > FULL_STOP + CENT) || wider || past) fail.push(t.id);
     else if ((loss && !priced(t)) || pulled) unknown.push(t.id);
     else pass.push(t.id);
   }
-  return result('R-02', `losses further than $${FULL_STOP} from entry, and stops moved away from entry where the poller recorded them`,
+  return result('R-02', `losses further than $${FULL_STOP} from entry, and stops set past $${FULL_STOP} or moved away from entry where the poller recorded them`,
                 pass, fail, unknown);
 }
 

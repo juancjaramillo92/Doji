@@ -2844,15 +2844,15 @@ test('every list of the rules check_rules answers is the list it evaluates', () 
    had. THE PROMPT CARRIES NO PREFERENCE OF HIS AT ALL: an instruction note is
    the channel for them, the one he can correct, and the prompt says notes
    outrank the shape. So tastes are searched for as tastes, and a rule propped
-   up with *and he has told you so*, or *the nag he asked to be rid of*, is the
-   other half. Bare `he told you` and
+   up with *and he has told you so*, *the nag he asked to be rid of* or *because
+   he asked*, is the other half. Bare `he told you` and
    `he said` stay: that is how the tool descriptions name the notes mechanism.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the prompt states no preference of his', () => {
   const taste =
     /\bhe (?:gets |is |gets a bit |grows )?\w*(?:frustrat|annoy|irritat|impatien|bored)|\bhe (?:hates|dislikes|prefers|resents)\b|\b(?:frustrates|annoys|irritates|bores) him\b/i;
-  const cited = /\bhe has (?:told you|said) so\b|\bas he has (?:told you|said)\b|\bhe (?:asked|wants) to be rid of\b/i;
+  const cited = /\bhe has (?:told you|said) so\b|\bas he has (?:told you|said)\b|\bhe (?:asked|wants) to be rid of\b|\bbecause he (?:asked|said)\b/i;
 
   const bodies = [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)];
   assert.ok(bodies.length >= 5,
@@ -3715,17 +3715,27 @@ test('the rung he sets himself is routed, and routed before the slash catch-all'
 
 /* ─── A rule the critic also holds has to move in both places ────────────────
    The critic runs LAST and returns the version that goes, so a rule loosened in
-   the prompt and standing in `CRITIC` is put back every morning. One chain per
-   briefing is such a pair: nine subjects each walking a mechanism is a survey.
+   the prompt and standing in `CRITIC` is put back every morning. The briefing's
+   four lines are such a pair, and so is its one line of why: with the critic
+   still told to complete the chain, a writer's 1,400 characters went out at
+   1,600 on 27 and 28 October.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('one chain per briefing is stated to the writer and to the critic', () => {
-  assert.match(EUGENIA_PROMPT, /ONE CHAIN IN A BRIEFING, NOT ONE PER EVENT/,
-    'the briefing prompt no longer bounds how many mechanisms a briefing carries, ' +
+test('the four lines and the one line of why are stated to the writer and to the critic', () => {
+  const cut = EUGENIA_PROMPT.indexOf('export const CRITIC');
+  const writer = EUGENIA_PROMPT.slice(0, cut), critic = EUGENIA_PROMPT.slice(cut);
+  assert.match(writer, /IT IS FOUR LINES, AND THE WORKING STAYS BEHIND THEM/,
+    'the writer is no longer given the four lines he asked for');
+  assert.match(critic, /IS IT FOUR LINES\?/,
+    'the critic no longer holds the four lines, and it runs last');
+  assert.match(writer, /THERE IS NO CHAIN IN A BRIEFING, ONLY ITS ONE LINE/,
+    'the briefing prompt no longer bounds how much mechanism a briefing carries, ' +
     'so it goes back to a survey with a clause of chain on every event');
-  assert.match(EUGENIA_PROMPT, /IS THERE MORE THAN ONE CHAIN IN IT\?/,
-    'the critic no longer checks it — so the writer may obey the rule and the ' +
-    'pass that runs last has no reason to keep that version');
+  assert.match(critic, /Is there a chain in it\? The why is one line/,
+    'the critic no longer cuts a chain back to its line — so the writer may obey ' +
+    'the rule and the pass that runs last has no reason to keep that version');
+  assert.doesNotMatch(critic, /If a link is missing, add it/,
+    'the critic completes a chain again, and the briefing grows back every morning');
 
   /* AND THE ROUND-UP SLOT SAYS SO ITSELF: a length says nothing about what may be
      inside the paragraph. */
@@ -4067,7 +4077,7 @@ test('the critic counts paragraphs and dashes last, after everything that can ad
     'the count step no longer bounds a paragraph at four sentences');
   assert.match(step, /every em-dash; each one becomes a full stop/,
     'the count step no longer removes the em-dash aside');
-  for (const earlier of ['${WRITING}', 'Is the chain complete', 'standing instructions']) {
+  for (const earlier of ['${WRITING}', 'Is there a chain in it', 'standing instructions']) {
     assert.ok(critic.indexOf(earlier) > -1 && critic.indexOf(earlier) < count,
       `the count comes before "${earlier}", which can add a clause after it`);
   }
@@ -4695,7 +4705,7 @@ const PACE_SQL = subject("How much of the worker's clock the briefing spends");
    is driven by nothing. */
 test('a reply records how it reached him, from what sayAloud answered', () => {
   const body = bodyOf(EUGENIA_TS, 'async function handleMessage(', 'doji-eugenia no longer has handleMessage()');
-  assert.match(body, /const heard = await sayAloud\(answer\);\s*await recordRun\(\{ caller: 'reply delivered', chars: answer\.length, ok: true,\s*detail: heard \? 'spoken' : 'sent as text' \}\);/,
+  assert.match(body, /const how = await sayAloud\(answer\);\s*await recordRun\(\{ caller: 'reply delivered', chars: answer\.length, ok: true, detail: how \}\);/,
     'a reply no longer records whether it was spoken or sent as text, so a missing one cannot be traced');
 });
 
@@ -6625,7 +6635,7 @@ test('the briefing opens on the weeks, in the writer and in the critic', () => {
     .replace(/\s+/g, ' ');
   const system = flat('SYSTEM');
   const critic = flat('CRITIC');
-  assert.match(system, /WHERE THE BIG PICTURE STANDS\. .*?weeks and months/,
+  assert.match(system, /WHERE THE BIG PICTURE STANDS, AND WHICH WAY IT LEANS\. .*?weeks and months/,
     'the briefing\'s first slot no longer opens on the forces that move gold over weeks');
   assert.match(system, /not to open on: a night's move is noise against the weeks/,
     'the handed quote reads as the opening again, which puts the overnight move first');
@@ -6636,15 +6646,16 @@ test('the briefing opens on the weeks, in the writer and in the critic', () => {
 });
 
 test('a word count never stands without what to cut instead: the briefing\'s two copies and the review', () => {
-  /* A CEILING ON ITS OWN CUTS THE TEACHING, the longest thing on the page. The
-     count is safe only beside what to cut INSTEAD, so a copy holding the count
-     alone reproduces that. The review's teaching is its verdict and its one
-     thing to keep and one to change. */
+  /* A CEILING ON ITS OWN CUTS WHATEVER IS LONGEST, which once was the teaching
+     every morning. The count is safe only beside what to cut INSTEAD, so a copy
+     holding the count alone reproduces that. The briefing's protected parts are
+     the read and its test, the events, the call and a verdict; the review's are
+     its verdict and its one thing to keep and one to change. */
   const writer = EUGENIA_PROMPT.slice(0, EUGENIA_PROMPT.indexOf('export const CRITIC'));
   const critic = EUGENIA_PROMPT.slice(EUGENIA_PROMPT.indexOf('export const CRITIC'));
   for (const [who, half] of [['writer', writer], ['critic', critic]]) {
-    assert.match(half, /250 to 300 words/, `the ${who} has lost the word count`);
-    assert.match(half, /[Nn]ever the teaching block|NOT A PLACE YOU CUT|never out of the block/,
+    assert.match(half, /80 to 120 words/, `the ${who} has lost the word count`);
+    assert.match(half, /THE READ AND ITS\s+TEST ARE NOT A PLACE YOU CUT|Never the read or its\s+test/,
       `the ${who} holds a word count with nothing saying what to cut instead — ` +
       `which is the arrangement that stopped her teaching the first time`);
   }

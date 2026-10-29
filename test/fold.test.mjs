@@ -50,7 +50,7 @@ import {
   sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
   volumeList, volumeBlock, keptMarket, storeMarket, storeRates, storeTrend, trendList, trendBlock,
   flowsList, flowsBlock, storeFlows, storePositioning,
-  structureList, structureBlock, storeStructure, THESIS_MAX, PORTRAIT_MAX,
+  structureList, structureBlock, storeStructure, THESIS_MAX, PORTRAIT_MAX, NOTE_MAX,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -4089,6 +4089,17 @@ test('R-02 checks the cap on every loss, and the stop history wherever the polle
   const short = win({ direction: 'SELL', exit_price: 3970 });
   assert.equal(r(short, [at(4010), at(4000, 5)]).verdict, 'pass');
   assert.equal(r(short, [at(4010), at(4015, 5)]).verdict, 'fail');
+
+  /* SET PAST THE CAP is the breach whatever the outcome: on 27 October a $22
+     stop won its target, and the exit alone passed it. $20.00 is the cap
+     honoured; a loss inside $20 does not excuse a stop set wider. */
+  assert.equal(r(win(), [at(3978)]).verdict, 'fail', 'a $22 stop passed because the trade won');
+  assert.equal(r(win(), [at(3980)]).verdict, 'pass', 'a $20.00 stop read as past the cap');
+  assert.equal(r(loss(3990, { pnl: -40 }), [at(3978)]).verdict, 'fail',
+    'a $22 stop passed because the loss closed inside $20');
+  assert.equal(r(short, [at(4022)]).verdict, 'fail', 'a short\'s $22 stop passed');
+  // A stop past entry on the winning side is no risk at all.
+  assert.equal(r(win(), [at(3990), at(4025, 5)]).verdict, 'pass');
 });
 
 test('R-03 allows no entry after a $20 stop, and a tighter loss is not one', () => {
@@ -5410,6 +5421,31 @@ test('one note can retire several, and every id it could not retire is named', a
   });
 });
 
+/* A NOTE CUT AT NOTE_MAX IS WRITTEN AGAIN NOW, whatever its kind. A fact was
+   told "shorter next time", and note 37 stayed cut mid-sentence in her window
+   until he found it on 28 October. The rewrite needs the cut note's id to
+   retire it, so the insert hands it back. */
+test('a note cut at its ceiling is to be written again now, retiring the cut one', async () => {
+  const prefer = [];
+  await stubbed(async () => {
+    globalThis.fetch = async (url, opts = {}) => {
+      prefer.push(new Headers(opts.headers).get('Prefer'));
+      return new Response(JSON.stringify([{ id: 37 }]), { status: 201 });
+    };
+    for (const kind of ['fact', 'instruction', 'commitment']) {
+      const said = await serve('remember', { note: 'a'.repeat(NOTE_MAX) + ' vault stocks', kind });
+      assert.match(said, /Write it again now, shorter, with supersedes 37 so the cut one is retired/,
+        `a cut ${kind} is left standing cut, or without the id that retires it`);
+      assert.doesNotMatch(said, /next time/, `a cut ${kind} waits for a next time`);
+      assert.equal(/say it back to him/.test(said), kind !== 'fact',
+        `a cut ${kind} is${kind === 'fact' ? '' : ' not'} checked with him`);
+    }
+    assert.ok(prefer.every(p => /return=representation/.test(p)), 'a cut note was written without its id coming back');
+    assert.equal(await serve('remember', { note: 'he trades the London open', kind: 'fact' }), 'Remembered.');
+    assert.match(prefer.at(-1), /return=minimal/, 'a whole note holds the row it never reads');
+  });
+});
+
 /* A PARAGRAPH CUT AT ITS CEILING IS SAID TO BE. On 27 October the portrait was
    kept at 800 characters ending "or jo", she was told it was updated, and every
    turn carried the broken sentence. */
@@ -5865,14 +5901,17 @@ test('a speech vendor that cannot answer still leaves him the message', async ()
      false without a request — the shape of a vendor that refused — so this
      replays the real sequence: every part fails, and the text must still go. */
   const sent = [];
-  await stubbed(async () => {
+  const how = await stubbed(async () => {
     globalThis.fetch = async (url, init) => {
       sent.push({ url: String(url), body: init?.body ? JSON.parse(init.body) : null });
       return { ok: true, status: 200, json: async () => ({ ok: true }) };
     };
-    await sayAloud('Gold is holding 4,410 into the close.');
+    return await sayAloud('Gold is holding 4,410 into the close.');
   });
 
+  /* AND SAYS WHY, since the delivered row is the only place the reason
+     outlives the logs. */
+  assert.equal(how, 'sent as text (no TTS_KEY)', 'the fallback no longer says why the voice did not land');
   const texts = sent.filter(r => r.url.includes('sendMessage'));
   assert.equal(texts.length, 1,
     'no text went out when the audio could not be made, so a speech vendor ' +
@@ -5914,9 +5953,9 @@ test('a speech vendor that never answers still leaves him the message, in time',
     timer = setTimeout(() => reject(new Error(
       'sayAloud waited past its budget for a vendor that never answers')), 3_000);
   });
-  let heard;
+  let how;
   try {
-    heard = await Promise.race([
+    how = await Promise.race([
       fresh.sayAloud('Gold is holding 4,410 into the close.', undefined, 50), deadline]);
   } finally {
     clearTimeout(timer);
@@ -5924,8 +5963,10 @@ test('a speech vendor that never answers still leaves him the message, in time',
     console.error = realErr;
   }
 
-  assert.equal(asked.length, 1, 'the voice was never attempted, so this proves nothing about a hang');
-  assert.equal(heard, false, 'a voice that never landed is reported as heard');
+  // Twice: each attempt is held to half the budget, and both stall here.
+  assert.equal(asked.length, 2, 'the voice was not attempted twice, so this proves nothing about a hang');
+  assert.match(how, /^sent as text \(.*timeout/i,
+    'a voice that never landed is reported as heard, or without the stall that stopped it');
   const texts = sent.filter(r => r.url.includes('sendMessage'));
   assert.equal(texts.length, 1,
     'no text went out when the voice never answered — the briefing of 2 October, again');
@@ -5944,7 +5985,7 @@ test('a speech vendor that refuses once is asked again before the text goes', as
 
   let asked = 0;
   const sent = [];
-  const heard = await stubbed(async () => {
+  const how = await stubbed(async () => {
     globalThis.fetch = async (url, init) => {
       const u = String(url);
       if (u.includes('/audio/speech')) {
@@ -5959,10 +6000,75 @@ test('a speech vendor that refuses once is asked again before the text goes', as
     return await fresh.sayAloud('Gold is holding 4,410 into the close.');
   });
   assert.equal(asked, 2, 'a part that failed once was not asked for again');
-  assert.equal(heard, true, 'the second attempt landed and the voice is reported as not heard');
+  assert.equal(how, 'spoken on a second try (speech HTTP 503)',
+    'the second attempt landed and the row does not say so, or not why the first failed');
   assert.equal(sent.filter(u => u.includes('sendVoice')).length, 1);
   assert.equal(sent.filter(u => u.includes('sendMessage')).length, 0,
     'the text went as well as the voice that landed — two bubbles for one message');
+});
+
+test('he sees her recording while she speaks, and the text never goes under it', async () => {
+  /* NOTHING ON HIS SCREEN WAS THE FAILURE he saw: the typing indicator stops
+     before the voice, and on 27 October the voice took two and a half minutes.
+     Driven through a refusal, so the text fallback is in the sequence too: the
+     indicator comes first and nothing follows the text. An interval left
+     running would also hold this suite open, so a lost clear cannot pass. */
+  const sent = [];
+  await stubbed(async () => {
+    globalThis.fetch = async (url, init) => {
+      const u = String(url);
+      sent.push(u.includes('sendChatAction') ? `action:${JSON.parse(init.body).action}` : u.split('/').pop());
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+    await sayAloud('Gold is holding 4,410 into the close.');
+  });
+  assert.equal(sent[0], 'action:record_voice', 'nothing shows him she is speaking before the voice is asked for');
+  assert.equal(sent.at(-1), 'sendMessage', 'something went after the text, or the text never went');
+});
+
+test('a speech request that stalls is asked again inside the same budget', async () => {
+  /* A STALL IS ONE REQUEST. Bounded at the whole budget, the first attempt took
+     all of it and the text went, on 26 and 27 October; each attempt gets half,
+     so the second is a fresh connection with time left. The budget is passed
+     short so the stall needs no waiting out. */
+  const realDeno = globalThis.Deno;
+  globalThis.Deno = { env: { get: (k) => (k === 'TTS_KEY' ? 'sk-test' : undefined) } };
+  const fresh = await import('../supabase/functions/doji-eugenia/index.ts?stall');
+  delete globalThis.Deno;
+  if (realDeno) globalThis.Deno = realDeno;
+
+  let asked = 0;
+  const sent = [];
+  const how = await stubbed(async () => {
+    globalThis.fetch = (url, init) => {
+      const u = String(url);
+      if (u.includes('/audio/speech')) {
+        // The first never answers unless aborted; the second answers at once.
+        return ++asked === 1
+          ? new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal.reason)))
+          : Promise.resolve({ ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(8) });
+      }
+      sent.push(u);
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ ok: true }) });
+    };
+    /* RACED AGAINST A DEADLINE OF ITS OWN, as the stall above is: the abort's
+       timer is unref'd, and this one stands in for the socket a real request
+       holds open. */
+    let timer;
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('sayAloud waited past its budget for a stalled request')), 3_000);
+    });
+    try {
+      return await Promise.race([
+        fresh.sayAloud('Gold is holding 4,410 into the close.', undefined, 200), deadline]);
+    } finally {
+      clearTimeout(timer);
+    }
+  });
+  assert.equal(asked, 2, 'a stalled request held the whole budget, so no second attempt was made');
+  assert.match(how, /^spoken on a second try \(.*timeout/i, 'the second attempt landed and the row does not say so');
+  assert.equal(sent.filter(u => u.includes('sendMessage')).length, 0,
+    'the text went although the second attempt landed');
 });
 
 /* THE BRIEFING'S SECOND WORKER, through the real sequence: the marker, its text
@@ -5998,7 +6104,7 @@ test('the speaking worker sends today\'s stored briefing and only then says it w
       throw new Error(`unexpected request ${u}`);
     };
     const res = await postSpeak('weekday');
-    assert.equal((await res.json()).heard, false, 'with no voice key the text went, and it reads as heard');
+    assert.equal((await res.json()).how, 'sent as text (no TTS_KEY)', 'with no voice key the text went, and it reads as heard');
   });
   assert.deepEqual(steps, ['marker', 'text', 'sent:Buenos días. Payrolls lands at 08:30.',
                            'row:weekday briefing delivered'],
@@ -6033,8 +6139,9 @@ test('nothing she writes is left unspoken for being long', () => {
 });
 
 test('a briefing is one voice note, not several', () => {
-  // 250–400 words is ~2,800 characters, one request; split, the teaching block
-  // would be cut across two notes.
+  // Her ceiling is 150 words, a verdict beside it included, well inside one
+  // request; 2,800 characters leaves room, and split, a call would be cut
+  // across two notes.
   assert.equal(chunk('x'.repeat(2800), 4000).length, 1);
 });
 

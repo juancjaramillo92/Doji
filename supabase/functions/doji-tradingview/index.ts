@@ -303,11 +303,15 @@ async function callback(url: URL): Promise<Response> {
    same credential serves eleven tools that change his alerts and watchlists,
    and mcp-watchlist-get-active-watchlist creates a watchlist when none is
    active. Left out on purpose: the technical rating, forecasts and screener,
-   which are signals by another name, and everything about companies. */
+   which are signals by another name, and everything about companies. His
+   alerts are read and never written: the list and the fire log are the two the
+   listing marks read-only, probed before any reader is written on them, since
+   the levels he marks are where she is meant to meet him. */
 const ALLOWED_TOOLS = [
   "mcp-tv-get-economic-calendar", "mcp-tv-get-economic-symbols", "mcp-tv-get-economic-data",
   "mcp-tv-get-symbol-data-batch",
   "mcp-tv-get-ohlcv", "mcp-tv-get-news", "mcp-tv-search-symbols",
+  "mcp-tv-list-alerts", "mcp-tv-get-alerts-log",
 ] as const;
 type AllowedTool = typeof ALLOWED_TOOLS[number];
 
@@ -930,6 +934,12 @@ const PROBES: Record<string, () => Call[]> = {
     ["mcp-tv-get-ohlcv", { symbol: GOLD[0], interval: "1m", count: 3 }],
   ],
   news: () => FEEDS.map((f): Call => ["mcp-tv-get-news", { symbol: f.symbol, limit: f.limit }]),
+  // His alerts as TradingView keeps them, and the last week of their firing
+  // with the message he wrote: what a reader of them would fold.
+  alerts: () => [
+    ["mcp-tv-list-alerts", { active: true }],
+    ["mcp-tv-get-alerts-log", { days: 7, limit: 20 }],
+  ],
   econ: () => [
     ["mcp-tv-get-economic-symbols", { country: "US", category: "prce" }],
     ["mcp-tv-get-economic-symbols", { country: "US", category: "mny" }],
