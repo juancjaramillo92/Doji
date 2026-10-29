@@ -2576,9 +2576,9 @@ export async function sayAloud(words: string, keyboard?: unknown, budget = SPEAK
       const marked = i === parts.length - 1 ? keyboard : undefined;
       let landed = false, attempt = 0;
       // Two attempts, each held to half the budget: a stall is one request, and
-      // the next is a fresh connection. Bounded at the whole budget, a stall on
-      // 26 and 27 October left no time for a second, where every voice note
-      // that landed that week took 5 to 30s and the slowest 90.
+      // the next is a fresh connection. A stall on 26 and 27 October held one
+      // request for the whole 150s, where every voice note that landed that
+      // week took 5 to 30s and the slowest 90.
       for (; attempt < 2 && !landed && !signal.aborted; attempt++) {
         const failed = await speak(part, marked, AbortSignal.any([signal, AbortSignal.timeout(budget / 2)]));
         if (failed) missed.add(failed);
@@ -3649,8 +3649,8 @@ export async function headlinesBlock(): Promise<string> {
    What doji-tradingview's `foldAlerts` answers: his levels, highest first, as
    a chart reads them. An alert on an indicator carries no price and says so.
    ───────────────────────────────────────────────────────────────────────── */
-export interface TvAlert {
-  id: number; symbol: string; condition: string; level: number | null; set: string; fired: string | null;
+interface TvAlert {
+  symbol: string; condition: string; level: number | null; set: string; fired: string | null;
 }
 
 export function alertsList(alerts: TvAlert[], now = Date.now()): string {

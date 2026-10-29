@@ -27,7 +27,7 @@ import {
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, unwrap, foldCalendar,
-  calendarWindow, foldBars, foldHeadlines, FOMC, contractMonths, foldRates, oddsOf, unlisted, zq, foldSessions,
+  calendarWindow, foldBars, foldHeadlines, foldAlerts, FOMC, contractMonths, foldRates, oddsOf, unlisted, zq, foldSessions,
   readMarket, readRates, readTrend, foldTrend, BACK, FITS, fitOf, foldReserves, foldFunds, FUNDS, readFlows, RESERVES,
 } from '../supabase/functions/doji-tradingview/index.ts';
 import {
@@ -45,7 +45,7 @@ import {
   callProblem, expiryOf, scoreCall, callsList, lossesList, reactionOf, fileReactions, effortMessages, BASE_EFFORT,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
-  aroundList, aroundBlock, headlinesList, headlinesBlock,
+  aroundList, aroundBlock, headlinesList, headlinesBlock, alertsList,
   releaseName, printsQuery, printsList, RELEASE_PRINTS,
   sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
   volumeList, volumeBlock, keptMarket, storeMarket, storeRates, storeTrend, trendList, trendBlock,
@@ -1652,6 +1652,24 @@ test('the conversation reads six hours of headlines, names another day, and says
   assert.match(next, /ET on Thursday 1 Oct/, 'a headline from yesterday reads as today\'s');
   assert.doesNotMatch(headlinesList({ headlines, missing: [] }, Date.parse('2026-10-01T17:45:00Z')),
     /on Thursday/, 'a headline from today carries a date it does not need');
+});
+
+/* HIS LEVELS, AS HIS CHART READS THEM: highest first, whenever they were set.
+   The capture of 29 October has two price alerts and nothing fired, so a
+   fired one, an alert on an indicator, and none at all are built beside it. */
+test('his alerts come highest first, say when each fired, and say when there is none', () => {
+  const capture = JSON.parse(readFileSync(new URL('./fixtures/tradingview-alerts.json', import.meta.url), 'utf8'));
+  const alerts = foldAlerts(capture.result.structuredContent);
+  assert.deepEqual(alerts.map(a => a.level), [4026.34, 4078.55], 'the fold changed the levels or their order');
+  const out = alertsList([...alerts, { symbol: 'PEPPERSTONE:XAUUSD', condition: 'cross', level: 4050,
+    set: '2026-10-28T13:00:00Z', fired: '2026-10-29T14:31:00Z' }], Date.parse('2026-10-29T20:15:00Z'));
+  assert.match(out, /· 4078\.55 on PEPPERSTONE:XAUUSD, cross, set 16:09 ET, not fired yet\n· 4050 [^\n]*set 09:00 ET on Wednesday 28 Oct, last fired 10:31 ET\n· 4026\.34 /,
+    'his levels are not highest first, or a fired one is not said to have fired, or another day not named');
+  const [indicator] = foldAlerts({ alerts: [{ alert_id: 1, symbol: 'PEPPERSTONE:XAUUSD', condition_type: 'indicator',
+    create_time: '2026-10-29T20:00:00Z', last_fire_time: null }] });
+  assert.equal(indicator.level, null, 'an alert with no price was given one');
+  assert.match(alertsList([indicator], Date.parse('2026-10-29T20:15:00Z')), /· no price level on /);
+  assert.match(alertsList([]), /He has no active alert in TradingView\./);
 });
 
 test('headlines that will not read send her to search, and never take the reply down', async () => {
@@ -6027,10 +6045,10 @@ test('he sees her recording while she speaks, and the text never goes under it',
 });
 
 test('a speech request that stalls is asked again inside the same budget', async () => {
-  /* A STALL IS ONE REQUEST. Bounded at the whole budget, the first attempt took
-     all of it and the text went, on 26 and 27 October; each attempt gets half,
-     so the second is a fresh connection with time left. The budget is passed
-     short so the stall needs no waiting out. */
+  /* A STALL IS ONE REQUEST. On 26 and 27 October one held the whole 150s and
+     the text went; each attempt gets half the budget, so the second is a fresh
+     connection with time left. The budget is passed short so the stall needs no
+     waiting out. */
   const realDeno = globalThis.Deno;
   globalThis.Deno = { env: { get: (k) => (k === 'TTS_KEY' ? 'sk-test' : undefined) } };
   const fresh = await import('../supabase/functions/doji-eugenia/index.ts?stall');
@@ -6139,9 +6157,9 @@ test('nothing she writes is left unspoken for being long', () => {
 });
 
 test('a briefing is one voice note, not several', () => {
-  // Her ceiling is 150 words, a verdict beside it included, well inside one
-  // request; 2,800 characters leaves room, and split, a call would be cut
-  // across two notes.
+  // Her ceiling, a verdict beside it included, is well inside one request;
+  // 2,800 characters leaves room, and split, a call would be cut across two
+  // notes.
   assert.equal(chunk('x'.repeat(2800), 4000).length, 1);
 });
 
