@@ -4705,7 +4705,7 @@ const PACE_SQL = subject("How much of the worker's clock the briefing spends");
    is driven by nothing. */
 test('a reply records how it reached him, from what sayAloud answered', () => {
   const body = bodyOf(EUGENIA_TS, 'async function handleMessage(', 'doji-eugenia no longer has handleMessage()');
-  assert.match(body, /const heard = await sayAloud\(answer\);\s*await recordRun\(\{ caller: 'reply delivered', chars: answer\.length, ok: true,\s*detail: heard \? 'spoken' : 'sent as text' \}\);/,
+  assert.match(body, /const how = await sayAloud\(answer\);\s*await recordRun\(\{ caller: 'reply delivered', chars: answer\.length, ok: true, detail: how \}\);/,
     'a reply no longer records whether it was spoken or sent as text, so a missing one cannot be traced');
 });
 

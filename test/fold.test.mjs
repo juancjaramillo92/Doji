@@ -5865,14 +5865,17 @@ test('a speech vendor that cannot answer still leaves him the message', async ()
      false without a request — the shape of a vendor that refused — so this
      replays the real sequence: every part fails, and the text must still go. */
   const sent = [];
-  await stubbed(async () => {
+  const how = await stubbed(async () => {
     globalThis.fetch = async (url, init) => {
       sent.push({ url: String(url), body: init?.body ? JSON.parse(init.body) : null });
       return { ok: true, status: 200, json: async () => ({ ok: true }) };
     };
-    await sayAloud('Gold is holding 4,410 into the close.');
+    return await sayAloud('Gold is holding 4,410 into the close.');
   });
 
+  /* AND SAYS WHY, since the delivered row is the only place the reason
+     outlives the logs. */
+  assert.equal(how, 'sent as text (no TTS_KEY)', 'the fallback no longer says why the voice did not land');
   const texts = sent.filter(r => r.url.includes('sendMessage'));
   assert.equal(texts.length, 1,
     'no text went out when the audio could not be made, so a speech vendor ' +
@@ -5914,9 +5917,9 @@ test('a speech vendor that never answers still leaves him the message, in time',
     timer = setTimeout(() => reject(new Error(
       'sayAloud waited past its budget for a vendor that never answers')), 3_000);
   });
-  let heard;
+  let how;
   try {
-    heard = await Promise.race([
+    how = await Promise.race([
       fresh.sayAloud('Gold is holding 4,410 into the close.', undefined, 50), deadline]);
   } finally {
     clearTimeout(timer);
@@ -5925,7 +5928,8 @@ test('a speech vendor that never answers still leaves him the message, in time',
   }
 
   assert.equal(asked.length, 1, 'the voice was never attempted, so this proves nothing about a hang');
-  assert.equal(heard, false, 'a voice that never landed is reported as heard');
+  assert.match(how, /^sent as text \(.*timeout/i,
+    'a voice that never landed is reported as heard, or without the stall that stopped it');
   const texts = sent.filter(r => r.url.includes('sendMessage'));
   assert.equal(texts.length, 1,
     'no text went out when the voice never answered — the briefing of 2 October, again');
@@ -5944,7 +5948,7 @@ test('a speech vendor that refuses once is asked again before the text goes', as
 
   let asked = 0;
   const sent = [];
-  const heard = await stubbed(async () => {
+  const how = await stubbed(async () => {
     globalThis.fetch = async (url, init) => {
       const u = String(url);
       if (u.includes('/audio/speech')) {
@@ -5959,7 +5963,8 @@ test('a speech vendor that refuses once is asked again before the text goes', as
     return await fresh.sayAloud('Gold is holding 4,410 into the close.');
   });
   assert.equal(asked, 2, 'a part that failed once was not asked for again');
-  assert.equal(heard, true, 'the second attempt landed and the voice is reported as not heard');
+  assert.equal(how, 'spoken on a second try (speech HTTP 503)',
+    'the second attempt landed and the row does not say so, or not why the first failed');
   assert.equal(sent.filter(u => u.includes('sendVoice')).length, 1);
   assert.equal(sent.filter(u => u.includes('sendMessage')).length, 0,
     'the text went as well as the voice that landed — two bubbles for one message');
@@ -5998,7 +6003,7 @@ test('the speaking worker sends today\'s stored briefing and only then says it w
       throw new Error(`unexpected request ${u}`);
     };
     const res = await postSpeak('weekday');
-    assert.equal((await res.json()).heard, false, 'with no voice key the text went, and it reads as heard');
+    assert.equal((await res.json()).how, 'sent as text (no TTS_KEY)', 'with no voice key the text went, and it reads as heard');
   });
   assert.deepEqual(steps, ['marker', 'text', 'sent:Buenos días. Payrolls lands at 08:30.',
                            'row:weekday briefing delivered'],

@@ -1893,8 +1893,8 @@ vendor or a format Telegram will not render would make audio alone a
 **missing** message, so `say()` fires whenever the audio did not land — in full,
 since three quarters heard is worse than either. That ordering lives once, in
 **`sayAloud`**, and a test reads it and counts the call sites; `fold.test.mjs`
-**drives** it, since with no TTS key every `speak()` answers false, exactly as a
-refusing vendor does. **What is stored is untouched**: `remember()` writes the
+**drives** it, since with no TTS key every `speak()` answers why it could not,
+exactly as a refusing vendor does. **What is stored is untouched**: `remember()` writes the
 transcript whatever happened on the wire. The briefing's keyboard rides on the
 last voice note.
 
@@ -2901,12 +2901,16 @@ Each briefing adds rows of its own, apart from the model calls so *the critic
 costs more than it is worth* and *the briefing is drifting long* stay separate
 questions: `<brief> briefing written` (`stored in 1s, handed to the speaking
 worker`, with its total `ms`) and `<brief> briefing delivered`, carrying the
-length he received and how it went out (`spoken in 19s`, or `sent as text`). A
-manual `?force=1` answers `accepted`, so the delivered row is where its length is
-read. **A reply writes `reply delivered` the same way** — its length, and
-`spoken` or `sent as text` off what `sayAloud` answered — since on 18 October a
-reply stored as spoken never reached him and nothing could say how it had gone
-out. `spoken` means Telegram accepted the voice note, not that it played.
+length he received and how it went out (`spoken in 19s`, or `sent as text (…)
+in 150s`). A manual `?force=1` answers `accepted`, so the delivered row is where
+its length is read. **A reply writes `reply delivered` the same way** — its
+length, and how it went out, which is what `sayAloud` answers — since on 18
+October a reply stored as spoken never reached him and nothing could say how it
+had gone out. `spoken` means Telegram accepted the voice note, not that it
+played. **Where the voice failed the row says why** — `sent as text (speech HTTP
+503)`, or `spoken on a second try (…)` when the retry landed: the reason was a
+console line alone, and the two stalls of 26 and 27 October had outlived the
+logs before anyone asked what stalled.
 
 **Three nightly meters write rows, both outcomes.** Her calls' scoring writes
 `caller: 'calls'`, since a broker door that stopped answering leaves every call
