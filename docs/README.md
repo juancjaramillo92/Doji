@@ -99,6 +99,7 @@ scripts/calibrate.mjs                   whether her map finds the levels he trad
 scripts/replay.mjs                      what her calls would have done on past mornings, by hand
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push, and says when the eval is owed
+.github/workflows/database.yml          runs the database suite on a push that touches what it reads
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
 .github/workflows/backup.yml            the daily copy of the tables nothing else holds
 .github/workflows/health.yml            the hourly outside check; a failed run is the alarm
@@ -448,6 +449,7 @@ single-sourced at run time:
 | the **columns of `eugenia_runs`** | the table, the object literals `recordRun` is called with, and the `verify.sql` row on the cache-write columns |
 | **which rules a row can answer** | §7's `Evaluable` column, the twelve predicates in `adherence.ts`, and the lists and counts in `check_rules`' description, the prompt and the paragraph below |
 | the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union, and `pace_line`'s `owed \|\| ' briefing delivered'` |
+| **what the database suite reads** | the files `test/db` reads, its script in `package.json` and its own workflow, and the `paths` `database.yml` runs on |
 | the **briefing's budgets** | the words, their ceiling and the count of numbers, in `SYSTEM` and in `CRITIC`, and as this README gives them |
 | the **number of scheduled jobs** | the `cron.schedule` calls in `schema.sql` and the count `verify.sql` asserts |
 | a **long door's deadline** | `DOOR_MS` in `doji-tradingview` and `READ_MS` in `doji-eugenia`, ten seconds apart for the boot, the sign-in and the wire |
@@ -1908,11 +1910,17 @@ quarters heard is worse than either. That ordering lives once, in
 **`sayAloud`**, and a test reads it and counts the call sites; `fold.test.mjs`
 **drives** it, since with no TTS key every `speak()` answers why it could not,
 exactly as a refusing vendor does. **What is stored is untouched**: `remember()`
-writes the transcript whatever happened on the wire. The briefing's keyboard
-rides on the last voice note. **While she speaks, Telegram shows her
-recording**, sent again every few seconds and stopped before the text can go, as
-typing is shown while she writes: on 27 October the voice took two and a half
-minutes with nothing on his screen, and he asked whether she had answered.
+writes the transcript whatever happened on the wire. **And it is written before
+it is spoken**, on every path that both stores and speaks: speaking can take
+minutes, and on 26 October *No reply?*, sent while the answer was still being
+spoken, read a history without it and was answered as something else. A failed
+write still costs only the history, with the apology after the message;
+`agree.test.mjs` holds the order for every censused path and `fold.test.mjs`
+drives it through the trade look. The briefing's keyboard rides on the last
+voice note. **While she speaks, Telegram shows her recording**, sent again every
+few seconds and stopped before the text can go, as typing is shown while she
+writes: on 27 October the voice took two and a half minutes with nothing on his
+screen, and he asked whether she had answered.
 
 **There is no length cap.** A briefing is 80–150 words by its own rule, and a
 cap decides that past some length a message is not worth hearing. A long message
@@ -2868,7 +2876,13 @@ poller's `?structure=1`, stored as the folded map (*Her map of his charts*).
 While the market is shut they are folded once: the first pass after the close,
 which has Friday's daily bar closed, folds the finished week, and the rest skip
 on a copy read after it — by Saturday morning the 5m chart's twelve hours held
-no bar, and every pass metered it as unread.
+no bar, and every pass metered it as unread. **And the hour after the Sunday
+open keeps that copy until a new bar prints**: the broker's first bar comes
+after the 17:00 open, so the 15m and 5m charts read empty and the rest end where
+the week did. While nothing served is newer than the finished week's map, the
+map stands and nothing is metered — on 25 October four passes, 17:05 to 17:50,
+had replaced it with one missing its entry charts and written four unread rows.
+The first new bar is a read like any other.
 
 **Each door reads three charts at a time, inside `DOOR_MS`, 35 seconds.** One by
 one, fourteen did not fit at a slow morning's pace; all at once is the burst
@@ -3903,7 +3917,13 @@ green is the tree everyone gets — and the same suite gates the function deploy
 The suites run on every push through `.github/workflows/test.yml`. The script
 globs `test/*.test.mjs` one level deep, so a test in a subfolder would silently
 not run — `test/db` is the one subfolder, on purpose, with its own command and
-its own CI job, and `agree.test.mjs` holds that both still name it.
+its own workflow, `database.yml`, and `agree.test.mjs` holds that both still
+name it. **That workflow runs only on a push that touches what the suite
+reads**: each job is billed by the minute rounded up, it ran on every push, and
+in October two pushes in three changed nothing it reads. What it reads is
+derived from the suite and held against the workflow's `paths`, so an input left
+off is a red test rather than a check skipped under a green tick. A merge into
+main carries the whole branch's diff, so a schema change is always run there.
 
 **Whether she still behaves is `scripts/eval.mjs`, run by hand.** Every rule
 that matters most about her is a sentence, and no suite can say whether the
@@ -3957,16 +3977,16 @@ it before it is merged.
 on every change to the function is one nobody reads.
 
 **`npm run test:db` needs a Postgres server with pgvector, of the major version
-Supabase runs** — named once, in `test.yml`'s `PGCLUSTER`, and asserted by the
-suite, so a Supabase upgrade is that one value changed — reached through the
-standard `PG*` variables as a superuser, so `npm test` keeps needing
-Node alone. It builds a throwaway database from `test/db/supabase.sql` — stand-ins
-for `auth`, `vault`, `pg_net`, `pg_cron` and the API roles, which record rather
-than send — and `schema.sql`. Text cannot see what it sees: Postgres resolves a
+Supabase runs** — named once, in `database.yml`'s `PGCLUSTER`, and asserted by
+the suite, so a Supabase upgrade is that one value changed — reached through the
+standard `PG*` variables as a superuser, so `npm test` keeps needing Node alone.
+It builds a throwaway database from `test/db/supabase.sql` — stand-ins for
+`auth`, `vault`, `pg_net`, `pg_cron` and the API roles, which record rather than
+send — and `schema.sql`. Text cannot see what it sees: Postgres resolves a
 PL/pgSQL body only on its first call, inside the write that fired it, so a
-one-letter typo in a trigger passes every other suite and fails every insert.
-In CI, the job installs that version and pgvector from PostgreSQL's own
-repository, since the runner carries an older one.
+one-letter typo in a trigger passes every other suite and fails every insert. In
+CI, the job installs that version and pgvector from PostgreSQL's own repository,
+since the runner carries an older one.
 
 **Every `uses:` in the workflows names a commit, never a tag.** A tag can be
 repointed between runs, so the action audited is not the action that runs;

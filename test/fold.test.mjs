@@ -1367,6 +1367,32 @@ test('his charts are folded once after the close, and not again until the open',
   assert.equal(read.length, 3, 'a pass read bars that had not moved, or skipped a closure never read');
 });
 
+/* OPEN, AND NOT PRINTING YET. The broker's first bar comes after the Sunday
+   open, so from 17:05 to 17:50 on 25 October the 15m and 5m charts came back
+   empty, metered unread, and the finished week's map was replaced by one with
+   no entry charts. Until something newer than that copy prints, it stands. */
+test('the hour after the Sunday open keeps the week\'s map until a new bar prints', async () => {
+  const world = marketWorld();
+  const friday = Date.parse('2026-10-23T20:55:00Z');
+  const bar = (t) => ({ t, open: 4000, high: 4001, low: 3999, close: 4000 });
+  // Friday's map, folded at the close; the hour and daily charts end where the week did.
+  world.stored.set('structure', { answer: { last: bar(friday) }, read_at: '2026-10-23T21:00:00Z' });
+  const stale = { ok: true, charts: { H_1: [bar(friday - 3_300_000)], D1: [bar(friday - 86_400_000)] },
+                  missing: [{ period: 'M_15', error: 'no bars' }, { period: 'M_5', error: 'no bars' }] };
+  await stubbed(async () => {
+    globalThis.fetch = world.fetch;
+    world.doors.structure = [stale, 200];
+    await storeStructure(new Date('2026-10-25T21:05:00Z'));
+    assert.equal(world.stored.get('structure').read_at, '2026-10-23T21:00:00Z', 'the week\'s map was replaced by one with no entry charts');
+    // The first new bar is a read like any other, and a chart still missing then is metered.
+    world.doors.structure = [{ ...stale, charts: { ...stale.charts, H_1: [bar(Date.parse('2026-10-25T22:00:00Z'))] } }, 200];
+    await storeStructure(new Date('2026-10-25T22:05:00Z'));
+    assert.notEqual(world.stored.get('structure').read_at, '2026-10-23T21:00:00Z', 'a new bar printed and the map was not read');
+  });
+  assert.deepEqual(world.rows.map(r => r.detail), ['structure: M_15, M_5: no bars'],
+    'the hour before the broker prints was metered unread, or a chart missing after it was not');
+});
+
 /* ONE SLOW CALL LEAVES NO GAP: a symbol this pass missed keeps the last pass's
    line, with that pass's bar times, and one never read is still named. */
 test('a symbol the pass did not reach keeps the line the last pass read', () => {
@@ -6772,15 +6798,16 @@ test('an opened event reads nothing and says nothing; a close past the limit rea
   const pending = [{ id: 1, at: new Date(Date.now() + 3600_000).toISOString(), name: 'US CPI',
     importance: 'high', consensus: '0.3%', prior: null, actual: null }];
 
-  const run = (trade, event) => {
+  const run = (trade, event, text = 'NOTHING') => {
     const asked = [];
-    return withFetch(async (url) => {
-      asked.push(String(url));
+    return withFetch(async (url, init) => {
+      asked.push(`${init?.method ?? 'GET'} ${url}`);
       if (String(url).includes('eugenia_trades')) return new Response(JSON.stringify([trade]), { status: 200 });
       if (String(url).includes('eugenia_calendar')) return new Response(JSON.stringify(pending), { status: 200 });
       // The model, answering with the silence the prompt allows.
       if (String(url).includes('anthropic')) return new Response(JSON.stringify(
-        { content: [{ type: 'text', text: 'NOTHING' }], stop_reason: 'end_turn', usage: {} }), { status: 200 });
+        { content: [{ type: 'text', text }], stop_reason: 'end_turn', usage: {} }), { status: 200 });
+      if (String(url).includes('api.telegram.org')) return Response.json({ ok: true });
       return new Response('[]', { status: 200 });
     }, async () => ({ said: await (await postTradeEvent('PID9', event)).json(), asked }));
   };
@@ -6797,6 +6824,17 @@ test('an opened event reads nothing and says nothing; a close past the limit rea
   assert.ok(closed.asked.some(u => u.includes('anthropic')),
     'a close past the day\'s limit never reached the model');
   assert.equal(closed.said.said, 'quiet');
+
+  /* STORED BEFORE IT IS SPOKEN: speaking can take minutes, and a message he
+     sends meanwhile reads the history. With no voice key the text is what
+     goes, so the turn's write must come before it. */
+  const spoken = await run(row({ exit_price: 3980, fill_time: new Date().toISOString(), pnl: -90, net_pnl: -90 }),
+                           'closed', 'That close took your day past R-11.');
+  assert.equal(spoken.said.said, 'sent');
+  const stored = spoken.asked.findIndex(u => u.startsWith('POST') && u.includes('/eugenia_turns'));
+  const sent = spoken.asked.findIndex(u => u.includes('sendMessage'));
+  assert.ok(stored > -1 && sent > -1 && stored < sent,
+    'the trade look is stored only after he has it, so a message he sends meanwhile reads a history without it');
 });
 
 /* ─── A trades read that reached its bound ───────────────────────────────────

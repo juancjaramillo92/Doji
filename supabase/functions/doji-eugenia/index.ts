@@ -3349,6 +3349,15 @@ export async function storeStructure(now = new Date()): Promise<void> {
     const served = await res.json();
     if (!served?.ok || !served.charts) throw new Error("no readable answer");
     if (served.missing.length) {
+      /* Open, and not printing yet: the broker's first bar comes after the
+         Sunday open, and until it does the 15m and 5m charts are empty and the
+         rest end where the week did — four unread rows every Sunday from 17:05
+         to 17:50. While nothing served is newer than the finished week's copy,
+         that copy stands and nothing is metered; the first new bar is a read
+         like any other. */
+      const kept = await readStored("structure");
+      const newest = Math.max(0, ...(Object.values(served.charts) as Candle[][]).flat().map(b => b.t));
+      if (kept && !marketOpen(new Date(kept.read_at)) && newest > 0 && newest <= (kept.answer.last?.t ?? 0)) return;
       await unread("structure", missed(served.missing.map((m: { period: string; error: string }) =>
         ({ symbol: m.period, error: m.error }))));
     }
@@ -4510,9 +4519,13 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
 
   if (isSilent(said)) return json({ ok: true, trade: id, said: "quiet" });
 
+  // Stored before it is spoken, as a reply is; a failed write still costs
+  // the history after the message, never the message.
+  const unstored = await remember([{ role: 'user', content: `[trade ${event}]` },
+                                   { role: 'assistant', content: said }])
+    .then(() => null, (err: unknown) => why(err));
   await sayAloud(said);
-  await remember([{ role: 'user', content: `[trade ${event}]` },
-                  { role: 'assistant', content: said }]);
+  if (unstored) throw new Error(unstored);
   return json({ ok: true, trade: id, said: "sent" });
 }
 
@@ -4811,13 +4824,19 @@ async function handleMessage(update: any): Promise<void> {
       clearInterval(keepTyping);
     }
 
-    // Sent before the write: the message is what he is waiting on. Its own
-    // row, as the briefing's delivery has: on 18 October a reply stored as
-    // spoken never reached him, and nothing said how it had gone out.
+    /* Stored before it is spoken, as the briefing is: speaking can take
+       minutes, and on 26 October "No reply?", sent while the answer was still
+       being spoken, read a history without it and was answered as something
+       else. A failed write is the apology, after the message: the message is
+       what he is waiting on. The text, never the blocks or the audio: a
+       megabyte resent as history. */
+    const unstored = await remember([{ role: 'user', content: asked }, { role: 'assistant', content: answer }])
+      .then(() => null, (err: unknown) => why(err));
+    // Its own row, as the briefing's delivery has: on 18 October a reply stored
+    // as spoken never reached him, and nothing said how it had gone out.
     const how = await sayAloud(answer);
     await recordRun({ caller: 'reply delivered', chars: answer.length, ok: true, detail: how });
-    // The text, never the blocks or the audio: a megabyte resent as history.
-    await remember([{ role: 'user', content: asked }, { role: 'assistant', content: answer }]);
+    if (unstored) throw new Error(unstored);
   } catch (err) {
     console.error("doji-eugenia:", why(err));
     await tg("sendMessage", { chat_id: CHAT_ID, text: APOLOGY.reply }).catch(() => {});
