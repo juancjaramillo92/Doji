@@ -120,6 +120,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--glow); outl
   /* The charm answers in JSON. While she tests a network her radio moves to
      its channel, so the phone can drop off her network for a moment: the page
      says so, and keeps asking for twenty-five seconds before giving up. */
+  // A question the phone could not get to her, told apart from her answer.
+  const LOST = 'The page lost the charm. Make sure your phone is on her network, then try again.';
   async function ask(path, fields) {
     const body = fields ? new URLSearchParams(fields) : undefined;
     const until = Date.now() + 25000;
@@ -201,7 +203,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--glow); outl
     button.disabled = false;
     if (!r.ok) {
       status(st, 'bad', r.why === 'full' ? `She keeps ${state.max} networks. Remove one first.`
-        : r.why === 'lost' ? 'The page lost the charm. Make sure your phone is on her network, then try again.'
+        : r.why === 'lost' ? LOST
         : 'That password didn’t work. Check it and try again.');
       return;
     }
@@ -343,9 +345,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--glow); outl
       state.keys[who] = { value, state: 'wait', say: 'Asking her door…' };
       status(st, 'wait', 'Asking her door…');
       next.disabled = true;
-      const r = await ask('/api/key', { who, key: value.trim() }).catch(() => ({ ok: false, why: 'offline' }));
+      const r = await ask('/api/key', { who, key: value.trim() }).catch(() => ({ ok: false, why: 'lost' }));
       state.keys[who] = { value, state: r.ok ? 'ok' : 'bad',
-        say: r.ok ? `${NAMES[who]} answered` : r.why === 'offline' ? 'She can’t reach the internet. Add a network first.' : 'Refused. Copy it again from Supabase; a character may be missing.' };
+        say: r.ok ? `${NAMES[who]} answered` : r.why === 'lost' ? LOST
+          : r.why === 'offline' ? 'She can’t reach the internet. Add a network first.' : 'Refused. Copy it again from Supabase; a character may be missing.' };
       render();
       const input = document.getElementById(`k-${who}`);
       input.focus();
