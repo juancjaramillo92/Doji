@@ -2726,10 +2726,13 @@ the most it may ever be, it usually sits tighter off the chart, and it moves onl
 outward to break-even or inward under R-19. A loss further than $20 can only be a
 widened stop; a $10 stop closed $18 out passes the cap, and `trade_stops` says
 which it was. A sighting further from entry than the stop that rested before it
-fails R-02, win or loss; an exit past a stop that never moved is slippage and
-passes; one pulled and never put back is `unknown`. Only a trade the poller
-recorded has that history, so a clean R-02 means no stop went past $20 and none
-was widened where one was watched — never that every stop was respected.
+fails R-02, win or loss, and so does one more than $20 from entry — the cap
+broken where it was set, which the exit of a winning trade cannot show (v1.29,
+after a $22 stop won its target on 27 October); an exit past a stop that never
+moved is slippage and passes; one pulled and never put back is `unknown`. Only a
+trade the poller recorded has that history, so a clean R-02 means no stop went
+past $20 and none was widened where one was watched — never that every stop was
+respected.
 
 **R-10 and R-11** — one position at a time; the day ends at −4% of the account —
 come out of broker columns alone: overlapping entry-to-fill spans, and cumulative

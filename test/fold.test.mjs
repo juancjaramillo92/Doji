@@ -4089,6 +4089,17 @@ test('R-02 checks the cap on every loss, and the stop history wherever the polle
   const short = win({ direction: 'SELL', exit_price: 3970 });
   assert.equal(r(short, [at(4010), at(4000, 5)]).verdict, 'pass');
   assert.equal(r(short, [at(4010), at(4015, 5)]).verdict, 'fail');
+
+  /* SET PAST THE CAP is the breach whatever the outcome: on 27 October a $22
+     stop won its target, and the exit alone passed it. $20.00 is the cap
+     honoured; a loss inside $20 does not excuse a stop set wider. */
+  assert.equal(r(win(), [at(3978)]).verdict, 'fail', 'a $22 stop passed because the trade won');
+  assert.equal(r(win(), [at(3980)]).verdict, 'pass', 'a $20.00 stop read as past the cap');
+  assert.equal(r(loss(3990, { pnl: -40 }), [at(3978)]).verdict, 'fail',
+    'a $22 stop passed because the loss closed inside $20');
+  assert.equal(r(short, [at(4022)]).verdict, 'fail', 'a short\'s $22 stop passed');
+  // A stop past entry on the winning side is no risk at all.
+  assert.equal(r(win(), [at(3990), at(4025, 5)]).verdict, 'pass');
 });
 
 test('R-03 allows no entry after a $20 stop, and a tighter loss is not one', () => {
