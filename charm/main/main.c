@@ -42,6 +42,7 @@
 #include "bsp/touch.h"
 #include "esp_attr.h"
 #include "esp_flash.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_psram.h"
 #include "esp_sleep.h"
@@ -155,8 +156,11 @@ static void light(face_mode_t mode) {
     face_start();
     bsp_display_unlock();
     // Timestamped from boot, beside talk.c's "listening": how much of a press's
-    // wait is the panel starting.
-    ESP_LOGI(TAG, "lit");
+    // wait is the panel starting. And what internal RAM the screen and Wi-Fi
+    // leave, which ran out on the first board.
+    ESP_LOGI(TAG, "lit, %u bytes of internal RAM free, %u in one piece",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
 }
 
 // Her briefing has landed: lit for Eugenia to say so.

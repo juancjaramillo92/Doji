@@ -3585,7 +3585,8 @@ floating in sleep, is quiet. That a battery run down resets her as a brownout
 and so switches her off, and whether a cable alone switches her back on. How
 long a press from sleep takes to reach the listening notes: the serial log's
 `lit` and `listening` lines are timestamped from boot, and the board package's
-panel start alone waits 1.2 s. How long her frames take in each mood, which the
+panel start alone waits 1.2 s. How much internal RAM is left once she is lit,
+and in how large a piece, which the `lit` line says. How long her frames take in each mood, which the
 serial log says — under the face's 33 ms is smooth — and whether a render
 changing tears, since the board package does not sync to the panel. Which way
 the motion sensor's x and y axes run across the screen (`SCREEN_X` and
