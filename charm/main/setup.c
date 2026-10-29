@@ -206,8 +206,23 @@ static void start_network(void) {
     events = xEventGroupCreate();
     esp_netif_init();
     esp_event_loop_create_default();
-    esp_netif_create_default_wifi_ap();
+    esp_netif_t *own = esp_netif_create_default_wifi_ap();
     esp_netif_create_default_wifi_sta();
+
+    /* DHCP tells a phone that joins to ask her for every name, and where her
+       page is (option 114, which newer phones open at once): a phone checks it
+       is online before anything, and one whose check goes unanswered leaves. */
+    esp_netif_ip_info_t at;
+    esp_netif_get_ip_info(own, &at);
+    esp_netif_dns_info_t dns = { .ip = { .u_addr.ip4 = at.ip, .type = ESP_IPADDR_TYPE_V4 } };
+    uint8_t offer = 1;
+    char page[24];
+    snprintf(page, sizeof page, "http://" IPSTR, IP2STR(&at.ip));
+    esp_netif_dhcps_stop(own);
+    esp_netif_set_dns_info(own, ESP_NETIF_DNS_MAIN, &dns);
+    esp_netif_dhcps_option(own, ESP_NETIF_OP_SET, ESP_NETIF_DOMAIN_NAME_SERVER, &offer, sizeof offer);
+    esp_netif_dhcps_option(own, ESP_NETIF_OP_SET, ESP_NETIF_CAPTIVEPORTAL_URI, page, strlen(page));
+    esp_netif_dhcps_start(own);
     wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&init);
     esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_event, NULL);

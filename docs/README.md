@@ -3391,8 +3391,10 @@ flashing — or after BOOT is held for five seconds, she becomes her own Wi-Fi
 network, named for her address like *Charm-4F2A* and **locked with a password
 made up for that setup**, and shows a **QR code** carrying both, centred on her
 screen with the name under it. A phone's camera joins it in one tap, and the
-page opens by itself: every name the phone asks for resolves to the charm and
-every page but its own redirects there. The page (`charm/main/setup.html`) is
+page opens by itself: her DHCP tells the phone to ask her for every name and
+where her page is (option 114, which newer phones open at once), every name the
+phone asks for resolves to the charm, and every page but its own redirects
+there. The page (`charm/main/setup.html`) is
 set in Doji's typeface, which the charm serves herself
 (`charm/main/setup.woff2`, made by `charm/tools/fonts.sh`) since the phone has
 no internet while it is on her network, and it is built for a phone: thumb-sized
