@@ -6482,6 +6482,7 @@ const TOOL_CALLS = [
   ['get_market',    {}],
   ['get_around',    {}],
   ['get_structure', {}],
+  ['get_alerts',    {}],
   ['set_thesis',    { thesis: 'a reading' }],
   ['set_portrait',  { portrait: 'a reading of him' }],
   ['open_loop',     { kind: 'question', body: 'a question' }],

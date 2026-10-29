@@ -1,0 +1,45 @@
+{
+ "jsonrpc": "2.0",
+ "id": 2,
+ "result": {
+  "content": [
+   {
+    "type": "text",
+    "text": "{\"alerts\":[{\"active\":true,\"alert_id\":5954465590,\"condition_type\":\"cross\",\"create_time\":\"2026-10-29T20:10:00Z\",\"expiration\":\"2026-11-30T02:09:53Z\",\"last_fire_time\":null,\"name\":null,\"resolution\":\"1\",\"symbol\":\"PEPPERSTONE:XAUUSD\",\"threshold\":4026.34,\"type\":\"price\"},{\"active\":true,\"alert_id\":5954464659,\"condition_type\":\"cross\",\"create_time\":\"2026-10-29T20:09:52Z\",\"expiration\":\"2026-11-30T01:09:45Z\",\"last_fire_time\":null,\"name\":null,\"resolution\":\"1\",\"symbol\":\"PEPPERSTONE:XAUUSD\",\"threshold\":4078.55,\"type\":\"price\"}],\"connected\":true,\"success\":true}"
+   }
+  ],
+  "structuredContent": {
+   "alerts": [
+    {
+     "active": true,
+     "alert_id": 5954465590,
+     "condition_type": "cross",
+     "create_time": "2026-10-29T20:10:00Z",
+     "expiration": "2026-11-30T02:09:53Z",
+     "last_fire_time": null,
+     "name": null,
+     "resolution": "1",
+     "symbol": "PEPPERSTONE:XAUUSD",
+     "threshold": 4026.34,
+     "type": "price"
+    },
+    {
+     "active": true,
+     "alert_id": 5954464659,
+     "condition_type": "cross",
+     "create_time": "2026-10-29T20:09:52Z",
+     "expiration": "2026-11-30T01:09:45Z",
+     "last_fire_time": null,
+     "name": null,
+     "resolution": "1",
+     "symbol": "PEPPERSTONE:XAUUSD",
+     "threshold": 4078.55,
+     "type": "price"
+    }
+   ],
+   "connected": true,
+   "success": true
+  },
+  "isError": false
+ }
+}
