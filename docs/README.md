@@ -3297,7 +3297,7 @@ with Espressif's audio codecs for the Opus a recording is encoded in. Her
 screen is started from the package's parts rather than its `bsp_display_start`,
 which draws into PSRAM: the SPI driver will not send from there, so it copies
 each draw into internal RAM first, 46 KB at a time, which a board running Wi-Fi
-seldom has free, and the first board showed nothing but white. She draws twenty
+seldom has free, and the first board showed nothing but white. She draws twelve
 rows at a time in internal RAM, sent as they are (`light` in
 `charm/main/main.c`). The versions every build uses are the ones `charm/dependencies.lock` names, and the
 workflow fails a build that resolved any other, so a new release reaches the

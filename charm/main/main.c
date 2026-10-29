@@ -69,7 +69,7 @@
 static const char *TAG = "charm";
 
 #define BRIGHTNESS    75     // percent
-#define DRAW_ROWS     20     // drawn at a time, twice over: 37 KB of internal RAM
+#define DRAW_ROWS     12     // drawn at a time, twice over: 22 KB of internal RAM
 #define AWAKE_MS      30000
 #define LAST_FRAME_MS 200    // the sleep screen reaching the panel
 #define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
