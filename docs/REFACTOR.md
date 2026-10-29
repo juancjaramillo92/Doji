@@ -1171,6 +1171,17 @@ says how long frames take in each mood, and the board will say which, if any,
 is slow.
 **Revisit if:** the frame log shows a mood over its frame.
 
+### R-125 — a planted defect for the map kept out of the briefing's prose
+**Retired.** Under the four-line briefing the plant cannot be caught. With the
+map rule taken from writer and critic, `critic-keeps-map-out-of-prose` still
+came back without the map, 0 of 3 on 29 October, wherever the draft put it: a
+paragraph of its own is cut as not one of the four lines, and said as the why
+it was rewritten into a force that moves gold over weeks. The shape now keeps
+the map out on its own, so no slot is left where the rule alone decides. The
+case stays, checking the real prompt; `agree.test.mjs` holds the rule's
+sentences in `SYSTEM` and `CRITIC`.
+**Revisit if:** the briefing gains a slot a sentence off the map could sit in.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED
