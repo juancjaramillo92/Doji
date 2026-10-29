@@ -1908,11 +1908,17 @@ quarters heard is worse than either. That ordering lives once, in
 **`sayAloud`**, and a test reads it and counts the call sites; `fold.test.mjs`
 **drives** it, since with no TTS key every `speak()` answers why it could not,
 exactly as a refusing vendor does. **What is stored is untouched**: `remember()`
-writes the transcript whatever happened on the wire. The briefing's keyboard
-rides on the last voice note. **While she speaks, Telegram shows her
-recording**, sent again every few seconds and stopped before the text can go, as
-typing is shown while she writes: on 27 October the voice took two and a half
-minutes with nothing on his screen, and he asked whether she had answered.
+writes the transcript whatever happened on the wire. **And it is written before
+it is spoken**, on every path that both stores and speaks: speaking can take
+minutes, and on 26 October *No reply?*, sent while the answer was still being
+spoken, read a history without it and was answered as something else. A failed
+write still costs only the history, with the apology after the message;
+`agree.test.mjs` holds the order for every censused path and `fold.test.mjs`
+drives it through the trade look. The briefing's keyboard rides on the last
+voice note. **While she speaks, Telegram shows her recording**, sent again every
+few seconds and stopped before the text can go, as typing is shown while she
+writes: on 27 October the voice took two and a half minutes with nothing on his
+screen, and he asked whether she had answered.
 
 **There is no length cap.** A briefing is 80–150 words by its own rule, and a
 cap decides that past some length a message is not worth hearing. A long message

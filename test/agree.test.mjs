@@ -4705,7 +4705,7 @@ const PACE_SQL = subject("How much of the worker's clock the briefing spends");
    is driven by nothing. */
 test('a reply records how it reached him, from what sayAloud answered', () => {
   const body = bodyOf(EUGENIA_TS, 'async function handleMessage(', 'doji-eugenia no longer has handleMessage()');
-  assert.match(body, /const how = await sayAloud\(answer\);\s*await recordRun\(\{ caller: 'reply delivered', chars: answer\.length, ok: true, detail: how \}\);/,
+  assert.match(body, /const how = await sayAloud\(answer\);\s*await recordRun\(\{ caller: 'reply delivered', chars: answer\.length, ok: true, detail: how \}\);\s*if \(unstored\) throw new Error\(unstored\);/,
     'a reply no longer records whether it was spoken or sent as text, so a missing one cannot be traced');
 });
 
@@ -7042,6 +7042,13 @@ test('every censused path gates, speaks and stores the same one text', () => {
     assert.match(body, new RegExp(`role: 'assistant', content: ${spec.carries}\\b`),
       `${fn} stores a text other than the one it sent — her history then holds ` +
       'words he never read, resent as hers for the next six exchanges');
+    /* STORED BEFORE IT IS SPOKEN: speaking can take minutes, and on 26 October
+       a message sent meanwhile read a history without the answer. */
+    const spoken = body.indexOf('await sayAloud(');
+    if (spoken > -1) {
+      assert.ok(body.indexOf('await remember(') > -1 && body.indexOf('await remember(') < spoken,
+        `${fn} stores what it sends only after speaking it, so a message he sends meanwhile reads a history without it`);
+    }
   }
 });
 

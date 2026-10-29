@@ -6772,15 +6772,16 @@ test('an opened event reads nothing and says nothing; a close past the limit rea
   const pending = [{ id: 1, at: new Date(Date.now() + 3600_000).toISOString(), name: 'US CPI',
     importance: 'high', consensus: '0.3%', prior: null, actual: null }];
 
-  const run = (trade, event) => {
+  const run = (trade, event, text = 'NOTHING') => {
     const asked = [];
-    return withFetch(async (url) => {
-      asked.push(String(url));
+    return withFetch(async (url, init) => {
+      asked.push(`${init?.method ?? 'GET'} ${url}`);
       if (String(url).includes('eugenia_trades')) return new Response(JSON.stringify([trade]), { status: 200 });
       if (String(url).includes('eugenia_calendar')) return new Response(JSON.stringify(pending), { status: 200 });
       // The model, answering with the silence the prompt allows.
       if (String(url).includes('anthropic')) return new Response(JSON.stringify(
-        { content: [{ type: 'text', text: 'NOTHING' }], stop_reason: 'end_turn', usage: {} }), { status: 200 });
+        { content: [{ type: 'text', text }], stop_reason: 'end_turn', usage: {} }), { status: 200 });
+      if (String(url).includes('api.telegram.org')) return Response.json({ ok: true });
       return new Response('[]', { status: 200 });
     }, async () => ({ said: await (await postTradeEvent('PID9', event)).json(), asked }));
   };
@@ -6797,6 +6798,17 @@ test('an opened event reads nothing and says nothing; a close past the limit rea
   assert.ok(closed.asked.some(u => u.includes('anthropic')),
     'a close past the day\'s limit never reached the model');
   assert.equal(closed.said.said, 'quiet');
+
+  /* STORED BEFORE IT IS SPOKEN: speaking can take minutes, and a message he
+     sends meanwhile reads the history. With no voice key the text is what
+     goes, so the turn's write must come before it. */
+  const spoken = await run(row({ exit_price: 3980, fill_time: new Date().toISOString(), pnl: -90, net_pnl: -90 }),
+                           'closed', 'That close took your day past R-11.');
+  assert.equal(spoken.said.said, 'sent');
+  const stored = spoken.asked.findIndex(u => u.startsWith('POST') && u.includes('/eugenia_turns'));
+  const sent = spoken.asked.findIndex(u => u.includes('sendMessage'));
+  assert.ok(stored > -1 && sent > -1 && stored < sent,
+    'the trade look is stored only after he has it, so a message he sends meanwhile reads a history without it');
 });
 
 /* ─── A trades read that reached its bound ───────────────────────────────────
