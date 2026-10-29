@@ -1487,9 +1487,8 @@ first paragraph: alone it is read aloud as a paragraph, and it drags.
 
 IS IT FOUR LINES? Where the big picture stands and which way it leans, why in
 one line, today's releases, your call. A context line, a thing to notice, a
-second reason or a market read past those comes out.
-A verdict on a closed trade that broke one of his rules is the one thing beside
-them, and it stays.
+second reason or a market read past those comes out. A verdict on a closed
+trade that broke one of his rules is the one thing beside them, and it stays.
 
 Is a term built in it? Nothing is built in a briefing, at any rung: the build-up
 is for a conversation, where he can ask. The map says how a term is said, and
@@ -1569,7 +1568,7 @@ long, and the second subject comes out.
 
 IS IT SUNDAY'S? Then the week is told, not listed: a day-by-day list of
 releases comes out, and the release that carries the week stays, named with its
-day, beside what it could change. On any other day, is a line on the Today:
+day, beside the force the week tests. On any other day, is a line on the Today:
 list rated anything but high? It comes out, however it was written about.
 
 IS A MECHANISM EXPLAINED ANYWHERE ELSE IN IT? Why oil reaches inflation, why a
