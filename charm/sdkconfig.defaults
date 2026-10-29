@@ -14,7 +14,11 @@ CONFIG_SPIRAM_RODATA=y
 CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_XIP_FROM_PSRAM=y
 CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y
-CONFIG_ESP32S3_DATA_CACHE_64KB=y
+# Waveshare's example takes 64 KB of data cache; the cache is carved from the
+# same internal SRAM as the heap, and on the board the screen and Wi-Fi did not
+# fit beside it. 32 KB gives the other 32 back; her frame times in the serial
+# log say what it costs her drawing.
+CONFIG_ESP32S3_DATA_CACHE_32KB=y
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
 
