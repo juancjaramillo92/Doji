@@ -6994,8 +6994,11 @@ test('every planted defect breaks a prompt and names a case that exists', () => 
   // And the case's draft names no level off the map, or the number budget cuts it
   // whatever the rule says.
   const mapCase = EVAL.CASES.find(c => c.id === 'critic-keeps-map-out-of-prose');
-  const chart = mapCase.draft.split('\n\n').find(par => /On the charts/.test(par));
+  const chart = mapCase.draft.split('\n\n').find(par => /on the charts/i.test(par));
   assert.doesNotMatch(chart, /\d/, 'the map case\'s chart paragraph carries a number the budget would cut anyway');
+  // And it is the why, the one line the four-line shape leaves a reason: in a
+  // paragraph of its own the shape cut it with the rule gone.
+  assert.match(chart, /^Why:/, 'the map case says the map outside the why, where the shape cuts it whatever the rule says');
   // Nor a trader's word, which the plain-words rule rewrites whatever the map rule says.
   assert.doesNotMatch(chart, /swe(pt|ep)|flip/i, 'the map case\'s chart paragraph carries a word the plain-words rule would cut anyway');
   assert.doesNotMatch(map.CRITIC, /Is the map of his charts in the prose/,
