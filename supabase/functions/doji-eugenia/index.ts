@@ -1283,20 +1283,28 @@ const THESIS_TOOL = {
   },
 } as const;
 
+/* Kept cut rather than refused, as a note is, and said as a note's cut is: the
+   paragraph is handed back with every turn until the next pass, and on 27
+   October a portrait went on ending "or jo" with nothing to tell her. Said
+   while the pass is still hers, so she can write it again. */
+const cutAt = (max: number, kept: string) =>
+  `Saved, but cut at ${max} characters, so it now ends "…${kept.slice(-60)}". Write it again, shorter.`;
+
 async function setThesis(thesis: unknown): Promise<string> {
-  const text = String(thesis ?? "").trim().slice(0, THESIS_MAX);
+  const text = String(thesis ?? "").trim();
   if (!text) return "Nothing to write.";
+  const kept = text.slice(0, THESIS_MAX);
   try {
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_thesis?id=eq.current`, {
       method: "PATCH", headers: sbHeaders("return=representation"),
-      body: JSON.stringify({ thesis: text, moved_on: nyDate(new Date()), updated_at: new Date().toISOString() }),
+      body: JSON.stringify({ thesis: kept, moved_on: nyDate(new Date()), updated_at: new Date().toISOString() }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     // Empty means the thesis seed row is missing, as with setChannel.
     if ((await res.json()).length === 0) {
       return "There is no thesis row — schema.sql has not been applied, so nothing was saved. Say nothing about this to him.";
     }
-    return "Thesis updated.";
+    return kept.length < text.length ? cutAt(THESIS_MAX, kept) : "Thesis updated.";
   } catch (err) {
     console.error("doji-eugenia: thesis not written —", why(err));
     return UNSAVED;
@@ -1334,19 +1342,20 @@ const PORTRAIT_TOOL = {
 } as const;
 
 async function setPortrait(portrait: unknown): Promise<string> {
-  const text = String(portrait ?? "").trim().slice(0, PORTRAIT_MAX);
+  const text = String(portrait ?? "").trim();
   if (!text) return "Nothing to write.";
+  const kept = text.slice(0, PORTRAIT_MAX);
   try {
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_portrait?id=eq.current`, {
       method: "PATCH", headers: sbHeaders("return=representation"),
-      body: JSON.stringify({ portrait: text, moved_on: nyDate(new Date()), updated_at: new Date().toISOString() }),
+      body: JSON.stringify({ portrait: kept, moved_on: nyDate(new Date()), updated_at: new Date().toISOString() }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     // Empty means the seed row is missing, as with setThesis.
     if ((await res.json()).length === 0) {
       return "There is no portrait row — schema.sql has not been applied, so nothing was saved. Say nothing about this to him.";
     }
-    return "Portrait updated.";
+    return kept.length < text.length ? cutAt(PORTRAIT_MAX, kept) : "Portrait updated.";
   } catch (err) {
     console.error("doji-eugenia: portrait not written —", why(err));
     return UNSAVED;

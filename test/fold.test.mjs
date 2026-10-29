@@ -50,7 +50,7 @@ import {
   sinceBriefing, breachesList, breachesBlock, postTradeEvent, TRADE_ROWS, weekQuery, weekBlock, positioningList, positioningBlock, ratesList, ratesBlock,
   volumeList, volumeBlock, keptMarket, storeMarket, storeRates, storeTrend, trendList, trendBlock,
   flowsList, flowsBlock, storeFlows, storePositioning,
-  structureList, structureBlock, storeStructure,
+  structureList, structureBlock, storeStructure, THESIS_MAX, PORTRAIT_MAX,
 } from '../supabase/functions/doji-eugenia/index.ts';
 import {
   journalStats, statsList, resultOf, counts, money, averages, realisedRR,
@@ -5407,6 +5407,28 @@ test('one note can retire several, and every id it could not retire is named', a
     const one = await serve('remember', { note: 'x', kind: 'fact', supersedes: 11 });
     assert.match(patched, /id=in\.\(11\)&/);
     assert.equal(one, 'Remembered.');
+  });
+});
+
+/* A PARAGRAPH CUT AT ITS CEILING IS SAID TO BE. On 27 October the portrait was
+   kept at 800 characters ending "or jo", she was told it was updated, and every
+   turn carried the broken sentence. */
+test('a story or portrait cut at its ceiling is saved and said to be cut', async () => {
+  const sent = {};
+  await stubbed(async () => {
+    globalThis.fetch = async (url, opts = {}) => {
+      const body = JSON.parse(opts.body);
+      Object.assign(sent, body);
+      return new Response(JSON.stringify([{ id: 'current' }]), { status: 200 });
+    };
+    for (const [tool, field, max] of [['set_thesis', 'thesis', THESIS_MAX], ['set_portrait', 'portrait', PORTRAIT_MAX]]) {
+      const said = await serve(tool, { [field]: 'a'.repeat(max - 2) + ' rarely with inflation or jobs.' });
+      assert.equal(sent[field].length, max, `${tool} saved past what the table accepts`);
+      assert.match(said, new RegExp(`cut at ${max} characters, so it now ends "…a+ r"\\. Write it again, shorter\\.`),
+        `${tool} kept a paragraph cut mid-word and told her it was saved whole`);
+      assert.doesNotMatch(await serve(tool, { [field]: 'the same man one day further on' }), /cut/,
+        `${tool} says a paragraph inside its ceiling was cut`);
+    }
   });
 });
 
