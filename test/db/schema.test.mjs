@@ -76,10 +76,10 @@ before(() => {
 
 /* A file that applies cleanly on one major version can refuse on another, so
    a pass here says something about the live database only on its version.
-   test.yml's PGCLUSTER is where that version is stated. */
+   database.yml's PGCLUSTER is where that version is stated. */
 test('the server is the major version Supabase runs', () => {
-  const live = file('.github/workflows/test.yml').match(/PGCLUSTER: (\d+)\//)?.[1];
-  assert.ok(live, 'test.yml no longer names the cluster the suite runs on');
+  const live = file('.github/workflows/database.yml').match(/PGCLUSTER: (\d+)\//)?.[1];
+  assert.ok(live, 'database.yml no longer names the cluster the suite runs on');
   assert.equal(String(Math.floor(Number(sql('show server_version_num', 'postgres')) / 10000)), live,
     `this server is not Postgres ${live}, the version Supabase runs`);
 });

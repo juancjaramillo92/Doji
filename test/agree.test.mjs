@@ -1555,8 +1555,28 @@ test('CI runs the database suite that npm test leaves out', () => {
   assert.match(scripts['test:db'] ?? '', /test\/db\/\*\.test\.mjs/, 'package.json no longer names the database suite');
   assert.ok(readdirSync(new URL('./db/', import.meta.url)).some(f => f.endsWith('.test.mjs')),
     'test/db holds no suite for test:db to run');
-  assert.match(source('.github/workflows/test.yml'), /^\s*- run: npm run test:db$/m,
-    'test.yml no longer runs the database suite, and nothing else does');
+  assert.match(source('.github/workflows/database.yml'), /^\s*- run: npm run test:db$/m,
+    'database.yml no longer runs the database suite, and nothing else does');
+});
+
+/* IT RUNS ON A PUSH THAT TOUCHES WHAT IT READS, and only then: so what it reads
+   is derived from the suite and held against the workflow's `paths`, or an
+   input left off is a check skipped with a green tick. Its own script and its
+   own workflow are inputs too. */
+test('the database suite runs on every push that touches a file it reads', () => {
+  const suite = readdirSync(new URL('./db/', import.meta.url)).filter(f => f.endsWith('.test.mjs'))
+    .map(f => source(`test/db/${f}`)).join('\n');
+  const read = [...new Set([
+    ...[...suite.matchAll(/\bfile\('([^']+)'\)/g)].map(m => m[1]),
+    ...[...suite.matchAll(/new URL\('\.\.\/\.\.\/([^']+)'/g)].map(m => m[1]),
+    'test/db/schema.test.mjs', 'package.json', '.github/workflows/database.yml',
+  ])];
+  assert.ok(read.length >= 7, `only ${read.length} inputs read out of the database suite — the reader has gone blind`);
+  const paths = [...source('.github/workflows/database.yml').match(/paths:\n((?:\s+- '[^']+'\n)+)/)[1]
+    .matchAll(/- '([^']+)'/g)].map(m => m[1]);
+  const covers = (path) => paths.some(p => p.endsWith('/**') ? path.startsWith(p.slice(0, -2)) : p === path);
+  assert.deepEqual(read.filter(f => !covers(f)), [],
+    'the database suite reads a file its workflow does not run for, so a change to it passes unchecked');
 });
 
 /* ─── A prompt change says the eval is owed ──────────────────────────────────

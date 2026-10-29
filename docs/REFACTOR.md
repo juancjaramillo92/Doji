@@ -1093,20 +1093,18 @@ measures how often the two would disagree on these criteria.
 **Revisit if:** the eval's cost matters more than its strictness, and then
 only after both judges have graded the same answers and been compared.
 
-### R-114 — the database suite only on a push that touches SQL
-**Why refused:** it would save a billed minute on most pushes, but the suite
-reads more than the SQL: the README's restore block and `test.yml`'s
-`PGCLUSTER`. A path filter has to name the README, which most commits change,
-so the saving shrinks, and any input left off the list is a check skipped with
-a green tick.
-**Revisit if:** the Actions minutes run out with the cheaper moves made.
-
 ### R-115 — caching the charm's build between runs
-**Deferred.** ccache and the component downloads could cut the 6.5-minute
-build to a fraction. But the workflow's claim is that the pinned image builds
-the firmware from the commit alone, and the lock check reads what was resolved;
-a cache is state between builds no commit names.
-**Revisit if:** the charm builds are what keeps the minutes over the plan.
+**Deferred, measured.** In October the charm's 74 builds were about 630 of
+roughly 2,000 billed minutes, each about 2.5 minutes pulling the pinned ESP-IDF
+image and 5 building. A cache reaches only the second. ccache could cut it to a
+fraction, but the workflow's claim is that the pinned image builds the firmware
+from the commit alone, and nothing could show a cached build equals a clean
+one: the image embeds its compile time, so no two builds of one commit match
+byte for byte. Making them match is a firmware config change, which the board
+has to check.
+**Revisit if:** the minutes run out again with the database suite path-filtered,
+and then with the build made reproducible first, so a cached image can be
+compared with a clean one.
 
 ### R-116 — asking the eval's cases in parallel
 **Deferred.** A full run spends about ten minutes of Actions time waiting on the
