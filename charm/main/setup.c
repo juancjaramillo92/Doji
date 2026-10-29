@@ -453,6 +453,10 @@ void setup_run(void) {
     httpd_handle_t server = NULL;
     httpd_config_t conf = HTTPD_DEFAULT_CONFIG();
     conf.uri_match_fn = httpd_uri_match_wildcard;
+    // A phone that has just joined opens several connections at once, past
+    // the server's seven; the oldest is closed for a new one rather than the
+    // new one refused, and the phone's check that it is online answered.
+    conf.lru_purge_enable = true;
     conf.stack_size = 10240;  // a key is checked over TLS from its handler
     if (httpd_start(&server, &conf) == ESP_OK) {
         // In order: the questions before the page that answers every other path.
