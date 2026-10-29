@@ -39,6 +39,11 @@ CONFIG_LV_USE_QRCODE=y
 # TLS for her door: its buffers in PSRAM, where the internal RAM the screen
 # needs is not.
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
+# And its AES in software: the AES peripheral reads by DMA, so with the TLS
+# buffers in PSRAM it copies through internal DMA memory, which on the board
+# was not there ("esp-aes: Failed to allocate memory") and no key could be
+# checked. A handshake's AES is a few kilobytes; the processor does it.
+CONFIG_MBEDTLS_HARDWARE_AES=n
 # Wi-Fi's and lwIP's buffers in PSRAM too: on the first board they left so
 # little internal RAM that the setup's web server could not start.
 CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
