@@ -2403,7 +2403,10 @@ nothing about today's market or what he has open. She uses it as she uses the
 facts — in the briefing and a reply, never the trade look — and never hands it to
 him as a verdict; `/notes` shows it to him in the
 second person, and he corrects it the way he corrects anything — by telling her,
-which the pass reads that night.
+which the pass reads that night. A story or portrait past its ceiling is saved
+cut, as a note is, and the tool says so and quotes where it now ends, so she
+writes it again while the pass is still hers: on 27 October a portrait went on
+ending mid-word with nothing to tell her.
 
 **A rewrite keeps what it replaced.** The story and the portrait are one row
 each, rewritten at night, and the portrait shapes every briefing and reply. A

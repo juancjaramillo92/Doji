@@ -318,27 +318,35 @@ with the week's trades beside it.
 **Deferred, not refused.** Hermes keeps "how to do this kind of task for this
 user" in skills that load when the task comes up, so always-loaded memory stays
 small. For her it would be a second memory that changes how she behaves, which
-needs his audit and his correction channel as notes have, and nothing yet shows
-an instruction that should hold only some days. Twelve standing instructions
-fit the window.
-**Revisit if:** he wants an instruction that holds only on certain days, or the
-merges the pass makes past fifteen start losing meaning.
+needs his audit and his correction channel as notes have. Looked at again on
+29 October, at fourteen standing instructions: one does hold only on some days
+(Sundays the week, weekdays the high-rated events), and it works as a plain
+note, so a day-bound instruction is not on its own a reason for a second memory.
+**Revisit if:** an instruction he gives is ignored because the window holds it
+on days it does not govern, or the merges the pass makes past fifteen start
+losing meaning.
 
 ### R-30 — recalling memory before every reply
 **Deferred, not refused.** Hermes searches its memory before each turn; she
 searches when she decides to. Automatic recall costs an embedding and a search
-on every reply and puts unasked-for rows in front of her. Unmeasured: a reply's
-`detail` counts `search_memory` calls, so how often she reaches past the window
-can be read.
-**Revisit if:** that count shows her rarely searching while he refers back to
-conversations she no longer holds.
+on every reply and puts unasked-for rows in front of her. Measured in late
+October: in the 14 days to 25 October she searched in 1 of 23 replies, and of
+his three messages in the 14 days to 29 October that referred back, none reached
+past what she holds — two named things in her notes or his rules, and the third
+a conversation still among her turns.
+**Revisit if:** he refers back to a conversation she no longer holds and she
+answers without searching.
 
 ### R-31 — ranking her own turns below his in search
 **Deferred, not refused.** Hermes demoted scheduled sessions once their
 vocabulary crowded the user's own out of recall. `eugenia_search` ranks her
 long daily briefings beside his short lines, and `ts_rank` is not normalised
-for length. Unmeasured.
-**Revisit if:** a search for words he used comes back mostly as her briefings.
+for length. Measured on 29 October, lexical arm only: of twelve hits, "quarters"
+found one of his lines and "retest" none, crowded out mostly by her replies
+rather than her briefings; "FOMO" came back even. The crowding is real, but she
+searched in 1 of 23 replies (R-30), so a better ranking would serve a tool she
+barely calls.
+**Revisit if:** R-30 reopens, or her searching grows past an occasional call.
 
 ### R-32 — opening a read when it is given and grading it later
 **Why refused:** a read is about today's news and the pass runs after the day
