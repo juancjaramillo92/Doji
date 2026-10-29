@@ -1147,6 +1147,17 @@ than reading it. TradingView serves neither daily open interest nor COMEX vault
 stocks, and CME's site refuses automated reads, so the weekly CFTC count is the
 open interest she has.
 
+**`?alerts=1` is his active price alerts** — the levels he marks in TradingView,
+folded by `foldAlerts` to the level, the symbol, the condition, when he set it
+and when it last fired; an alert on an indicator has no price and says so. A
+conversation reads it through `get_alerts`, live rather than from a copy, since
+an alert is set the minute before he talks a setup through and a copy fifteen
+minutes old would miss it — one of TradingView's daily calls each time she asks.
+`alertsList` puts them highest first, as a chart reads them, and she judges each
+against her map. The message he writes on an alert is not in the list; it is in
+the fire log, which is permitted and probed but not yet read.
+`test/fixtures/tradingview-alerts.json` is the 29 October capture, two alerts.
+
 **A refusal can arrive marked as success.** The quote batch's 429 came inside a
 result marked `isError: false`, with `success: false` in the payload. `unwrap`
 checks both and reads `structuredContent` rather than the duplicate text block.
@@ -1170,7 +1181,7 @@ failure is its own answer:
 | `quotes` | whether the quote batch answers for the dollar, the yields at home and abroad, the real yield, the breakeven, silver, oil, the S&P, the VIX and GVZ with no forex symbol in it (the euro and the yuan are left out) — it refused twice with the forex scanner's 429, taking the whole batch with it — and each one's last bars from the OHLCV read, which answered where the batch did not, with the bar times saying how fresh each feed is |
 | `gold` | the broker's quote through the poller and TradingView's gold feeds read in the same second, plus the last three one-minute bars, which say how stale a TradingView quote is |
 | `news` | headlines for gold and the dollar, and what one carries |
-| `alerts` | his active alerts, and the last week of their firing with the message he wrote on each — the two alert reads the listing marks read-only, permitted so the levels he marks in TradingView can reach her. Nothing reads them yet: the reader and her tool are written on this probe's answer, as every reader here was |
+| `alerts` | his active alerts, and the last week of their firing with the message he wrote on each — the two alert reads the listing marks read-only. The list's 29 October answer is what `?alerts=1` folds; the log had fired nothing, so it is not read until a fired alert has been captured |
 | `econ` | which US price and money series exist, the actual releases a calendar entry would be judged against |
 | `search` | the names gold's feeds and a real yield go by, for whatever `quotes` could not resolve |
 | `fedfunds` | whether thirty-day fed funds futures answer, under the continuous names (`ZQ1!` to `ZQ3!`) and under named contract months, and what a bar of them carries — the price `?rates=1` works the meeting odds out from |

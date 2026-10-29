@@ -6446,7 +6446,7 @@ test('every market read she goes without writes a row', () => {
     .map((m, i) => [m[1], EUGENIA_TS.slice(m.index, starts[i + 1]?.index)])
     .filter(([, body]) => new RegExp(`tvRead\\("|fetch\\((${MARKET_URLS})`).test(uncomment(body)));
   assert.deepEqual(readers.map(([name]) => name).sort(),
-    ['headlinesBlock', 'marketQuote', 'readTvCalendar', 'storeFlows', 'storeMarket', 'storePositioning', 'storeRates',
+    ['alertsBlock', 'headlinesBlock', 'marketQuote', 'readTvCalendar', 'storeFlows', 'storeMarket', 'storePositioning', 'storeRates',
      'storeStructure', 'storeTrend', 'volumeBlock'],
     'the market reads have changed — declare the new one, and give it the meter');
   for (const [name, body] of readers) {

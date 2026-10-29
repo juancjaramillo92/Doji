@@ -1182,6 +1182,22 @@ const STRUCTURE_TOOL = {
   input_schema: { type: "object", properties: {}, additionalProperties: false },
 } as const;
 
+/* His levels, as he marks them: price alerts in TradingView. Read live when
+   she asks, unlike the market's copy — an alert is set the minute before he
+   talks a setup through, and a copy fifteen minutes old would miss it. */
+const ALERTS_TOOL = {
+  name: "get_alerts",
+  description:
+    "The price alerts he has active in TradingView: each level, the symbol, how it " +
+    "triggers, when he set it and whether it has fired. They are the levels he marks " +
+    "for a setup, so read them when he talks one through or mentions his alerts, and " +
+    "judge each against your map — at the edge of the range or inside it, and so which " +
+    "of his setups it is. The message he writes on an alert is not in what is served. " +
+    "They are his levels, never a call of yours; like get_market, they say nothing " +
+    "about where price goes next.",
+  input_schema: { type: "object", properties: {}, additionalProperties: false },
+} as const;
+
 /* Display prices: the poller settles the scale before serving. */
 export interface Quote {
   bid: number; ask: number; high: number; low: number;
@@ -1946,6 +1962,7 @@ const CHAT_TOOLS = [
   LOOP_TOOL,
   CALL_TOOL,
   RELEASES_TOOL,
+  ALERTS_TOOL,
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, PORTRAIT_TOOL, CLOSE_TOOL,
                            RECORD_TOOL, EXPLAIN_TOOL, CHECK_TOOL, STATS_TOOL];
@@ -2083,6 +2100,7 @@ export async function serve(name: string, input: any): Promise<string> {
       return (await Promise.all([aroundBlock(), ratesBlock(), headlinesBlock(),
                                  positioningBlock(), flowsBlock(), volumeBlock()])).join("").trim();
     case STRUCTURE_TOOL.name: return (await structureBlock()).trim();
+    case ALERTS_TOOL.name:   return (await alertsBlock()).trim();
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
     case PORTRAIT_TOOL.name: return await setPortrait(input.portrait);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
@@ -3624,6 +3642,36 @@ export async function headlinesBlock(): Promise<string> {
   } catch (err) {
     await unread("news", why(err));
     return "\n\nThe headlines could not be read just now; search for what moved it.";
+  }
+}
+
+/* ─── His alerts ───────────────────────────────────────────────────────────
+   What doji-tradingview's `foldAlerts` answers: his levels, highest first, as
+   a chart reads them. An alert on an indicator carries no price and says so.
+   ───────────────────────────────────────────────────────────────────────── */
+export interface TvAlert {
+  id: number; symbol: string; condition: string; level: number | null; set: string; fired: string | null;
+}
+
+export function alertsList(alerts: TvAlert[], now = Date.now()): string {
+  if (!alerts.length) return "\n\nHe has no active alert in TradingView.";
+  const today = nyDate(new Date(now));
+  const when = (iso: string) => {
+    const day = nyDate(new Date(iso));
+    return `${nyTime(iso)} ET` + (day === today ? "" : ` on ${weekday(day)} ${civilDay(day)}`);
+  };
+  return "\n\nHis active alerts in TradingView, his levels, highest first:\n" +
+    [...alerts].sort((a, b) => (b.level ?? -Infinity) - (a.level ?? -Infinity))
+      .map(a => `· ${a.level ?? "no price level"} on ${a.symbol}, ${a.condition}, set ${when(a.set)}, ` +
+                (a.fired ? `last fired ${when(a.fired)}` : "not fired yet")).join("\n");
+}
+
+export async function alertsBlock(): Promise<string> {
+  try {
+    return alertsList((await tvRead("alerts")).alerts);
+  } catch (err) {
+    await unread("alerts", why(err));
+    return "\n\nHis alerts could not be read just now; ask him for his levels.";
   }
 }
 
