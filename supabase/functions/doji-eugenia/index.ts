@@ -2542,21 +2542,32 @@ export async function sayAloud(words: string, keyboard?: unknown, budget = SPEAK
   const signal = AbortSignal.timeout(budget);
   let heard = parts.length > 0;
   const missed = new Set<string>();
-  // Sequentially, keyboard on the last part, as in say().
-  for (const [i, part] of parts.entries()) {
-    const marked = i === parts.length - 1 ? keyboard : undefined;
-    let landed = false, attempt = 0;
-    // Two attempts, each held to half the budget: a stall is one request, and
-    // the next is a fresh connection. Bounded at the whole budget, a stall on
-    // 26 and 27 October left no time for a second, where every voice note that
-    // landed that week took 5 to 30s and the slowest 90.
-    for (; attempt < 2 && !landed && !signal.aborted; attempt++) {
-      const failed = await speak(part, marked, AbortSignal.any([signal, AbortSignal.timeout(budget / 2)]));
-      if (failed) missed.add(failed);
-      landed = failed === null;
+  /* Shown while she speaks, as typing is while she writes: on 27 October the
+     voice took two and a half minutes with nothing on his screen, and he asked
+     whether she had answered. Best effort; it lasts five seconds, so it is sent
+     again, and it stops before the text can go. */
+  const recording = () => tg("sendChatAction", { chat_id: CHAT_ID, action: "record_voice" }).catch(() => {});
+  recording();
+  const keepRecording = setInterval(recording, 4_500);
+  try {
+    // Sequentially, keyboard on the last part, as in say().
+    for (const [i, part] of parts.entries()) {
+      const marked = i === parts.length - 1 ? keyboard : undefined;
+      let landed = false, attempt = 0;
+      // Two attempts, each held to half the budget: a stall is one request, and
+      // the next is a fresh connection. Bounded at the whole budget, a stall on
+      // 26 and 27 October left no time for a second, where every voice note
+      // that landed that week took 5 to 30s and the slowest 90.
+      for (; attempt < 2 && !landed && !signal.aborted; attempt++) {
+        const failed = await speak(part, marked, AbortSignal.any([signal, AbortSignal.timeout(budget / 2)]));
+        if (failed) missed.add(failed);
+        landed = failed === null;
+      }
+      if (!attempt) missed.add("no time left to ask");
+      if (!landed) heard = false;
     }
-    if (!attempt) missed.add("no time left to ask");
-    if (!landed) heard = false;
+  } finally {
+    clearInterval(keepRecording);
   }
   const reasons = [...missed].join("; ").slice(0, 300);
   // Any part missing: three quarters of a message cannot be acted on.

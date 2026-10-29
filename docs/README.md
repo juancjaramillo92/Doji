@@ -1896,7 +1896,10 @@ since three quarters heard is worse than either. That ordering lives once, in
 **drives** it, since with no TTS key every `speak()` answers why it could not,
 exactly as a refusing vendor does. **What is stored is untouched**: `remember()` writes the
 transcript whatever happened on the wire. The briefing's keyboard rides on the
-last voice note.
+last voice note. **While she speaks, Telegram shows her recording**, sent again
+every few seconds and stopped before the text can go, as typing is shown while
+she writes: on 27 October the voice took two and a half minutes with nothing on
+his screen, and he asked whether she had answered.
 
 **There is no length cap.** A briefing is 80–150 words by its own rule, and a
 cap decides that past some length a message is not worth hearing. A long message

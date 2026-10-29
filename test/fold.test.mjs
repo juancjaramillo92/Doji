@@ -5971,6 +5971,25 @@ test('a speech vendor that refuses once is asked again before the text goes', as
     'the text went as well as the voice that landed — two bubbles for one message');
 });
 
+test('he sees her recording while she speaks, and the text never goes under it', async () => {
+  /* NOTHING ON HIS SCREEN WAS THE FAILURE he saw: the typing indicator stops
+     before the voice, and on 27 October the voice took two and a half minutes.
+     Driven through a refusal, so the text fallback is in the sequence too: the
+     indicator comes first and nothing follows the text. An interval left
+     running would also hold this suite open, so a lost clear cannot pass. */
+  const sent = [];
+  await stubbed(async () => {
+    globalThis.fetch = async (url, init) => {
+      const u = String(url);
+      sent.push(u.includes('sendChatAction') ? `action:${JSON.parse(init.body).action}` : u.split('/').pop());
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    };
+    await sayAloud('Gold is holding 4,410 into the close.');
+  });
+  assert.equal(sent[0], 'action:record_voice', 'nothing shows him she is speaking before the voice is asked for');
+  assert.equal(sent.at(-1), 'sendMessage', 'something went after the text, or the text never went');
+});
+
 test('a speech request that stalls is asked again inside the same budget', async () => {
   /* A STALL IS ONE REQUEST. Bounded at the whole budget, the first attempt took
      all of it and the text went, on 26 and 27 October; each attempt gets half,
