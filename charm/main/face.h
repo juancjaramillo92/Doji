@@ -7,7 +7,7 @@
    the next frame, so a mode change is an expression change, never a jump. */
 typedef enum {
     FACE_IDLE,       // awake: blinks, glances
-    FACE_LISTENING,  // he is talking: eyes up, the ring follows his voice
+    FACE_LISTENING,  // he is talking: eyes up, the ring round the rim
     FACE_SPEAKING,   // she is talking: the mouth follows her voice
     FACE_THINKING,   // her answer is on its way: up and away, the thought dots
     FACE_CONFUSED,   // something went wrong: her door refused
@@ -28,8 +28,7 @@ face_mode_t face_get_mode(void);
 // A frame of anything drawn moving: her face, the dial, the journal's done.
 #define FACE_FRAME_MS 33
 
-// How loud the audio is right now, 0 to 1: the ring while listening, the
-// mouth while speaking.
+// How loud her voice is right now, 0 to 1: the mouth follows it.
 void face_set_level(float level);
 
 // PWR held toward switching off, 0 to 1: a ring empties round the rim.

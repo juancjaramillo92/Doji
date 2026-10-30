@@ -1,7 +1,9 @@
 /* The face: Eugenia as one still render, her eyes and mouth drawn live on
-   top of it. Only the face's own patch of screen is redrawn on a
-   frame, which is what keeps it smooth on this chip — the ring is the only
-   thing that redraws the full screen, and only while it shows.
+   top of it. Only the face's own patch of screen is redrawn, and only on a
+   frame where something in it moved, which is what keeps it smooth on this
+   chip and leaves it to her voice while she listens and speaks. The
+   listening ring is still, so it redraws the full screen only as it comes
+   and goes.
 
    The sleep screen is a layer over her: black but for its marks.
 
@@ -12,6 +14,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include "esp_random.h"
 #include "lvgl.h"
 #include "palette.h"
@@ -52,12 +55,11 @@ static volatile float level, hold;
 static volatile bool briefing_waits, trade_waits, low, offline;
 static volatile int charge = -1;
 
-// What is on screen, eased toward what the mode asks for.
-static struct { float open, gx, gy, mouth, smile, ring, dots, confused; } V = { .open = 0, .smile = 1 };
+// What is on screen, eased toward what the mode asks for, and what was last drawn.
+static struct { float open, gx, gy, mouth, smile, dots, confused, lid; } V = { .open = 0, .smile = 1, .lid = 1 }, drawn;
 static float gaze[2];
 static uint32_t next_glance, next_blink, blink_at;
-static float lid = 1;  // the blink, on top of how open the mode wants the eyes
-static bool blinking, ring_was_on;
+static bool blinking, ring;
 static bool dark;
 static int shift[2];
 
@@ -81,8 +83,10 @@ static void wander(void) {
     shift[1] = (int)lroundf((rnd() * 2 - 1) * SHIFT_Y);
 }
 
+// Snapped to the target within a hair of it, so a face at rest is still.
 static float ease(float v, float t, float rate, float dt) {
-    return v + (t - v) * (1.0f - expf(-rate * dt));
+    float e = v + (t - v) * (1.0f - expf(-rate * dt));
+    return fabsf(t - e) < 0.002f ? t : e;
 }
 
 /* A smile through its two ends and its lowest point, as an arc of the circle
@@ -194,7 +198,7 @@ static void draw_hold(lv_layer_t *layer) {
 
 static void draw_face(lv_event_t *e) {
     lv_layer_t *layer = lv_event_get_layer(e);
-    float open = V.open * lid;
+    float open = V.open * V.lid;
     const lv_color_t ink = lv_color_hex(0x0d0c0b);
 
     // Eyes, a line when shut, with the highlight once open enough to hold it.
@@ -242,8 +246,8 @@ static void draw_face(lv_event_t *e) {
         }
     }
 
-    // The ring on the rim, while listening, follows his voice.
-    if (V.ring > 0.02f) face_ring(layer, 231, 4 + (int32_t)(7 * V.ring), 1, lv_tick_get() / (float)FACE_RING_TURN_MS, 0.35f + 0.65f * V.ring);
+    // The ring on the rim while she listens.
+    if (ring) face_ring(layer, 231, 6, 1, 0, 1);
     if (hold > 0) draw_hold(layer);
 }
 
@@ -345,12 +349,12 @@ static void tick(lv_timer_t *t) {
         return;
     }
 
-    float t_open = 1, t_mouth = 0, t_smile = 1, t_ring = 0, t_dots = 0, t_confused = 0, glance = 1;
+    float t_open = 1, t_mouth = 0, t_smile = 1, t_dots = 0, t_confused = 0, glance = 1;
     const float *fixed = NULL;
     static const float up[2] = { 0, -2 }, puzzled[2] = { 3, -2.5f }, rest[2] = { 0, 1 };
     // Thinking looks up to one side, then the other, every 1.7 seconds.
     float pondering[2] = { (now / 1700) % 2 ? -LOOK_RANGE * 0.55f : LOOK_RANGE * 0.9f, -LOOK_RANGE };
-    if (m == FACE_LISTENING) { t_smile = 1.1f; t_ring = 0.25f + 0.75f * level; fixed = up; }
+    if (m == FACE_LISTENING) { t_smile = 1.1f; fixed = up; }
     if (m == FACE_SPEAKING)  { t_mouth = level; t_smile = 0.9f; glance = 0.4f; }
     if (m == FACE_THINKING)  { t_open = 0.85f; t_smile = 0.25f; t_dots = 1; fixed = pondering; }
     if (m == FACE_CONFUSED)  { t_smile = -0.35f; t_confused = 1; fixed = puzzled; }
@@ -365,11 +369,11 @@ static void tick(lv_timer_t *t) {
     }
 
     // Blinks: shut in 70 ms, open in 90.
-    lid = 1;
+    V.lid = 1;
     if (!blinking && m != FACE_ASLEEP && (int32_t)(now - next_blink) >= 0) { blinking = true; blink_at = now; }
     if (blinking) {
         uint32_t b = now - blink_at;
-        lid = b < 70 ? 1 - b / 70.0f : b < 160 ? (b - 70) / 90.0f : 1;
+        V.lid = b < 70 ? 1 - b / 70.0f : b < 160 ? (b - 70) / 90.0f : 1;
         if (b >= 160) {
             blinking = false;
             next_blink = now + (uint32_t)(BLINK_EVERY_MS * (0.6f + rnd() * 0.8f));
@@ -381,19 +385,20 @@ static void tick(lv_timer_t *t) {
     V.gy = ease(V.gy, gaze[1], 22, dt);
     V.mouth = ease(V.mouth, t_mouth, 28, dt);
     V.smile = ease(V.smile, t_smile, 10, dt);
-    V.ring = ease(V.ring, t_ring, 18, dt);
     V.dots = ease(V.dots, t_dots, 5, dt);
     V.confused = ease(V.confused, t_confused, 8, dt);
 
-    // The ring needs the whole screen; everything else lives in the face's
-    // patch and the thought dots'.
-    bool ring_on = V.ring > 0.02f;
-    if (ring_on || ring_was_on) lv_obj_invalidate(lv_screen_active());
-    else {
+    // The ring needs the whole screen, once as it comes and once as it goes;
+    // everything else lives in the face's patch and the thought dots', redrawn
+    // only when it moved. The dots pulse while they show.
+    if ((m == FACE_LISTENING) != ring) {
+        ring = m == FACE_LISTENING;
+        lv_obj_invalidate(lv_screen_active());
+    } else if (memcmp(&V, &drawn, sizeof V) || V.dots > 0) {
         static const lv_area_t patches[] = { { 150, 108, 326, 232 }, { 195, 30, 272, 62 } };
         for (size_t i = 0; i < sizeof patches / sizeof *patches; i++) lv_obj_invalidate_area(card, &patches[i]);
     }
-    ring_was_on = ring_on;
+    drawn = V;
 }
 
 static lv_obj_t *plain(lv_obj_t *parent) {

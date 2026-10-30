@@ -3375,10 +3375,12 @@ the render puts them, her head leaning ten degrees. Then they move: blinks,
 glances, the mouth following the loudness of what plays; thinking, she looks up
 and away from one side to the other under three thought dots; when
 something goes wrong, her eyes go uneven and her smile turns down; going to
-sleep, her eyes close slowly. Only the face's own patch is redrawn on a frame;
-the rings round the rim — Doji's emeralds turning slowly while she listens, and
-the one emptying while PWR is held — are the only things that redraw the full
-screen, and only while they show. **Nothing flashes between screens**: whatever
+sleep, her eyes close slowly. Nothing else moves. Only the face's own patch is
+redrawn, and only on a frame where something in it moved, so a face at rest
+costs nothing and the chip is left to her voice. While she listens, Doji's
+emeralds stand still round the rim, redrawing the full screen once as they come
+and once as they go; the ring emptying while PWR is held is the only thing that
+redraws it on every frame. **Nothing flashes between screens**: whatever
 comes up first is the only thing seen, so no face shows for a moment before the
 journal's questions or after them. Her state — a low battery, no internet — is
 never an expression on her face; it is a mark on the sleep screen.
@@ -3509,7 +3511,7 @@ listening — from sleep the press that wakes her is enough, and she listens eve
 while she is still joining her Wi-Fi, the recording waiting for it, not him —
 but not once her Wi-Fi has given up, when the press takes her to the sleep
 screen and its no-internet mark rather than recording words that cannot go. The
-ring shows round the rim and follows his voice. **His pauses are his own**:
+ring shows round the rim while she listens. **His pauses are his own**:
 nothing ends his turn but the next press, so he can stop to think as long as he
 needs; **two falling notes** say his words are on their way. A press with
 nothing said for thirty seconds is dropped quietly. **A turn runs to five
