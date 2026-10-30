@@ -29,9 +29,9 @@ typedef struct {
 } face_geometry_t;
 
 static const face_geometry_t F = {
-    {188.8f, 162.0f}, {286.7f, 146.6f}, 8.8f, 9.0f,
+    {188.8f, 148.0f}, {286.7f, 132.6f}, 8.8f, 9.0f,
     {4.3f, -2.6f, 1.8f},
-    {244.3f, 176.2f}, 51.0f, 9.4f, 3.4f,
+    {244.3f, 162.2f}, 51.0f, 9.4f, 3.4f,
     -10.0f,
 };
 
@@ -237,7 +237,7 @@ static void draw_face(lv_event_t *e) {
 
     // Thought dots above her head, lighting up one after another.
     if (V.dots > 0.02f) {
-        static const float dots[3][3] = { { 208, 52, 3.2f }, { 233, 44, 3.8f }, { 258, 52, 3.2f } };
+        static const float dots[3][3] = { { 208, 38, 3.2f }, { 233, 30, 3.8f }, { 258, 38, 3.2f } };
         uint32_t now = lv_tick_get();
         for (int i = 0; i < 3; i++) {
             float pulse = 0.5f + 0.5f * sinf(now / 260.0f - i * 1.1f);
@@ -395,7 +395,7 @@ static void tick(lv_timer_t *t) {
         ring = m == FACE_LISTENING;
         lv_obj_invalidate(lv_screen_active());
     } else if (memcmp(&V, &drawn, sizeof V) || V.dots > 0) {
-        static const lv_area_t patches[] = { { 150, 108, 326, 232 }, { 195, 30, 272, 62 } };
+        static const lv_area_t patches[] = { { 150, 94, 326, 218 }, { 195, 16, 272, 48 } };
         for (size_t i = 0; i < sizeof patches / sizeof *patches; i++) lv_obj_invalidate_area(card, &patches[i]);
     }
     drawn = V;
