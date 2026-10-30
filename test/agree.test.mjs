@@ -433,7 +433,7 @@ test('a journal answer her door does not take is asked again while the network i
   assert.match(journal, /reached = knock\(body, &t\) \|\| net_wait\(0\);/,
     'a refused answer ends the journal with the network still up, and nothing says it was not saved');
   assert.match(bodyOf(source('charm/main/gladys.c'), 'static bool knock(const char *body, trade_t *t) {'),
-    /return ok && read_answer\(got, t\);/, 'a refused answer now changes the trade, so the same question is not asked again');
+    /return status == 200 && read_answer\(got, t\);/, 'a refused answer now changes the trade, so the same question is not asked again');
 });
 
 /* The charm's manifest asks for ranges, so a build resolves its components
@@ -1768,7 +1768,7 @@ test('the charm asks a network that is there again until its time is up', () => 
 test('the charm tells an answer cut off from a finished one, and shows the failure', () => {
   const talk = source('charm/main/talk.c');
   const knock = bodyOf(talk, 'static int knock(', 'talk.c has no knock()');
-  assert.match(knock, /if \(play_answer\(h\) && !esp_http_client_is_complete_data_received\(h\)\) status = -1;/,
+  assert.match(knock, /bool heard = play_answer\(h\);\s*if \(heard && !esp_http_client_is_complete_data_received\(h\)\) status = -1;/,
     'knock() takes an answer that stopped short of its end for a finished one');
   assert.match(bodyOf(talk, 'static bool play_answer(', 'talk.c has no play_answer()'), /return false;/,
     'play_answer() no longer says when PWR stopped it, so a press reads as a line cut');

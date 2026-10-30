@@ -57,35 +57,47 @@ static bool read_answer(const char *body, trade_t *t) {
     return ok;
 }
 
-// A GET when `body` is NULL, else a POST of it.
+/* A GET when `body` is NULL, else a POST of it. One connection serves the
+   whole waking — a journal's every answer is a request, and a new TLS
+   handshake costs about a second — so the answer is read to its end to leave
+   it ready for the next. One kept from before that her door has closed since
+   is tried once more afresh. */
 static bool knock(const char *body, trade_t *t) {
-    esp_http_client_config_t c = {
-        .url = GLADYS_DOOR,
-        .method = body ? HTTP_METHOD_POST : HTTP_METHOD_GET,
-        .timeout_ms = READ_MS,
-        .crt_bundle_attach = esp_crt_bundle_attach,
-    };
+    static esp_http_client_handle_t h;
     if (!net_wait(NET_ALL_MS)) return false;
-    esp_http_client_handle_t h = esp_http_client_init(&c);
-    esp_http_client_set_header(h, "x-charm-key", cfg.gladys_key);
-    if (body) esp_http_client_set_header(h, "Content-Type", "application/json");
-    int len = body ? (int)strlen(body) : 0;
-    bool ok = esp_http_client_open(h, len) == ESP_OK && (!body || esp_http_client_write(h, body, len) == len);
+    if (!h) {
+        esp_http_client_config_t c = {
+            .url = GLADYS_DOOR,
+            .timeout_ms = READ_MS,
+            .crt_bundle_attach = esp_crt_bundle_attach,
+        };
+        h = esp_http_client_init(&c);
+        esp_http_client_set_header(h, "x-charm-key", cfg.gladys_key);
+        esp_http_client_set_header(h, "Content-Type", "application/json");
+    }
+    esp_http_client_set_method(h, body ? HTTP_METHOD_POST : HTTP_METHOD_GET);
+    int len = body ? (int)strlen(body) : 0, status = -1;
+    for (int tries = 0; tries < 2 && status < 0; tries++) {
+        bool kept = esp_http_client_get_socket(h) >= 0;
+        if (esp_http_client_open(h, len) == ESP_OK && (!body || esp_http_client_write(h, body, len) == len) &&
+            esp_http_client_fetch_headers(h) >= 0) {
+            status = esp_http_client_get_status_code(h);
+        }
+        if (status < 0) esp_http_client_close(h);
+        if (!kept) break;
+    }
     static char got[2048];
     int have = 0;
-    if (ok) {
-        esp_http_client_fetch_headers(h);
-        int status = esp_http_client_get_status_code(h);
+    if (status >= 0) {
         for (int n; have < (int)sizeof got - 1 &&
                     (n = esp_http_client_read(h, got + have, sizeof got - 1 - have)) > 0;) have += n;
-        ok = status == 200;
-        if (!ok) ESP_LOGW(TAG, "her door answered %d", status);
+        if (esp_http_client_flush_response(h, NULL) != ESP_OK) esp_http_client_close(h);
+        if (status != 200) ESP_LOGW(TAG, "her door answered %d", status);
     } else {
         ESP_LOGW(TAG, "her door could not be reached");
     }
     got[have] = 0;
-    esp_http_client_cleanup(h);
-    return ok && read_answer(got, t);
+    return status == 200 && read_answer(got, t);
 }
 
 int gladys_check(void) {

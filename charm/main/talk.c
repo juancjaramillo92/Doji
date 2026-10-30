@@ -132,19 +132,29 @@ static bool play_answer(esp_http_client_handle_t h) {
    one, has lit the screen for her. Returns the status, or -1 when the door
    could not be reached or her answer was cut off on the way: a dropped line
    ends a read as her last word does, and only the stream's own end tells the
-   two apart. */
+   two apart.
+
+   One connection serves the whole waking, since a new TLS handshake costs
+   about a second of every turn: an answer heard to its end leaves it ready
+   for the next, and anything else closes it. One kept from before that her
+   door has closed since is tried once more afresh. */
 static int knock(const char *url, const uint8_t *ogg, size_t len, void (*lit)(void)) {
-    esp_http_client_config_t c = {
-        .url = url,
-        .method = ogg ? HTTP_METHOD_POST : HTTP_METHOD_GET,
-        .timeout_ms = READ_MS,
-        .crt_bundle_attach = esp_crt_bundle_attach,
-        // Her voice read in pieces the size of `in`, not the default 512 bytes.
-        .buffer_size = 4096,
-    };
+    static esp_http_client_handle_t h;
     if (!net_wait(NET_ALL_MS)) return -1;
-    esp_http_client_handle_t h = esp_http_client_init(&c);
-    esp_http_client_set_header(h, "x-charm-key", cfg.eugenia_key);
+    if (!h) {
+        esp_http_client_config_t c = {
+            .url = url,
+            .timeout_ms = READ_MS,
+            .crt_bundle_attach = esp_crt_bundle_attach,
+            // Her voice read in pieces the size of `in`, not the default 512 bytes.
+            .buffer_size = 4096,
+        };
+        h = esp_http_client_init(&c);
+        esp_http_client_set_header(h, "x-charm-key", cfg.eugenia_key);
+    }
+    esp_http_client_set_url(h, url);
+    esp_http_client_set_method(h, ogg ? HTTP_METHOD_POST : HTTP_METHOD_GET);
+    esp_http_client_set_timeout_ms(h, READ_MS);
     bool low = false;
     if (ogg) {
         char battery[8], volume[8];
@@ -156,30 +166,36 @@ static int knock(const char *url, const uint8_t *ogg, size_t len, void (*lit)(vo
         snprintf(volume, sizeof volume, "%d", cfg.volume);
         esp_http_client_set_header(h, "Content-Type", "audio/ogg");
         if (percent >= 0) esp_http_client_set_header(h, "x-charm-battery", battery);
+        else esp_http_client_delete_header(h, "x-charm-battery");
         esp_http_client_set_header(h, "x-charm-charging", charging ? "1" : "0");
         esp_http_client_set_header(h, "x-charm-volume", volume);
         if (low) esp_http_client_set_header(h, "x-charm-low", "1");
-    }
-    bool sent = esp_http_client_open(h, (int)len) == ESP_OK;
-    for (size_t at = 0; sent && at < len;) {
-        int n = esp_http_client_write(h, (const char *)ogg + at, (int)(len - at));
-        sent = n > 0;
-        if (sent) at += (size_t)n;
+        else esp_http_client_delete_header(h, "x-charm-low");
     }
     int status = -1;
-    if (sent) {
-        esp_http_client_fetch_headers(h);
-        status = esp_http_client_get_status_code(h);
+    for (int tries = 0; tries < 2 && status < 0; tries++) {
+        bool kept = esp_http_client_get_socket(h) >= 0;
+        bool sent = esp_http_client_open(h, (int)len) == ESP_OK;
+        for (size_t at = 0; sent && at < len;) {
+            int n = esp_http_client_write(h, (const char *)ogg + at, (int)(len - at));
+            sent = n > 0;
+            if (sent) at += (size_t)n;
+        }
+        if (sent && esp_http_client_fetch_headers(h) >= 0) status = esp_http_client_get_status_code(h);
+        if (status < 0) esp_http_client_close(h);
+        if (!kept) break;
     }
     if (status == 200) {
         told_low |= low;
         if (lit) lit();
         face_set_mode(FACE_THINKING);
-        if (play_answer(h) && !esp_http_client_is_complete_data_received(h)) status = -1;
+        bool heard = play_answer(h);
+        if (heard && !esp_http_client_is_complete_data_received(h)) status = -1;
+        if (!heard || status < 0) esp_http_client_close(h);
     } else {
         ESP_LOGW(TAG, "her door answered %d", status);
+        esp_http_client_close(h);
     }
-    esp_http_client_cleanup(h);
     face_set_level(0);
     return status;
 }

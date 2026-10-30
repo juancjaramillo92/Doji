@@ -3548,7 +3548,11 @@ he speaks — Opus at 24 kbit/s, 16 kHz mono, in an Ogg file built in memory
 whole five — and goes to her door with her battery, the cable and her volume in
 its headers, and the battery line asked for once a charge when she is low. Asked
 to speak up or down, she sets the volume before she answers, and keeps it, as
-the dial does. The answer is read out of its frames (`charm/main/frames.c`) and
+the dial does. Each door keeps one connection for the whole waking, so only
+the first request pays for a TLS handshake, about a second; a connection her
+door has closed since is tried once more afresh, and the journal's answers,
+the look at what waits after each of her answers and every later turn go
+straight out. The answer is read out of its frames (`charm/main/frames.c`) and
 played as it streams in (*The charm — her voice on his keyring*): her face
 thinks through the silence and speaks when her voice starts, since the silence
 is exact zeros. A press while she thinks or speaks cuts her off at once — she
