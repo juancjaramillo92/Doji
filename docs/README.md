@@ -3557,9 +3557,12 @@ typeface, Hanken Grotesk, made into the charm's four fonts by
 
 **A finger round the rim is the volume**: one full turn from silent to
 loudest, from a press at least 160 px from the centre. The screen dims, and
-round the rim a faint track, the level in Doji's emeralds, a white knob at its
-end, and the number under *VOLUME*; it fades a moment after the finger lifts,
-and the volume is saved in her flash with the rest.
+round the rim a faint track, the level in Doji's light emerald, a white knob at
+its end, and the number under *VOLUME*; it goes a moment after the finger lifts,
+and the volume is saved in her flash with the rest. It appears and goes at once,
+the only two frames that redraw the whole screen: a turn redraws only the
+stretch of rim it moved and the number, so the knob keeps up with the finger,
+and the speaker is told only when the number changes.
 
 **PWR also switches her on and off**, and **BOOT held for five seconds opens
 the setup**. PWR belongs to the power chip, an AXP2101 (`charm/main/power.c`):
