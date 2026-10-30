@@ -105,12 +105,13 @@ static void draw_done(lv_event_t *e) {
         lv_draw_line(layer, &l);
         drawn -= len;
     }
-    face_ring(layer, 231, 8, fminf(1, t / (float)SWEEP_MS), t / (float)FACE_RING_TURN_MS, all_yes ? 1 : 0.55f);
+    face_ring(layer, 231, 8, fminf(1, t / (float)SWEEP_MS), 0, all_yes ? 1 : 0.55f);
 }
 
+// Redrawn while the tick and the ring draw themselves in, then still.
 static void redraw(lv_timer_t *t) {
-    (void)t;
     lv_obj_invalidate(done);
+    if (lv_tick_elaps(done_at) > SWEEP_MS) lv_timer_pause(t);
 }
 
 // Built on first use, under the display lock.

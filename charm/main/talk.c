@@ -139,6 +139,8 @@ static int knock(const char *url, const uint8_t *ogg, size_t len, void (*lit)(vo
         .method = ogg ? HTTP_METHOD_POST : HTTP_METHOD_GET,
         .timeout_ms = READ_MS,
         .crt_bundle_attach = esp_crt_bundle_attach,
+        // Her voice read in pieces the size of `in`, not the default 512 bytes.
+        .buffer_size = 4096,
     };
     if (!net_wait(NET_ALL_MS)) return -1;
     esp_http_client_handle_t h = esp_http_client_init(&c);

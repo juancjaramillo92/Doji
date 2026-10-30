@@ -47,6 +47,5 @@ void face_set_marks(bool briefing, bool trade, bool low, bool offline, int charg
 int face_marks(bool briefing, bool trade, bool low, bool offline, int charge);
 
 /* Doji's emeralds round the rim, from the top for `part` of a turn, `turn`
-   spinning the colours: her listening ring, the charge, the journal's done. */
-#define FACE_RING_TURN_MS 1800  // one turn of the colours, where they spin
+   turning the colours round: her listening ring, the charge, the journal's done. */
 void face_ring(lv_layer_t *layer, int32_t radius, int32_t width, float part, float turn, float opa);
