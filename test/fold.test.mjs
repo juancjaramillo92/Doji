@@ -3244,6 +3244,48 @@ test('a caller on a cheaper model does not read as having fallen back', async ()
     'comparison is against one name for the file rather than against the caller');
 });
 
+/* Fast mode is the reply's alone, and a research preview with its own limit:
+   a fast request it refuses must come back as an ordinary one, never as an
+   apology. Driven through ask(), since the speed is derived from the label
+   there and the retry lives in the request beneath it. */
+test('a reply asks for fast mode, and is answered at the ordinary speed when it is refused', async () => {
+  const sent = [];
+  let answer;
+  await stubbed(async () => {
+    console.log = () => {};
+    globalThis.fetch = async (url, init) => {
+      // The run's row goes to the database through the same fetch.
+      if (!String(url).includes('api.anthropic.com')) return { ok: true, json: async () => [], text: async () => '' };
+      const body = JSON.parse(init.body);
+      sent.push({ speed: body.speed, beta: init.headers['anthropic-beta'] ?? '' });
+      return body.speed === 'fast'
+        ? { ok: false, status: 429, text: async () => 'fast mode is busy' }
+        : answers('claude-opus-5-5');
+    };
+    answer = await ask([{ role: 'user', content: 'anything' }], 'medium', 'reply');
+  });
+  assert.equal(sent[0]?.speed, 'fast', 'a reply does not ask for fast mode');
+  assert.match(sent[0].beta, /fast-mode-2026-02-01/, 'fast mode is asked for without its beta header');
+  assert.equal(sent.length, 2, 'a refused fast request was not sent again');
+  assert.equal(sent[1].speed, undefined, 'the second request still asked for fast mode');
+  assert.equal(answer, 'an answer', 'a refused fast request cost the reply');
+
+  sent.length = 0;
+  await stubbed(async () => {
+    console.log = () => {};
+    globalThis.fetch = async (url, init) => {
+      // The run's row goes to the database through the same fetch.
+      if (!String(url).includes('api.anthropic.com')) return { ok: true, json: async () => [], text: async () => '' };
+      const body = JSON.parse(init.body);
+      sent.push({ speed: body.speed, beta: init.headers['anthropic-beta'] ?? '' });
+      return answers('claude-opus-5-5');
+    };
+    await ask([{ role: 'user', content: 'anything' }], 'medium', 'test');
+  });
+  assert.equal(sent[0]?.speed, undefined, 'a caller other than the reply asks for fast mode');
+  assert.doesNotMatch(sent[0].beta, /fast-mode/, 'the fast-mode beta rides on a caller that is not fast');
+});
+
 test('a turn served by another model names it in the cost line', async () => {
   const [line] = await costLines([answers('some-other-model')]);
   assert.match(line, /FELL BACK TO some-other-model/);

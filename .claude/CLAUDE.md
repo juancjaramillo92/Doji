@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 841 tests, eight suites
+npm test      # 842 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -453,6 +453,9 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   the caller asked for. `fallbacks` rides with Opus alone, header and field
   together. The critic stays on Opus and is handed `CRITIC_TOOLS` (empty) — see
   `REFACTOR.md` R-15.
+- **`FAST` is keyed like `MODELS`** and holds `reply` alone: one reply,
+  whichever channel carried it. A fast request refused for any reason is sent
+  once more at the ordinary speed; `fold.test.mjs` drives both halves.
 - **`chunk` is two lookups, not a `max()`**: `lastIndexOf('\n')` is always at or
   past `lastIndexOf('\n\n')`.
 

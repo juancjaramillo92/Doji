@@ -4806,7 +4806,7 @@ test('a model turn may spend what pace_line calls safe, and no more', () => {
     `TURN_MS is ${turn}ms where pace_line warns at ${ceiling * num / den}ms`);
   assert.match(EUGENIA_TS, /const deadline = AbortSignal\.timeout\(budget\);/,
     'ask() no longer starts its turn on the budget');
-  assert.match(EUGENIA_TS, /call\(convo, effort, tools, model, deadline, container\)/,
+  assert.match(EUGENIA_TS, /call\(convo, effort, tools, model, deadline, container, fast\)/,
     'the turn\'s signal no longer reaches the request');
 });
 
