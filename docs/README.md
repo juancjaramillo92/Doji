@@ -3345,10 +3345,19 @@ spare; the same firmware goes on any.
 digest) whenever `charm/` changes. The board's support package
 (`waveshare/esp32_s3_touch_amoled_1_75c`) and LVGL 9.5 come from Espressif's
 component registry, at the versions Waveshare's own examples for this board use,
-with Espressif's audio codecs for the Opus a recording is encoded in. The
-versions every build uses are the ones `charm/dependencies.lock` names, and the
-workflow fails a build that resolved any other, so a new release reaches the
-firmware only by a commit that changes the lock.
+with Espressif's audio codecs for the Opus a recording is encoded in. Her
+screen is started from the package's parts rather than its `bsp_display_start`,
+which draws into PSRAM: the SPI driver will not send from there, so it copies
+each whole draw into internal RAM first, which a board running Wi-Fi seldom has
+free, and the panel stays white. She draws a few rows at a time in internal
+RAM, sent as they are (`light` in `charm/main/main.c`). Her task's stack, the
+Opus encoder's, is in PSRAM, since in internal RAM it leaves the codecs too
+little and the board package aborts as her speaker starts; deep sleep, which
+suspends the cache PSRAM is read through, is entered from a small task of its
+own (`charm/main/sleep.c`). The versions every build uses are the ones
+`charm/dependencies.lock` names, and the workflow fails a build that resolved
+any other, so a new release reaches the firmware only by a commit that changes
+the lock.
 The download is **`charm-full.bin`**, one image written at `0x0`: plug the
 board in by USB-C and flash it from Chrome with Espressif's web flasher, or with
 `esptool.py write_flash 0x0 charm-full.bin`. Not `charm.bin`, which is
@@ -3438,8 +3447,10 @@ flashing — or after BOOT is held for five seconds, she becomes her own Wi-Fi
 network, named for her address like *Charm-4F2A* and **locked with a password
 made up for that setup**, and shows a **QR code** carrying both, centred on her
 screen with the name under it. A phone's camera joins it in one tap, and the
-page opens by itself: every name the phone asks for resolves to the charm and
-every page but its own redirects there. The page (`charm/main/setup.html`) is
+page opens by itself: her DHCP tells the phone to ask her for every name and
+where her page is (option 114, which newer phones open at once), every name the
+phone asks for resolves to the charm, and every page but its own redirects
+there. The page (`charm/main/setup.html`) is
 set in Doji's typeface, which the charm serves herself
 (`charm/main/setup.woff2`, made by `charm/tools/fonts.sh`) since the phone has
 no internet while it is on her network, and it is built for a phone: thumb-sized
@@ -3455,8 +3466,11 @@ Eugenia's with an empty recording, which a right key is refused with a `400`
 for, Gladys's with what waits — while her screen shows a spinner, then a tick or
 a cross. While she tests a network her radio moves to its channel, so the phone
 can drop off her network for a moment; the page says it is reconnecting and
-carries on by itself. Coming back later, the page shows what she has: her
-networks in the order she tries them, each with Remove behind a second tap, a
+carries on by itself. A phone that does not find its way back, not knowing
+her password to rejoin, has the code again: whenever no phone is on her
+network, her screen shows the QR code rather than the step it was on, since
+the password is in nothing else. Coming back later, the page shows what she
+has: her networks in the order she tries them, each with Remove behind a second tap, a
 way to add one, and Replace for either key, checked before the old one goes. She
 keeps four networks: a fifth is refused until one is removed, never swapped in
 silently. Finishing ends on "All set", since the page cannot close itself.
@@ -3516,8 +3530,11 @@ and the touch controller's reset are held through sleep, so the sleep screen
 needs no chip awake to stay up and a tap can still wake her. **Each waking joins
 her Wi-Fi in the background**, the network she was last on first, asked directly
 on its own channel and access point so no scan is needed, then each saved one in
-turn; nothing waits for it but the moment something must be sent. Leaving an
-attempt that failed is never taken for the next network refusing her.
+turn; nothing waits for it but the moment something must be sent. A network
+that is there but does not let her in is asked again until its time is up,
+since one unanswered handshake would otherwise cost the whole waking; one
+that is not there is not. Leaving an attempt that failed is never taken for
+the next network refusing her.
 
 **Asleep, she runs errands in the dark** every five minutes, day and night,
 and on the cable every two so the charge stays current (`charm/main/errand.c`).
@@ -3632,8 +3649,10 @@ floating in sleep, is quiet. That a battery run down resets her as a brownout
 and so switches her off, and whether a cable alone switches her back on. How
 long a press from sleep takes to reach the listening notes: the serial log's
 `lit` and `listening` lines are timestamped from boot, and the board package's
-panel start alone waits 1.2 s. How long her frames take in each mood, which the
-serial log says — under the face's 33 ms is smooth — and whether a render
+panel start alone waits 1.2 s. How much internal RAM is left once she is lit,
+and in how large a piece, which the `lit` line says. That a phone opens her
+setup page by itself from the code, as her DHCP's option 114 asks of it. How
+long her frames take in each mood, which the serial log says — under the face's 33 ms is smooth — and whether a render
 changing tears, since the board package does not sync to the panel. Which way
 the motion sensor's x and y axes run across the screen (`SCREEN_X` and
 `SCREEN_Y` in `charm/main/lift.c`), how hard a knock must be to be a jolt and

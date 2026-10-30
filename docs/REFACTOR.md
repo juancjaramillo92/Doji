@@ -1180,6 +1180,21 @@ case stays, checking the real prompt; `agree.test.mjs` holds the rule's
 sentences in `SYSTEM` and `CRITIC`.
 **Revisit if:** the briefing gains a slot a sentence off the map could sit in.
 
+### R-126 — asking a network that is not there again within its time
+**Why refused:** `attempt` asks a network again on any refusal but
+`WIFI_REASON_NO_AP_FOUND`. Asking an absent one again would keep the radio on
+for its whole time at every errand away from home, for a network a scan has
+already not found; the next errand asks it afresh.
+**Revisit if:** the board shows a network in range reported as not found.
+
+### R-127 — the screen's SPI transfers sized to the rows she draws
+**Deferred.** `light` keeps the board package's `max_transfer_sz`, the whole
+screen, though she draws only `DRAW_ROWS` rows at a time; the bus allocates DMA
+descriptors for the larger size out of internal RAM, a couple of kilobytes by
+reading. Sizing it to the rows is a change to the panel's driver to prove on
+the board, for memory the `lit` line says she now has.
+**Revisit if:** the `lit` line runs short again.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

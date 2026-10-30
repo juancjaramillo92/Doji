@@ -4,6 +4,8 @@
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
 #include "esp_sleep.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "power.h"
 
 // The BOOT button and the touch controller's interrupt pull low, as the
@@ -33,6 +35,13 @@ void sleep_woke(void) {
     for (size_t i = 0; i < COUNT(WAKE); i++) rtc_gpio_deinit(WAKE[i]);
 }
 
+/* The last step, from a task of its own: deep sleep suspends the cache that
+   PSRAM is read through, and her task's stack is in PSRAM (main.c). */
+static void enter(void *arg) {
+    (void)arg;
+    esp_deep_sleep_start();
+}
+
 void sleep_until(time_t wake_at, bool motion) {
     for (size_t i = 0; i < COUNT(HELD); i++) gpio_hold_en(HELD[i]);
     gpio_deep_sleep_hold_en();
@@ -57,5 +66,6 @@ void sleep_until(time_t wake_at, bool motion) {
     // press would wake her.
     time_t now = time(NULL);
     esp_sleep_enable_timer_wakeup((uint64_t)(wake_at > now ? wake_at - now : 1) * 1000000ULL);
-    esp_deep_sleep_start();
+    xTaskCreatePinnedToCore(enter, "sleep", 3072, NULL, configMAX_PRIORITIES - 1, NULL, xPortGetCoreID());
+    vTaskSuspend(NULL);
 }
