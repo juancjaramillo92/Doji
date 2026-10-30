@@ -3543,7 +3543,8 @@ nothing ends his turn but the next press, so he can stop to think as long as he
 needs; **two falling notes** say his words are on their way. A press with
 nothing said for thirty seconds is dropped quietly. **A turn runs to five
 minutes**, a soft tick half a minute before the end; the recording is encoded as
-he speaks — Opus at 24 kbit/s, 16 kHz mono, in an Ogg file built in memory
+he speaks — Opus at 24 kbit/s, 24 kHz mono, her voice's own rate so the
+codecs are never reopened between his words and hers, in an Ogg file built in memory
 (`charm/main/ogg.c`), one packet a page, about 1.3 MB for the
 whole five — and goes to her door with her battery, the cable and her volume in
 its headers, and the battery line asked for once a charge when she is low. Asked
