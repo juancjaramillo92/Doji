@@ -7,8 +7,10 @@
 // volume after.
 void sound_start(void);
 
-// The rate the microphones record at, and the notes play at.
-#define SOUND_RATE 16000
+/* The rate the microphones record at and the notes play at: her voice's too
+   (HER_RATE in talk.c), since the two codecs share one bus and are reopened
+   whenever the rate changes — twice a turn, with a click, at any other. */
+#define SOUND_RATE 24000
 
 /* Both codecs closed, the speaker's amplifier with them: they are powered
    by the board, not the chip, so deep sleep alone leaves them biased. Before

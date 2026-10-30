@@ -78,9 +78,11 @@ void sound_chime(void) {
 void sound_tick(void) {
     open_at(SOUND_RATE);
     for (int n = 0; n < 2; n++) {
-        // A tick: 8 ms of a high note dying fast, then the quiet between the two.
-        for (size_t at = 0; at < 1760; at += CHUNK) {
-            size_t k = 1760 - at < CHUNK ? 1760 - at : CHUNK;
+        // A tick: 8 ms of a high note dying fast, then the quiet between the
+        // two, 110 ms in all.
+        const size_t span = SOUND_RATE * 11 / 100;
+        for (size_t at = 0; at < span; at += CHUNK) {
+            size_t k = span - at < CHUNK ? span - at : CHUNK;
             for (size_t i = 0; i < k; i++) {
                 float t = (float)(at + i) / SOUND_RATE;
                 float env = t < 0.008f ? expf(-t * 600.0f) : 0;

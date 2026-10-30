@@ -3,8 +3,8 @@
 
    Its wake-on-motion holds the interrupt at a level until the acceleration
    moves past a threshold, then flips it, so it is armed again before every
-   sleep with the level high and the chip woken by its fall. Looking is two
-   ordinary readings after the wake, judged by lift.c.
+   sleep with the level high and the chip woken by its fall. Looking is
+   ordinary readings after the wake, a pair at a time, judged by lift.c.
 
    The registers and the wake-on-motion sequence are the chip's datasheet's,
    and are among what to check on the real board first. */
@@ -21,7 +21,7 @@
 static const char *TAG = "motion";
 
 #define ADDRESS     0x6B
-#define CTRL1       0x02  // bit 6 auto-increment, bit 3 INT1 out
+#define CTRL1       0x02  // bit 6 auto-increment, bit 5 big-endian, bit 3 INT1 out
 #define CTRL2       0x03  // accelerometer: bits 6:4 range, 3:0 rate
 #define CTRL7       0x08  // bit 0 accelerometer on
 #define CTRL9       0x0A  // commands
@@ -30,18 +30,23 @@ static const char *TAG = "motion";
 #define STATUSINT   0x2D  // bit 7 a command done
 #define AX_L        0x35
 
+/* Auto-increment and little-endian, as read_g reads six bytes, and INT1 out.
+   The chip powers up big-endian without auto-increment, which reads one byte
+   six times: every axis the same number. */
+#define INTERFACE   (0x40 | 0x08)
 #define ON_INT1_HIGH (3 << 6)
 #define WOM_SETTING 0x08
 #define ACK         0x00
 #define RANGE_2G    0x00
 #define RATE_LOW    0x0D  // 21 Hz, low power, for wake-on-motion
-#define RATE_READ   0x06  // 125 Hz, for the two readings
+#define RATE_READ   0x06  // 125 Hz, for the readings awake
 
 // Readings, not facts: how hard a movement wakes her, and the gap between the
-// two readings that judge it.
+// two readings of a pair that judge it.
 #define THRESHOLD_MG 120
 #define BLANK        8
 #define APART_MS     150
+#define LOOK_FOR_MS  1500  // how long a lift has to settle into him looking
 #define SAMPLES      8     // averaged into one reading, so the sensor's noise is not a hand's tremor
 #define SAMPLE_MS    8     // a new sample at RATE_READ's 125 Hz
 
@@ -74,7 +79,7 @@ void motion_arm(void) {
     attach();
     reading = false;
     set(CTRL7, 0);
-    set(CTRL1, 0x40 | 0x08);
+    set(CTRL1, INTERFACE);
     set(CTRL2, RANGE_2G | RATE_LOW);
     set(CAL1_L, THRESHOLD_MG);
     set(CAL1_H, ON_INT1_HIGH | BLANK);
@@ -92,6 +97,7 @@ static void read_g(float g[3]) {
 static void start_reading(void) {
     if (reading) return;
     attach();
+    set(CTRL1, INTERFACE);
     set(CAL1_L, 0);
     command(WOM_SETTING);
     set(CTRL2, RANGE_2G | RATE_READ);
@@ -100,15 +106,24 @@ static void start_reading(void) {
     reading = true;
 }
 
+/* A lift wakes her as it starts, still moving, so its first instant says
+   little: she watches it settle, a pair of readings at a time, for up to
+   LOOK_FOR_MS, and is lit the moment one pair is him looking. */
 bool motion_looked(void) {
     start_reading();
-    float first[3], second[3];
-    read_g(first);
-    vTaskDelay(pdMS_TO_TICKS(APART_MS));
-    read_g(second);
-    bool looked = lift_seen(first, second);
-    ESP_LOGI(TAG, "lift %s: %.2f %.2f %.2f", looked ? "seen" : "not him", second[0], second[1], second[2]);
-    return looked;
+    float before[3], now[3];
+    read_g(before);
+    for (int waited = 0; waited < LOOK_FOR_MS; waited += APART_MS) {
+        vTaskDelay(pdMS_TO_TICKS(APART_MS));
+        read_g(now);
+        if (lift_seen(before, now)) {
+            ESP_LOGI(TAG, "lift seen after %d ms: %.2f %.2f %.2f", waited + APART_MS, now[0], now[1], now[2]);
+            return true;
+        }
+        memcpy(before, now, sizeof now);
+    }
+    ESP_LOGI(TAG, "lift not him: %.2f %.2f %.2f", now[0], now[1], now[2]);
+    return false;
 }
 
 lift_hold_t motion_hold(void) {

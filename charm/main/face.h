@@ -22,6 +22,11 @@ void face_start(void);
 void face_set_mode(face_mode_t mode);
 face_mode_t face_get_mode(void);
 
+/* The sleep screen, rendered whole before this returns, for a chip about to
+   sleep: a frame left to the timer can be cut off by the sleep partway down
+   the panel. Under the display lock. */
+void face_draw_dark(void);
+
 // How long FACE_ASLEEP takes to close her eyes.
 #define FACE_GOODNIGHT_MS 1200
 

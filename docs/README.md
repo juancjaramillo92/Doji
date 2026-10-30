@@ -3391,7 +3391,10 @@ emeralds stand still round the rim, redrawing the full screen once as they come
 and once as they go; the ring emptying while PWR is held is the only thing that
 redraws it on every frame. **Nothing flashes between screens**: whatever
 comes up first is the only thing seen, so no face shows for a moment before the
-journal's questions or after them. Her state — a low battery, no internet — is
+journal's questions or after them. The panel keeps its last picture through
+sleep and would show it again as it starts, so it stays switched off until the
+first frame is drawn whole; and the sleep screen is drawn whole before she
+sleeps, so none of what was there is left on it. Her state — a low battery, no internet — is
 never an expression on her face; it is a mark on the sleep screen.
 
 **The sleep screen is black but for its marks**, still, so they stay on the
@@ -3471,9 +3474,10 @@ the chip's sleep does not take away — and the chip goes into deep sleep,
 where it wakes as if switched on again: **lifted to look**, on a tap
 on the screen, PWR, the BOOT button, or a time. A lift is the motion sensor's:
 armed before every sleep, on GPIO21 (Waveshare's schematic for the 1.75C), it
-wakes the chip on a movement, which then takes two readings a moment apart and
-keeps her awake only when the screen is tilted up toward him and held still
-(`charm/main/lift.c`); a swing on the keyring or a bump in a pocket sends her
+wakes the chip on a movement, which then watches it settle for up to a second
+and a half, a pair of readings 150 ms apart at a time, and lights her the moment
+a pair has the screen tilted up toward him and held still (`charm/main/lift.c`),
+so a lift still moving when it woke her is not mistaken for a swing; a swing on the keyring or a bump in a pocket sends her
 straight back to sleep without lighting the screen, and rests the sensor for
 twenty seconds, so a keyring swinging all day cannot keep waking her. What shows
 first is decided before the screen lights: **a trade waiting puts its questions
@@ -3539,12 +3543,17 @@ nothing ends his turn but the next press, so he can stop to think as long as he
 needs; **two falling notes** say his words are on their way. A press with
 nothing said for thirty seconds is dropped quietly. **A turn runs to five
 minutes**, a soft tick half a minute before the end; the recording is encoded as
-he speaks — Opus at 24 kbit/s, 16 kHz mono, in an Ogg file built in memory
+he speaks — Opus at 24 kbit/s, 24 kHz mono, her voice's own rate so the
+codecs are never reopened between his words and hers, in an Ogg file built in memory
 (`charm/main/ogg.c`), one packet a page, about 1.3 MB for the
 whole five — and goes to her door with her battery, the cable and her volume in
 its headers, and the battery line asked for once a charge when she is low. Asked
 to speak up or down, she sets the volume before she answers, and keeps it, as
-the dial does. The answer is read out of its frames (`charm/main/frames.c`) and
+the dial does. Each door keeps one connection for the whole waking, so only
+the first request pays for a TLS handshake, about a second; a connection her
+door has closed since is tried once more afresh, and the journal's answers,
+the look at what waits after each of her answers and every later turn go
+straight out. The answer is read out of its frames (`charm/main/frames.c`) and
 played as it streams in (*The charm — her voice on his keyring*): her face
 thinks through the silence and speaks when her voice starts, since the silence
 is exact zeros. A press while she thinks or speaks cuts her off at once — she
@@ -3579,7 +3588,10 @@ typeface, Hanken Grotesk, made into the charm's four fonts by
 `charm/tools/fonts.sh` with only the letters they use.
 
 **A finger round the rim is the volume**: one full turn from silent to
-loudest, from a press at least 160 px from the centre. The screen dims, and
+loudest. It comes up only for a slide: a press at least 160 px from the centre
+arms it, and it takes hold once the finger has gone 25 degrees round the rim
+without leaving it, so a touch at the edge or a slide across it never brings it
+up, and the volume moves only from there. The screen dims, and
 round the rim a faint track, the level in Doji's light emerald, a white knob at
 its end, and the number under *VOLUME*; it goes a moment after the finger lifts,
 and the volume is saved in her flash with the rest. It appears and goes at once,
@@ -3624,8 +3636,9 @@ off before sleep, and that the speaker's amplifier, enabled on GPIO46 and left
 floating in sleep, is quiet. That a battery run down resets her as a brownout
 and so switches her off, and whether a cable alone switches her back on. How
 long a press from sleep takes to reach the listening notes: the serial log's
-`lit` and `listening` lines are timestamped from boot, and the board package's
-panel start alone waits 1.2 s. How much internal RAM is left once she is lit,
+`lit` and `listening` lines are timestamped from boot. That the panel comes up
+clean on 120 ms after sleep-out, where the board package waited 1.2 s in all
+(`PANEL_START` in `charm/main/main.c`). How much internal RAM is left once she is lit,
 and in how large a piece, which the `lit` line says. That a phone opens her
 setup page by itself from the code, as her DHCP's option 114 asks of it. How
 she is judged held or put down, which the serial log says at each change with

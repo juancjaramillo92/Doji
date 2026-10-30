@@ -16,7 +16,8 @@
 LV_FONT_DECLARE(hanken_16);
 LV_FONT_DECLARE(hanken_36);
 
-#define RIM      160    // a press this far from the centre or more is the dial's
+#define RIM      160    // a press this far from the centre or more may be the dial's
+#define ENGAGE   0.44f  // and becomes it once slid this far round the rim, in radians: 25 degrees
 #define RADIUS   217    // the track's outer edge
 #define WIDTH    6
 #define KNOB     8      // the knob's radius, and its shadow's
@@ -26,8 +27,8 @@ static const lv_area_t NUMBER = { 0, 382, 465, 424 };
 
 static lv_obj_t *veil;
 static lv_timer_t *timer;
-static bool held, turned;
-static float angle, volume;
+static bool armed, held, turned;
+static float angle, travel, volume;
 static int set;  // the volume the speaker was last given
 
 static float angle_of(lv_point_t p) { return atan2f(p.y - 233, p.x - 233); }
@@ -118,34 +119,43 @@ static void gone(lv_timer_t *tm) {
     lv_timer_pause(tm);
 }
 
+/* A press on the rim only arms the dial; it takes hold once the finger has
+   slid ENGAGE round the rim without leaving it, so a touch at the edge, or a
+   slide across it, never brings it up. The volume moves only after that. */
 void dial_press(lv_point_t p) {
-    turned = false;
-    held = hypotf(p.x - 233, p.y - 233) >= RIM;
-    if (!held) return;
+    turned = held = false;
+    armed = hypotf(p.x - 233, p.y - 233) >= RIM;
     angle = angle_of(p);
-    volume = set = cfg.volume;
-    if (!veil) {
-        veil = lv_obj_create(lv_layer_top());
-        lv_obj_remove_style_all(veil);
-        lv_obj_set_size(veil, 466, 466);
-        lv_obj_remove_flag(veil, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_add_flag(veil, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_event_cb(veil, draw, LV_EVENT_DRAW_MAIN, NULL);
-        timer = lv_timer_create(gone, STAY_MS, NULL);
-    }
-    lv_timer_pause(timer);
-    if (lv_obj_has_flag(veil, LV_OBJ_FLAG_HIDDEN)) lv_obj_remove_flag(veil, LV_OBJ_FLAG_HIDDEN);
-    else invalidate_between(volume, volume);
+    travel = 0;
 }
 
 // The speaker is told only when the whole number changes: each is a write
 // on the bus the touch is read over.
 void dial_slide(lv_point_t p) {
-    if (!held) return;
+    if (!armed) return;
     float a = angle_of(p), d = a - angle;
     if (d > (float)M_PI) d -= 2 * (float)M_PI;
     if (d < -(float)M_PI) d += 2 * (float)M_PI;
     angle = a;
+    if (!held) {
+        if (hypotf(p.x - 233, p.y - 233) < RIM) armed = false;
+        if (!armed || fabsf(travel += d) < ENGAGE) return;
+        held = true;
+        volume = set = cfg.volume;
+        if (!veil) {
+            veil = lv_obj_create(lv_layer_top());
+            lv_obj_remove_style_all(veil);
+            lv_obj_set_size(veil, 466, 466);
+            lv_obj_remove_flag(veil, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_add_flag(veil, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_event_cb(veil, draw, LV_EVENT_DRAW_MAIN, NULL);
+            timer = lv_timer_create(gone, STAY_MS, NULL);
+        }
+        lv_timer_pause(timer);
+        if (lv_obj_has_flag(veil, LV_OBJ_FLAG_HIDDEN)) lv_obj_remove_flag(veil, LV_OBJ_FLAG_HIDDEN);
+        else invalidate_between(volume, volume);
+        return;
+    }
     if (fabsf(d) > 0.002f) turned = true;
     float was = volume;
     volume = fminf(100, fmaxf(0, volume + d / (2 * (float)M_PI) * 100));
@@ -157,6 +167,7 @@ void dial_slide(lv_point_t p) {
 }
 
 void dial_lift(void) {
+    armed = false;
     if (!held) return;
     held = false;
     lv_timer_reset(timer);

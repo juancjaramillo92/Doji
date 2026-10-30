@@ -40,9 +40,13 @@
    held three seconds she says goodnight and switches off. */
 #include "bsp/esp-bsp.h"
 #include "bsp/touch.h"
+#include "driver/spi_master.h"
 #include "esp_attr.h"
 #include "esp_flash.h"
 #include "esp_heap_caps.h"
+#include "esp_lcd_co5300.h"
+#include "esp_lcd_panel_io.h"
+#include "esp_lcd_panel_ops.h"
 #include "esp_log.h"
 #include "esp_psram.h"
 #include "esp_sleep.h"
@@ -68,11 +72,11 @@
 
 static const char *TAG = "charm";
 
-#define BRIGHTNESS    75     // percent
+#define BRIGHTNESS    191    // of 255, the panel's own brightness: 75%
 #define LIFE_STACK    40960  // bytes
 #define DRAW_ROWS     12     // drawn at a time, twice over: 22 KB of internal RAM
 #define AWAKE_MS      30000
-#define LAST_FRAME_MS 200    // the sleep screen reaching the panel
+#define LAST_FRAME_MS 50     // a rendered frame's last rows reaching the panel
 #define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
 #define EARLY_S       5      // how early a timer may wake her and still be the errand's
 #define OFFLINE_TRY_MS 8000  // woken offline, how long the network has to answer
@@ -111,12 +115,36 @@ static void even_area(lv_event_t *e) {
     a->y2 |= 1;
 }
 
+/* The panel's start, as the board package's bsp_display_new sends it but for
+   its waits: it sleeps 600 ms after the window and 600 more after sleep-out,
+   1.2 s of every waking before her face. Sleep-out asks 120 ms; the window
+   asks none. Her brightness is set here, since the package's setter reaches
+   only a panel its own bsp_display_new made. Display-on is not in it: light()
+   switches the panel on once her first frame is drawn. */
+static const co5300_lcd_init_cmd_t PANEL_START[] = {
+    {0xFE, (uint8_t[]){0x20}, 1, 0},
+    {0x19, (uint8_t[]){0x10}, 1, 0},
+    {0x1C, (uint8_t[]){0xA0}, 1, 0},
+    {0xFE, (uint8_t[]){0x00}, 1, 0},
+    {0xC4, (uint8_t[]){0x80}, 1, 0},
+    {0x3A, (uint8_t[]){0x55}, 1, 0},
+    {0x35, (uint8_t[]){0x00}, 1, 0},
+    {0x53, (uint8_t[]){0x20}, 1, 0},
+    {0x51, (uint8_t[]){BRIGHTNESS}, 1, 0},
+    {0x63, (uint8_t[]){0xFF}, 1, 0},
+    {0x2A, (uint8_t[]){0x00, 0x06, 0x01, 0xD7}, 4, 0},
+    {0x2B, (uint8_t[]){0x00, 0x00, 0x01, 0xD1}, 4, 0},
+    {0x11, NULL, 0, 120},
+};
+
 /* The screen, started once, in `mode`. It is the board package's
    bsp_display_start but for where she draws: the package's draws into PSRAM,
    which the SPI driver will not send from, so it copies each draw into an
    internal buffer as large as the draw, 46 KB, which a board running Wi-Fi
    seldom has free. DRAW_ROWS rows at a time in internal RAM are sent as they
-   are. */
+   are. The panel keeps its picture through sleep and shows it again the
+   moment it is switched on, so it stays off until her first frame is
+   rendered whole: otherwise what was last there flashes up first. */
 static void light(face_mode_t mode) {
     if (lit) return;
     lit = true;
@@ -125,12 +153,31 @@ static void light(face_mode_t mode) {
         .lv_adapter_cfg = ESP_LV_ADAPTER_DEFAULT_CONFIG(),
         .touch_flags = { .mirror_x = 1, .mirror_y = 1 },
     };
-    const bsp_display_config_t whole = { .max_transfer_sz = BSP_LCD_H_RES * BSP_LCD_V_RES * BSP_LCD_BITS_PER_PIXEL / 8 };
     esp_lcd_panel_handle_t panel;
     esp_lcd_panel_io_handle_t io;
     esp_lcd_touch_handle_t touch;
     ESP_ERROR_CHECK(esp_lv_adapter_init(&cfg.lv_adapter_cfg));
-    ESP_ERROR_CHECK(bsp_display_new(&whole, &panel, &io));
+    const spi_bus_config_t bus = CO5300_PANEL_BUS_QSPI_CONFIG(BSP_LCD_PCLK, BSP_LCD_DATA0, BSP_LCD_DATA1, BSP_LCD_DATA2,
+                                                              BSP_LCD_DATA3, BSP_LCD_H_RES * BSP_LCD_V_RES * BSP_LCD_BITS_PER_PIXEL / 8);
+    ESP_ERROR_CHECK(spi_bus_initialize(BSP_LCD_SPI_NUM, &bus, SPI_DMA_CH_AUTO));
+    esp_lcd_panel_io_spi_config_t wire = CO5300_PANEL_IO_QSPI_CONFIG(BSP_LCD_CS, NULL, NULL);
+    wire.trans_queue_depth = CONFIG_BSP_LCD_TRANS_QUEUE_DEPTH;
+    ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi((esp_lcd_spi_bus_handle_t)BSP_LCD_SPI_NUM, &wire, &io));
+    co5300_vendor_config_t vendor = {
+        .init_cmds = PANEL_START,
+        .init_cmds_size = sizeof PANEL_START / sizeof *PANEL_START,
+        .flags = { .use_qspi_interface = 1 },
+    };
+    const esp_lcd_panel_dev_config_t chip = {
+        .reset_gpio_num = BSP_LCD_RST,
+        .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
+        .bits_per_pixel = BSP_LCD_BITS_PER_PIXEL,
+        .vendor_config = &vendor,
+    };
+    ESP_ERROR_CHECK(esp_lcd_new_panel_co5300(io, &chip, &panel));
+    esp_lcd_panel_set_gap(panel, 0x06, 0);
+    esp_lcd_panel_reset(panel);
+    esp_lcd_panel_init(panel);
     const esp_lv_adapter_display_config_t screen = {
         .panel = panel,
         .panel_io = io,
@@ -150,12 +197,17 @@ static void light(face_mode_t mode) {
     ESP_ERROR_CHECK(bsp_touch_new(&cfg, &touch));
     const esp_lv_adapter_touch_config_t finger = ESP_LV_ADAPTER_TOUCH_DEFAULT_CONFIG(display, touch);
     esp_lv_adapter_register_touch(&finger);
-    ESP_ERROR_CHECK(bsp_display_brightness_init());
     ESP_ERROR_CHECK(esp_lv_adapter_start());
-    bsp_display_brightness_set(BRIGHTNESS);
     face_set_mode(mode);
     bsp_display_lock(-1);
     face_start();
+    lv_refr_now(NULL);
+    bsp_display_unlock();
+    vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
+    // Under the lock: LVGL's task sends frames to the same panel, and a
+    // command between its transfers waits for them only if it is not mid-send.
+    bsp_display_lock(-1);
+    esp_lcd_panel_disp_on_off(panel, true);
     bsp_display_unlock();
     // Timestamped from boot, beside talk.c's "listening": how much of a press's
     // wait is the panel starting. And what internal RAM the screen and Wi-Fi
@@ -194,7 +246,9 @@ static void sleep_now(void) {
         } else {
             light(FACE_DARK);
             face_set_marks(briefing_waits, trade_waits, low, offline, charge);
-            face_set_mode(FACE_DARK);
+            bsp_display_lock(-1);
+            face_draw_dark();
+            bsp_display_unlock();
             vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
         }
         drawn = marks;
@@ -291,18 +345,19 @@ static between_t between_turns(bool trade) {
 }
 
 static void awake(void) {
-    // Joining runs beside everything else: she listens while it does, and
-    // waits for it only to send. Offline when she last looked, nothing lights
-    // unless it answers now.
-    net_start();
-    if (offline && !net_wait(OFFLINE_TRY_MS)) sleep_now();
-    offline = false;
-    away = 0;
-
     // PWR woke her: he wants to talk, so she listens before anything that
     // waits. Otherwise a trade waiting keeps the screen dark until its
     // questions cover it.
     bool pressed = woke == ESP_SLEEP_WAKEUP_EXT0, trade = trade_waits && !pressed;
+
+    // Joining runs beside everything else: she listens while it does, and
+    // waits for it only to send, so the screen comes first. Offline when she
+    // last looked, nothing lights unless the network answers now.
+    if (!offline) light(trade ? FACE_DARK : FACE_IDLE);
+    net_start();
+    if (offline && !net_wait(OFFLINE_TRY_MS)) sleep_now();
+    offline = false;
+    away = 0;
     light(trade ? FACE_DARK : FACE_IDLE);
     bsp_display_lock(-1);
     lv_obj_t *screen = lv_screen_active();
