@@ -3582,7 +3582,10 @@ typeface, Hanken Grotesk, made into the charm's four fonts by
 `charm/tools/fonts.sh` with only the letters they use.
 
 **A finger round the rim is the volume**: one full turn from silent to
-loudest, from a press at least 160 px from the centre. The screen dims, and
+loudest. It comes up only for a slide: a press at least 160 px from the centre
+arms it, and it takes hold once the finger has gone 25 degrees round the rim
+without leaving it, so a touch at the edge or a slide across it never brings it
+up, and the volume moves only from there. The screen dims, and
 round the rim a faint track, the level in Doji's light emerald, a white knob at
 its end, and the number under *VOLUME*; it goes a moment after the finger lifts,
 and the volume is saved in her flash with the rest. It appears and goes at once,
