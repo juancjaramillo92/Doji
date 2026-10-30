@@ -15,8 +15,8 @@
    before a waiting briefing, which is read after her answer however she is
    held. Between turns she feels about once a second whether she is held up
    to look, which keeps her awake, or has been put down, which puts her to
-   sleep DOWN_MS later; a finger on the screen counts as held; otherwise AWAKE_MS without a press does:
-   her eyes close and the chip stops (sleep.c). Held up and quiet for
+   sleep DOWN_MS later; a finger on the screen counts as held; otherwise
+   AWAKE_MS without a press does: her eyes close and the chip stops (sleep.c). Held up and quiet for
    QUIET_MS, the conversation is over, and a waiting trade's questions come up
    from the dark her eyes close to; put down, she sleeps with the trade under
    its ring. PWR closes the questions for her, the trade waiting again. Lifting her to look wakes her
@@ -39,8 +39,10 @@
    PWR is also the power chip's (power.c): off, a press switches her on, and
    held three seconds she says goodnight and switches off. */
 #include "bsp/esp-bsp.h"
+#include "bsp/touch.h"
 #include "esp_attr.h"
 #include "esp_flash.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_psram.h"
 #include "esp_sleep.h"
@@ -67,6 +69,8 @@
 static const char *TAG = "charm";
 
 #define BRIGHTNESS    75     // percent
+#define LIFE_STACK    40960  // bytes
+#define DRAW_ROWS     12     // drawn at a time, twice over: 22 KB of internal RAM
 #define AWAKE_MS      30000
 #define LAST_FRAME_MS 200    // the sleep screen reaching the panel
 #define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
@@ -98,20 +102,67 @@ static void on_touch(lv_event_t *e) {
     if (code == LV_EVENT_RELEASED) dial_lift();
 }
 
-// The screen, started once, in `mode`.
+// The panel takes its coordinates in pairs, as the board package rounds them.
+static void even_area(lv_event_t *e) {
+    lv_area_t *a = lv_event_get_param(e);
+    a->x1 &= ~1;
+    a->y1 &= ~1;
+    a->x2 |= 1;
+    a->y2 |= 1;
+}
+
+/* The screen, started once, in `mode`. It is the board package's
+   bsp_display_start but for where she draws: the package's draws into PSRAM,
+   which the SPI driver will not send from, so it copies each draw into an
+   internal buffer as large as the draw, 46 KB, which a board running Wi-Fi
+   seldom has free. DRAW_ROWS rows at a time in internal RAM are sent as they
+   are. */
 static void light(face_mode_t mode) {
     if (lit) return;
     lit = true;
     sleep_release();
-    bsp_display_start();
+    bsp_display_cfg_t cfg = {
+        .lv_adapter_cfg = ESP_LV_ADAPTER_DEFAULT_CONFIG(),
+        .touch_flags = { .mirror_x = 1, .mirror_y = 1 },
+    };
+    const bsp_display_config_t whole = { .max_transfer_sz = BSP_LCD_H_RES * BSP_LCD_V_RES * BSP_LCD_BITS_PER_PIXEL / 8 };
+    esp_lcd_panel_handle_t panel;
+    esp_lcd_panel_io_handle_t io;
+    esp_lcd_touch_handle_t touch;
+    ESP_ERROR_CHECK(esp_lv_adapter_init(&cfg.lv_adapter_cfg));
+    ESP_ERROR_CHECK(bsp_display_new(&whole, &panel, &io));
+    const esp_lv_adapter_display_config_t screen = {
+        .panel = panel,
+        .panel_io = io,
+        .profile = {
+            .interface = ESP_LV_ADAPTER_PANEL_IF_OTHER,
+            .rotation = ESP_LV_ADAPTER_ROTATE_0,
+            .hor_res = BSP_LCD_H_RES,
+            .ver_res = BSP_LCD_V_RES,
+            .buffer_height = DRAW_ROWS,
+            .use_psram = false,
+            .require_double_buffer = true,
+        },
+        .tear_avoid_mode = ESP_LV_ADAPTER_TEAR_AVOID_MODE_NONE,
+    };
+    lv_display_t *display = esp_lv_adapter_register_display(&screen);
+    lv_display_add_event_cb(display, even_area, LV_EVENT_INVALIDATE_AREA, NULL);
+    ESP_ERROR_CHECK(bsp_touch_new(&cfg, &touch));
+    const esp_lv_adapter_touch_config_t finger = ESP_LV_ADAPTER_TOUCH_DEFAULT_CONFIG(display, touch);
+    esp_lv_adapter_register_touch(&finger);
+    ESP_ERROR_CHECK(bsp_display_brightness_init());
+    ESP_ERROR_CHECK(esp_lv_adapter_start());
     bsp_display_brightness_set(BRIGHTNESS);
     face_set_mode(mode);
     bsp_display_lock(-1);
     face_start();
     bsp_display_unlock();
     // Timestamped from boot, beside talk.c's "listening": how much of a press's
-    // wait is the panel starting.
-    ESP_LOGI(TAG, "lit");
+    // wait is the panel starting. And what internal RAM the screen and Wi-Fi
+    // leave the codecs and TLS, the board's scarcest memory.
+    ESP_LOGI(TAG, "lit, %u bytes of internal RAM free, %u in one piece",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
 }
 
 // Her briefing has landed: lit for Eugenia to say so.
@@ -341,8 +392,13 @@ void app_main(void) {
         light(FACE_DARK);
         setup_run();
     }
-    // The stack holds a TLS handshake, and the Opus encoder, which Espressif's
-    // codec README puts at about 40 KB. Internal RAM, as deep sleep requires
-    // of the task that starts it.
-    xTaskCreatePinnedToCore(life, "life", 40960, NULL, 5, NULL, 0);
+    /* The stack holds a TLS handshake, and the Opus encoder, which Espressif's
+       codec README puts at about 40 KB. In PSRAM: in internal RAM beside the
+       screen and Wi-Fi it leaves the codecs too little for their DMA, and the
+       board package aborts as her speaker starts. Her code runs from PSRAM,
+       so the cache stays on while she writes her flash, and deep sleep, which
+       suspends it, is entered from a task of its own (sleep.c). */
+    static StaticTask_t task;
+    xTaskCreateStaticPinnedToCore(life, "life", LIFE_STACK, NULL, 5,
+                                  heap_caps_malloc(LIFE_STACK, MALLOC_CAP_SPIRAM), &task, 0);
 }

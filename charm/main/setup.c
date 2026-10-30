@@ -152,11 +152,20 @@ static void show(show_t what, const char *doing) {
     bsp_display_unlock();
 }
 
+/* The phone's step while one is on her network; the code again when none is,
+   since its password is in nothing else. Testing a network moves her radio to
+   that network's channel, and a phone that falls off then may not know the
+   password to come back. */
+static show_t phone_step(void) {
+    wifi_sta_list_t on;
+    return esp_wifi_ap_get_sta_list(&on) == ESP_OK && on.num ? SHOW_JOINED : SHOW_CODE;
+}
+
 // A tick or a cross for a moment, then back to the phone's step.
 static void answer_shown(bool ok) {
     show(ok ? SHOW_TICK : SHOW_CROSS, NULL);
     vTaskDelay(pdMS_TO_TICKS(TICK_MS));
-    show(SHOW_JOINED, NULL);
+    show(phone_step(), NULL);
 }
 
 /* ─── The network and the answer to every name ────────────────────────────
@@ -184,6 +193,7 @@ static void dns_task(void *arg) {
 static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
     (void)arg;
     if (base == WIFI_EVENT && id == WIFI_EVENT_AP_STACONNECTED) show(SHOW_JOINED, NULL);
+    if (base == WIFI_EVENT && id == WIFI_EVENT_AP_STADISCONNECTED) show(phone_step(), NULL);
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED &&
         ((wifi_event_sta_disconnected_t *)data)->reason != WIFI_REASON_ASSOC_LEAVE) {
         online = false;
@@ -196,8 +206,24 @@ static void start_network(void) {
     events = xEventGroupCreate();
     esp_netif_init();
     esp_event_loop_create_default();
-    esp_netif_create_default_wifi_ap();
+    esp_netif_t *own = esp_netif_create_default_wifi_ap();
     esp_netif_create_default_wifi_sta();
+
+    /* DHCP tells a phone that joins to ask her for every name, and where her
+       page is (option 114, which newer phones open at once): a phone checks it
+       is online before anything, and one whose check goes unanswered leaves.
+       The server keeps the page's address by pointer, so it outlives this. */
+    esp_netif_ip_info_t at;
+    esp_netif_get_ip_info(own, &at);
+    esp_netif_dns_info_t dns = { .ip = { .u_addr.ip4 = at.ip, .type = ESP_IPADDR_TYPE_V4 } };
+    uint8_t offer = 1;
+    static char page[24];
+    snprintf(page, sizeof page, "http://" IPSTR, IP2STR(&at.ip));
+    esp_netif_dhcps_stop(own);
+    esp_netif_set_dns_info(own, ESP_NETIF_DNS_MAIN, &dns);
+    esp_netif_dhcps_option(own, ESP_NETIF_OP_SET, ESP_NETIF_DOMAIN_NAME_SERVER, &offer, sizeof offer);
+    esp_netif_dhcps_option(own, ESP_NETIF_OP_SET, ESP_NETIF_CAPTIVEPORTAL_URI, page, strlen(page));
+    esp_netif_dhcps_start(own);
     wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&init);
     esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, on_event, NULL);
@@ -369,7 +395,7 @@ static esp_err_t api_key(httpd_req_t *req) {
     // Online on a saved network, if she is not already.
     for (int i = 0; i < cfg.n_nets && !online; i++) join(cfg.nets[i].ssid, cfg.nets[i].pass);
     if (!online) {
-        show(SHOW_JOINED, NULL);
+        show(phone_step(), NULL);
         return reply(req, "{\"ok\":false,\"why\":\"offline\"}");
     }
     esp_http_client_config_t c = {
@@ -443,6 +469,10 @@ void setup_run(void) {
     httpd_handle_t server = NULL;
     httpd_config_t conf = HTTPD_DEFAULT_CONFIG();
     conf.uri_match_fn = httpd_uri_match_wildcard;
+    // A phone that has just joined opens several connections at once, past
+    // the server's seven; the oldest is closed for a new one rather than the
+    // new one refused, and the phone's check that it is online answered.
+    conf.lru_purge_enable = true;
     conf.stack_size = 10240;  // a key is checked over TLS from its handler
     if (httpd_start(&server, &conf) == ESP_OK) {
         // In order: the questions before the page that answers every other path.

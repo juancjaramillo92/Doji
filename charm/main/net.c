@@ -29,6 +29,7 @@ static const char *TAG = "net";
 static RTC_DATA_ATTR struct { char ssid[33]; uint8_t bssid[6]; uint8_t channel; } last;
 
 static EventGroupHandle_t events;
+static uint8_t refusal;  // why the network last refused her
 
 /* Her own leaving, after an attempt that failed, is no network refusing her:
    it can arrive once the next attempt has begun, and would end that one
@@ -39,13 +40,18 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
     (void)arg;
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED &&
         ((wifi_event_sta_disconnected_t *)data)->reason != WIFI_REASON_ASSOC_LEAVE) {
+        refusal = ((wifi_event_sta_disconnected_t *)data)->reason;
         if (xEventGroupClearBits(events, JOINED) & JOINED) xEventGroupSetBits(events, GAVE_UP);
         xEventGroupSetBits(events, REFUSED);
     }
     if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) xEventGroupSetBits(events, JOINED);
 }
 
-// One attempt at one network; `fast` names its access point and channel.
+/* One network, asked until it lets her in or its time is up; `fast` names its
+   access point and channel. A handshake can go unanswered — on the board the
+   first after a restart was — and a refusal that ended the attempt would give
+   up the waking with her network in range. A network that is not there is
+   not asked again, so a waking away from home is not on the radio for it. */
 static bool attempt(const charm_net_t *net, bool fast) {
     wifi_config_t sta = { 0 };
     memcpy(sta.sta.ssid, net->ssid, strlen(net->ssid));
@@ -56,11 +62,14 @@ static bool attempt(const charm_net_t *net, bool fast) {
         sta.sta.channel = last.channel;
     }
     esp_wifi_set_config(WIFI_IF_STA, &sta);
-    xEventGroupClearBits(events, JOINED | REFUSED);
-    esp_wifi_connect();
-    EventBits_t got = xEventGroupWaitBits(events, JOINED | REFUSED, pdFALSE, pdFALSE,
-                                          pdMS_TO_TICKS(fast ? FAST_MS : JOIN_MS));
-    if (got & JOINED) return true;
+    TickType_t start = xTaskGetTickCount(), span = pdMS_TO_TICKS(fast ? FAST_MS : JOIN_MS), gone;
+    while ((gone = xTaskGetTickCount() - start) < span) {
+        xEventGroupClearBits(events, JOINED | REFUSED);
+        esp_wifi_connect();
+        EventBits_t got = xEventGroupWaitBits(events, JOINED | REFUSED, pdFALSE, pdFALSE, span - gone);
+        if (got & JOINED) return true;
+        if (!(got & REFUSED) || refusal == WIFI_REASON_NO_AP_FOUND) break;
+    }
     esp_wifi_disconnect();
     return false;
 }
