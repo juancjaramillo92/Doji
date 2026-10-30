@@ -80,5 +80,13 @@ CONFIG_LWIP_TCP_RECVMBOX_SIZE=64
 CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=64
 CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=64
 
+# Every waking joins her Wi-Fi again, and the address is most of the join:
+# after the router offers one, lwIP's ARP check asks the network twice
+# whether anyone else holds it, 1 to 2 s by its own description (1.1 s on her
+# board), and a fresh address is a full DHCP exchange. The router's lease is
+# her conflict check; the last address, kept in NVS, is asked for directly.
+CONFIG_LWIP_DHCP_DOES_NOT_CHECK_OFFERED_IP=y
+CONFIG_LWIP_DHCP_RESTORE_LAST_IP=y
+
 # An update that never reaches her Wi-Fi is rolled back by the bootloader.
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
