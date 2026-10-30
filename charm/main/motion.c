@@ -21,7 +21,7 @@
 static const char *TAG = "motion";
 
 #define ADDRESS     0x6B
-#define CTRL1       0x02  // bit 6 auto-increment, bit 3 INT1 out
+#define CTRL1       0x02  // bit 6 auto-increment, bit 5 big-endian, bit 3 INT1 out
 #define CTRL2       0x03  // accelerometer: bits 6:4 range, 3:0 rate
 #define CTRL7       0x08  // bit 0 accelerometer on
 #define CTRL9       0x0A  // commands
@@ -30,6 +30,10 @@ static const char *TAG = "motion";
 #define STATUSINT   0x2D  // bit 7 a command done
 #define AX_L        0x35
 
+/* Auto-increment and little-endian, as read_g reads six bytes, and INT1 out.
+   The chip powers up big-endian without auto-increment, which reads one byte
+   six times: every axis the same number. */
+#define INTERFACE   (0x40 | 0x08)
 #define ON_INT1_HIGH (3 << 6)
 #define WOM_SETTING 0x08
 #define ACK         0x00
@@ -74,7 +78,7 @@ void motion_arm(void) {
     attach();
     reading = false;
     set(CTRL7, 0);
-    set(CTRL1, 0x40 | 0x08);
+    set(CTRL1, INTERFACE);
     set(CTRL2, RANGE_2G | RATE_LOW);
     set(CAL1_L, THRESHOLD_MG);
     set(CAL1_H, ON_INT1_HIGH | BLANK);
@@ -92,6 +96,7 @@ static void read_g(float g[3]) {
 static void start_reading(void) {
     if (reading) return;
     attach();
+    set(CTRL1, INTERFACE);
     set(CAL1_L, 0);
     command(WOM_SETTING);
     set(CTRL2, RANGE_2G | RATE_READ);
