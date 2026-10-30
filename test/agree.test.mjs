@@ -1733,6 +1733,25 @@ test('the charm never takes her own leaving for a network refusing her', () => {
   }
 });
 
+/* One handshake her network left unanswered once gave up the whole waking on
+   the board, her own network in range, since each network was asked once. So
+   a refusal from a network that is there asks it again within its time, and
+   only one that is not there ends the attempt early. net.c is the board's, so
+   the loop is read. */
+test('the charm asks a network that is there again until its time is up', () => {
+  const net = source('charm/main/net.c');
+  const handler = bodyOf(net, 'static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {',
+    'net.c has no on_event()');
+  assert.match(handler, /refusal = \(\(wifi_event_sta_disconnected_t \*\)data\)->reason;/,
+    'on_event() no longer keeps why she was refused, so the attempt cannot tell a network absent from one that is there');
+  const attempt = bodyOf(net, 'static bool attempt(const charm_net_t *net, bool fast) {', 'net.c has no attempt()');
+  const loop = attempt.match(/while \(\(gone = xTaskGetTickCount\(\) - start\) < span\) \{([^}]*)\}/);
+  assert.ok(loop, 'attempt() asks once, so one handshake unanswered gives up the waking');
+  assert.match(loop[1], /esp_wifi_connect\(\);/, 'attempt() loops without asking again');
+  assert.match(loop[1], /if \(!\(got & REFUSED\) \|\| refusal == WIFI_REASON_NO_AP_FOUND\) break;/,
+    'attempt() ends early on a refusal from a network that is there, or keeps asking one that is not');
+});
+
 /* A dropped line ends a read exactly as her last word does, so an answer is
    finished only when its stream says so; one PWR did not stop that ends short
    is a failure, and a failure while the network is up is shown, where it once

@@ -3477,8 +3477,11 @@ and the touch controller's reset are held through sleep, so the sleep screen
 needs no chip awake to stay up and a tap can still wake her. **Each waking joins
 her Wi-Fi in the background**, the network she was last on first, asked directly
 on its own channel and access point so no scan is needed, then each saved one in
-turn; nothing waits for it but the moment something must be sent. Leaving an
-attempt that failed is never taken for the next network refusing her.
+turn; nothing waits for it but the moment something must be sent. A network
+that is there but does not let her in is asked again until its time is up,
+since on the board one unanswered handshake once cost a whole waking; one
+that is not there is not. Leaving an attempt that failed is never taken for
+the next network refusing her.
 
 **Asleep, she runs errands in the dark** every five minutes, day and night,
 and on the cable every two so the charge stays current (`charm/main/errand.c`).
