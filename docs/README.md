@@ -3189,6 +3189,16 @@ stays on Opus: about $2 a month saved, against the last gate on exactly what he
 said read badly. `MODELS` is keyed on the caller's label, the string
 `eugenia_runs.caller` records, and absent means Opus.
 
+**Her replies run in fast mode** (`FAST`, keyed the same way): the same Opus
+writing up to 2.5× faster at twice the rate, `speed: "fast"` under the
+`fast-mode-2026-02-01` beta. A reply is one turn whichever way it came —
+Telegram or the charm — and it is the one he waits on: in October's thirty days
+62 replies cost $11.95 and took 20.4 s each before a word was spoken, and he
+chose speed over the price. Fast mode is a research preview with its own rate
+limit, so a fast request refused for any reason is sent once more at the
+ordinary speed; and a change of speed is its own cache, so the replies no longer
+share the briefing's prefix.
+
 **The cache window is derived from the tool array.** A cache read is a twentieth
 of the input rate; a write is 1.25× at five minutes and **2× at an hour**, so the hour
 pays once about two turns in five arrive inside it, sparing the rewrites the five

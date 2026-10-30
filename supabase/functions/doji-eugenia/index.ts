@@ -1998,6 +1998,16 @@ const MODELS: Record<string, string> = {
 
 export const modelFor = (label: string): string => MODELS[label] ?? OPUS;
 
+/* Fast mode, keyed on the caller's label as MODELS is: the same model writing
+   up to 2.5× faster, at twice the rate. The replies are the caller he waits
+   on — one reply, whether it came through Telegram or the charm — and at about
+   $12 a month on Opus he chose speed over the price, 30 October. Opus alone
+   serves it. A research preview with its own rate limit, so a fast request
+   refused for any reason is sent once more at the ordinary speed: the turn
+   is slower, never lost. A change of speed is a cache of its own, so the
+   replies no longer read the prefix the briefing writes. */
+const FAST = new Set(['reply']);
+
 /* One effort at the top of every Opus request, and the caller's own as an
    effort-only system message at the head of `messages`. The top-level effort
    renders ahead of the tools and the system prompt, so two callers on one
@@ -2014,7 +2024,8 @@ export const effortMessages = (messages: any[], effort: Effort, model: string): 
     : messages;
 
 async function call(messages: any[], effort: Effort, tools: unknown[],
-                    model: string, signal: AbortSignal, container?: string) {
+                    model: string, signal: AbortSignal, container: string | undefined,
+                    fast: boolean): Promise<any> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST", signal,
     headers: {
@@ -2026,7 +2037,8 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
       // decline there costs nothing a fallback would save. The header and the
       // field go together.
       ...(model === OPUS
-          ? { "anthropic-beta": "server-side-fallback-2026-07-01,mid-conversation-output-config-2026-07-01" }
+          ? { "anthropic-beta": "server-side-fallback-2026-07-01,mid-conversation-output-config-2026-07-01" +
+                                (fast ? ",fast-mode-2026-02-01" : "") }
           : {}),
       "content-type": "application/json",
     },
@@ -2053,10 +2065,16 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
       // `fallbacks: "default"` re-runs on another model inside this call,
       // routed by refusal category; a decline before output is not billed.
       ...(model === OPUS ? { fallbacks: "default" } : {}),
+      ...(fast ? { speed: "fast" } : {}),
       // The first request of a turn has none.
       ...(container ? { container } : {}),
     }),
   });
+  if (!res.ok && fast) {
+    console.error(`doji-eugenia: fast mode refused (${res.status}), sent at the ordinary speed —`,
+                  (await res.text()).slice(0, 300));
+    return call(messages, effort, tools, model, signal, container, false);
+  }
   if (!res.ok) throw new Error(`Claude ${res.status}: ${(await res.text()).slice(0, 300)}`);
   return res.json();
 }
@@ -2125,6 +2143,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
                           tools: unknown[] = CHAT_TOOLS, budget = TURN_MS): Promise<string> {
   // Derived, so a caller cannot run one model and be recorded under another.
   const model = modelFor(label);
+  const fast = FAST.has(label) && model === OPUS;
   const offered = new Set(tools.map((t: any) => t.name));
   const convo: any[] = withClock(messages);
   // Carried forward and never cleared: it outlives the round that opened it.
@@ -2162,7 +2181,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
   try {
   while (rounds < MAX_ROUNDS) {
     rounds++;
-    const body = await call(convo, effort, tools, model, deadline, container);
+    const body = await call(convo, effort, tools, model, deadline, container, fast);
     container = body.container?.id ?? container;
 
     const used = body.usage ?? {};
