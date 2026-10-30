@@ -211,12 +211,13 @@ static void start_network(void) {
 
     /* DHCP tells a phone that joins to ask her for every name, and where her
        page is (option 114, which newer phones open at once): a phone checks it
-       is online before anything, and one whose check goes unanswered leaves. */
+       is online before anything, and one whose check goes unanswered leaves.
+       The server keeps the page's address by pointer, so it outlives this. */
     esp_netif_ip_info_t at;
     esp_netif_get_ip_info(own, &at);
     esp_netif_dns_info_t dns = { .ip = { .u_addr.ip4 = at.ip, .type = ESP_IPADDR_TYPE_V4 } };
     uint8_t offer = 1;
-    char page[24];
+    static char page[24];
     snprintf(page, sizeof page, "http://" IPSTR, IP2STR(&at.ip));
     esp_netif_dhcps_stop(own);
     esp_netif_set_dns_info(own, ESP_NETIF_DNS_MAIN, &dns);

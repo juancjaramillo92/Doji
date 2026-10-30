@@ -1753,6 +1753,17 @@ test('the charm never takes her own leaving for a network refusing her', () => {
   }
 });
 
+/* ESP-IDF's DHCP server keeps the captive-portal address it is handed by
+   pointer and reads it at every offer, so the address must outlive the call
+   that sets it: on the stack, each offer reads whatever the frame has become. */
+test('the setup hands her DHCP a portal address that outlives the call', () => {
+  const setup = source('charm/main/setup.c');
+  const handed = setup.match(/ESP_NETIF_CAPTIVEPORTAL_URI, (\w+),/);
+  assert.ok(handed, 'setup.c no longer offers its page as the captive portal as this reads it');
+  assert.match(setup, new RegExp(`\\bstatic char ${handed[1]}\\[`),
+    `the portal address ${handed[1]} is not static, so the DHCP server reads a dead stack frame`);
+});
+
 /* One handshake her network left unanswered once gave up the whole waking on
    the board, her own network in range, since each network was asked once. So
    a refusal from a network that is there asks it again within its time, and
