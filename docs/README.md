@@ -3474,9 +3474,10 @@ the chip's sleep does not take away — and the chip goes into deep sleep,
 where it wakes as if switched on again: **lifted to look**, on a tap
 on the screen, PWR, the BOOT button, or a time. A lift is the motion sensor's:
 armed before every sleep, on GPIO21 (Waveshare's schematic for the 1.75C), it
-wakes the chip on a movement, which then takes two readings a moment apart and
-keeps her awake only when the screen is tilted up toward him and held still
-(`charm/main/lift.c`); a swing on the keyring or a bump in a pocket sends her
+wakes the chip on a movement, which then watches it settle for up to a second
+and a half, a pair of readings 150 ms apart at a time, and lights her the moment
+a pair has the screen tilted up toward him and held still (`charm/main/lift.c`),
+so a lift still moving when it woke her is not mistaken for a swing; a swing on the keyring or a bump in a pocket sends her
 straight back to sleep without lighting the screen, and rests the sensor for
 twenty seconds, so a keyring swinging all day cannot keep waking her. What shows
 first is decided before the screen lights: **a trade waiting puts its questions
