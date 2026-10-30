@@ -3485,7 +3485,11 @@ needs no chip awake to stay up and a tap can still wake her. **Each waking joins
 her Wi-Fi in the background**, the network she was last on first, asked directly
 on its own channel and access point so no scan is needed, then each saved one in
 turn; nothing waits for it but the moment something must be sent. Leaving an
-attempt that failed is never taken for the next network refusing her.
+attempt that failed is never taken for the next network refusing her. Awake,
+the radio's power save is off, and her sockets take a 64 KB window
+(`charm/sdkconfig.defaults`): her voice streams in at 48 KB a second, which
+lwIP's default window of 5.7 KB passes only on a round trip under 120 ms, and
+the power save holds her packets at the access point until its next beacon.
 
 **Asleep, she runs errands in the dark** every five minutes, day and night,
 and on the cable every two so the charge stays current (`charm/main/errand.c`).

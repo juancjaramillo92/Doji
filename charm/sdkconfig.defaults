@@ -36,5 +36,17 @@ CONFIG_LV_USE_QRCODE=y
 # needs is not.
 CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC=y
 
+# Her voice streams in at 48 KB a second. lwIP's default window, 5.7 KB, lets
+# that through only on a round trip under 120 ms, which a home network to her
+# door does not always make: her voice came slower than it plays, and broke.
+# A window of 64 KB is over a second of her voice in flight, and the sockets'
+# buffers and the radio's go to PSRAM, as TLS's do.
+CONFIG_LWIP_TCP_WND_DEFAULT=65534
+CONFIG_LWIP_TCP_SND_BUF_DEFAULT=65534
+CONFIG_LWIP_TCP_RECVMBOX_SIZE=64
+CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=64
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=64
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+
 # An update that never reaches her Wi-Fi is rolled back by the bootloader.
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y

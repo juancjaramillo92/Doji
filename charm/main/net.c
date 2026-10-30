@@ -106,6 +106,10 @@ void net_start(void) {
     esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_event, NULL);
     esp_wifi_set_mode(WIFI_MODE_STA);
     esp_wifi_start();
+    // Awake, nothing waits at the access point for a beacon: with the power
+    // save on, her voice is held there in bursts and arrives slower than it
+    // plays. She is awake only in short spells, and asleep the radio is off.
+    esp_wifi_set_ps(WIFI_PS_NONE);
     // The clock itself survives sleep; the zone it is read in does not.
     setenv("TZ", NEW_YORK, 1);
     tzset();
