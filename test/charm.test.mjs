@@ -2,10 +2,9 @@
    time zone the charm itself reads its clock in: the briefing watch held
    against the server's own hours every five minutes of both weeks the clocks
    change in, how long she sleeps between errands, a lift judged on
-   readings, the setup's answer to a phone's every name, the Ogg file a recording travels in, her answer read out of
-   the server's own frames, and her glass — its bubbles, its breath and its
-   wobble — against the outline and renders charm/tools/art.py made. Only
-   what has no ESP-IDF in it is here; the rest is the board's to prove. */
+   readings, the setup's answer to a phone's every name, the Ogg file a recording travels in, and her answer read out of
+   the server's own frames. Only what has no ESP-IDF in it is here; the rest is
+   the board's to prove. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -22,11 +21,7 @@ const MAIN = 'charm/main';
 // hex>` (- for no answer), `ogg <room> <packet sizes…> 0` (the file in hex, or
 // - when a packet did not fit), `frames <read size> <a stream in hex>` (the
 // volume, -1 for none, then each sample), `wait <epoch> <charging> <trade>
-// <away>` (seconds), `up <a reading in g>` and `jolt <six readings in g>`,
-// `glass <seed> <steps> <up x y> <rise> <every> <most> <stir> <depth>
-// <period> <at step> <poke> <depth after>` (a line a step at 30 a second: the
-// render, then `x y radius shown` for each bubble), `place <render> <x> <y>`
-// and `chord <x> <y> <dx> <dy> <margin>` (its ends, or -).
+// <away>` (seconds).
 const DRIVER = `
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,7 +31,6 @@ const DRIVER = `
 #include "dns.h"
 #include "errand.h"
 #include "frames.h"
-#include "glass.h"
 #include "lift.h"
 #include "ogg.h"
 int main(int argc, char **argv) {
@@ -60,41 +54,6 @@ int main(int argc, char **argv) {
             printf("%d\\n", lift_seen(a, b));
         if (!strcmp(op, "hold") && scanf("%f %f %f %f %f %f", a, a + 1, a + 2, b, b + 1, b + 2) == 6)
             printf("%d\\n", lift_hold(a, b));
-        if (!strcmp(op, "up") && scanf("%f %f %f", a, a + 1, a + 2) == 3) {
-            float up[2];
-            lift_up(a, up);
-            printf("%.4f %.4f\\n", up[0], up[1]);
-        }
-        if (!strcmp(op, "jolt") && scanf("%f %f %f %f %f %f", a, a + 1, a + 2, b, b + 1, b + 2) == 6)
-            printf("%.4f\\n", lift_jolt(a, b));
-        glass_mood_t m;
-        int seed, steps, at;
-        float poke, after;
-        if (!strcmp(op, "glass") && scanf("%d %d %f %f %f %f %d %f %f %f %d %f %f", &seed, &steps, &m.up[0], &m.up[1],
-                                          &m.rise, &m.every, &m.most, &m.stir, &m.depth, &m.period, &at, &poke, &after) == 13) {
-            static glass_t g;
-            glass_start(&g, (uint32_t)seed);
-            for (int s = 0; s < steps; s++) {
-                if (s == at) { glass_poke(&g, poke); m.depth = after; }
-                glass_step(&g, &m, 1.0f / 30);
-                printf("%d", glass_frame(&g));
-                for (int i = 0; i < GLASS_BUBBLES; i++) {
-                    const glass_bubble_t *bb = &g.bubbles[i];
-                    if (bb->state != GLASS_NONE) printf(" %.3f %.3f %.2f %.3f", bb->x, bb->y, GLASS_RADIUS[bb->size], bb->shown);
-                }
-                printf("\\n");
-            }
-        }
-        int f;
-        if (!strcmp(op, "place") && scanf("%d %f %f", &f, a, a + 1) == 3) {
-            glass_place(f, a[0], a[1], b);
-            printf("%.4f %.4f\\n", b[0], b[1]);
-        }
-        float ends[4];
-        if (!strcmp(op, "chord") && scanf("%f %f %f %f %f", a, a + 1, b, b + 1, b + 2) == 5) {
-            if (glass_chord(a[0], a[1], b[0], b[1], b[2], ends)) printf("%.3f %.3f %.3f %.3f\\n", ends[0], ends[1], ends[2], ends[3]);
-            else printf("-\\n");
-        }
         if (!strcmp(op, "dns") && scanf("%1024s", hex) == 1) {
             size_t n = 0;
             for (; hex[2 * n] && n < sizeof msg; n++) sscanf(hex + 2 * n, "%2hhx", &msg[n]);
@@ -142,9 +101,8 @@ function charm(questions) {
     writeFileSync(join(dir, 'esp_attr.h'), '#define RTC_DATA_ATTR\n');
     writeFileSync(join(dir, 'drive.c'), DRIVER);
     execFileSync('cc', ['-std=c11', '-D_DEFAULT_SOURCE', '-Wall', '-Werror', '-I', dir, '-I', MAIN,
-      join(dir, 'drive.c'), `${MAIN}/briefing.c`, `${MAIN}/errand.c`, `${MAIN}/lift.c`, `${MAIN}/dns.c`, `${MAIN}/ogg.c`, `${MAIN}/frames.c`,
-      `${MAIN}/glass.c`, `${MAIN}/art.c`, '-lm', '-o', join(dir, 'drive')]);
-    return execFileSync(join(dir, 'drive'), [zone[1]], { input: questions.join('\n') + '\n', encoding: 'utf8', maxBuffer: 1 << 28 })
+      join(dir, 'drive.c'), `${MAIN}/briefing.c`, `${MAIN}/errand.c`, `${MAIN}/lift.c`, `${MAIN}/dns.c`, `${MAIN}/ogg.c`, `${MAIN}/frames.c`, '-lm', '-o', join(dir, 'drive')]);
+    return execFileSync(join(dir, 'drive'), [zone[1]], { input: questions.join('\n') + '\n', encoding: 'utf8' })
       .trim().split('\n');
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -261,231 +219,6 @@ test('awake, held up she stays, put down she sleeps, and anything else is left t
     hold([0.1, 0.2, -0.6], [0.3, 0.1, -0.7]),    // face down in a moving hand
     hold([0.1, 0.95, 0.1], [0.3, 0.9, 0.2]),     // upright in a pocket, walking
   ]), [HELD, HELD, DOWN, DOWN, DOWN, ELSE]);
-});
-
-/* Awake, her face is told which way is up and of any jolt. The sensor reads
-   the push that holds her up, so held upright, its top up, the bubbles rise
-   up the screen; lying flat there is no up across it; and a hand's tremor is
-   no jolt where a knock is a full one. */
-test('held up, her bubbles know which way is up, and a knock is a jolt where a hand is not', () => {
-  const [upright, flat, sideways, hard] = charm(['up 0 0.9 0.4', 'up 0 0 1', 'up 0.9 0.1 0.4', 'up 0.9 0.9 0'])
-    .map(line => line.split(' ').map(Number));
-  assert.ok(upright[1] < -0.85 && Math.abs(upright[0]) < 0.01, `held upright, up across the screen is ${upright}`);
-  assert.ok(Math.hypot(...flat) < 0.01, `lying flat, up across the screen is ${flat}, not nothing`);
-  assert.ok(sideways[0] > 0.85, `turned onto her side, up across the screen is ${sideways}`);
-  assert.ok(Math.abs(Math.hypot(...hard) - 1) < 1e-3, 'up is longer than upright');
-  const jolt = (a, b) => `jolt ${[...a, ...b].join(' ')}`;
-  const [still, tremor, knock, middling] = charm([
-    jolt([0, 0.9, 0.4], [0, 0.9, 0.4]),
-    jolt([0, 0.9, 0.4], [0.05, 0.86, 0.43]),
-    jolt([0, 0.9, 0.4], [1.2, -0.6, 1.4]),
-    jolt([0, 0.9, 0.4], [0.3, 0.5, 0.6]),
-  ]).map(Number);
-  assert.deepEqual([still, tremor, knock], [0, 0, 1]);
-  assert.ok(middling > 0 && middling < 1, `a middling jolt is ${middling}, not part of a full one`);
-});
-
-/* Her glass, from what art.py wrote: the outline row by row, the patch every
-   render is cut to, the point she squashes about and each render's squash. */
-const ART_C = readFileSync(`${MAIN}/art.c`, 'utf8');
-const GLASS_H = readFileSync(`${MAIN}/glass.h`, 'utf8');
-const glassDefine = (name) => Number(GLASS_H.match(new RegExp(`^#define GLASS_${name}\\s+(\\d+)`, 'm'))?.[1]);
-const artList = (name) => ART_C.match(new RegExp(`${name}\\[[^\\]]*\\](?:\\[2\\])? = \\{([^;]+)\\};`))?.[1]
-  .match(/-?\d+(?:\.\d+)?/g).map(Number);
-const OUTLINE = (() => {
-  const n = artList('GLASS_OUTLINE');
-  return Array.from({ length: n.length / 2 }, (_, y) => [n[2 * y], n[2 * y + 1]]);
-})();
-const [CROP_X, CROP_Y, CROP_W, CROP_H] = artList('GLASS_CROP');
-const SQUASH = artList('GLASS_SQUASH'), [ANCHOR_X, ANCHOR_Y] = artList('GLASS_ANCHOR');
-const REST = SQUASH.indexOf(0);
-const TOP = OUTLINE.findIndex(([l, r]) => r >= l);
-
-// Whether a disc lies inside her outline, row by row: the test's own reading.
-const insideHer = (x, y, r) => {
-  for (let row = Math.floor(y - r); row <= Math.ceil(y + r); row++) {
-    const dy = row - y, w = dy * dy < r * r ? Math.sqrt(r * r - dy * dy) : 0;
-    const [l, rr] = OUTLINE[row] ?? [0, -1];
-    if (x - w < l || x + w > rr) return false;
-  }
-  return true;
-};
-
-/* A run of her glass, a step a line: the render showing, and each bubble. */
-function glass({ seed = 7, steps = 900, up = [0, -0.9], rise = 9, every = 2.5, most = 6, stir = 0, depth = 0,
-                 period = 5, at = -1, poke = 0, after = depth } = {}) {
-  return charm([`glass ${seed} ${steps} ${up.join(' ')} ${rise} ${every} ${most} ${stir} ${depth} ${period} ${at} ${poke} ${after}`])
-    .map(line => {
-      const n = line.split(' ').map(Number);
-      const bubbles = [];
-      for (let i = 1; i < n.length; i += 4) bubbles.push({ x: n[i], y: n[i + 1], r: n[i + 2], shown: n[i + 3] });
-      return { frame: n[0], bubbles };
-    });
-}
-
-/* art.py makes the renders and the tables that describe them in one run;
-   each is held here to the other, and to glass.h's counts, so a render made
-   again without its tables, or a count changed without the renders, is
-   caught before a board draws past the end of one. */
-test('her renders are the ones art.c describes, and her outline is the one they draw', () => {
-  const frames = glassDefine('FRAMES'), sizes = glassDefine('SIZES'), phases = glassDefine('PHASES');
-  assert.equal(SQUASH.length, frames, 'art.c has a squash for other than every render');
-  assert.deepEqual(SQUASH, [...SQUASH].sort((a, b) => a - b), 'the renders are not in order of their squash');
-  assert.ok(REST >= 0, 'no render is her at rest');
-  assert.equal(OUTLINE.length, 466, 'the outline is not a row for every row of the screen');
-  const body = readFileSync('charm/art/body.rgb565'), glow = readFileSync('charm/art/glow.a8');
-  assert.equal(body.length, frames * CROP_W * CROP_H * 2, 'body.rgb565 is not every render, each the patch art.c gives');
-  assert.equal(glow.length, CROP_W * CROP_H, 'glow.a8 is not the patch art.c gives');
-  const sides = artList('GLASS_SIDE'), radii = artList('GLASS_RADIUS');
-  assert.equal(sides.length, sizes);
-  assert.equal(radii.length, sizes);
-  assert.equal(readFileSync('charm/art/bubbles.argb8888').length, phases * phases * sides.reduce((n, s) => n + 4 * s * s, 0),
-    'bubbles.argb8888 is not every size at every phase');
-  sides.forEach((s, i) => assert.ok(s >= 2 * radii[i] + 2, `a bubble of radius ${radii[i]} does not fit its ${s}-pixel sprite`));
-
-  // Her render at rest is her outline: lit inside it, black two pixels clear
-  // of it every way, and her light is nowhere outside her.
-  let lit = 0, dark = 0;
-  for (let y = 0; y < CROP_H; y++) {
-    const [l, r] = OUTLINE[CROP_Y + y];
-    for (let x = 0; x < CROP_W; x++) {
-      const sx = CROP_X + x, sy = CROP_Y + y, px = body.readUInt16LE(2 * ((REST * CROP_H + y) * CROP_W + x));
-      const far = [-2, -1, 0, 1, 2].every(d => { const [ll, rr] = OUTLINE[sy + d] ?? [0, -1]; return sx < ll - 2 || sx > rr + 2; });
-      if (sx >= l && sx <= r) { assert.ok(px, `(${sx}, ${sy}) is inside her outline and black`); lit++; }
-      else if (far) {
-        assert.equal(px, 0, `(${sx}, ${sy}) is outside her outline and lit`);
-        assert.equal(glow[y * CROP_W + x], 0, `her light reaches (${sx}, ${sy}), outside her`);
-        dark++;
-      }
-    }
-  }
-  assert.ok(lit > 80_000 && dark > 20_000, `${lit} pixels inside her and ${dark} outside — the reader has gone blind`);
-  // Every render fits the patch: her top, bottom and sides at rest, squashed
-  // and stretched as far as they go.
-  const rows = OUTLINE.map(([l, r], y) => ({ l, r, y })).filter(({ l, r }) => r >= l);
-  const left = rows.reduce((a, b) => b.l < a.l ? b : a), right = rows.reduce((a, b) => b.r > a.r ? b : a);
-  const ends = [[rows[0].l, rows[0].y], [rows.at(-1).r, rows.at(-1).y], [left.l, left.y], [right.r, right.y]];
-  const placed = charm([0, frames - 1].flatMap(f => ends.map(([x, y]) => `place ${f} ${x} ${y}`)))
-    .map(line => line.split(' ').map(Number));
-  for (const [x, y] of placed) {
-    assert.ok(x >= CROP_X && x < CROP_X + CROP_W && y >= CROP_Y && y < CROP_Y + CROP_H, `(${x}, ${y}) falls outside the patch`);
-  }
-});
-
-/* The bubbles are drawn inside her glass and nowhere else: every one shown,
-   at every step, upright, on her side, upside down, stirred and thinking,
-   against her outline as this test reads it. */
-test('a bubble is only ever drawn inside her glass', () => {
-  let seen = 0;
-  for (const mood of [{}, { up: [0.85, 0] }, { up: [-0.7, 0.2] }, { up: [0, 0.9] }, { stir: 1, most: 8 },
-                      { rise: 16, every: 0.7, most: 12 }, { up: [0, 0] }]) {
-    for (const [step, { bubbles }] of glass({ ...mood, steps: 600 }).entries()) {
-      for (const b of bubbles) {
-        if (b.shown <= 0) continue;
-        assert.ok(insideHer(b.x, b.y, b.r), `step ${step} of ${JSON.stringify(mood)}: a bubble at (${b.x}, ${b.y}) is outside her`);
-        seen++;
-      }
-    }
-  }
-  assert.ok(seen > 10_000, `only ${seen} bubbles seen — the run has gone blind`);
-});
-
-test('her bubbles rise the way up is, come and go, and never more than her mood allows', () => {
-  // How far each bubble moves along x and y in a step, from one line to the next.
-  const drift = (run) => {
-    const d = [0, 0];
-    for (let s = 1; s < run.length; s++) {
-      for (const b of run[s].bubbles) {
-        const was = run[s - 1].bubbles.find(o => Math.hypot(o.x - b.x, o.y - b.y) < 3);
-        if (was) { d[0] += b.x - was.x; d[1] += b.y - was.y; }
-      }
-    }
-    return d;
-  };
-  const upright = glass({ steps: 2700 }), right = glass({ up: [0.85, 0] }), down = glass({ up: [0, 0.9] });
-  const [ux, uy] = drift(upright), [rx, ry] = drift(right), [, dy] = drift(down);
-  assert.ok(uy < -5 * Math.abs(ux), `held upright they drift (${ux}, ${uy}), not up`);
-  assert.ok(rx > 5 * Math.abs(ry), `on her side they drift (${rx}, ${ry}), not toward her new top`);
-  assert.ok(dy > 0, 'upside down they still rise toward the screen\'s top');
-  const most = Math.max(...upright.map(s => s.bubbles.length));
-  assert.equal(most, 6, `at most ${most} bubbles at once, where her mood asks six`);
-  // They pop as they reach her top, so new ones keep coming: over ninety
-  // seconds, far more starts than there is room for at once.
-  let starts = 0;
-  for (let s = 1; s < upright.length; s++) {
-    starts += upright[s].bubbles.filter(b => !upright[s - 1].bubbles.some(o => Math.hypot(o.x - b.x, o.y - b.y) < 3)).length;
-  }
-  assert.ok(starts > 12, `only ${starts} bubbles started in ninety seconds — they are stuck, not rising and popping`);
-});
-
-/* She is thick, so her bubbles drift: smoothness over speed. Idle, a bubble
-   moves under half a pixel a frame, where its quarter-pixel sprites keep it
-   gliding; in her quickest mood, thinking and shaken, still under one. */
-test('her bubbles drift, never dart: under a pixel a frame even thinking and shaken', () => {
-  const fastest = (run) => {
-    let most = 0;
-    for (let s = 1; s < run.length; s++) {
-      for (const b of run[s].bubbles) {
-        const was = run[s - 1].bubbles.map(o => Math.hypot(o.x - b.x, o.y - b.y)).sort((x, y) => x - y)[0];
-        if (was !== undefined && was < 3) most = Math.max(most, was);
-      }
-    }
-    return most;
-  };
-  const idle = fastest(glass({ steps: 1800, depth: 0.009 }));
-  const quickest = fastest(glass({ steps: 1800, up: [0, -1], rise: 16, every: 0.7, most: 12, stir: 1 }));
-  assert.ok(idle > 0.1 && idle < 0.5, `idle, her bubbles move ${idle.toFixed(2)} pixels a frame at the fastest`);
-  assert.ok(quickest < 1, `thinking and shaken, a bubble moves ${quickest.toFixed(2)} pixels a frame`);
-});
-
-/* A tap or a jolt wobbles her: squashed and stretched both, then still, at
-   rest, within two seconds. Untouched and not breathing, she never leaves
-   rest. */
-test('a poke wobbles her glass and she settles back to rest', () => {
-  assert.ok(glass({ steps: 300 }).every(s => s.frame === REST), 'untouched and holding her breath, she moved');
-  const run = glass({ steps: 300, at: 10, poke: 1 }).map(s => s.frame);
-  assert.ok(run.some(f => f > REST) && run.some(f => f < REST), 'a poke did not both squash and stretch her');
-  assert.ok(run.slice(10 + 60).every(f => f === REST), 'two seconds after a poke she is still wobbling');
-  assert.ok(run.includes(0) || run.includes(SQUASH.length - 1), 'a full poke never reached the furthest render');
-});
-
-/* A breath is slow, so it must glide: it walks the renders one at a time,
-   each step moving her top less than a pixel, and holding her breath — as
-   listening does — eases out rather than jumping back to rest. */
-test('a breath walks her renders one at a time, under a pixel a step, and is held without a jump', () => {
-  const run = glass({ steps: 600, depth: 0.009, at: 300, after: 0 }).map(s => s.frame);
-  const used = [...new Set(run)].sort((a, b) => a - b);
-  assert.ok(used.length >= 4, `a breath used only ${used.length} renders`);
-  assert.ok(used.every(f => f <= REST), 'a breath squashed her rather than drawing her up');
-  for (let s = 1; s < run.length; s++) {
-    assert.ok(Math.abs(run[s] - run[s - 1]) <= 1, `step ${s}: the breath skipped from render ${run[s - 1]} to ${run[s]}`);
-  }
-  const top = (f) => ANCHOR_Y - (ANCHOR_Y - TOP) / (1 + SQUASH[f]);
-  for (let i = 1; i < used.length; i++) {
-    const moved = Math.abs(top(used[i]) - top(used[i - 1]));
-    assert.ok(moved < 1, `from render ${used[i - 1]} to ${used[i]} her top moves ${moved.toFixed(2)} pixels`);
-  }
-  assert.ok(run.slice(-60).every(f => f === REST), 'held, her breath never came to rest');
-});
-
-test('a render places her face on her glass where it draws it', () => {
-  const [rest, anchor, squashed, stretched] = charm([`place ${REST} 188.8 162`, `place 0 ${ANCHOR_X} ${ANCHOR_Y}`,
-    `place ${SQUASH.length - 1} 188.8 162`, `place 0 188.8 162`]).map(line => line.split(' ').map(Number));
-  assert.deepEqual(rest, [188.8, 162], 'at rest her eye is not where it is drawn');
-  assert.deepEqual(anchor, [ANCHOR_X, ANCHOR_Y], 'the point she squashes about moves');
-  assert.ok(squashed[1] > 162 && squashed[0] < 188.8, 'squashed, her eye does not sink and spread with her');
-  assert.ok(stretched[1] < 162 && stretched[0] > 188.8, 'stretched, her eye does not rise and draw in with her');
-});
-
-test('the glint\'s chord runs inside her edge, to it and no further', () => {
-  const [through, outside] = charm(['chord 233 250 -0.6 0.8 18', 'chord 10 10 1 0 18']);
-  assert.equal(outside, '-', 'a chord through a point outside her has ends');
-  const [x1, y1, x2, y2] = through.split(' ').map(Number);
-  assert.ok(Math.hypot(x2 - x1, y2 - y1) > 200, 'the chord through her middle is short');
-  for (const [x, y, sign] of [[x1, y1, 1], [x2, y2, -1]]) {
-    assert.ok(insideHer(x, y, 18), `the chord ends at (${x}, ${y}), less than its margin inside her`);
-    assert.ok(!insideHer(x + sign * -0.6 * 3, y + sign * 0.8 * 3, 18), `the chord stops short of her edge at (${x}, ${y})`);
-  }
 });
 
 test('the setup answers every name with the charm, whether or not the phone adds an EDNS record', () => {

@@ -13,10 +13,3 @@ bool lift_seen(const float first[3], const float second[3]);
    a bag, a hand at his side, is neither, and the quiet spell decides. */
 typedef enum { LIFT_ELSE, LIFT_HELD, LIFT_DOWN } lift_hold_t;
 lift_hold_t lift_hold(const float before[3], const float now[3]);
-
-/* Awake and showing her face, a reading many times a second: which way is up
-   across the screen, x right and y down, its length how upright she is held,
-   0 lying flat to 1 upright; and, against the reading before, how hard a
-   jolt it was, 0 for a hand's ordinary movement to 1. */
-void lift_up(const float g[3], float up[2]);
-float lift_jolt(const float before[3], const float now[3]);

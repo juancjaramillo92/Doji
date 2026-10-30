@@ -6,10 +6,6 @@
    sleep with the level high and the chip woken by its fall. Looking is two
    ordinary readings after the wake, judged by lift.c.
 
-   Awake, a task of its own follows her for her face: which way is up, for
-   the bubbles in her glass, and a jolt, which wobbles it. It reaches the
-   screen only through face.c's setters, and is stopped as she is armed.
-
    The registers and the wake-on-motion sequence are the chip's datasheet's,
    and are among what to check on the real board first. */
 #include "motion.h"
@@ -18,7 +14,6 @@
 #include "bsp/esp-bsp.h"
 #include "driver/i2c_master.h"
 #include "esp_log.h"
-#include "face.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lift.h"
@@ -49,11 +44,9 @@ static const char *TAG = "motion";
 #define APART_MS     150
 #define SAMPLES      8     // averaged into one reading, so the sensor's noise is not a hand's tremor
 #define SAMPLE_MS    8     // a new sample at RATE_READ's 125 Hz
-#define FOLLOW_MS    40    // how often her face is told how she is held
 
 static i2c_master_dev_handle_t chip;
 static bool reading;
-static volatile bool following;
 
 static void set(uint8_t reg, uint8_t v) {
     uint8_t out[2] = { reg, v };
@@ -79,7 +72,6 @@ static void command(uint8_t c) {
 
 void motion_arm(void) {
     attach();
-    following = false;
     reading = false;
     set(CTRL7, 0);
     set(CTRL1, 0x40 | 0x08);
@@ -133,26 +125,4 @@ lift_hold_t motion_hold(void) {
     memcpy(before, now, sizeof now);
     judged = true;
     return hold;
-}
-
-static void follow(void *arg) {
-    (void)arg;
-    float before[3], now[3], up[2];
-    read_g(before);
-    while (following) {
-        vTaskDelay(pdMS_TO_TICKS(FOLLOW_MS));
-        read_g(now);
-        lift_up(now, up);
-        face_set_tilt(up[0], up[1]);
-        float jolt = lift_jolt(before, now);
-        if (jolt > 0) face_jolt(jolt);
-        memcpy(before, now, sizeof now);
-    }
-    vTaskDelete(NULL);
-}
-
-void motion_follow(void) {
-    start_reading();
-    following = true;
-    xTaskCreate(follow, "follow", 3072, NULL, 2, NULL);
 }

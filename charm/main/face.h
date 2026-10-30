@@ -25,7 +25,7 @@ face_mode_t face_get_mode(void);
 // How long FACE_ASLEEP takes to close her eyes.
 #define FACE_GOODNIGHT_MS 1200
 
-// A frame of anything drawn moving: her face and glass, the dial, the journal's done.
+// A frame of anything drawn moving: her face, the dial, the journal's done.
 #define FACE_FRAME_MS 33
 
 // How loud the audio is right now, 0 to 1: the ring while listening, the
@@ -34,16 +34,6 @@ void face_set_level(float level);
 
 // PWR held toward switching off, 0 to 1: a ring empties round the rim.
 void face_set_hold(float hold);
-
-/* How she is held, from the motion sensor (motion.c): which way is up across
-   the screen, x right and y down, its length how upright, 0 to 1. The
-   bubbles in her glass rise that way, and her eyes drift downhill. */
-void face_set_tilt(float x, float y);
-
-/* A tap on her face, which wobbles her glass and makes her eyes smile; and a
-   jolt, 0 to 1 how hard, which wobbles it and stirs her bubbles. */
-void face_tap(void);
-void face_jolt(float strength);
 
 /* What the sleep screen shows. Low on it, one mark for what waits: an emerald
    dot while a briefing does, a white ring while a trade does, the dot inside

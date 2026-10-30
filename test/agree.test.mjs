@@ -1700,29 +1700,6 @@ test('a low battery leaves the night\'s look for an update to a later errand', (
     'ota_due no longer marks the night as this test reads it');
 });
 
-/* Her face is told how she is held only while she is awake to be looked at:
-   the follow task starts as she wakes, never on an errand in the dark, and
-   stops as she is armed for sleep, before the sensor is set to wake her. A
-   press is the dial's on the rim and a tap on her face inside it, never both.
-   main.c and motion.c are the board's, so the calls are read. */
-test('her glass follows how she is held only while she is awake, and a press is the dial\'s or a tap', () => {
-  const main = source('charm/main/main.c');
-  const callers = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n')
-    .filter(f => f.endsWith('.c') && /\bmotion_follow\(\);/.test(source(f)));
-  assert.deepEqual(callers, ['charm/main/main.c'], 'her face is told how she is held from somewhere other than her waking');
-  assert.match(bodyOf(main, 'static void awake(void) {', 'main.c has no awake()'), /\bmotion_follow\(\);/,
-    'she wakes to be looked at and her bubbles never learn which way is up');
-  assert.doesNotMatch(bodyOf(main, 'static void errand(void) {', 'main.c has no errand()'), /motion_follow/,
-    'an errand in the dark follows how she is held');
-  const arm = bodyOf(source('charm/main/motion.c'), 'void motion_arm(void) {', 'motion.c has no motion_arm()');
-  const stop = arm.indexOf('following = false;');
-  assert.ok(stop > -1 && stop < arm.indexOf('command(WOM_SETTING);'),
-    'the follow task is not stopped before the sensor is armed to wake her, so it reads on through the arming');
-  assert.match(bodyOf(main, 'static void on_touch(lv_event_t *e) {', 'main.c has no on_touch()'),
-    /if \(code == LV_EVENT_PRESSED && !dial_press\(at\)\) face_tap\(\);/,
-    'a press on the rim is no longer the dial\'s alone, or one inside it no longer a tap on her face');
-});
-
 /* A new app is good once she has reached her Wi-Fi, whichever waking it is:
    confirmed where every join succeeds, and nowhere else. Confirmed on one
    path only, a press in the second after an update took the other, and the

@@ -13,7 +13,3 @@ bool motion_looked(void);
    by lift.c against the reading before. The first call has nothing to judge
    against and answers neither. */
 lift_hold_t motion_hold(void);
-
-/* Awake, her face told about twenty-five times a second which way is up and
-   of any jolt (lift.c), until she is armed for sleep. */
-void motion_follow(void);

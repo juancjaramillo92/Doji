@@ -106,10 +106,10 @@ static void tick(lv_timer_t *tm) {
     }
 }
 
-bool dial_press(lv_point_t p) {
+void dial_press(lv_point_t p) {
     turned = false;
     held = hypotf(p.x - 233, p.y - 233) >= RIM;
-    if (!held) return false;
+    if (!held) return;
     angle = angle_of(p);
     volume = cfg.volume;
     if (!veil) {
@@ -122,7 +122,6 @@ bool dial_press(lv_point_t p) {
     }
     lv_obj_remove_flag(veil, LV_OBJ_FLAG_HIDDEN);
     lv_timer_resume(timer);
-    return true;
 }
 
 void dial_slide(lv_point_t p) {

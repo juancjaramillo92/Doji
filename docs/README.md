@@ -65,9 +65,7 @@ supabase/functions/doji-tradingview/    Edge Function: the TradingView sign-in
 doji_gmail_sync.gs                      Apps Script: broker email parser
 charm/                                  firmware for the charm — see The charms
   main/main.c                           who wakes, her errands, and what a touch does
-  main/face.c                           her face and glass, drawn live, and the sleep screen
-  main/glass.c                          her glass: its breath, its wobble and the bubbles in it
-  main/art.c                            her outline and her renders' numbers, made by tools/art.py
+  main/face.c                           her face, drawn live, and the sleep screen
   main/sound.c                          the speaker and both microphones
   main/config.c                         what the setup page saved, in her flash
   main/setup.c                          the setup, on her own Wi-Fi network
@@ -84,13 +82,13 @@ charm/                                  firmware for the charm — see The charm
   main/journal.c                        the journal's questions, a screen each
   main/dial.c                           the volume, a finger round the rim
   main/power.c                          the two buttons and the battery
-  main/motion.c                         the motion sensor, armed to wake her, and followed while she is awake
-  main/lift.c                           whether a lift was him looking, which way is up, and a jolt
+  main/motion.c                         the motion sensor, armed to wake her
+  main/lift.c                           whether a lift was him looking
   main/ota.c                            her updates over Wi-Fi, from main
   main/hanken_64.c                      Doji's typeface for the journal's words; _16, _18, _36 the rest
   art/HankenGrotesk.ttf                 that typeface, with its licence beside it
-  art/eugenia.png                       a render; art/body.rgb565, glow.a8 and bubbles.argb8888 the bytes drawn
-  tools/art.py                          turns a render into those bytes, and into art.c
+  art/eugenia.png                       a render; art/eugenia.rgb565 the bytes drawn
+  tools/art.py                          turns a render into those bytes
   tools/fonts.sh                        turns the typeface into the charm's fonts and the page's
 scripts/backup.mjs                      the paged read behind the daily copy
 scripts/health.mjs                      whether anything is running, asked from outside
@@ -3369,52 +3367,21 @@ the bootloader at the wake after, to the app that was (`charm/main/ota.c`).
 Only a power-on chimes, so neither an update nor the setup's restart wakes
 anyone.
 
-**A face is her glass plus a drawing.** Eugenia's render is a still 466 × 466
-image of her glass, `charm/art/eugenia.png`, and `charm/tools/art.py` makes
-thirteen renders of it, from stretched to squashed about the bottom of her
-glass and keeping her volume, each cut to the one 398 × 351 patch every render
-fits: 3.6 MB of the app's 7 MB slot, embedded as the RGB565 bytes the screen
-draws, so nothing is decoded at boot and no render is transformed while she
-shows. Her eyes, highlight and smile are drawn live on top, where the drawing of
-her face over the render puts them, her head leaning ten degrees, and ride
-whichever render shows. Then they move: blinks, now and then a wink, glances,
-now and then one following a bubble up, the mouth following the loudness of
-what plays; waking, her eyes open wide and settle; tapped, her eyes smile;
-thinking, she looks up and away from one side to the other under three thought
-dots; when something goes wrong, her eyes go uneven and her smile turns down;
-going to sleep, her eyes close slowly. Late at night — from 23:00 to 06:00 by
-her clock, once the internet has set it — her eyes are heavier, her blinks and
-breaths slower, and her goodnight starts with a yawn.
-
-**Her glass is alive** (`charm/main/glass.c`). It breathes, drawing her up
-three pixels and back so slowly that a breath walks the renders one at a time,
-each step moving her top less than a pixel; listening, she holds it. She is
-thick, and everything in her is slow and eased, smoothness over speed. A tap on
-her face or a jolt makes her wobble, one gooey rebound and still again within
-two seconds. Bubbles drift up inside her, a third of a pixel a frame while she
-idles and under one even at her quickest, the way up is, as the motion sensor
-reads her — tilt her and they drift to her new top, and her eyes drift
-downhill — and melt away at her edge, never outside it: a few at a time while
-she idles, stirred by his voice while she listens, a stream while she thinks,
-sent up as her voice swells while she speaks, when it lights her from inside.
-Each fades in and out rather than blinking, and is drawn at the quarter pixel
-it has reached, so it glides. As she wakes, and now and then while she idles, a
-glint of light crosses her, slowly. None of
-it moves with the market or with his trades: what her glass does follows her
-mood, never his position.
-
-**Only what changes is redrawn on a frame**: her face's patch, each bubble's
-own, and the whole of her glass only when its render changes, its light moves
-one of sixteen steps or the glint crosses it. The rings round the rim — Doji's
-emeralds turning slowly while she listens, and the one emptying while PWR is
-held — are the only things that redraw the full screen, and only while they
-show. Every five seconds, and whenever her mood changes, the serial log says
-how many frames were drawn and how long they took on average and at the
-slowest, so the real board says whether she keeps time. **Nothing flashes
-between screens**: whatever comes up first is the only thing seen, so no face
-shows for a moment before the journal's questions or after them. Her state — a
-low battery, no internet — is never an expression on her face; it is a mark on
-the sleep screen.
+**A face is a render plus a drawing.** Eugenia's render is a still 466 × 466
+image, embedded as the RGB565 bytes the screen draws (`charm/tools/art.py` makes
+them from `charm/art/eugenia.png`), so nothing is decoded at boot. Her eyes,
+highlight and smile are drawn live on top, where the drawing of her face over
+the render puts them, her head leaning ten degrees. Then they move: blinks,
+glances, the mouth following the loudness of what plays; thinking, she looks up
+and away from one side to the other under three thought dots; when
+something goes wrong, her eyes go uneven and her smile turns down; going to
+sleep, her eyes close slowly. Only the face's own patch is redrawn on a frame;
+the rings round the rim — Doji's emeralds turning slowly while she listens, and
+the one emptying while PWR is held — are the only things that redraw the full
+screen, and only while they show. **Nothing flashes between screens**: whatever
+comes up first is the only thing seen, so no face shows for a moment before the
+journal's questions or after them. Her state — a low battery, no internet — is
+never an expression on her face; it is a mark on the sleep screen.
 
 **The sleep screen is black but for its marks**, still, so they stay on the
 panel while the chip sleeps. With no marks at all the panel is held in reset
@@ -3508,9 +3475,8 @@ with the trade under its ring, and its questions come up from the dark at the
 next lift. **PWR while the questions are up closes them** and she listens, the
 trade waiting again until the conversation is over — on waking too, where the
 press puts a waiting briefing after her answer. **Put down while she thinks, she
-finishes**: nothing judges how she is held while she listens, thinks or speaks —
-her bubbles still read which way is up — so setting her on the table to listen
-costs nothing, and a waiting briefing is
+finishes**: nothing reads the motion sensor while she listens, thinks or speaks,
+so setting her on the table to listen costs nothing, and a waiting briefing is
 still read after her answer, since he is near. The panel's reset and select pins
 and the touch controller's reset are held through sleep, so the sleep screen
 needs no chip awake to stay up and a tap can still wake her. **Each waking joins
@@ -3559,8 +3525,7 @@ thinks through the silence and speaks when her voice starts, since the silence
 is exact zeros. A press while she thinks or speaks cuts her off at once — she
 looks for it every tenth of a second while nothing arrives, not only when the
 next beat of silence does; the copy in Telegram is the whole of it. The screen is not for talking: a tap on it answers
-a journal question, awake inside the rim wobbles her glass, and asleep wakes her
-to look. Losing the network sends her
+a journal question, and asleep wakes her to look. Losing the network sends her
 back to the sleep screen, where the no-internet mark says why — her voice
 breaking off with it, since an answer that stops short of its end is read as
 cut, not finished; with the network up, a door that answers with an error,
@@ -3632,13 +3597,7 @@ floating in sleep, is quiet. That a battery run down resets her as a brownout
 and so switches her off, and whether a cable alone switches her back on. How
 long a press from sleep takes to reach the listening notes: the serial log's
 `lit` and `listening` lines are timestamped from boot, and the board package's
-panel start alone waits 1.2 s. How long her frames take in each mood, which the
-serial log says — under the face's 33 ms is smooth — and whether a render
-changing tears, since the board package does not sync to the panel. Which way
-the motion sensor's x and y axes run across the screen (`SCREEN_X` and
-`SCREEN_Y` in `charm/main/lift.c`), how hard a knock must be to be a jolt and
-not a hand, and whether the bubbles, her light and the glint read on the
-panel. That the emeralds read on the panel as they
+panel start alone waits 1.2 s. That the emeralds read on the panel as they
 were chosen on a screen: the ring, the journal's halves, the dial, the sleep
 marks and her blob, where a dark green in RGB565 may band or go muddy.
 
@@ -4005,7 +3964,7 @@ home-screen shortcut and every bookmark open `/`.
 | `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load — past one page — save and soft delete, the scratch rule and aggregates, the money split and averages, the week boundary, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the snapshot, the offline boot, and the watch card |
 | `test/golden.test.mjs` | the snapshot: the real page on fixed fixtures and a frozen clock, every derived value and every panel's markup compared against `test/golden.json`, plus `Dates.session` swept across the four DST changeovers; and `test/golden-fold.json`, everything the folds return off the real captures — the rows the poller writes through its two windows, the email parsed and bounded, the calendar folded, and Eugenia's rule verdicts, day standings and stats over that week, with what she is told about each. Regenerate with `GOLDEN=write npm test`, deliberately, in the commit that changes behaviour — never to make a red run go away |
 | `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the charm driven end to end through the real turn — the reply read as the charm reads its frames, silence first, the recording transcribed as the Ogg it is, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, its headers in her turn and the volume she set sent ahead of her voice and nowhere else, the battery line spoken after her answer and neither copied nor stored, a wordless recording answered on the charm alone, and the door refusing a missing vendor, an empty recording and a wrong key; and the briefing on the charm, her ready line then today's briefing read as `pcm` in frames, the right day's briefing asked for, a `204` while none is stored; and Gladys's charm told what waits oldest first and a week back, its answer writing exactly one of the four columns, an edit, a stray column and a malformed body refused, and the door shut without its secret; and between the functions, every door Eugenia reads but the quote — the calendar, the market, its weeks, the rate odds, the wires, futures volume, the flows, his charts and the bars her calls are scored on — served by the real `doji-tradingview` and poller handlers off stubbed vendors, and read by her as she reads it |
-| `test/charm.test.mjs` | the charm's pure C — `charm/main/briefing.c`, `charm/main/errand.c`, `charm/main/lift.c`, `charm/main/dns.c`, `charm/main/ogg.c`, `charm/main/frames.c`, and `charm/main/glass.c` with the `charm/main/art.c` `charm/tools/art.py` writes — compiled on the machine running the suite and driven in the zone the charm reads its clock in, out of `charm/main/net.c`: the briefing watch against `briefDue` and `retryDue` every five minutes of both weeks the clocks change in, an announced briefing not asked for again until the next day, and waiting until New York's midnight and no longer, on the server's own day, never before the clock is set, the wait between errands longer for each that found no network and never an hour, and over the weekend, every five minutes of both weeks the clocks change in against `marketOpen`, half-hourly with the open woken for unless a trade waits, a lift judged on readings, held and put down told apart, which way is up and a jolt from readings, her renders, light and bubbles the sizes `art.c` says and her render at rest her outline, every bubble drawn inside her outline as the suite reads it, rising the way up is, coming and going, and under half a pixel a frame idle and under one at her quickest, a poke squashing and stretching her and settling, a breath walking the renders one at a time under a pixel a step and held without a jump, and her face placed on the render that shows, the setup's answer to a name, with and without the EDNS record a phone may add, a recording's Ogg file page by page against the specification's CRC, and her answer read out of `charmFrame`'s own bytes however the reads fall; and the firmware's names, the other of the two scope questions in C — every static, macro and enum constant a file declares used in it, every function a header declares called from another file, every non-static function in a header — since the ESP-IDF build refuses a name declared nowhere and only warns of one used nowhere |
+| `test/charm.test.mjs` | the charm's pure C — `charm/main/briefing.c`, `charm/main/errand.c`, `charm/main/lift.c`, `charm/main/dns.c`, `charm/main/ogg.c` and `charm/main/frames.c` — compiled on the machine running the suite and driven in the zone the charm reads its clock in, out of `charm/main/net.c`: the briefing watch against `briefDue` and `retryDue` every five minutes of both weeks the clocks change in, an announced briefing not asked for again until the next day, and waiting until New York's midnight and no longer, on the server's own day, never before the clock is set, the wait between errands longer for each that found no network and never an hour, and over the weekend, every five minutes of both weeks the clocks change in against `marketOpen`, half-hourly with the open woken for unless a trade waits, a lift judged on readings, held and put down told apart, the setup's answer to a name, with and without the EDNS record a phone may add, a recording's Ogg file page by page against the specification's CRC, and her answer read out of `charmFrame`'s own bytes however the reads fall; and the firmware's names, the other of the two scope questions in C — every static, macro and enum constant a file declares used in it, every function a header declares called from another file, every non-static function in a header — since the ESP-IDF build refuses a name declared nowhere and only warns of one used nowhere |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions and the app as two programs — with one planted defect per question proving the check can fail |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, and `syncPepperstone`'s three outcomes |
