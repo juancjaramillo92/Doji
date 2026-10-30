@@ -112,10 +112,10 @@ static void even_area(lv_event_t *e) {
 
 /* The screen, started once, in `mode`. It is the board package's
    bsp_display_start but for where she draws: the package's draws into PSRAM,
-   which the SPI driver will not send from, so each frame was copied into an
+   which the SPI driver will not send from, so it copies each draw into an
    internal buffer as large as the draw, 46 KB, which a board running Wi-Fi
-   seldom has free, and nothing reached the panel. DRAW_ROWS rows at a time in
-   internal RAM is sent as it is. */
+   seldom has free. DRAW_ROWS rows at a time in internal RAM are sent as they
+   are. */
 static void light(face_mode_t mode) {
     if (lit) return;
     lit = true;
@@ -158,7 +158,7 @@ static void light(face_mode_t mode) {
     bsp_display_unlock();
     // Timestamped from boot, beside talk.c's "listening": how much of a press's
     // wait is the panel starting. And what internal RAM the screen and Wi-Fi
-    // leave, which ran out on the first board.
+    // leave the codecs and TLS, the board's scarcest memory.
     ESP_LOGI(TAG, "lit, %u bytes of internal RAM free, %u in one piece",
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
              (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
@@ -391,9 +391,9 @@ void app_main(void) {
         setup_run();
     }
     /* The stack holds a TLS handshake, and the Opus encoder, which Espressif's
-       codec README puts at about 40 KB. In PSRAM: on the board, in internal
-       RAM beside the screen and Wi-Fi, it left the codecs too little for their
-       DMA and she rebooted as her speaker started. Her code runs from PSRAM,
+       codec README puts at about 40 KB. In PSRAM: in internal RAM beside the
+       screen and Wi-Fi it leaves the codecs too little for their DMA, and the
+       board package aborts as her speaker starts. Her code runs from PSRAM,
        so the cache stays on while she writes her flash, and deep sleep, which
        suspends it, is entered from a task of its own (sleep.c). */
     static StaticTask_t task;

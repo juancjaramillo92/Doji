@@ -1764,11 +1764,11 @@ test('the setup hands her DHCP a portal address that outlives the call', () => {
     `the portal address ${handed[1]} is not static, so the DHCP server reads a dead stack frame`);
 });
 
-/* One handshake her network left unanswered once gave up the whole waking on
-   the board, her own network in range, since each network was asked once. So
-   a refusal from a network that is there asks it again within its time, and
-   only one that is not there ends the attempt early. net.c is the board's, so
-   the loop is read. */
+/* A handshake can go unanswered, as the first after a restart was on the
+   board, and a refusal that ended the attempt would give up the waking with
+   her network in range. So a refusal from a network that is there asks it
+   again within its time, and only one that is not there ends the attempt
+   early. net.c is the board's, so the loop is read. */
 test('the charm asks a network that is there again until its time is up', () => {
   const net = source('charm/main/net.c');
   const handler = bodyOf(net, 'static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {',

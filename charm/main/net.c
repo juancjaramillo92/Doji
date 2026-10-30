@@ -29,7 +29,7 @@ static const char *TAG = "net";
 static RTC_DATA_ATTR struct { char ssid[33]; uint8_t bssid[6]; uint8_t channel; } last;
 
 static EventGroupHandle_t events;
-static uint16_t refusal;  // why the network last refused her
+static uint8_t refusal;  // why the network last refused her
 
 /* Her own leaving, after an attempt that failed, is no network refusing her:
    it can arrive once the next attempt has begun, and would end that one
@@ -48,10 +48,10 @@ static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
 }
 
 /* One network, asked until it lets her in or its time is up; `fast` names its
-   access point and channel. Asked once, one handshake unanswered cost the
-   whole waking: on the board, the first after a restart went unanswered and
-   she gave up on her own network with nine seconds of its time left. A
-   network that is not there is not asked again. */
+   access point and channel. A handshake can go unanswered — on the board the
+   first after a restart was — and a refusal that ended the attempt would give
+   up the waking with her network in range. A network that is not there is
+   not asked again, so a waking away from home is not on the radio for it. */
 static bool attempt(const charm_net_t *net, bool fast) {
     wifi_config_t sta = { 0 };
     memcpy(sta.sta.ssid, net->ssid, strlen(net->ssid));
