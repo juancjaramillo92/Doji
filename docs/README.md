@@ -3446,10 +3446,12 @@ what woke it.
 
 **She lives in short waking spells: lift to look, press to talk.** Awake, she
 feels about once a second whether she is **held up to look**, which keeps her
-awake, or **has been put down** — lying flat and still, either way up, or face
-down — which puts her to sleep a couple of seconds later (`lift_hold` in
-`charm/main/lift.c`). Anything else, a pocket or a hand at his side, leaves it
-to thirty seconds without a press. Then her eyes close, her speaker and
+awake, or **has been put down** — lying still at any angle, since on a table
+she sits propped on her keyring, or face down — which, with nothing playing,
+puts her to sleep eight seconds after she was put down or finished speaking,
+whichever is later (`lift_hold` in `charm/main/lift.c`). A finger on the screen
+counts as held. Anything else, a pocket or a hand at his side, leaves it to
+thirty seconds without a press. Then her eyes close, her speaker and
 microphones are switched off — the codecs live on the board's power, which
 the chip's sleep does not take away — and the chip goes into deep sleep,
 where it wakes as if switched on again: **lifted to look**, on a tap

@@ -122,6 +122,13 @@ lift_hold_t motion_hold(void) {
         vTaskDelay(pdMS_TO_TICKS(SAMPLE_MS));
     }
     lift_hold_t hold = judged ? lift_hold(before, now) : LIFT_ELSE;
+    // Said when it changes, with the reading, so the board says how it is judged.
+    static lift_hold_t said = LIFT_ELSE;
+    if (hold != said) {
+        static const char *const HOLDS[] = { "neither", "held", "down" };
+        ESP_LOGI(TAG, "%s: %.2f %.2f %.2f", HOLDS[hold], now[0], now[1], now[2]);
+        said = hold;
+    }
     memcpy(before, now, sizeof now);
     judged = true;
     return hold;

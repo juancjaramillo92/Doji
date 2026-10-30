@@ -215,10 +215,11 @@ test('awake, held up she stays, put down she sleeps, and anything else is left t
     hold([0, 0.5, 0.85], [0.03, 0.52, 0.84]),    // tilted toward him in a hand, a little tremor
     hold([0, 0.05, 0.99], [0.02, 0.06, 0.99]),   // flat in his palm, still a hand's tremor
     hold([0, 0.01, 1.0], [0, 0.01, 1.0]),        // lying face up on a table
+    hold([0, 0.38, 0.92], [0, 0.38, 0.92]),      // face up on a table, propped on her keyring
     hold([0, 0.01, -1.0], [0, 0.01, -1.0]),      // lying face down
     hold([0.1, 0.2, -0.6], [0.3, 0.1, -0.7]),    // face down in a moving hand
     hold([0.1, 0.95, 0.1], [0.3, 0.9, 0.2]),     // upright in a pocket, walking
-  ]), [HELD, HELD, DOWN, DOWN, DOWN, ELSE]);
+  ]), [HELD, HELD, DOWN, DOWN, DOWN, DOWN, ELSE]);
 });
 
 test('the setup answers every name with the charm, whether or not the phone adds an EDNS record', () => {
