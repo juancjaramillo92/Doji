@@ -72,7 +72,7 @@ static const char *TAG = "charm";
 #define LIFE_STACK    40960  // bytes
 #define DRAW_ROWS     12     // drawn at a time, twice over: 22 KB of internal RAM
 #define AWAKE_MS      30000
-#define LAST_FRAME_MS 200    // the sleep screen reaching the panel
+#define LAST_FRAME_MS 200    // the sleep screen's last rows reaching the panel, once rendered
 #define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
 #define EARLY_S       5      // how early a timer may wake her and still be the errand's
 #define OFFLINE_TRY_MS 8000  // woken offline, how long the network has to answer
@@ -194,7 +194,9 @@ static void sleep_now(void) {
         } else {
             light(FACE_DARK);
             face_set_marks(briefing_waits, trade_waits, low, offline, charge);
-            face_set_mode(FACE_DARK);
+            bsp_display_lock(-1);
+            face_draw_dark();
+            bsp_display_unlock();
             vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
         }
         drawn = marks;

@@ -401,6 +401,12 @@ static void tick(lv_timer_t *t) {
     drawn = V;
 }
 
+void face_draw_dark(void) {
+    mode = FACE_DARK;
+    tick(NULL);
+    lv_refr_now(NULL);
+}
+
 static lv_obj_t *plain(lv_obj_t *parent) {
     lv_obj_t *o = lv_obj_create(parent);
     lv_obj_remove_style_all(o);
