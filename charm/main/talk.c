@@ -72,7 +72,6 @@ static bool tapped(void) { return ulTaskNotifyTake(pdTRUE, 0); }
    five minutes, a soft tick saying so half a minute before. The mics wait
    while the tick plays, a fifth of a second the recording does not keep. */
 static bool heard(const int16_t *in, size_t n, float loud) {
-    face_set_level(loud);
     for (size_t i = 0; i < n; i++) {
         frame[filled++] = in[i];
         if (filled * 2 < frame_bytes) continue;
@@ -140,6 +139,8 @@ static int knock(const char *url, const uint8_t *ogg, size_t len, void (*lit)(vo
         .method = ogg ? HTTP_METHOD_POST : HTTP_METHOD_GET,
         .timeout_ms = READ_MS,
         .crt_bundle_attach = esp_crt_bundle_attach,
+        // Her voice read in pieces the size of `in`, not the default 512 bytes.
+        .buffer_size = 4096,
     };
     if (!net_wait(NET_ALL_MS)) return -1;
     esp_http_client_handle_t h = esp_http_client_init(&c);
@@ -229,7 +230,6 @@ int talk(void) {
     esp_opus_enc_close(encoder);
     // What the encoder left of her stack, for the board to say how much it needs.
     ESP_LOGI(TAG, "a turn left %u bytes of her stack", (unsigned)uxTaskGetStackHighWaterMark(NULL));
-    face_set_level(0);
     if (!spoke) { face_set_mode(FACE_IDLE); return 0; }
 
     sound_sent();

@@ -1,34 +1,25 @@
-/* The face: Eugenia as her glass, breathing, with bubbles rising in it, her
-   eyes and mouth drawn live on top. The glass is one of glass.c's renders,
-   drawn as it is and never transformed, and the face rides it. Only what
-   changes is redrawn on a frame, which is what keeps it smooth on this chip:
-   her face's patch, each bubble's own, and the whole of her glass only when
-   its render changes, its light moves a step or a glint crosses it. The ring
-   is the only thing that redraws the full screen, and only while it shows.
-   The serial log says every few seconds how long the frames took, so the
-   real board says whether they keep time.
+/* The face: Eugenia as one still render, her eyes and mouth drawn live on
+   top of it. Only the face's own patch of screen is redrawn, and only on a
+   frame where something in it moved, which is what keeps it smooth on this
+   chip and leaves it to her voice while she listens and speaks. The
+   listening ring is still, so it redraws the full screen only as it comes
+   and goes.
 
    The sleep screen is a layer over her: black but for its marks.
 
    The numbers are measured from the drawing of her face over the render, in
-   pixels of the 466 x 466 screen, with her glass at rest. */
+   pixels of the 466 x 466 screen. */
 #include "face.h"
 
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <time.h>
-#include "esp_log.h"
+#include <string.h>
 #include "esp_random.h"
-#include "esp_timer.h"
-#include "glass.h"
 #include "lvgl.h"
-#include "net.h"
 #include "palette.h"
 
 LV_FONT_DECLARE(hanken_36);
-
-static const char *TAG = "face";
 
 typedef struct {
     float eye_l[2], eye_r[2], rx, ry;
@@ -49,66 +40,33 @@ static const face_geometry_t F = {
 #define LOOK_RANGE      6.0f
 #define SHIFT_X         8     // how far the sleep screen's marks wander, so none burns in
 #define SHIFT_Y         4
-#define WINK_ONE_IN     12    // of her blinks while idle, one in this many a wink
-#define WIDEN_MS        700   // waking, her eyes open wide, then settle
-#define HAPPY_MS        900   // tapped, her eyes smile
-#define TAP             0.6f  // how hard a tap pokes her glass, of a full poke
-#define YAWN_MS         800   // late, her goodnight starts with a yawn
-#define LATE_FROM       23    // the hours she is sleepy in, by her clock
-#define LATE_UNTIL      6
-#define FOLLOW_ONE_IN   3     // of her glances while idle, one in this many follows a bubble
-#define FOLLOW_MS       2500
-#define FOLLOW_GAIN     0.05f // how far her eyes turn toward the bubble she follows, a pixel's worth per pixel away
-#define GLINT_MS        1600  // a glint crossing her glass, slowly
-#define GLINT_EVERY_MS  25000 // about how often, while she idles, after the one she wakes with
-#define BREATH          0.009f // her breath, as a squash toward stretched: her top rises three pixels
-#define GLOW_OPA        150   // her light at its brightest, inside her
-#define GLOW_STEPS      16    // its levels: her glass is redrawn only when it moves one
-#define BUBBLE_OPA      230
-#define LOG_MS          5000  // how often the serial log says how her frames kept time
 
-extern const uint8_t body_rgb565_start[] asm("_binary_body_rgb565_start");
-extern const uint8_t glow_a8_start[] asm("_binary_glow_a8_start");
-extern const uint8_t bubbles_argb8888_start[] asm("_binary_bubbles_argb8888_start");
+extern const uint8_t eugenia_rgb565_start[] asm("_binary_eugenia_rgb565_start");
 
-// Her renders, her light and the bubbles' sprites, as the bytes art.py made.
-static lv_image_dsc_t body[GLASS_FRAMES], glow, bubble[GLASS_SIZES][GLASS_PHASES * GLASS_PHASES];
+static lv_image_dsc_t art_dsc = {
+    .header = { .magic = LV_IMAGE_HEADER_MAGIC, .cf = LV_COLOR_FORMAT_RGB565, .w = 466, .h = 466, .stride = 466 * 2 },
+    .data_size = 466 * 466 * 2,
+};
 
 static lv_obj_t *card, *night;
 
 static volatile face_mode_t mode = FACE_IDLE;
-static volatile float level, hold, jolted, tilt[2] = { 0, -0.9f };
-static volatile bool briefing_waits, trade_waits, low, offline, tapped;
+static volatile float level, hold;
+static volatile bool briefing_waits, trade_waits, low, offline;
 static volatile int charge = -1;
 
-// What is on screen, eased toward what the mode asks for.
-static struct { float open, gx, gy, mouth, smile, ring, dots, confused, happy, glow, stir, up[2]; } V = {
-    .open = 0, .smile = 1,
-};
+// What is on screen, eased toward what the mode asks for, and what was last drawn.
+static struct { float open, gx, gy, mouth, smile, dots, confused, lid; } V = { .open = 0, .smile = 1, .lid = 1 }, drawn;
 static float gaze[2];
-static uint32_t next_glance, next_blink, blink_at, woke_at, happy_until, follow_until, glint_at, glint_next;
-static float lid[2] = { 1, 1 };  // the blink, on top of how open the mode wants the eyes; a wink is one
-static int winking = -1, following = -1;
-static bool blinking, ring_was_on, glinting, sleepy;
+static uint32_t next_glance, next_blink, blink_at;
+static bool blinking, ring;
 static bool dark;
 static int shift[2];
-
-/* Her glass, and what the next frame draws of it, worked out by tick: the
-   render, its light's step, each bubble's sprite and place, and the glint. */
-static glass_t G;
-static lv_area_t crop;  // GLASS_CROP, as LVGL takes an area
-static int frame, glow_step;
-static struct { lv_area_t at; const lv_image_dsc_t *src; lv_opa_t opa; } seen[GLASS_BUBBLES];
-static float glint[4];
-static lv_opa_t glint_opa;
 
 void face_set_mode(face_mode_t m) { mode = m; }
 face_mode_t face_get_mode(void) { return mode; }
 void face_set_level(float l) { level = l < 0 ? 0 : l > 1 ? 1 : l; }
 void face_set_hold(float h) { hold = h < 0 ? 0 : h > 1 ? 1 : h; }
-void face_set_tilt(float x, float y) { tilt[0] = x; tilt[1] = y; }
-void face_tap(void) { tapped = true; }
-void face_jolt(float strength) { if (strength > jolted) jolted = strength; }
 void face_set_marks(bool b, bool t, bool l, bool o, int c) {
     briefing_waits = b; trade_waits = t; low = l; offline = o; charge = c;
 }
@@ -125,16 +83,10 @@ static void wander(void) {
     shift[1] = (int)lroundf((rnd() * 2 - 1) * SHIFT_Y);
 }
 
+// Snapped to the target within a hair of it, so a face at rest is still.
 static float ease(float v, float t, float rate, float dt) {
-    return v + (t - v) * (1.0f - expf(-rate * dt));
-}
-
-// Late at night by her clock, once the internet has set it.
-static bool late(void) {
-    time_t now = time(NULL);
-    struct tm t;
-    localtime_r(&now, &t);
-    return now >= CLOCK_SET && (t.tm_hour >= LATE_FROM || t.tm_hour < LATE_UNTIL);
+    float e = v + (t - v) * (1.0f - expf(-rate * dt));
+    return fabsf(t - e) < 0.002f ? t : e;
 }
 
 /* A smile through its two ends and its lowest point, as an arc of the circle
@@ -246,79 +198,40 @@ static void draw_hold(lv_layer_t *layer) {
 
 static void draw_face(lv_event_t *e) {
     lv_layer_t *layer = lv_event_get_layer(e);
+    float open = V.open * V.lid;
     const lv_color_t ink = lv_color_hex(0x0d0c0b);
 
-    // Her glass as the render that shows, then the light inside it and the
-    // bubbles, under her eyes and mouth, which sit on its surface.
-    lv_draw_image_dsc_t img;
-    lv_draw_image_dsc_init(&img);
-    img.src = &body[frame];
-    lv_draw_image(layer, &img, &crop);
-    if (glow_step) {
-        lv_draw_image_dsc_init(&img);
-        img.src = &glow;
-        img.recolor = lv_color_hex(GLOW);
-        img.opa = (lv_opa_t)(GLOW_OPA * glow_step / GLOW_STEPS);
-        lv_draw_image(layer, &img, &crop);
-    }
-    for (int i = 0; i < GLASS_BUBBLES; i++) {
-        if (!seen[i].opa) continue;
-        lv_draw_image_dsc_init(&img);
-        img.src = seen[i].src;
-        img.opa = seen[i].opa;
-        lv_draw_image(layer, &img, &seen[i].at);
-    }
-
-    // The glint: a soft streak, widest and faintest outside.
-    if (glint_opa) {
-        static const float strokes[3][2] = { { 48, 0.08f }, { 26, 0.1f }, { 10, 0.13f } };
-        lv_draw_line_dsc_t l;
-        lv_draw_line_dsc_init(&l);
-        l.p1.x = glint[0]; l.p1.y = glint[1]; l.p2.x = glint[2]; l.p2.y = glint[3];
-        l.round_start = 1; l.round_end = 1; l.color = lv_color_hex(0xf2f0ec);
-        for (int i = 0; i < 3; i++) {
-            l.width = (int32_t)strokes[i][0];
-            l.opa = (lv_opa_t)(glint_opa * strokes[i][1]);
-            lv_draw_line(layer, &l);
-        }
-    }
-
     // Eyes, a line when shut, with the highlight once open enough to hold it.
-    // Confused, one is smaller and they sit at a tilt; smiling, each shut eye
-    // arches; winking, one shuts alone.
-    const float *scale = GLASS_SCALE[frame];
-    float at[2];
+    // Confused, one is smaller and they sit at a tilt.
     for (int i = 0; i < 2; i++) {
         const float *eye = i ? F.eye_r : F.eye_l;
-        float open = V.open * lid[i] * (1 - V.happy);
         float odd = 1 + V.confused * (i ? 0.12f : -0.18f);
-        glass_place(frame, eye[0] + V.gx, eye[1] + V.gy + V.confused * (i ? -1.6f : 1.6f), at);
-        float rx = F.rx * odd * scale[0], ry = F.ry * odd * open * scale[1];
+        float cx = eye[0] + V.gx, cy = eye[1] + V.gy + V.confused * (i ? -1.6f : 1.6f);
+        float rx = F.rx * odd, ry = F.ry * odd * open;
         if (ry < 1.8f) {
-            draw_curve(layer, at[0], at[1], rx * 0.9f, 1.2f - 4.6f * V.happy, 2.6f, ink);
+            draw_curve(layer, cx, cy, rx * 0.9f, 1.2f, 2.6f, ink);
             continue;
         }
-        dot(layer, at[0], at[1], rx, ry, ink, LV_OPA_COVER);
+        dot(layer, cx, cy, rx, ry, ink, LV_OPA_COVER);
         if (open > 0.45f) {
             float k = open - 0.45f > 0.25f ? 1.0f : (open - 0.45f) * 4;
-            dot(layer, at[0] + F.hl[0], at[1] + F.hl[1] * fminf(1, open), F.hl[2], F.hl[2],
+            dot(layer, cx + F.hl[0], cy + F.hl[1] * open, F.hl[2], F.hl[2],
                 lv_color_hex(0xf2f0ec), (lv_opa_t)(235 * k));
         }
     }
 
-    // Mouth: the smile, or open while she speaks, or yawns.
-    glass_place(frame, F.mouth[0], F.mouth[1], at);
-    float mx = at[0], my = at[1];
+    // Mouth: the smile, or open while she speaks.
+    float mx = F.mouth[0], my = F.mouth[1];
     if (V.mouth < 0.06f) {
-        draw_curve(layer, mx, my, F.mouth_w / 2 * scale[0], F.sag * V.smile * scale[1], F.stroke, ink);
+        draw_curve(layer, mx, my, F.mouth_w / 2, F.sag * V.smile, F.stroke, ink);
     } else {
-        float half = F.mouth_w / 2 * 0.86f * scale[0], h = V.mouth * 12.0f * scale[1];
+        float half = F.mouth_w / 2 * 0.86f, h = V.mouth * 12.0f;
         lv_draw_rect_dsc_t d;
         lv_draw_rect_dsc_init(&d);
         d.bg_color = lv_color_hex(0x1d0e0b); d.radius = LV_RADIUS_CIRCLE;
         d.border_color = ink; d.border_width = 2; d.border_opa = LV_OPA_COVER;
         lv_area_t a = { lroundf(mx - half), lroundf(my - 1), lroundf(mx + half),
-                        lroundf(my + F.sag * 0.8f * scale[1] + 2 * h) };
+                        lroundf(my + F.sag * 0.8f + 2 * h) };
         lv_draw_rect(layer, &d, &a);
     }
 
@@ -328,14 +241,13 @@ static void draw_face(lv_event_t *e) {
         uint32_t now = lv_tick_get();
         for (int i = 0; i < 3; i++) {
             float pulse = 0.5f + 0.5f * sinf(now / 260.0f - i * 1.1f);
-            glass_place(frame, dots[i][0], dots[i][1] - pulse * 2.5f, at);
-            dot(layer, at[0], at[1], dots[i][2], dots[i][2], lv_color_hex(0xead3b6),
+            dot(layer, dots[i][0], dots[i][1] - pulse * 2.5f, dots[i][2], dots[i][2], lv_color_hex(0xead3b6),
                 (lv_opa_t)(255 * V.dots * (0.25f + 0.75f * pulse)));
         }
     }
 
-    // The ring on the rim, while listening, follows his voice.
-    if (V.ring > 0.02f) face_ring(layer, 231, 4 + (int32_t)(7 * V.ring), 1, lv_tick_get() / (float)FACE_RING_TURN_MS, 0.35f + 0.65f * V.ring);
+    // The ring on the rim while she listens.
+    if (ring) face_ring(layer, 231, 6, 1, 0, 1);
     if (hold > 0) draw_hold(layer);
 }
 
@@ -398,41 +310,6 @@ static void draw_night(lv_event_t *e) {
     if (hold > 0) draw_hold(layer);
 }
 
-// A patch of her at rest, invalidated where a render puts it, a pixel or two over.
-static void invalidate_placed(const lv_area_t *rest, int f) {
-    float a[2], b[2];
-    glass_place(f, rest->x1, rest->y1, a);
-    glass_place(f, rest->x2, rest->y2, b);
-    lv_area_t at = { (int32_t)floorf(a[0]) - 2, (int32_t)floorf(a[1]) - 2, (int32_t)ceilf(b[0]) + 2, (int32_t)ceilf(b[1]) + 2 };
-    lv_obj_invalidate_area(card, &at);
-}
-
-// Her face appearing: eyes opening wide, a glint as she wakes, and her glass
-// afresh, its bubbles still to come.
-static void wake(uint32_t now) {
-    woke_at = now;
-    glint_at = now + 350;
-    glinting = true;
-    sleepy = late();
-    V.up[0] = tilt[0];
-    V.up[1] = tilt[1];
-    glass_start(&G, esp_random());
-}
-
-/* How long the frames took, from LVGL starting to render to its last area
-   handed to the panel: the panel takes that one as the next starts. Said
-   every LOG_MS, and whenever her mode changes, under the mode it was. */
-static int64_t render_from, slowest, total;
-static int frames;
-
-static void on_render(lv_event_t *e) {
-    int64_t t = esp_timer_get_time();
-    if (lv_event_get_code(e) == LV_EVENT_RENDER_START) { render_from = t; return; }
-    frames++;
-    total += t - render_from;
-    if (t - render_from > slowest) slowest = t - render_from;
-}
-
 static void tick(lv_timer_t *t) {
     (void)t;
     static uint32_t last;
@@ -442,20 +319,6 @@ static void tick(lv_timer_t *t) {
     last = now;
 
     face_mode_t m = mode;
-
-    static face_mode_t was = FACE_DARK;
-    static uint32_t since, said;
-    if (m != was || now - said >= LOG_MS) {
-        static const char *const MODES[] = { "idle", "listening", "speaking", "thinking", "confused", "asleep", "dark" };
-        if (frames) {
-            ESP_LOGI(TAG, "%s: %d frames in %lu ms, %d ms on average, %d ms the slowest",
-                     MODES[was], frames, (unsigned long)(now - said), (int)(total / frames / 1000), (int)(slowest / 1000));
-        }
-        frames = 0;
-        total = slowest = 0;
-        said = now;
-    }
-    if (m != was) { was = m; since = now; }
 
     // Into or out of the sleep screen: the whole screen changes once. On the
     // way in her marks find a new place; on the way out her eyes open from shut.
@@ -469,7 +332,6 @@ static void tick(lv_timer_t *t) {
         } else {
             lv_obj_remove_flag(card, LV_OBJ_FLAG_HIDDEN);
             lv_obj_add_flag(night, LV_OBJ_FLAG_HIDDEN);
-            wake(now);
         }
         V.open = 0;
     }
@@ -484,120 +346,37 @@ static void tick(lv_timer_t *t) {
         int marks = face_marks(briefing_waits, trade_waits, low, offline, charge);
         if (marks != drawn) lv_obj_invalidate(night);
         drawn = marks;
-        tapped = false;
-        jolted = 0;
         return;
     }
-    static uint32_t asked;
-    if (now - asked >= 1000) { asked = now; sleepy = late(); }
 
-    // A tap she likes, a jolt she only feels: either wobbles her glass, and
-    // a jolt stirs the bubbles.
-    if (tapped) {
-        tapped = false;
-        glass_poke(&G, TAP);
-        if (m == FACE_IDLE) happy_until = now + HAPPY_MS;
-    }
-    float jolt = jolted;
-    if (jolt > 0) {
-        jolted = 0;
-        glass_poke(&G, jolt);
-        if (jolt > V.stir) V.stir = jolt;
-    }
-    V.stir = ease(V.stir, 0, 1.5f, dt);
-    V.up[0] = ease(V.up[0], tilt[0], 5, dt);
-    V.up[1] = ease(V.up[1], tilt[1], 5, dt);
-
-    float t_open = 1, t_mouth = 0, t_smile = 1, t_ring = 0, t_dots = 0, t_confused = 0, t_happy = 0, t_glow = 0, glance = 1;
-    glass_mood_t mood = { .up = { V.up[0], V.up[1] }, .rise = 9, .every = 2.5f, .most = 6, .stir = V.stir,
-                          .depth = BREATH, .period = sleepy ? 6.5f : 5 };
+    float t_open = 1, t_mouth = 0, t_smile = 1, t_dots = 0, t_confused = 0, glance = 1;
     const float *fixed = NULL;
     static const float up[2] = { 0, -2 }, puzzled[2] = { 3, -2.5f }, rest[2] = { 0, 1 };
     // Thinking looks up to one side, then the other, every 1.7 seconds.
     float pondering[2] = { (now / 1700) % 2 ? -LOOK_RANGE * 0.55f : LOOK_RANGE * 0.9f, -LOOK_RANGE };
-    // Listening, she holds her breath and his voice stirs her bubbles.
-    if (m == FACE_LISTENING) {
-        t_smile = 1.1f; t_ring = 0.25f + 0.75f * level; fixed = up;
-        mood.depth = 0; mood.stir = fmaxf(V.stir, level); mood.every = 1.8f; mood.most = 8;
-    }
-    // Speaking, her voice lights her and sends bubbles up as it swells.
-    if (m == FACE_SPEAKING) {
-        t_mouth = level; t_smile = 0.9f; glance = 0.4f; t_glow = 0.3f + 0.7f * level;
-        mood.depth = 0.0065f; mood.period = 4; mood.every = 0.9f + 1.6f * (1 - level); mood.most = 9;
-    }
-    // Thinking, a quick stream of them.
-    if (m == FACE_THINKING) {
-        t_open = 0.85f; t_smile = 0.25f; t_dots = 1; fixed = pondering;
-        mood.rise = 16; mood.every = 0.7f; mood.most = GLASS_BUBBLES; mood.depth = 0.0045f; mood.period = 3.4f;
-    }
-    if (m == FACE_CONFUSED) {
-        t_smile = -0.35f; t_confused = 1; fixed = puzzled;
-        mood.rise = 5; mood.every = 4; mood.most = 4; mood.depth = 0;
-    }
-    // Going to sleep, the last bubbles drift up, and late she yawns first.
-    if (m == FACE_ASLEEP) {
-        t_open = 0; t_smile = 0.6f; fixed = rest;
-        mood.rise = 4; mood.every = 60; mood.depth = 0.003f; mood.period = 6.5f;
-        if (sleepy && now - since < YAWN_MS) t_mouth = 0.9f * sinf((float)M_PI * (now - since) / YAWN_MS);
-    }
-    if (m == FACE_IDLE) {
-        if (sleepy) { t_open = 0.8f; glance = 0.6f; }
-        if ((int32_t)(happy_until - now) > 0) t_happy = 1;
-    }
-    if (now - woke_at < WIDEN_MS && t_open >= 1) t_open = 1.18f;
+    if (m == FACE_LISTENING) { t_smile = 1.1f; fixed = up; }
+    if (m == FACE_SPEAKING)  { t_mouth = level; t_smile = 0.9f; glance = 0.4f; }
+    if (m == FACE_THINKING)  { t_open = 0.85f; t_smile = 0.25f; t_dots = 1; fixed = pondering; }
+    if (m == FACE_CONFUSED)  { t_smile = -0.35f; t_confused = 1; fixed = puzzled; }
+    if (m == FACE_ASLEEP)    { t_open = 0; t_smile = 0.6f; fixed = rest; }
 
-    glass_step(&G, &mood, dt);
-    int was_frame = frame;
-    frame = glass_frame(&G);
-
-    // Glances: a quick jump to a point, held for a moment, the downhill side
-    // favoured when she is tilted; or now and then a bubble, followed up.
-    glass_bubble_t *chased = following >= 0 ? &G.bubbles[following] : NULL;
-    if (fixed) {
-        gaze[0] = fixed[0]; gaze[1] = fixed[1];
-        following = -1;
-    } else if (chased && chased->state == GLASS_RISING && (int32_t)(follow_until - now) > 0) {
-        float eyes[2] = { (F.eye_l[0] + F.eye_r[0]) / 2, (F.eye_l[1] + F.eye_r[1]) / 2 }, at[2];
-        glass_place(frame, chased->x, chased->y, at);
-        float dx = (at[0] - eyes[0]) * FOLLOW_GAIN, dy = (at[1] - eyes[1]) * FOLLOW_GAIN, r = hypotf(dx, dy);
-        float k = r > LOOK_RANGE ? LOOK_RANGE / r : 1;
-        gaze[0] = dx * k; gaze[1] = dy * k * 0.7f;
-    } else if ((int32_t)(now - next_glance) >= 0) {
-        following = -1;
-        int from = (int)(rnd() * GLASS_BUBBLES);
-        for (int i = 0; m == FACE_IDLE && rnd() < 1.0f / FOLLOW_ONE_IN && i < GLASS_BUBBLES; i++) {
-            int b = (from + i) % GLASS_BUBBLES;
-            if (G.bubbles[b].state == GLASS_RISING) { following = b; break; }
-        }
-        if (following >= 0) {
-            follow_until = now + FOLLOW_MS;
-        } else {
-            float a = rnd() * 2 * (float)M_PI, r = sqrtf(rnd()) * LOOK_RANGE * glance;
-            gaze[0] = cosf(a) * r - V.up[0] * LOOK_RANGE * 0.5f;
-            gaze[1] = sinf(a) * r * 0.7f;
-        }
+    // Glances: a quick jump to a point, held for a moment.
+    if (fixed) { gaze[0] = fixed[0]; gaze[1] = fixed[1]; }
+    else if ((int32_t)(now - next_glance) >= 0) {
+        float a = rnd() * 2 * (float)M_PI, r = sqrtf(rnd()) * LOOK_RANGE * glance;
+        gaze[0] = cosf(a) * r; gaze[1] = sinf(a) * r * 0.7f;
         next_glance = now + 1200 + (uint32_t)(rnd() * 2800);
     }
 
-    // Blinks: shut in 70 ms, open in 90. Now and then, idle, a wink: one eye,
-    // slower, held a moment, with a smile.
-    if (!blinking && m != FACE_ASLEEP && (int32_t)(now - next_blink) >= 0) {
-        blinking = true;
-        blink_at = now;
-        winking = m == FACE_IDLE && rnd() < 1.0f / WINK_ONE_IN ? rnd() < 0.5f : -1;
-    }
-    lid[0] = lid[1] = 1;
+    // Blinks: shut in 70 ms, open in 90.
+    V.lid = 1;
+    if (!blinking && m != FACE_ASLEEP && (int32_t)(now - next_blink) >= 0) { blinking = true; blink_at = now; }
     if (blinking) {
-        uint32_t b = now - blink_at, shut = winking < 0 ? 70 : 90, shut_for = winking < 0 ? 0 : 140,
-                 opening = winking < 0 ? 90 : 120;
-        float l = b < shut ? 1 - b / (float)shut : b < shut + shut_for ? 0 :
-                  b < shut + shut_for + opening ? (b - shut - shut_for) / (float)opening : 1;
-        if (winking != 1) lid[0] = l;
-        if (winking != 0) lid[1] = l;
-        if (winking >= 0) t_smile += 0.3f;
-        if (b >= shut + shut_for + opening) {
+        uint32_t b = now - blink_at;
+        V.lid = b < 70 ? 1 - b / 70.0f : b < 160 ? (b - 70) / 90.0f : 1;
+        if (b >= 160) {
             blinking = false;
-            next_blink = now + (uint32_t)(BLINK_EVERY_MS * (sleepy ? 1.5f : 1) * (0.6f + rnd() * 0.8f));
+            next_blink = now + (uint32_t)(BLINK_EVERY_MS * (0.6f + rnd() * 0.8f));
         }
     }
 
@@ -606,76 +385,20 @@ static void tick(lv_timer_t *t) {
     V.gy = ease(V.gy, gaze[1], 22, dt);
     V.mouth = ease(V.mouth, t_mouth, 28, dt);
     V.smile = ease(V.smile, t_smile, 10, dt);
-    V.ring = ease(V.ring, t_ring, 18, dt);
     V.dots = ease(V.dots, t_dots, 5, dt);
     V.confused = ease(V.confused, t_confused, 8, dt);
-    V.happy = ease(V.happy, t_happy, 12, dt);
-    V.glow = ease(V.glow, t_glow, 2.5f, dt);
 
-    // The glint: as she wakes, then now and then while she idles, never
-    // over her light or a wobble. It sweeps across her, down to the right.
-    if (!glinting && m == FACE_IDLE && (int32_t)(now - glint_next) >= 0 && V.glow < 0.02f && fabsf(G.give) < 0.05f) {
-        glinting = true;
-        glint_at = now;
-    }
-    lv_opa_t glint_was = glint_opa;
-    glint_opa = 0;
-    if (glinting && (int32_t)(now - glint_at) >= 0) {
-        float p = (now - glint_at) / (float)GLINT_MS, ends[4];
-        static const float across[2] = { 0.8f, 0.6f };
-        float x = GLASS_CROP[0] + GLASS_CROP[2] / 2.0f + across[0] * (340 * p - 170);
-        float y = GLASS_CROP[1] + GLASS_CROP[3] / 2.0f + across[1] * (340 * p - 170);
-        if (p >= 1) {
-            glinting = false;
-            glint_next = now + (uint32_t)(GLINT_EVERY_MS * (0.6f + rnd() * 0.8f));
-        } else if (glass_chord(x, y, -across[1], across[0], 18, ends)) {
-            glass_place(frame, ends[0], ends[1], glint);
-            glass_place(frame, ends[2], ends[3], glint + 2);
-            glint_opa = (lv_opa_t)(255 * sinf((float)M_PI * p));
-        }
-    }
-
-    // What the next frame draws of the bubbles.
-    lv_area_t before[GLASS_BUBBLES];
-    lv_opa_t was_shown[GLASS_BUBBLES];
-    for (int i = 0; i < GLASS_BUBBLES; i++) {
-        glass_bubble_t *b = &G.bubbles[i];
-        before[i] = seen[i].at;
-        was_shown[i] = seen[i].opa;
-        seen[i].opa = b->state == GLASS_NONE ? 0 : (lv_opa_t)(BUBBLE_OPA * b->shown);
-        if (!seen[i].opa) continue;
-        float at[2];
-        glass_place(frame, b->x, b->y, at);
-        int side = GLASS_SIDE[b->size], x = (int)floorf(at[0]), y = (int)floorf(at[1]);
-        int px = (int)((at[0] - x) * GLASS_PHASES), py = (int)((at[1] - y) * GLASS_PHASES);
-        seen[i].src = &bubble[b->size][py * GLASS_PHASES + px];
-        seen[i].at = (lv_area_t){ x - side / 2, y - side / 2, x - side / 2 + side - 1, y - side / 2 + side - 1 };
-    }
-    int step = (int)lroundf(V.glow * GLOW_STEPS);
-    bool whole = frame != was_frame || step != glow_step || glint_opa || glint_was;
-    glow_step = step;
-
-    /* The ring needs the whole screen, and her glass all of its patch when its
-       render, its light or the glint changes; otherwise her face's patch and
-       the thought dots', placed on the render, and each bubble's, where it
-       was and where it is. */
-    static const lv_area_t face_patch = { 150, 108, 326, 232 }, dots_patch = { 195, 30, 272, 62 };
-    bool ring_on = V.ring > 0.02f;
-    if (ring_on || ring_was_on) {
+    // The ring needs the whole screen, once as it comes and once as it goes;
+    // everything else lives in the face's patch and the thought dots', redrawn
+    // only when it moved. The dots pulse while they show.
+    if ((m == FACE_LISTENING) != ring) {
+        ring = m == FACE_LISTENING;
         lv_obj_invalidate(lv_screen_active());
-    } else if (whole) {
-        lv_obj_invalidate_area(card, &crop);
-        invalidate_placed(&dots_patch, was_frame);
-        invalidate_placed(&dots_patch, frame);
-    } else {
-        invalidate_placed(&face_patch, frame);
-        invalidate_placed(&dots_patch, frame);
-        for (int i = 0; i < GLASS_BUBBLES; i++) {
-            if (was_shown[i]) lv_obj_invalidate_area(card, &before[i]);
-            if (seen[i].opa) lv_obj_invalidate_area(card, &seen[i].at);
-        }
+    } else if (memcmp(&V, &drawn, sizeof V) || V.dots > 0) {
+        static const lv_area_t patches[] = { { 150, 108, 326, 232 }, { 195, 30, 272, 62 } };
+        for (size_t i = 0; i < sizeof patches / sizeof *patches; i++) lv_obj_invalidate_area(card, &patches[i]);
     }
-    ring_was_on = ring_on;
+    drawn = V;
 }
 
 static lv_obj_t *plain(lv_obj_t *parent) {
@@ -686,52 +409,30 @@ static lv_obj_t *plain(lv_obj_t *parent) {
     return o;
 }
 
-static void image(lv_image_dsc_t *d, lv_color_format_t cf, int w, int h, int bytes, const uint8_t *data) {
-    d->header = (lv_image_header_t){ .magic = LV_IMAGE_HEADER_MAGIC, .cf = cf, .w = w, .h = h, .stride = w * bytes };
-    d->data_size = w * h * bytes;
-    d->data = data;
-}
-
 void face_start(void) {
-    for (int f = 0; f < GLASS_FRAMES; f++) {
-        image(&body[f], LV_COLOR_FORMAT_RGB565, GLASS_CROP[2], GLASS_CROP[3], 2,
-              body_rgb565_start + (size_t)f * GLASS_CROP[2] * GLASS_CROP[3] * 2);
-    }
-    image(&glow, LV_COLOR_FORMAT_A8, GLASS_CROP[2], GLASS_CROP[3], 1, glow_a8_start);
-    const uint8_t *sprite = bubbles_argb8888_start;
-    for (int s = 0; s < GLASS_SIZES; s++) {
-        for (int p = 0; p < GLASS_PHASES * GLASS_PHASES; p++) {
-            image(&bubble[s][p], LV_COLOR_FORMAT_ARGB8888, GLASS_SIDE[s], GLASS_SIDE[s], 4, sprite);
-            sprite += GLASS_SIDE[s] * GLASS_SIDE[s] * 4;
-        }
-    }
-    crop = (lv_area_t){ GLASS_CROP[0], GLASS_CROP[1], GLASS_CROP[0] + GLASS_CROP[2] - 1, GLASS_CROP[1] + GLASS_CROP[3] - 1 };
-    frame = glass_frame(&G);  // at rest, until she wakes
+    art_dsc.data = eugenia_rgb565_start;
 
     lv_obj_t *screen = lv_screen_active();
     lv_obj_set_style_bg_color(screen, lv_color_black(), 0);
     lv_obj_remove_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
 
     card = plain(screen);
-    lv_obj_add_event_cb(card, draw_face, LV_EVENT_DRAW_MAIN, NULL);
+    lv_obj_t *art = lv_image_create(card);
+    lv_image_set_src(art, &art_dsc);
+    lv_obj_remove_flag(art, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(plain(card), draw_face, LV_EVENT_DRAW_MAIN, NULL);
     lv_obj_add_flag(card, LV_OBJ_FLAG_HIDDEN);
     night = plain(screen);
     lv_obj_add_event_cb(night, draw_night, LV_EVENT_DRAW_MAIN, NULL);
     lv_obj_add_flag(night, LV_OBJ_FLAG_HIDDEN);
 
-    lv_display_t *display = lv_display_get_default();
-    lv_display_add_event_cb(display, on_render, LV_EVENT_RENDER_START, NULL);
-    lv_display_add_event_cb(display, on_render, LV_EVENT_RENDER_READY, NULL);
-
     // Started on the sleep screen, her face never shows.
-    uint32_t now = lv_tick_get();
     dark = mode == FACE_DARK;
     wander();
-    if (!dark) wake(now);
     lv_obj_remove_flag(dark ? night : card, LV_OBJ_FLAG_HIDDEN);
 
+    uint32_t now = lv_tick_get();
     next_blink = now + 400;
     next_glance = now + 1500;
-    glint_next = now + GLINT_EVERY_MS;
     lv_timer_create(tick, FACE_FRAME_MS, NULL);
 }

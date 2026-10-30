@@ -16,8 +16,7 @@ CONFIG_SPIRAM_XIP_FROM_PSRAM=y
 CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y
 # Waveshare's example takes 64 KB of data cache; the cache is carved from the
 # same internal SRAM as the heap, and the screen and Wi-Fi do not fit beside
-# that much. 32 KB gives the other 32 back; her frame times in the serial log
-# say what it costs her drawing.
+# that much. 32 KB gives the other 32 back.
 CONFIG_ESP32S3_DATA_CACHE_32KB=y
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
@@ -61,6 +60,17 @@ CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=8
 # Her task's stack in PSRAM (main.c): ESP-IDF's external-RAM guide allows a
 # stack there with this option, given through xTaskCreateStatic.
 CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM=y
+
+# Her voice streams in at 48 KB a second. lwIP's default window, 5.7 KB, lets
+# that through only on a round trip under 120 ms, which a home network to her
+# door does not always make: her voice came slower than it plays, and broke.
+# A window of 64 KB is over a second of her voice in flight, held in PSRAM
+# with the dynamic receive buffers behind it, as above.
+CONFIG_LWIP_TCP_WND_DEFAULT=65534
+CONFIG_LWIP_TCP_SND_BUF_DEFAULT=65534
+CONFIG_LWIP_TCP_RECVMBOX_SIZE=64
+CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=64
+CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=64
 
 # An update that never reaches her Wi-Fi is rolled back by the bootloader.
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y

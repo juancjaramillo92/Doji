@@ -10,19 +10,11 @@
 #define FACING    0.4f
 #define STILL     0.15f
 
-/* Readings too: how flat is lying on a table — the share of gravity through
-   the screen — and how little two readings may differ for her to be lying
-   there rather than in a hand, which never holds that still. */
-#define FLAT      0.97f
+/* A reading too: how little two readings may differ for her to be lying
+   somewhere rather than in a hand, which never holds that still. Stillness
+   alone, at any angle: on a table she sits propped on her keyring and her
+   case, tilted further than any test of flatness could allow for. */
 #define RESTING   0.01f
-
-/* Readings too: which way the sensor's x and y axes point across the screen
-   (+1, toward its right and its top), and how far two readings a moment
-   apart must part to be a jolt rather than a hand, and to be a full one. */
-#define SCREEN_X  1
-#define SCREEN_Y  1
-#define JOLT_FROM 0.5f
-#define JOLT_FULL 1.5f
 
 static float moved(const float a[3], const float b[3]) {
     float m = 0;
@@ -36,21 +28,7 @@ bool lift_seen(const float first[3], const float second[3]) {
 
 lift_hold_t lift_hold(const float before[3], const float now[3]) {
     float z = SCREEN_Z * now[2];
-    bool lying = fabsf(z) >= FLAT && moved(before, now) <= RESTING;
+    bool lying = moved(before, now) <= RESTING;
     if (lying || z <= -FACING) return LIFT_DOWN;
     return z >= FACING ? LIFT_HELD : LIFT_ELSE;
-}
-
-void lift_up(const float g[3], float up[2]) {
-    // The sensor reads the push that holds her up, so it points up. Across
-    // the screen that is toward its right and its top, and the screen's y
-    // runs down.
-    up[0] = SCREEN_X * g[0];
-    up[1] = -SCREEN_Y * g[1];
-    float len = hypotf(up[0], up[1]);
-    if (len > 1) { up[0] /= len; up[1] /= len; }
-}
-
-float lift_jolt(const float before[3], const float now[3]) {
-    return fminf(1, fmaxf(0, (moved(before, now) - JOLT_FROM) / (JOLT_FULL - JOLT_FROM)));
 }

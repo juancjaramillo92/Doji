@@ -15,8 +15,8 @@
    before a waiting briefing, which is read after her answer however she is
    held. Between turns she feels about once a second whether she is held up
    to look, which keeps her awake, or has been put down, which puts her to
-   sleep a couple of seconds later; otherwise AWAKE_MS without a press does:
-   her eyes close and the chip stops (sleep.c). Held up and quiet for
+   sleep DOWN_MS later; a finger on the screen counts as held; otherwise
+   AWAKE_MS without a press does: her eyes close and the chip stops (sleep.c). Held up and quiet for
    QUIET_MS, the conversation is over, and a waiting trade's questions come up
    from the dark her eyes close to; put down, she sleeps with the trade under
    its ring. PWR closes the questions for her, the trade waiting again. Lifting her to look wakes her
@@ -77,7 +77,7 @@ static const char *TAG = "charm";
 #define EARLY_S       5      // how early a timer may wake her and still be the errand's
 #define OFFLINE_TRY_MS 8000  // woken offline, how long the network has to answer
 #define LOOK_MS       1000   // awake and idle, how often she feels whether she is held
-#define DOWN_READS    2      // put down this many readings running, she sleeps
+#define DOWN_MS       8000   // put down this long, and nothing playing, she sleeps
 #define QUIET_MS      8000   // held up and quiet this long after her last word, the conversation is over
 
 // What waits, whether the internet answered last time and how many errands
@@ -89,14 +89,15 @@ static RTC_DATA_ATTR time_t errand_at;
 
 static esp_sleep_wakeup_cause_t woke;
 static bool lit;
+static volatile uint32_t touches;  // every press and slide on the screen, counted
 
-// A slide round the rim is the volume, and a tap inside it is on her face; a
-// tap on a question is the journal's.
+// A slide round the rim is the volume; a tap on a question is the journal's.
 static void on_touch(lv_event_t *e) {
     lv_event_code_t code = lv_event_get_code(e);
     lv_point_t at;
     lv_indev_get_point(lv_indev_active(), &at);
-    if (code == LV_EVENT_PRESSED && !dial_press(at)) face_tap();
+    touches++;
+    if (code == LV_EVENT_PRESSED) dial_press(at);
     if (code == LV_EVENT_PRESSING) dial_slide(at);
     if (code == LV_EVENT_RELEASED) dial_lift();
 }
@@ -268,22 +269,24 @@ static bool exchange(void) {
 
 /* Between turns, how the conversation goes on or ends: PWR, and he talks
    again; with a trade waiting, held up to look and quiet QUIET_MS since she
-   finished, and the conversation is over with him looking; put down
-   DOWN_READS readings running, or AWAKE_MS since she was last held up, and he
-   has gone. */
+   finished, and the conversation is over with him looking; put down for
+   DOWN_MS since she finished, or AWAKE_MS since she was last held up, and he
+   has gone. A finger on the screen is held, and never put down. */
 typedef enum { NEXT_TURN, OVER_LOOKING, OVER_AWAY } between_t;
 
 static between_t between_turns(bool trade) {
-    TickType_t finished = xTaskGetTickCount(), looked = finished;
-    int down = 0;
+    TickType_t finished = xTaskGetTickCount(), looked = finished, up = finished;
+    uint32_t counted = touches;
     for (;;) {
         if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(LOOK_MS))) return NEXT_TURN;
         lift_hold_t hold = motion_hold();
         TickType_t now = xTaskGetTickCount();
-        if (hold == LIFT_HELD) looked = now;
+        bool touched = touches != counted;
+        counted = touches;
+        if (hold == LIFT_HELD || touched) looked = now;
+        if (hold != LIFT_DOWN || touched) up = now;
         if (trade && hold == LIFT_HELD && now - finished >= pdMS_TO_TICKS(QUIET_MS)) return OVER_LOOKING;
-        down = hold == LIFT_DOWN ? down + 1 : 0;
-        if (down == DOWN_READS || now - looked >= pdMS_TO_TICKS(AWAKE_MS)) return OVER_AWAY;
+        if (now - up >= pdMS_TO_TICKS(DOWN_MS) || now - looked >= pdMS_TO_TICKS(AWAKE_MS)) return OVER_AWAY;
     }
 }
 
@@ -306,7 +309,6 @@ static void awake(void) {
     static const lv_event_code_t codes[] = { LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED };
     for (size_t i = 0; i < sizeof codes / sizeof *codes; i++) lv_obj_add_event_cb(screen, on_touch, codes[i], NULL);
     bsp_display_unlock();
-    motion_follow();
 
     sound_start();
     sound_volume(cfg.volume);
