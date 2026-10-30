@@ -99,6 +99,7 @@ scripts/calibrate.mjs                   whether her map finds the levels he trad
 scripts/replay.mjs                      what her calls would have done on past mornings, by hand
 test/                                   node:test suites — see Tests
 .github/workflows/test.yml              runs the suite on every push, and says when the eval is owed
+.github/workflows/database.yml          runs the database suite on a push that touches what it reads
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
 .github/workflows/backup.yml            the daily copy of the tables nothing else holds
 .github/workflows/health.yml            the hourly outside check; a failed run is the alarm
@@ -448,6 +449,8 @@ single-sourced at run time:
 | the **columns of `eugenia_runs`** | the table, the object literals `recordRun` is called with, and the `verify.sql` row on the cache-write columns |
 | **which rules a row can answer** | §7's `Evaluable` column, the twelve predicates in `adherence.ts`, and the lists and counts in `check_rules`' description, the prompt and the paragraph below |
 | the **caller a delivered briefing writes** | the `` `${due} briefing delivered` `` template in `postBriefing`, the `Brief` union, and `pace_line`'s `owed \|\| ' briefing delivered'` |
+| **what the database suite reads** | the files `test/db` reads, its script in `package.json` and its own workflow, and the `paths` `database.yml` runs on |
+| the **briefing's budgets** | the words, their ceiling and the count of numbers, in `SYSTEM` and in `CRITIC`, and as this README gives them |
 | the **number of scheduled jobs** | the `cron.schedule` calls in `schema.sql` and the count `verify.sql` asserts |
 | a **long door's deadline** | `DOOR_MS` in `doji-tradingview` and `READ_MS` in `doji-eugenia`, ten seconds apart for the boot, the sign-in and the wire |
 | the **paid worker wall clock** | `ceiling_ms` in `pace_line` and the sentence in `CLAUDE.md` on why the cron half answers first; its three-quarter share, `speak_at` in `pace_line` and `TURN_MS` in `doji-eugenia`; `WRITER_MS` beneath it |
@@ -1147,6 +1150,17 @@ than reading it. TradingView serves neither daily open interest nor COMEX vault
 stocks, and CME's site refuses automated reads, so the weekly CFTC count is the
 open interest she has.
 
+**`?alerts=1` is his active price alerts** — the levels he marks in TradingView,
+folded by `foldAlerts` to the level, the symbol, the condition, when he set it
+and when it last fired; an alert on an indicator has no price and says so. A
+conversation reads it through `get_alerts`, live rather than from a copy, since
+an alert is set the minute before he talks a setup through and a copy fifteen
+minutes old would miss it — one of TradingView's daily calls each time she asks.
+`alertsList` puts them highest first, as a chart reads them, and she judges each
+against her map. The message he writes on an alert is not in the list; it is in
+the fire log, which is permitted and probed but not yet read.
+`test/fixtures/tradingview-alerts.json` is the 29 October capture, two alerts.
+
 **A refusal can arrive marked as success.** The quote batch's 429 came inside a
 result marked `isError: false`, with `success: false` in the payload. `unwrap`
 checks both and reads `structuredContent` rather than the duplicate text block.
@@ -1170,6 +1184,7 @@ failure is its own answer:
 | `quotes` | whether the quote batch answers for the dollar, the yields at home and abroad, the real yield, the breakeven, silver, oil, the S&P, the VIX and GVZ with no forex symbol in it (the euro and the yuan are left out) — it refused twice with the forex scanner's 429, taking the whole batch with it — and each one's last bars from the OHLCV read, which answered where the batch did not, with the bar times saying how fresh each feed is |
 | `gold` | the broker's quote through the poller and TradingView's gold feeds read in the same second, plus the last three one-minute bars, which say how stale a TradingView quote is |
 | `news` | headlines for gold and the dollar, and what one carries |
+| `alerts` | his active alerts, and the last week of their firing with the message he wrote on each — the two alert reads the listing marks read-only. The list's 29 October answer is what `?alerts=1` folds; the log had fired nothing, so it is not read until a fired alert has been captured |
 | `econ` | which US price and money series exist, the actual releases a calendar entry would be judged against |
 | `search` | the names gold's feeds and a real yield go by, for whatever `quotes` could not resolve |
 | `fedfunds` | whether thirty-day fed funds futures answer, under the continuous names (`ZQ1!` to `ZQ3!`) and under named contract months, and what a bar of them carries — the price `?rates=1` works the meeting odds out from |
@@ -1416,13 +1431,20 @@ changed the bigger story. The live quote is still handed in, for knowing where
 gold stands rather than for opening on. Her map of his charts is handed in
 for her call and nothing else.
 
-Five slots: **where the big picture stands** — the Fed's path, the dollar's
-trend, inflation, central-bank buying, and which of them moved — in two or three
-sentences with the conclusion first, or one saying none did; **why that matters
-for gold**, walked link by link, one sentence per step; the calendar; one context
-line on the same scale; one thing worth noticing. Numbered sections with
-headings are a report whatever the vocabulary inside them, which is why there
-are none.
+**Four lines, because he asked for four.** On 26 October he said the briefings
+were not helping: they reached him when he was not trading, and he asked for
+something much simpler with the working done behind it. So: **where the big
+picture stands and which way it leans** — the Fed's path, the dollar's trend,
+inflation, central-bank buying, her read on them and what would prove it wrong —
+in one or two sentences; **why, in one line**, the one force and the one fact
+that shows it, with no chain; the calendar; her call. Nothing beside them but a
+verdict on a closed trade that broke a rule. The teaching moved to where he is
+listening — a conversation, above all one before a trade — and what she worked
+out and left out is what she answers from when he asks. His note alone did not
+do it: the writer obeyed and the critic, told to complete the chain, put 160 to
+240 characters back on 27 and 28 October; both copies now state the shape.
+Numbered sections with headings are a report whatever the vocabulary inside
+them, which is why there are none.
 
 **The calendar is the one place the prose rule is relaxed** — a plain `Today:`
 label and one line per item, times in ET, one fact each, on weekdays only. It is
@@ -1435,29 +1457,29 @@ it, and `CRITIC` takes a lower-rated line off the list, since it runs last. The
 list holds times and names, `NAMED AND NOTHING MORE`: no mechanism goes in it,
 because that slot is where a second chain hides.
 
-**On Sunday the briefing is about the week it opens** (`weekBlock`). It files the
-whole week first (`filedWeek`, the nightly pass's own filing) and is handed every
-US release TradingView rates high for the seven days ahead, and from abroad the
-central banks' decisions and headline inflation, in place of the rolling
-calendar — high only, since seven days of medium is a page and none of it moves
-gold alone. The first paragraph is where the story stands as the market opens,
-and the teaching block walks the release most likely to move it. **The week is
-told, not listed**: there is no calendar slot on Sunday. The release that carries
-the week is named with its day, and the rest is a sentence or two on which force
-the week tests and what it could change; the calendar is on his own screen, and
-each weekday morning lists that day's high-rated releases with their times. `CRITIC` holds
-the same rule, since it runs last.
+**On Sunday the briefing is about the week it opens** (`weekBlock`). It files
+the whole week first (`filedWeek`, the nightly pass's own filing) and is handed
+every US release TradingView rates high for the seven days ahead, and from
+abroad the central banks' decisions and headline inflation, in place of the
+rolling calendar — high only, since seven days of medium is a page and none of
+it moves gold alone. The first line is where the story stands as the market
+opens, and the why is the release most likely to move it. **The week is told,
+not listed**: there is no calendar slot on Sunday. The release that carries the
+week is named with its day, and one sentence says which force the week tests;
+the calendar is on his own screen, and each weekday morning lists that day's
+high-rated releases with their times. `CRITIC` holds the same rule, since it
+runs last.
 
 **Length is a rule, and what makes it safe is what sits beside it.** A ceiling
-with nothing saying what to lose cuts the teaching block, the longest thing on
-the page — and with channels at `unseen`, where §0 says build the term before
-using it, that is the part that matters. So the budget is 250–300 words, less on
-a day the picture did not move, 400 at the outside, and beside it a fixed order of what comes out: numbers he cannot act
-on, then levels he can read off his own screen, then any market sentence that
-could have been written on any morning. **Never the teaching block and never an
-event.** Still over means the briefing is about too many things. Four thousand
-characters is the separate mechanical bound, Telegram's. `agree.test.mjs` reads
-both the writer's copy and the critic's for the count **and** the protection.
+with nothing saying what to lose cuts whatever is longest on the page, which was
+once the teaching, every morning. So the budget is 80–120 words, less on a day
+the picture did not move, 150 at the outside, and beside it a fixed order of what
+comes out: numbers he cannot act on, then levels he can read off his own screen,
+then any sentence that is not one of the four lines. **Never the read or its
+test, never an event, never the call, never a verdict.** Still over means the
+briefing is about too many things. Four thousand characters is the separate
+mechanical bound, Telegram's. `agree.test.mjs` reads both the writer's copy and
+the critic's for the count **and** the protection.
 
 **The writing rules bound a sentence, not only a word.** Plain words alone still
 read as hard when one sentence carries three ideas. The rules, in `WRITING`:
@@ -1481,8 +1503,8 @@ read as hard when one sentence carries three ideas. The rules, in `WRITING`:
   of them. `CRITIC` and `TRIM` each COUNT this, and every em-dash, as
   their last step rather than reading for it among the rest.
 - **A number earns its place** by meaning something he can use; the briefing
-  holds two to four, one budget the writer and `CRITIC` both state and a test
-  holds equal.
+  holds one or two beside the call's levels and the calendar's times, one budget
+  the writer and `CRITIC` both state and a test holds equal.
 
 **The judgement rules carry worked examples.** The countable rules landed at once
 — a first briefing with no sentence over twenty words — while the same message
@@ -1501,21 +1523,23 @@ it: `WRITING` asks for the accents and the ñ, since the voice stresses off the
 spelling, and `TTS_STYLE` asks for native Latin American Spanish at speed, as
 code-switching in both directions, so no Spanish accent leaks onto the English.
 
-**She teaches, and that is a rule about depth rather than length.** The day's one
-thing is stated as a chain — *hot inflation, so the Fed waits, so the gap between
-rates and inflation widens, so gold is a harder sell* — because a cause named with
-no chain under it is something to memorise rather than understand. **One chain
-per briefing**: every scheduled thing still gets named, but only one gets its
-mechanism walked. A term explained this week is **used** the next time rather
-than redefined; a simplification is signposted in a clause (*that is the clean
-version*); and what he has shown he understands is recorded, since it is the
-only thing that says what **not** to explain.
+**She teaches, and that is a rule about depth rather than length.** A mechanism
+is stated as a chain — *hot inflation, so the Fed waits, so the gap between
+rates and inflation widens, so gold is a harder sell* — because a cause named
+with no chain under it is something to memorise rather than understand. **The
+chain lives in a conversation, not the briefing**: the briefing names its one
+force in one line, builds no term at any rung, and leaves the walk to when he
+asks or a trade he brings turns on it. A term explained this week is **used**
+the next time rather than redefined; a simplification is signposted in a clause
+(*that is the clean version*); and what he has shown he understands is recorded,
+since it is the only thing that says what **not** to explain.
 
 **One chain is exempt from the rung, the one under everything else.** Gold pays
 no interest, so it competes with what a bond pays once inflation is taken out.
 `PITCH` says a channel at `owns` gets its term bare — right for every term but
-this, which sits under nearly every briefing. Writer and critic are both told,
-the critic especially, since it decides what counts as a repetition.
+this, which sits under nearly every read. Writer and critic are both told, and
+in the briefing's one line of why it is said in plain words whenever it carries
+the argument.
 
 **She remembers yesterday.** The briefing reads the last twelve turns, so it
 opens with how yesterday's print landed rather than from nothing. What is stored
@@ -1665,7 +1689,7 @@ and `TRIM` holds the reply to no short length: a plan checked against his rules
 can be nine findings long.
 
 `TRIM` is **not `CRITIC` with a shorter prompt**. The briefing's checks — a first
-sentence true only today, a complete chain, one chain only, 250–300 words —
+sentence true only today, four lines, one line of why, 80–120 words —
 would ruin three sentences. `TRIM` asks the writing questions alone, off the same
 `WRITING` the writer was given; it gets no notes and no channel map, since it is
 not judging whether a term was built, but **is** handed what you have on now,
@@ -1813,13 +1837,14 @@ a sweep re-entry follows a close, and he trades one entry at a time.
 The briefing is researched and written in one generation, and its quality target
 lives on the far side of a model call. So `CRITIC` reads it once more before it
 goes, at `medium` effort with no tools: does the first sentence say where the
-big picture stands today, is a term built at a rung that no longer needs it, is
-a link missing from the chain, is there a forward call, is it inside the budget,
-does it obey his standing instructions. It returns the briefing, not notes about it.
+big picture stands today, is it the four lines, is a term built or a chain
+walked where one line of why belongs, is there a forward call, is it inside the
+budget, does it obey his standing instructions. It returns the briefing, not
+notes about it.
 
 **It is handed his notes and the channel map, because two of those checks read
-them.** Without the map, the mechanism sitting in the paragraph reads as a
-redefinition, and the build-up `PITCH` required is cut — last, fluently.
+them.** The map says how a term is said — plain words below `used`, the short
+name at `used` and `owns` — and the notes outrank the shape.
 
 **It takes out a print tied to a position he opened that session.** That is
 R-20's caution, his to weigh, and the calendar already names the print; on 15
@@ -1879,16 +1904,25 @@ charm.
 
 **The voice note is the message, and the text is the fallback.** Both together
 were two notifications for one thing she said. But an unset key, a refusing
-vendor or a format Telegram will not render would make audio alone a
-**missing** message, so `say()` fires whenever the audio did not land — in full,
-since three quarters heard is worse than either. That ordering lives once, in
+vendor or a format Telegram will not render would make audio alone a **missing**
+message, so `say()` fires whenever the audio did not land — in full, since three
+quarters heard is worse than either. That ordering lives once, in
 **`sayAloud`**, and a test reads it and counts the call sites; `fold.test.mjs`
-**drives** it, since with no TTS key every `speak()` answers false, exactly as a
-refusing vendor does. **What is stored is untouched**: `remember()` writes the
-transcript whatever happened on the wire. The briefing's keyboard rides on the
-last voice note.
+**drives** it, since with no TTS key every `speak()` answers why it could not,
+exactly as a refusing vendor does. **What is stored is untouched**: `remember()`
+writes the transcript whatever happened on the wire. **And it is written before
+it is spoken**, on every path that both stores and speaks: speaking can take
+minutes, and on 26 October *No reply?*, sent while the answer was still being
+spoken, read a history without it and was answered as something else. A failed
+write still costs only the history, with the apology after the message;
+`agree.test.mjs` holds the order for every censused path and `fold.test.mjs`
+drives it through the trade look. The briefing's keyboard rides on the last
+voice note. **While she speaks, Telegram shows her recording**, sent again every
+few seconds and stopped before the text can go, as typing is shown while she
+writes: on 27 October the voice took two and a half minutes with nothing on his
+screen, and he asked whether she had answered.
 
-**There is no length cap.** A briefing is 250–400 words by its own rule, and a
+**There is no length cap.** A briefing is 80–150 words by its own rule, and a
 cap decides that past some length a message is not worth hearing. A long message
 becomes *several* voice notes, split by `chunk()` with its paragraph preference
 so each part is a whole thought; the only number is what the vendor accepts per
@@ -1908,11 +1942,13 @@ reached him — today's only.
 **Every request in `speak()` carries a budget, and a failed part gets a second
 attempt.** The budget covers the whole message: **`SPEAK_MS`**, 150 seconds, on
 paths that write and speak in one worker; **`SPEAK_WORKER_MS`**, 330 seconds, on
-the speaking worker. **`ATTEMPT_MS`** bounds each attempt at 150 seconds — a
-stall is one request, the next a fresh connection — so on the speaking worker a
-stall costs an attempt rather than the voice. A part that has not landed when
-the budget runs out fails like any other, and the full text goes. The Telegram
-upload carries the budget too.
+the speaking worker. **Each attempt gets half the budget** — a stall is one
+request, the next a fresh connection — so on every path a stall costs an attempt
+rather than the voice. The stalls of 26 and 27 October each held one request for
+the whole 150 seconds, where every voice note that landed that week took 5 to 30
+seconds and the slowest 90. A part that has not landed when the budget runs out
+fails like any other, and the full text goes. The Telegram upload carries the
+budget too.
 
 **The markdown is stripped on the way to the vendor.** No parse mode is sent, so
 she is asked for plain text, but the calendar slot is where a model writes a
@@ -2645,15 +2681,18 @@ never switches into the third person about him. A failed channel read costs the
 whole reply rather than being swallowed: an audit that silently omits half of
 what it audits is the defect it exists to prevent.
 
-**A note can be retired.** Every note reaches her with its number, and `remember`
-takes an optional `supersedes`, so a correction names what it replaces — or
-several, when one line merges notes that already said the same thing; every id
-the write could not retire is named back to her. **The filter is the whole
-feature and fails silently**: without `superseded_by is null`
-on the read she is handed the correction *and* the thing it corrected, every
-turn. The column, the filter and the tool parameter are held together by a test.
-The row itself stays — findable by search and marked no longer true — and there
-is no delete path.
+**A note can be retired.** Every note reaches her with its number, and
+`remember` takes an optional `supersedes`, so a correction names what it
+replaces — or several, when one line merges notes that already said the same
+thing; every id the write could not retire is named back to her. **The filter is
+the whole feature and fails silently**: without `superseded_by is null` on the
+read she is handed the correction *and* the thing it corrected, every turn. The
+column, the filter and the tool parameter are held together by a test. The row
+itself stays — findable by search and marked no longer true — and there is no
+delete path. **A note cut at its ceiling is written again at once**, whatever
+its kind: `remember` keeps it cut, quotes it, and hands back its id for the
+rewrite to supersede. A fact was once told *shorter next time*, and note 37
+stayed cut mid-sentence in her window until he found it on 28 October.
 
 **She can search everything she ever said.** The windows are the newest slice of
 two append-only tables, and `search_memory` reaches the rest on demand rather
@@ -2710,10 +2749,13 @@ the most it may ever be, it usually sits tighter off the chart, and it moves onl
 outward to break-even or inward under R-19. A loss further than $20 can only be a
 widened stop; a $10 stop closed $18 out passes the cap, and `trade_stops` says
 which it was. A sighting further from entry than the stop that rested before it
-fails R-02, win or loss; an exit past a stop that never moved is slippage and
-passes; one pulled and never put back is `unknown`. Only a trade the poller
-recorded has that history, so a clean R-02 means no stop went past $20 and none
-was widened where one was watched — never that every stop was respected.
+fails R-02, win or loss, and so does one more than $20 from entry — the cap
+broken where it was set, which the exit of a winning trade cannot show (v1.29,
+after a $22 stop won its target on 27 October); an exit past a stop that never
+moved is slippage and passes; one pulled and never put back is `unknown`. Only a
+trade the poller recorded has that history, so a clean R-02 means no stop went
+past $20 and none was widened where one was watched — never that every stop was
+respected.
 
 **R-10 and R-11** — one position at a time; the day ends at −4% of the account —
 come out of broker columns alone: overlapping entry-to-fill spans, and cumulative
@@ -2834,7 +2876,13 @@ poller's `?structure=1`, stored as the folded map (*Her map of his charts*).
 While the market is shut they are folded once: the first pass after the close,
 which has Friday's daily bar closed, folds the finished week, and the rest skip
 on a copy read after it — by Saturday morning the 5m chart's twelve hours held
-no bar, and every pass metered it as unread.
+no bar, and every pass metered it as unread. **And the hour after the Sunday
+open keeps that copy until a new bar prints**: the broker's first bar comes
+after the 17:00 open, so the 15m and 5m charts read empty and the rest end where
+the week did. While nothing served is newer than the finished week's map, the
+map stands and nothing is metered — on 25 October four passes, 17:05 to 17:50,
+had replaced it with one missing its entry charts and written four unread rows.
+The first new bar is a read like any other.
 
 **Each door reads three charts at a time, inside `DOOR_MS`, 35 seconds.** One by
 one, fourteen did not fit at a slow morning's pace; all at once is the burst
@@ -2891,12 +2939,16 @@ Each briefing adds rows of its own, apart from the model calls so *the critic
 costs more than it is worth* and *the briefing is drifting long* stay separate
 questions: `<brief> briefing written` (`stored in 1s, handed to the speaking
 worker`, with its total `ms`) and `<brief> briefing delivered`, carrying the
-length he received and how it went out (`spoken in 19s`, or `sent as text`). A
-manual `?force=1` answers `accepted`, so the delivered row is where its length is
-read. **A reply writes `reply delivered` the same way** — its length, and
-`spoken` or `sent as text` off what `sayAloud` answered — since on 18 October a
-reply stored as spoken never reached him and nothing could say how it had gone
-out. `spoken` means Telegram accepted the voice note, not that it played.
+length he received and how it went out (`spoken in 19s`, or `sent as text (…)
+in 150s`). A manual `?force=1` answers `accepted`, so the delivered row is where
+its length is read. **A reply writes `reply delivered` the same way** — its
+length, and how it went out, which is what `sayAloud` answers — since on 18
+October a reply stored as spoken never reached him and nothing could say how it
+had gone out. `spoken` means Telegram accepted the voice note, not that it
+played. **Where the voice failed the row says why** — `sent as text (speech HTTP
+503)`, or `spoken on a second try (…)` when the retry landed: the reason was a
+console line alone, and the two stalls of 26 and 27 October had outlived the
+logs before anyone asked what stalled.
 
 **Three nightly meters write rows, both outcomes.** Her calls' scoring writes
 `caller: 'calls'`, since a broker door that stopped answering leaves every call
@@ -3882,7 +3934,13 @@ green is the tree everyone gets — and the same suite gates the function deploy
 The suites run on every push through `.github/workflows/test.yml`. The script
 globs `test/*.test.mjs` one level deep, so a test in a subfolder would silently
 not run — `test/db` is the one subfolder, on purpose, with its own command and
-its own CI job, and `agree.test.mjs` holds that both still name it.
+its own workflow, `database.yml`, and `agree.test.mjs` holds that both still
+name it. **That workflow runs only on a push that touches what the suite
+reads**: each job is billed by the minute rounded up, it ran on every push, and
+in October two pushes in three changed nothing it reads. What it reads is
+derived from the suite and held against the workflow's `paths`, so an input left
+off is a red test rather than a check skipped under a green tick. A merge into
+main carries the whole branch's diff, so a schema change is always run there.
 
 **Whether she still behaves is `scripts/eval.mjs`, run by hand.** Every rule
 that matters most about her is a sentence, and no suite can say whether the
@@ -3936,16 +3994,16 @@ it before it is merged.
 on every change to the function is one nobody reads.
 
 **`npm run test:db` needs a Postgres server with pgvector, of the major version
-Supabase runs** — named once, in `test.yml`'s `PGCLUSTER`, and asserted by the
-suite, so a Supabase upgrade is that one value changed — reached through the
-standard `PG*` variables as a superuser, so `npm test` keeps needing
-Node alone. It builds a throwaway database from `test/db/supabase.sql` — stand-ins
-for `auth`, `vault`, `pg_net`, `pg_cron` and the API roles, which record rather
-than send — and `schema.sql`. Text cannot see what it sees: Postgres resolves a
+Supabase runs** — named once, in `database.yml`'s `PGCLUSTER`, and asserted by
+the suite, so a Supabase upgrade is that one value changed — reached through the
+standard `PG*` variables as a superuser, so `npm test` keeps needing Node alone.
+It builds a throwaway database from `test/db/supabase.sql` — stand-ins for
+`auth`, `vault`, `pg_net`, `pg_cron` and the API roles, which record rather than
+send — and `schema.sql`. Text cannot see what it sees: Postgres resolves a
 PL/pgSQL body only on its first call, inside the write that fired it, so a
-one-letter typo in a trigger passes every other suite and fails every insert.
-In CI, the job installs that version and pgvector from PostgreSQL's own
-repository, since the runner carries an older one.
+one-letter typo in a trigger passes every other suite and fails every insert. In
+CI, the job installs that version and pgvector from PostgreSQL's own repository,
+since the runner carries an older one.
 
 **Every `uses:` in the workflows names a commit, never a tag.** A tag can be
 repointed between runs, so the action audited is not the action that runs;

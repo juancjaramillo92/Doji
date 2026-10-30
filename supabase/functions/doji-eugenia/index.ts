@@ -509,8 +509,9 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
   // An unrecognised kind takes the quieter branch.
   const k = (NOTE_KINDS as readonly string[]).includes(String(kind)) ? String(kind) : 'fact';
   const kept = text.slice(0, NOTE_MAX);
+  const cut = kept.length < text.length;
 
-  // Only a retirement needs the new row back; an unread body holds its
+  // Only a retirement or a cut needs the new row back; an unread body holds its
   // connection open. Several ids is a merge; a lone number is taken too, since
   // this is where the model's arguments enter.
   const old = [supersedes ?? []].flat().map(n => Math.trunc(Number(n)))
@@ -522,15 +523,15 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
     // write; caught, because a lost vector must never read as a lost note.
     const [vec] = await embed([kept]).catch(() => null) ?? [];
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_notes`, {
-      method: "POST", headers: sbHeaders(retiring ? "return=representation" : "return=minimal"),
+      method: "POST", headers: sbHeaders(retiring || cut ? "return=representation" : "return=minimal"),
       body: JSON.stringify([{ note: kept, kind: k, ...(vec ? { embedding: vec } : {}) }]),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const [row] = retiring || cut ? await res.json() : [];
 
     // The new note is written before the old one is retired: a failed
     // retirement leaves two live notes, recoverably, never neither.
     if (retiring) {
-      const [row] = await res.json();
       const done = await fetch(
         `${SB_URL}/rest/v1/eugenia_notes?id=in.(${old.join(',')})&superseded_by=is.null`, {
           method: "PATCH", headers: sbHeaders("return=representation"),
@@ -547,11 +548,13 @@ async function writeNote(note: unknown, kind: unknown, supersedes: unknown): Pro
       }
     }
 
-    if (kept.length < text.length) {
-      return `Kept, but cut at ${NOTE_MAX} characters: "${kept}". ` +
-             (k !== 'fact'
-               ? 'Say it back to him shorter and check that is still what he meant.'
-               : 'Write it shorter next time.');
+    /* Written again now, every kind: "shorter next time" left a fact cut
+       mid-sentence in her window until he found it, note 37 on 28 October. Its
+       id is handed back so the rewrite retires it. */
+    if (cut) {
+      return `Kept, but cut at ${NOTE_MAX} characters: "${kept}". Write it again now, shorter, ` +
+             `with supersedes ${row.id} so the cut one is retired` +
+             (k !== 'fact' ? ', and say it back to him to check it is still what he meant.' : '.');
     }
     return "Remembered.";
   } catch (err) {
@@ -1176,6 +1179,22 @@ const STRUCTURE_TOOL = {
     "his level when he has sent no chart, and before filing a call, whose levels come off it. It is " +
     "your map, computed the same way every time, and not his. Every figure in it has already " +
     "printed; like get_market, it says nothing about where price goes next.",
+  input_schema: { type: "object", properties: {}, additionalProperties: false },
+} as const;
+
+/* His levels, as he marks them: price alerts in TradingView. Read live when
+   she asks, unlike the market's copy — an alert is set the minute before he
+   talks a setup through, and a copy fifteen minutes old would miss it. */
+const ALERTS_TOOL = {
+  name: "get_alerts",
+  description:
+    "The price alerts he has active in TradingView: each level, the symbol, how it " +
+    "triggers, when he set it and whether it has fired. They are the levels he marks " +
+    "for a setup, so read them when he talks one through or mentions his alerts, and " +
+    "judge each against your map — at the edge of the range or inside it, and so which " +
+    "of his setups it is. The message he writes on an alert is not in what is served. " +
+    "They are his levels, never a call of yours; like get_market, they say nothing " +
+    "about where price goes next.",
   input_schema: { type: "object", properties: {}, additionalProperties: false },
 } as const;
 
@@ -1943,6 +1962,7 @@ const CHAT_TOOLS = [
   LOOP_TOOL,
   CALL_TOOL,
   RELEASES_TOOL,
+  ALERTS_TOOL,
 ];
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, PORTRAIT_TOOL, CLOSE_TOOL,
                            RECORD_TOOL, EXPLAIN_TOOL, CHECK_TOOL, STATS_TOOL];
@@ -2080,6 +2100,7 @@ export async function serve(name: string, input: any): Promise<string> {
       return (await Promise.all([aroundBlock(), ratesBlock(), headlinesBlock(),
                                  positioningBlock(), flowsBlock(), volumeBlock()])).join("").trim();
     case STRUCTURE_TOOL.name: return (await structureBlock()).trim();
+    case ALERTS_TOOL.name:   return (await alertsBlock()).trim();
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
     case PORTRAIT_TOOL.name: return await setPortrait(input.portrait);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
@@ -2476,11 +2497,6 @@ const TTS_SPEED = 1.3;
 const SPEAK_MS = 150_000;
 const SPEAK_WORKER_MS = 330_000;
 
-/* A part that does not land gets one more attempt, each bounded: a stall is
-   one request, and the next is a fresh connection. On SPEAK_MS only a quick
-   refusal gets its second try. */
-const ATTEMPT_MS = 150_000;
-
 /* One reading of her words. How she sounds is this request, whoever is
    listening; only the format is the listener's. */
 function reading(words: string, format: string, signal: AbortSignal): Promise<Response> {
@@ -2499,12 +2515,12 @@ function reading(words: string, format: string, signal: AbortSignal): Promise<Re
   });
 }
 
-/* Never throws and never messages him: any failure answers false and the text
-   goes instead. Its own fetch, sendVoice being multipart. Ogg/opus, because the
-   default mp3 works and arrives as a file attachment rather than a voice note,
-   with nothing erroring. */
-async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Promise<boolean> {
-  if (!TTS_KEY) return false;
+/* Never throws and never messages him: any failure answers why, null is a
+   voice note that landed, and the text goes instead. Its own fetch, sendVoice
+   being multipart. Ogg/opus, because the default mp3 works and arrives as a
+   file attachment rather than a voice note, with nothing erroring. */
+async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Promise<string | null> {
+  if (!TTS_KEY) return "no TTS_KEY";
 
   try {
     const spoken = await reading(answer, "opus", signal);
@@ -2522,10 +2538,10 @@ async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Pr
     });
     const said = await sent.json();
     if (!said?.ok) throw new Error(`sendVoice: ${said?.description ?? "unknown"}`);
-    return true;
+    return null;
   } catch (err) {
     console.error("doji-eugenia: could not speak —", why(err));
-    return false;
+    return why(err);
   }
 }
 
@@ -2536,24 +2552,49 @@ async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Pr
 
    Not `say` itself, which keeps three things silent: the /notes audit, the
    apologies, and short operational lines. Exported so the fallback is driven —
-   with no TTS key every speak answers false, a refusing vendor's shape — with
-   the budget a parameter so a stall needs no waiting out. */
-export async function sayAloud(words: string, keyboard?: unknown, budget = SPEAK_MS): Promise<boolean> {
+   with no TTS key every speak answers why not, a refusing vendor's shape — with
+   the budget a parameter so a stall needs no waiting out.
+
+   It answers how the message went out, with why where the voice failed: the
+   reason was a console line alone, and the two text fallbacks of 26 and 27
+   October had outlived the logs before anyone asked what stalled. */
+export async function sayAloud(words: string, keyboard?: unknown, budget = SPEAK_MS): Promise<string> {
   const parts = chunk(words, TTS_LIMIT);
   const signal = AbortSignal.timeout(budget);
   let heard = parts.length > 0;
-  // Sequentially, keyboard on the last part, as in say().
-  for (const [i, part] of parts.entries()) {
-    const marked = i === parts.length - 1 ? keyboard : undefined;
-    let landed = false;
-    for (let attempt = 0; attempt < 2 && !landed && !signal.aborted; attempt++) {
-      landed = await speak(part, marked, AbortSignal.any([signal, AbortSignal.timeout(ATTEMPT_MS)]));
+  const missed = new Set<string>();
+  /* Shown while she speaks, as typing is while she writes: on 27 October the
+     voice took two and a half minutes with nothing on his screen, and he asked
+     whether she had answered. Best effort; it lasts five seconds, so it is sent
+     again, and it stops before the text can go. */
+  const recording = () => tg("sendChatAction", { chat_id: CHAT_ID, action: "record_voice" }).catch(() => {});
+  recording();
+  const keepRecording = setInterval(recording, 4_500);
+  try {
+    // Sequentially, keyboard on the last part, as in say().
+    for (const [i, part] of parts.entries()) {
+      const marked = i === parts.length - 1 ? keyboard : undefined;
+      let landed = false, attempt = 0;
+      // Two attempts, each held to half the budget: a stall is one request, and
+      // the next is a fresh connection. A stall on 26 and 27 October held one
+      // request for the whole 150s, where every voice note that landed that
+      // week took 5 to 30s and the slowest 90.
+      for (; attempt < 2 && !landed && !signal.aborted; attempt++) {
+        const failed = await speak(part, marked, AbortSignal.any([signal, AbortSignal.timeout(budget / 2)]));
+        if (failed) missed.add(failed);
+        landed = failed === null;
+      }
+      if (!attempt) missed.add("no time left to ask");
+      if (!landed) heard = false;
     }
-    if (!landed) heard = false;
+  } finally {
+    clearInterval(keepRecording);
   }
+  const reasons = [...missed].join("; ").slice(0, 300);
   // Any part missing: three quarters of a message cannot be acted on.
   if (!heard) await say(words, keyboard);
-  return heard;
+  return heard ? (reasons ? `spoken on a second try (${reasons})` : "spoken")
+               : `sent as text (${reasons || "nothing to speak"})`;
 }
 
 /* ─── What she brings to a turn ────────────────────────────────────────────
@@ -3308,6 +3349,15 @@ export async function storeStructure(now = new Date()): Promise<void> {
     const served = await res.json();
     if (!served?.ok || !served.charts) throw new Error("no readable answer");
     if (served.missing.length) {
+      /* Open, and not printing yet: the broker's first bar comes after the
+         Sunday open, and until it does the 15m and 5m charts are empty and the
+         rest end where the week did — four unread rows every Sunday from 17:05
+         to 17:50. While nothing served is newer than the finished week's copy,
+         that copy stands and nothing is metered; the first new bar is a read
+         like any other. */
+      const kept = await readStored("structure");
+      const newest = Math.max(0, ...(Object.values(served.charts) as Candle[][]).flat().map(b => b.t));
+      if (kept && !marketOpen(new Date(kept.read_at)) && newest > 0 && newest <= (kept.answer.last?.t ?? 0)) return;
       await unread("structure", missed(served.missing.map((m: { period: string; error: string }) =>
         ({ symbol: m.period, error: m.error }))));
     }
@@ -3601,6 +3651,36 @@ export async function headlinesBlock(): Promise<string> {
   } catch (err) {
     await unread("news", why(err));
     return "\n\nThe headlines could not be read just now; search for what moved it.";
+  }
+}
+
+/* ─── His alerts ───────────────────────────────────────────────────────────
+   What doji-tradingview's `foldAlerts` answers: his levels, highest first, as
+   a chart reads them. An alert on an indicator carries no price and says so.
+   ───────────────────────────────────────────────────────────────────────── */
+interface TvAlert {
+  symbol: string; condition: string; level: number | null; set: string; fired: string | null;
+}
+
+export function alertsList(alerts: TvAlert[], now = Date.now()): string {
+  if (!alerts.length) return "\n\nHe has no active alert in TradingView.";
+  const today = nyDate(new Date(now));
+  const when = (iso: string) => {
+    const day = nyDate(new Date(iso));
+    return `${nyTime(iso)} ET` + (day === today ? "" : ` on ${weekday(day)} ${civilDay(day)}`);
+  };
+  return "\n\nHis active alerts in TradingView, his levels, highest first:\n" +
+    [...alerts].sort((a, b) => (b.level ?? -Infinity) - (a.level ?? -Infinity))
+      .map(a => `· ${a.level ?? "no price level"} on ${a.symbol}, ${a.condition}, set ${when(a.set)}, ` +
+                (a.fired ? `last fired ${when(a.fired)}` : "not fired yet")).join("\n");
+}
+
+export async function alertsBlock(): Promise<string> {
+  try {
+    return alertsList((await tvRead("alerts")).alerts);
+  } catch (err) {
+    await unread("alerts", why(err));
+    return "\n\nHis alerts could not be read just now; ask him for his levels.";
   }
 }
 
@@ -4148,7 +4228,7 @@ async function postBriefing(due: Brief): Promise<Response> {
     return json({ ok: true, brief: due, chars: brief.length });
   }
 
-  const heard = await sayAloud(brief, feedbackKeyboard(nyDate(new Date())), Math.min(SPEAK_MS, left()));
+  const how = await sayAloud(brief, feedbackKeyboard(nyDate(new Date())), Math.min(SPEAK_MS, left()));
 
   // The artifact's row, apart from the two calls': what he received and how
   // long it all took, with the stretch after the critic split out.
@@ -4157,7 +4237,7 @@ async function postBriefing(due: Brief): Promise<Response> {
     caller: `${due} briefing delivered`, chars: brief.length,
     ms: spoken - opened, ok: true,
     detail: `stored in ${Math.round((stored - checked) / 1000)}s, the speaking worker did not start `
-          + `(${handed}), ${heard ? "spoken" : "sent as text"} in ${Math.round((spoken - stored) / 1000)}s`,
+          + `(${handed}), ${how} in ${Math.round((spoken - stored) / 1000)}s`,
   });
   return json({ ok: true, brief: due, chars: brief.length });
 }
@@ -4203,13 +4283,13 @@ export async function postSpeak(due: string): Promise<Response> {
   const turn = await storedBriefing(due, today);
   if (!turn) throw new Error(`no ${due} briefing is stored for ${today}`);
 
-  const heard = await sayAloud(turn.content, feedbackKeyboard(today), SPEAK_WORKER_MS);
+  const how = await sayAloud(turn.content, feedbackKeyboard(today), SPEAK_WORKER_MS);
   const spoken = Date.now();
   await recordRun({
     caller: `${due} briefing delivered`, chars: turn.content.length, ms: spoken - opened, ok: true,
-    detail: `${heard ? "spoken" : "sent as text"} in ${Math.round((spoken - opened) / 1000)}s`,
+    detail: `${how} in ${Math.round((spoken - opened) / 1000)}s`,
   });
-  return json({ ok: true, spoke: due, heard });
+  return json({ ok: true, spoke: due, how });
 }
 
 /* ─── The weekly review ────────────────────────────────────────────────────
@@ -4439,9 +4519,13 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
 
   if (isSilent(said)) return json({ ok: true, trade: id, said: "quiet" });
 
+  // Stored before it is spoken, as a reply is; a failed write still costs
+  // the history after the message, never the message.
+  const unstored = await remember([{ role: 'user', content: `[trade ${event}]` },
+                                   { role: 'assistant', content: said }])
+    .then(() => null, (err: unknown) => why(err));
   await sayAloud(said);
-  await remember([{ role: 'user', content: `[trade ${event}]` },
-                  { role: 'assistant', content: said }]);
+  if (unstored) throw new Error(unstored);
   return json({ ok: true, trade: id, said: "sent" });
 }
 
@@ -4740,14 +4824,19 @@ async function handleMessage(update: any): Promise<void> {
       clearInterval(keepTyping);
     }
 
-    // Sent before the write: the message is what he is waiting on. Its own
-    // row, as the briefing's delivery has: on 18 October a reply stored as
-    // spoken never reached him, and nothing said how it had gone out.
-    const heard = await sayAloud(answer);
-    await recordRun({ caller: 'reply delivered', chars: answer.length, ok: true,
-                      detail: heard ? 'spoken' : 'sent as text' });
-    // The text, never the blocks or the audio: a megabyte resent as history.
-    await remember([{ role: 'user', content: asked }, { role: 'assistant', content: answer }]);
+    /* Stored before it is spoken, as the briefing is: speaking can take
+       minutes, and on 26 October "No reply?", sent while the answer was still
+       being spoken, read a history without it and was answered as something
+       else. A failed write is the apology, after the message: the message is
+       what he is waiting on. The text, never the blocks or the audio: a
+       megabyte resent as history. */
+    const unstored = await remember([{ role: 'user', content: asked }, { role: 'assistant', content: answer }])
+      .then(() => null, (err: unknown) => why(err));
+    // Its own row, as the briefing's delivery has: on 18 October a reply stored
+    // as spoken never reached him, and nothing said how it had gone out.
+    const how = await sayAloud(answer);
+    await recordRun({ caller: 'reply delivered', chars: answer.length, ok: true, detail: how });
+    if (unstored) throw new Error(unstored);
   } catch (err) {
     console.error("doji-eugenia:", why(err));
     await tg("sendMessage", { chat_id: CHAT_ID, text: APOLOGY.reply }).catch(() => {});

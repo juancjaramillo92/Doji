@@ -535,6 +535,8 @@ test('doji-gladys: the charm cannot write anything but an answer, and is shut wi
 const TRENDBARS = readFileSync(new URL('./fixtures/ctrader-get-trendbars.txt', import.meta.url), 'utf8');
 const CALENDAR = JSON.parse(readFileSync(new URL('./fixtures/tradingview-calendar.json', import.meta.url), 'utf8'));
 const RESERVES = JSON.parse(readFileSync(new URL('./fixtures/tradingview-reserves.json', import.meta.url), 'utf8'));
+// His alerts, as the list answered on 29 October with two set.
+const ALERTS = JSON.parse(readFileSync(new URL('./fixtures/tradingview-alerts.json', import.meta.url), 'utf8'));
 
 // Daily or hourly bars ending now, at `price`.
 const tvBars = (count, every, price) => {
@@ -548,6 +550,7 @@ const tvBars = (count, every, price) => {
 // What TradingView answers each tool with, as the envelope's result.
 function tradingViewAnswer(name, args) {
   if (name === 'mcp-tv-get-economic-calendar') return CALENDAR.result;
+  if (name === 'mcp-tv-list-alerts') return ALERTS.result;
   if (name === 'mcp-tv-get-ohlcv') {
     const bars = args.symbol === 'COMEX:GC1!' ? tvBars(args.count, 86_400, 4000)
       : args.symbol.startsWith('CBOT:ZQ') ? tvBars(args.count, 86_400, 96.1)
@@ -633,11 +636,14 @@ test('every answer the poller and doji-tradingview serve Eugenia is one she read
   const blocks = {
     around: await eugenia.aroundBlock(), rates: await eugenia.ratesBlock(), news: await eugenia.headlinesBlock(),
     volume: await eugenia.volumeBlock(), flows: await eugenia.flowsBlock(), structure: await eugenia.structureBlock(),
+    alerts: await eugenia.alertsBlock(),
   };
   for (const [name, text] of Object.entries(blocks)) {
     assert.doesNotMatch(text, /could not be read/, `the ${name} door answered and she says it could not be read`);
   }
   assert.match(blocks.around, /Dollar index[\s\S]*The weeks behind it/);
+  assert.match(blocks.alerts, /· 4078\.55 on PEPPERSTONE:XAUUSD, cross, set [^\n]*not fired yet\n· 4026\.34 /,
+    'his alerts were served and she does not read his levels off them, highest first');
   assert.match(blocks.news, /A headline on TVC:GOLD/);
   assert.match(blocks.volume, /contracts/);
   assert.match(blocks.flows, /China: \d+ t in/);

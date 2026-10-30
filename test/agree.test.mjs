@@ -1555,8 +1555,28 @@ test('CI runs the database suite that npm test leaves out', () => {
   assert.match(scripts['test:db'] ?? '', /test\/db\/\*\.test\.mjs/, 'package.json no longer names the database suite');
   assert.ok(readdirSync(new URL('./db/', import.meta.url)).some(f => f.endsWith('.test.mjs')),
     'test/db holds no suite for test:db to run');
-  assert.match(source('.github/workflows/test.yml'), /^\s*- run: npm run test:db$/m,
-    'test.yml no longer runs the database suite, and nothing else does');
+  assert.match(source('.github/workflows/database.yml'), /^\s*- run: npm run test:db$/m,
+    'database.yml no longer runs the database suite, and nothing else does');
+});
+
+/* IT RUNS ON A PUSH THAT TOUCHES WHAT IT READS, and only then: so what it reads
+   is derived from the suite and held against the workflow's `paths`, or an
+   input left off is a check skipped with a green tick. Its own script and its
+   own workflow are inputs too. */
+test('the database suite runs on every push that touches a file it reads', () => {
+  const suite = readdirSync(new URL('./db/', import.meta.url)).filter(f => f.endsWith('.test.mjs'))
+    .map(f => source(`test/db/${f}`)).join('\n');
+  const read = [...new Set([
+    ...[...suite.matchAll(/\bfile\('([^']+)'\)/g)].map(m => m[1]),
+    ...[...suite.matchAll(/new URL\('\.\.\/\.\.\/([^']+)'/g)].map(m => m[1]),
+    'test/db/schema.test.mjs', 'package.json', '.github/workflows/database.yml',
+  ])];
+  assert.ok(read.length >= 7, `only ${read.length} inputs read out of the database suite — the reader has gone blind`);
+  const paths = [...source('.github/workflows/database.yml').match(/paths:\n((?:\s+- '[^']+'\n)+)/)[1]
+    .matchAll(/- '([^']+)'/g)].map(m => m[1]);
+  const covers = (path) => paths.some(p => p.endsWith('/**') ? path.startsWith(p.slice(0, -2)) : p === path);
+  assert.deepEqual(read.filter(f => !covers(f)), [],
+    'the database suite reads a file its workflow does not run for, so a change to it passes unchecked');
 });
 
 /* ─── A prompt change says the eval is owed ──────────────────────────────────
@@ -2863,15 +2883,15 @@ test('every list of the rules check_rules answers is the list it evaluates', () 
    had. THE PROMPT CARRIES NO PREFERENCE OF HIS AT ALL: an instruction note is
    the channel for them, the one he can correct, and the prompt says notes
    outrank the shape. So tastes are searched for as tastes, and a rule propped
-   up with *and he has told you so*, or *the nag he asked to be rid of*, is the
-   other half. Bare `he told you` and
+   up with *and he has told you so*, *the nag he asked to be rid of* or *because
+   he asked*, is the other half. Bare `he told you` and
    `he said` stay: that is how the tool descriptions name the notes mechanism.
    ─────────────────────────────────────────────────────────────────────────── */
 
 test('the prompt states no preference of his', () => {
   const taste =
     /\bhe (?:gets |is |gets a bit |grows )?\w*(?:frustrat|annoy|irritat|impatien|bored)|\bhe (?:hates|dislikes|prefers|resents)\b|\b(?:frustrates|annoys|irritates|bores) him\b/i;
-  const cited = /\bhe has (?:told you|said) so\b|\bas he has (?:told you|said)\b|\bhe (?:asked|wants) to be rid of\b/i;
+  const cited = /\bhe has (?:told you|said) so\b|\bas he has (?:told you|said)\b|\bhe (?:asked|wants) to be rid of\b|\bbecause he (?:asked|said)\b/i;
 
   const bodies = [...EUGENIA_PROMPT.matchAll(/export const (\w+) = `([\s\S]*?)`;/g)];
   assert.ok(bodies.length >= 5,
@@ -3734,17 +3754,27 @@ test('the rung he sets himself is routed, and routed before the slash catch-all'
 
 /* ─── A rule the critic also holds has to move in both places ────────────────
    The critic runs LAST and returns the version that goes, so a rule loosened in
-   the prompt and standing in `CRITIC` is put back every morning. One chain per
-   briefing is such a pair: nine subjects each walking a mechanism is a survey.
+   the prompt and standing in `CRITIC` is put back every morning. The briefing's
+   four lines are such a pair, and so is its one line of why: with the critic
+   still told to complete the chain, a writer's 1,400 characters went out at
+   1,600 on 27 and 28 October.
    ─────────────────────────────────────────────────────────────────────────── */
 
-test('one chain per briefing is stated to the writer and to the critic', () => {
-  assert.match(EUGENIA_PROMPT, /ONE CHAIN IN A BRIEFING, NOT ONE PER EVENT/,
-    'the briefing prompt no longer bounds how many mechanisms a briefing carries, ' +
+test('the four lines and the one line of why are stated to the writer and to the critic', () => {
+  const cut = EUGENIA_PROMPT.indexOf('export const CRITIC');
+  const writer = EUGENIA_PROMPT.slice(0, cut), critic = EUGENIA_PROMPT.slice(cut);
+  assert.match(writer, /IT IS FOUR LINES, AND THE WORKING STAYS BEHIND THEM/,
+    'the writer is no longer given the four lines he asked for');
+  assert.match(critic, /IS IT FOUR LINES\?/,
+    'the critic no longer holds the four lines, and it runs last');
+  assert.match(writer, /THERE IS NO CHAIN IN A BRIEFING, ONLY ITS ONE LINE/,
+    'the briefing prompt no longer bounds how much mechanism a briefing carries, ' +
     'so it goes back to a survey with a clause of chain on every event');
-  assert.match(EUGENIA_PROMPT, /IS THERE MORE THAN ONE CHAIN IN IT\?/,
-    'the critic no longer checks it — so the writer may obey the rule and the ' +
-    'pass that runs last has no reason to keep that version');
+  assert.match(critic, /Is there a chain in it\? The why is one line/,
+    'the critic no longer cuts a chain back to its line — so the writer may obey ' +
+    'the rule and the pass that runs last has no reason to keep that version');
+  assert.doesNotMatch(critic, /If a link is missing, add it/,
+    'the critic completes a chain again, and the briefing grows back every morning');
 
   /* AND THE ROUND-UP SLOT SAYS SO ITSELF: a length says nothing about what may be
      inside the paragraph. */
@@ -4086,7 +4116,7 @@ test('the critic counts paragraphs and dashes last, after everything that can ad
     'the count step no longer bounds a paragraph at four sentences');
   assert.match(step, /every em-dash; each one becomes a full stop/,
     'the count step no longer removes the em-dash aside');
-  for (const earlier of ['${WRITING}', 'Is the chain complete', 'standing instructions']) {
+  for (const earlier of ['${WRITING}', 'Is there a chain in it', 'standing instructions']) {
     assert.ok(critic.indexOf(earlier) > -1 && critic.indexOf(earlier) < count,
       `the count comes before "${earlier}", which can add a clause after it`);
   }
@@ -4714,7 +4744,7 @@ const PACE_SQL = subject("How much of the worker's clock the briefing spends");
    is driven by nothing. */
 test('a reply records how it reached him, from what sayAloud answered', () => {
   const body = bodyOf(EUGENIA_TS, 'async function handleMessage(', 'doji-eugenia no longer has handleMessage()');
-  assert.match(body, /const heard = await sayAloud\(answer\);\s*await recordRun\(\{ caller: 'reply delivered', chars: answer\.length, ok: true,\s*detail: heard \? 'spoken' : 'sent as text' \}\);/,
+  assert.match(body, /const how = await sayAloud\(answer\);\s*await recordRun\(\{ caller: 'reply delivered', chars: answer\.length, ok: true, detail: how \}\);\s*if \(unstored\) throw new Error\(unstored\);/,
     'a reply no longer records whether it was spoken or sent as text, so a missing one cannot be traced');
 });
 
@@ -6455,7 +6485,7 @@ test('every market read she goes without writes a row', () => {
     .map((m, i) => [m[1], EUGENIA_TS.slice(m.index, starts[i + 1]?.index)])
     .filter(([, body]) => new RegExp(`tvRead\\("|fetch\\((${MARKET_URLS})`).test(uncomment(body)));
   assert.deepEqual(readers.map(([name]) => name).sort(),
-    ['headlinesBlock', 'marketQuote', 'readTvCalendar', 'storeFlows', 'storeMarket', 'storePositioning', 'storeRates',
+    ['alertsBlock', 'headlinesBlock', 'marketQuote', 'readTvCalendar', 'storeFlows', 'storeMarket', 'storePositioning', 'storeRates',
      'storeStructure', 'storeTrend', 'volumeBlock'],
     'the market reads have changed — declare the new one, and give it the meter');
   for (const [name, body] of readers) {
@@ -6469,7 +6499,7 @@ test('every market read she goes without writes a row', () => {
       /if \(answer\.missing\.length\) await unread\(/, `${name} keeps a partial read to itself`);
   }
   assert.match(bodyOf(EUGENIA_TS, 'export async function storeStructure('),
-    /if \(served\.missing\.length\) \{\s*await unread\(/, 'storeStructure keeps a chart it did not read to itself');
+    /if \(served\.missing\.length\) \{[^}]*?return;\s*await unread\(/, 'storeStructure keeps a chart it did not read to itself');
 });
 
 /* THE MARKET IS READ AHEAD BY ONE WRITER, AND READ BACK BY EVERYONE ELSE. A
@@ -6585,6 +6615,10 @@ test('the number budget is stated to the writer and to the critic, and is one bu
      writer told fewer is rewritten back up to the old count. */
   assert.deepEqual(critic.slice(1).map(w => w.toLowerCase()), writer.slice(1).map(w => w.toLowerCase()),
     'the writer and the critic hold different number budgets, and the critic runs last');
+  // And the README's copy, which the facts table lists.
+  assert.match(source('docs/README.md').replace(/\s+/g, ' '),
+    new RegExp(`the briefing holds ${writer[1].toLowerCase()} or ${writer[2].toLowerCase()} beside`),
+    'the README gives the briefing a number budget the prompt does not');
 });
 
 /* A PRINT BESIDE A POSITION HE OPENED KNOWING IT WAS THERE IS HIS. SYSTEM says
@@ -6644,7 +6678,7 @@ test('the briefing opens on the weeks, in the writer and in the critic', () => {
     .replace(/\s+/g, ' ');
   const system = flat('SYSTEM');
   const critic = flat('CRITIC');
-  assert.match(system, /WHERE THE BIG PICTURE STANDS\. .*?weeks and months/,
+  assert.match(system, /WHERE THE BIG PICTURE STANDS, AND WHICH WAY IT LEANS\. .*?weeks and months/,
     'the briefing\'s first slot no longer opens on the forces that move gold over weeks');
   assert.match(system, /not to open on: a night's move is noise against the weeks/,
     'the handed quote reads as the opening again, which puts the overnight move first');
@@ -6655,17 +6689,31 @@ test('the briefing opens on the weeks, in the writer and in the critic', () => {
 });
 
 test('a word count never stands without what to cut instead: the briefing\'s two copies and the review', () => {
-  /* A CEILING ON ITS OWN CUTS THE TEACHING, the longest thing on the page. The
-     count is safe only beside what to cut INSTEAD, so a copy holding the count
-     alone reproduces that. The review's teaching is its verdict and its one
-     thing to keep and one to change. */
+  /* A CEILING ON ITS OWN CUTS WHATEVER IS LONGEST, which once was the teaching
+     every morning. The count is safe only beside what to cut INSTEAD, so a copy
+     holding the count alone reproduces that. The briefing's protected parts are
+     the read and its test, the events, the call and a verdict; the review's are
+     its verdict and its one thing to keep and one to change. */
   const writer = EUGENIA_PROMPT.slice(0, EUGENIA_PROMPT.indexOf('export const CRITIC'));
   const critic = EUGENIA_PROMPT.slice(EUGENIA_PROMPT.indexOf('export const CRITIC'));
+  const [, low, high] = writer.match(/(\d+) to (\d+) words/) ?? [];
+  const most = critic.match(/(\d+)\s+at the outside/)?.[1];
+  assert.ok(low && most, 'the briefing\'s word count and ceiling are no longer read where this test reads them');
   for (const [who, half] of [['writer', writer], ['critic', critic]]) {
-    assert.match(half, /250 to 300 words/, `the ${who} has lost the word count`);
-    assert.match(half, /[Nn]ever the teaching block|NOT A PLACE YOU CUT|never out of the block/,
+    assert.match(half, new RegExp(`${low} to ${high} words`), `the ${who} has lost the word count`);
+    assert.match(half, /THE READ AND ITS\s+TEST ARE NOT A PLACE YOU CUT|Never the read or its\s+test/,
       `the ${who} holds a word count with nothing saying what to cut instead — ` +
       `which is the arrangement that stopped her teaching the first time`);
+  }
+  // One ceiling, the writer's in words and the critic's in figures, and the
+  // README's copies of both, which the facts table lists.
+  const SPOKEN = { 150: 'One hundred and fifty' };
+  assert.ok(writer.replace(/\s+/g, ' ').includes(`${SPOKEN[most]} is the ceiling`),
+    `the writer and the critic hold different ceilings, and the critic runs last`);
+  const told = source('docs/README.md').replace(/\s+/g, ' ');
+  for (const said of [`the budget is ${low}–${high} words`, `${most} at the outside`,
+                      `A briefing is ${low}–${most} words by its own rule`, `one line of why, ${low}–${high} words`]) {
+    assert.ok(told.includes(said), `the README no longer gives the briefing's budget as the prompt does: "${said}"`);
   }
   const review = REVIEW.replace(/\s+/g, ' ');
   assert.match(review, /Under two hundred and fifty words/, 'the review has lost its word count');
@@ -7033,6 +7081,13 @@ test('every censused path gates, speaks and stores the same one text', () => {
     assert.match(body, new RegExp(`role: 'assistant', content: ${spec.carries}\\b`),
       `${fn} stores a text other than the one it sent — her history then holds ` +
       'words he never read, resent as hers for the next six exchanges');
+    /* STORED BEFORE IT IS SPOKEN: speaking can take minutes, and on 26 October
+       a message sent meanwhile read a history without the answer. */
+    const spoken = body.indexOf('await sayAloud(');
+    if (spoken > -1) {
+      assert.ok(body.indexOf('await remember(') > -1 && body.indexOf('await remember(') < spoken,
+        `${fn} stores what it sends only after speaking it, so a message he sends meanwhile reads a history without it`);
+    }
   }
 });
 

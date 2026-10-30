@@ -303,11 +303,15 @@ async function callback(url: URL): Promise<Response> {
    same credential serves eleven tools that change his alerts and watchlists,
    and mcp-watchlist-get-active-watchlist creates a watchlist when none is
    active. Left out on purpose: the technical rating, forecasts and screener,
-   which are signals by another name, and everything about companies. */
+   which are signals by another name, and everything about companies. His
+   alerts are read and never written: the list and the fire log are the two the
+   listing marks read-only, since the levels he marks are where she is meant to
+   meet him. The list has its reader; the log waits on a capture of a fired one. */
 const ALLOWED_TOOLS = [
   "mcp-tv-get-economic-calendar", "mcp-tv-get-economic-symbols", "mcp-tv-get-economic-data",
   "mcp-tv-get-symbol-data-batch",
   "mcp-tv-get-ohlcv", "mcp-tv-get-news", "mcp-tv-search-symbols",
+  "mcp-tv-list-alerts", "mcp-tv-get-alerts-log",
 ] as const;
 type AllowedTool = typeof ALLOWED_TOOLS[number];
 
@@ -629,6 +633,25 @@ async function readHeadlines() {
   return { ok: true, headlines: foldHeadlines(answers), missing };
 }
 
+/* ─── His alerts ───────────────────────────────────────────────────────────
+   The price alerts still active on his account: the levels he marks. The list
+   carries no message — what he writes on one is in the fire log alone — and
+   an alert on an indicator has no price, so its level is null rather than
+   guessed. Folded on the capture of 29 October, kept whole in
+   test/fixtures/tradingview-alerts.json. */
+export function foldAlerts(answer: any) {
+  return (answer.alerts ?? []).map((a: any) => ({
+    symbol: a.symbol, condition: a.condition_type,
+    level: typeof a.threshold === "number" ? a.threshold : null,
+    set: a.create_time, fired: a.last_fire_time ?? null,
+  }));
+}
+
+async function readAlerts() {
+  const answer = await tvCall(await tvSession(), "mcp-tv-list-alerts", { active: true });
+  return { ok: true, alerts: foldAlerts(answer) };
+}
+
 /* ─── What the market prices for the Fed ───────────────────────────────────
    Thirty-day fed funds futures, read as CME's FedWatch reads them, so the odds
    are worked out from prices rather than copied off a page. A contract settles
@@ -930,6 +953,12 @@ const PROBES: Record<string, () => Call[]> = {
     ["mcp-tv-get-ohlcv", { symbol: GOLD[0], interval: "1m", count: 3 }],
   ],
   news: () => FEEDS.map((f): Call => ["mcp-tv-get-news", { symbol: f.symbol, limit: f.limit }]),
+  // His alerts as TradingView keeps them, what `foldAlerts` reads, and the last
+  // week of their firing with the message he wrote, which nothing reads yet.
+  alerts: () => [
+    ["mcp-tv-list-alerts", { active: true }],
+    ["mcp-tv-get-alerts-log", { days: 7, limit: 20 }],
+  ],
   econ: () => [
     ["mcp-tv-get-economic-symbols", { country: "US", category: "prce" }],
     ["mcp-tv-get-economic-symbols", { country: "US", category: "mny" }],
@@ -1023,13 +1052,14 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return json({ ok: true, events: foldCalendar(answer) });
     }
 
-    // ?market=1, ?trend=1, ?news=1, ?rates=1, ?volume=1 and ?flows=1 read only what is fixed above.
+    // ?market=1, ?trend=1, ?news=1, ?rates=1, ?volume=1, ?flows=1 and ?alerts=1 read only what is fixed above.
     if (url.searchParams.get("market") === "1") return json(await readMarket());
     if (url.searchParams.get("trend") === "1") return json(await readTrend());
     if (url.searchParams.get("news") === "1") return json(await readHeadlines());
     if (url.searchParams.get("rates") === "1") return json(await readRates());
     if (url.searchParams.get("volume") === "1") return json(await readVolume());
     if (url.searchParams.get("flows") === "1") return json(await readFlows());
+    if (url.searchParams.get("alerts") === "1") return json(await readAlerts());
 
     const asked = url.searchParams.get("probe");
     if (asked) {
@@ -1039,7 +1069,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return plain(await probe(asked));
     }
 
-    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1, ?trend=1, ?news=1, ?rates=1, ?volume=1, ?flows=1 or ?probe=" }, 400);
+    return json({ ok: false, error: "nothing asked — ?connect=1, ?tools=1, ?calendar=1, ?market=1, ?trend=1, ?news=1, ?rates=1, ?volume=1, ?flows=1, ?alerts=1 or ?probe=" }, 400);
   } catch (err) {
     console.error("doji-tradingview:", why(err));
     return json({ ok: false, error: err instanceof Error ? err.message : "unknown" }, 500);
