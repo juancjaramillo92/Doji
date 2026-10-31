@@ -254,6 +254,15 @@ test('the first run creates the two labels rather than failing on their absence'
   assert.deepEqual(t.labels, ['doji-synced']);
 });
 
+test('a run with nothing to read makes no call but the search', () => {
+  // Nearly every one of the 1,440 runs a day finds nothing, and each Gmail call
+  // is one more chance at Google's transient "server error". The labels are
+  // fetched only once there is a thread to put one on.
+  const gs = boot({ threads: [], existingLabels: [] });
+  gs.syncPepperstone();
+  assert.deepEqual(gs.created, [], 'an idle run still reached for the labels');
+});
+
 test('resetDojiLabels passes over a label that was never created', () => {
   const gs = boot({ existingLabels: [] });
   gs.resetDojiLabels();
