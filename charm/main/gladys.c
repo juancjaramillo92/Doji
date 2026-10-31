@@ -59,8 +59,8 @@ static bool read_answer(const char *body, trade_t *t) {
 
 /* A GET when `body` is NULL, else a POST of it. One connection serves the
    whole waking — a journal's every answer is a request, and a new TLS
-   handshake costs about a second — so the answer is read to its end to leave
-   it ready for the next. One kept from before that her door has closed since
+   handshake costs about a second — so an answer read to its end leaves it
+   ready for the next, and one that is not closes it. One kept from before that her door has closed since
    is tried once more afresh. */
 static bool knock(const char *body, trade_t *t) {
     static esp_http_client_handle_t h;
@@ -91,7 +91,10 @@ static bool knock(const char *body, trade_t *t) {
     if (status >= 0) {
         for (int n; have < (int)sizeof got - 1 &&
                     (n = esp_http_client_read(h, got + have, sizeof got - 1 - have)) > 0;) have += n;
-        if (esp_http_client_flush_response(h, NULL) != ESP_OK) esp_http_client_close(h);
+        // An answer not read to its end leaves the line mid-answer: closed,
+        // never drained — a drain waits on its read with no end when the
+        // rest never comes.
+        if (!esp_http_client_is_complete_data_received(h)) esp_http_client_close(h);
         if (status != 200) ESP_LOGW(TAG, "her door answered %d", status);
     } else {
         ESP_LOGW(TAG, "her door could not be reached");

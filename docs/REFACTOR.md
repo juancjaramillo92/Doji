@@ -1141,7 +1141,7 @@ already not found; the next errand asks it afresh.
 **Revisit if:** the board shows a network in range reported as not found.
 
 ### R-127 — the screen's SPI transfers sized to the rows she draws
-**Deferred.** `light` keeps the board package's largest SPI transfer, the whole
+**Deferred.** `light` keeps the board package's `max_transfer_sz`, the whole
 screen, though she draws only `DRAW_ROWS` rows at a time; the bus allocates DMA
 descriptors for the larger size out of internal RAM, a couple of kilobytes by
 reading. Sizing it to the rows is a change to the panel's driver to prove on
