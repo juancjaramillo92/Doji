@@ -12,5 +12,9 @@ bool ota_due(time_t now);
    Reading the version costs only the image's first bytes. */
 bool ota_update(void);
 
-// She reached her Wi-Fi: the app she runs is good, and stays.
+/* A new app not yet proved: any reset before ota_confirm, deep sleep included,
+   has the bootloader start the app that was. */
+bool ota_unproven(void);
+
+// The app she runs is good, and stays.
 void ota_confirm(void);

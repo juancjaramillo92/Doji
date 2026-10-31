@@ -47,6 +47,7 @@
 #include "esp_psram.h"
 #include "esp_sleep.h"
 #include "esp_system.h"
+#include "esp_task_wdt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lvgl.h"
@@ -72,6 +73,7 @@ static const char *TAG = "charm";
 #define LIFE_STACK    40960  // bytes
 #define DRAW_ROWS     12     // drawn at a time, twice over: 22 KB of internal RAM
 #define AWAKE_MS      30000
+#define PROVE_MS      60000  // a new app's whole proof, the network's wait included
 #define LAST_FRAME_MS 200    // the sleep screen's last rows reaching the panel, once rendered
 #define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
 #define EARLY_S       5      // how early a timer may wake her and still be the errand's
@@ -118,7 +120,10 @@ static void even_area(lv_event_t *e) {
    seldom has free. DRAW_ROWS rows at a time in internal RAM are sent as they
    are. */
 static void light(face_mode_t mode) {
-    if (lit) return;
+    if (lit) {
+        face_set_mode(mode);
+        return;
+    }
     lit = true;
     sleep_release();
     bsp_display_cfg_t cfg = {
@@ -354,6 +359,32 @@ static void awake(void) {
     }
 }
 
+/* A new app from main is kept only once it has done what a broken one could
+   not: started her screen and drawn the sleep screen whole, and reached her
+   Wi-Fi. A hang on the way — a screen that never finishes a frame — is caught
+   by the task watchdog, armed for this alone to reset her, and any reset
+   before ota_confirm has the bootloader start the app that was. Without a
+   network it is not kept yet: the next waking rolls it back, as it always
+   has. Every waking of an unproven app does this first, whichever it is, so
+   no path sleeps on an app nothing has judged. */
+static void prove(void) {
+    const esp_task_wdt_config_t strict = { .timeout_ms = PROVE_MS, .idle_core_mask = 0, .trigger_panic = true };
+    esp_task_wdt_reconfigure(&strict);
+    esp_task_wdt_add(NULL);
+    net_start();
+    bool joined = net_wait(NET_ALL_MS);
+    light(FACE_DARK);
+    bsp_display_lock(-1);
+    face_draw_dark();
+    bsp_display_unlock();
+    esp_task_wdt_delete(NULL);
+    const esp_task_wdt_config_t usual = { .timeout_ms = CONFIG_ESP_TASK_WDT_TIMEOUT_S * 1000,
+                                          .idle_core_mask = (1 << portNUM_PROCESSORS) - 1 };
+    esp_task_wdt_reconfigure(&usual);
+    if (joined) ota_confirm();
+    ESP_LOGI(TAG, "a new app %s", joined ? "proved and kept" : "drawn, but no network to keep it on");
+}
+
 static void life(void *arg) {
     (void)arg;
     power_start(xTaskGetCurrentTaskHandle());
@@ -364,6 +395,7 @@ static void life(void *arg) {
     // cannot be read reads as no cable and no battery alike, so it is a
     // battery seen that makes this off the cable.
     if (esp_reset_reason() == ESP_RST_BROWNOUT && power_battery() >= 0 && power_charge() < 0) power_off();
+    if (ota_unproven()) prove();
     // A lift that was not him: back to sleep at once, the sensor resting.
     if (woke == ESP_SLEEP_WAKEUP_EXT1 && (esp_sleep_get_ext1_wakeup_status() & (1ULL << MOTION_PIN)) && !motion_looked()) {
         time_t rest = time(NULL) + LIFT_REST_S;
