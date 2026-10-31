@@ -1,0 +1,98 @@
+# Builds Eugenia's laptop app, the Mac app in laptop/, and keeps it as a
+# download: Eugenia.zip, the app for Apple silicon. A build of main is also
+# published for the app to update itself from, to a public Storage bucket, its
+# version the commit — as the charm's firmware is.
+#
+# Signed with his own certificate, made once in Keychain Access, never with
+# Apple's: macOS keeps the microphone and screen permissions for an app whose
+# signer is the same from one version to the next, and asks again for one
+# whose signature is new each build. So a build without the certificate is
+# signed ad hoc, proves only that the app packages, and is never published.
+name: laptop
+
+on:
+  push:
+    paths:
+      - 'laptop/**'
+      - 'charm/art/eugenia.png'
+      - '.github/workflows/laptop.yml'
+  workflow_dispatch:
+
+# Only a branch's newest build is the one anyone installs, and on main it is
+# the order the update is published in.
+concurrency:
+  group: laptop-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: package.json
+      - name: Build
+        working-directory: laptop
+        run: |
+          npm ci
+          # The commit, which the app compares with the version published beside it.
+          echo "${GITHUB_SHA:0:12}" > build.txt
+          npm run package
+      # A self-signed certificate is not trusted, so it is named by its hash
+      # rather than found by trust; codesign signs with it all the same.
+      - name: Sign
+        working-directory: laptop/out/Eugenia-darwin-arm64
+        env:
+          LAPTOP_CERT_P12: ${{ secrets.LAPTOP_CERT_P12 }}
+          LAPTOP_CERT_PASSWORD: ${{ secrets.LAPTOP_CERT_PASSWORD }}
+        run: |
+          if [ -z "$LAPTOP_CERT_P12" ]; then
+            codesign --force --deep --sign - Eugenia.app
+            exit 0
+          fi
+          keychain="$RUNNER_TEMP/eugenia.keychain-db"
+          echo "$LAPTOP_CERT_P12" | base64 --decode > "$RUNNER_TEMP/eugenia.p12"
+          security create-keychain -p "" "$keychain"
+          security set-keychain-settings "$keychain"
+          security unlock-keychain -p "" "$keychain"
+          security import "$RUNNER_TEMP/eugenia.p12" -k "$keychain" -P "$LAPTOP_CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          identity=$(security find-identity -p codesigning "$keychain" | awk '/\)/ { print $2; exit }')
+          codesign --force --deep --sign "$identity" --keychain "$keychain" Eugenia.app
+          echo "SIGNED=1" >> "$GITHUB_ENV"
+      - name: Check the signature and pack the app
+        working-directory: laptop/out/Eugenia-darwin-arm64
+        run: |
+          codesign --verify --deep --strict Eugenia.app
+          ditto -c -k --keepParent Eugenia.app Eugenia.zip
+          ls -l Eugenia.zip
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: eugenia-laptop
+          path: laptop/out/Eugenia-darwin-arm64/Eugenia.zip
+          if-no-files-found: error
+      # The bucket is made on first use, with room for an app of Electron's
+      # size: the project's own upload limit must allow as much (README).
+      - name: Publish the update
+        if: github.ref == 'refs/heads/main' && env.SIGNED == '1'
+        working-directory: laptop/out/Eugenia-darwin-arm64
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SB_SECRET_KEY: ${{ secrets.SB_SECRET_KEY }}
+        run: |
+          curl -sf "$SUPABASE_URL/storage/v1/bucket/laptop" -H "apikey: $SB_SECRET_KEY" > /dev/null ||
+            curl -sf -X POST "$SUPABASE_URL/storage/v1/bucket" -H "apikey: $SB_SECRET_KEY" \
+              -H "Content-Type: application/json" \
+              -d '{"id":"laptop","name":"laptop","public":true,"file_size_limit":314572800}'
+          curl -sf -X POST "$SUPABASE_URL/storage/v1/object/laptop/Eugenia.zip" -H "apikey: $SB_SECRET_KEY" \
+            -H "x-upsert: true" -H "Content-Type: application/zip" --data-binary @Eugenia.zip
+          # Its version beside it, after it, so it never names an app not yet there.
+          printf '%s' "${GITHUB_SHA:0:12}" | curl -sf -X POST "$SUPABASE_URL/storage/v1/object/laptop/version" \
+            -H "apikey: $SB_SECRET_KEY" -H "x-upsert: true" -H "Content-Type: text/plain" --data-binary @-

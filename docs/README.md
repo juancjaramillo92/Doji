@@ -102,15 +102,24 @@ test/                                   node:test suites — see Tests
 .github/workflows/backup.yml            the daily copy of the tables nothing else holds
 .github/workflows/health.yml            the hourly outside check; a failed run is the alarm
 .github/workflows/charm.yml             builds the charm firmware, kept as a download; main's is her update
+.github/workflows/laptop.yml            builds the laptop app, signed with his certificate; main's is her update
 .github/workflows/calibrate.yml         runs scripts/calibrate.mjs, by hand from the Actions tab
 .github/workflows/eval.yml              runs scripts/eval.mjs --plant, or one case alone, by hand from the Actions tab
 .github/workflows/replay.yml            runs scripts/replay.mjs, by hand from the Actions tab
-.github/dependabot.yml                  monthly update PRs, both ecosystems
+.github/dependabot.yml                  monthly update PRs, both ecosystems, the laptop's npm too
 package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
 .npmrc                                  engine-strict: the Node floor made a gate
 .gitignore                              node_modules, and nothing else
 charm/.gitignore                        ESP-IDF's build output and fetched components
+laptop/                                 Eugenia on the Mac — see The laptop
+  main.mjs                              the window, the keys, the menu, her door, the chart, the update
+  face.mjs                              her face and body, his microphone, her voice
+  frames.mjs                            her answer, read out of its frames
+  preload.cjs                           what the pages may ask the main process
+  key.html                              her key, asked once; key.mjs tries it
+  Info.plist                            the menu-bar app, and why it asks for the microphone
+  .gitignore                            the copied render, the stamp and the build
 ```
 
 ---
@@ -424,7 +433,11 @@ single-sourced at run time:
 | what **Gladys's charm** reads and posts | the keys `charm/main/gladys.c` reads off her door's answer and the trade in it, against `waiting()`'s answer and `SELECT`, and the one key it posts, against what `charmAnswer` reads |
 | what a **right key** gets at each door | the statuses `charm/main/setup.c` takes as a key proved, and the refusals and the answer each door gives a right one |
 | how long the **charm waits out her silence** | `READ_MS` in `charm/main/talk.c`, at least two of `BEAT_MS` in `doji-eugenia`, or the charm hangs up while she thinks |
-| the **largest recording** | `FILE_ROOM` in `charm/main/talk.c`, at most `FILE_MAX` in `doji-eugenia` |
+| the **largest recording** | `FILE_ROOM` in `charm/main/talk.c`, at most `FILE_MAX` in `doji-eugenia`; on the laptop, `RECORD_MS` at `RECORD_BPS` in `laptop/face.mjs`, at most half of it |
+| the **laptop's answer frames and rate** | `FRAME` and `PCM_RATE` in `laptop/frames.mjs`, and the door's, whose bytes `laptop.test.mjs` feeds it |
+| what **the laptop sends her door** | the `x-laptop-` header, the form's fields with their types and names, and the briefing's two words in `laptop/main.mjs`, against what the laptop's door reads and `IMAGE_TYPES`; and the statuses `tryKey` takes as a key proved, against the door's answers to a right one |
+| **the charm's face on the laptop** | `F`, `DOTS`, the drawing's four colours and the ring's emeralds in `laptop/face.mjs`, against `F`, the thought dots, `draw_face`'s colours and `RING` in `charm/main/face.c`, and `charm/main/palette.h` |
+| where the **laptop's update** lives | the two objects `.github/workflows/laptop.yml` writes and the version it stamps, and `UPDATES`, the objects and `build.txt` in `laptop/main.mjs` |
 | what the charm asks **`?briefing=`** for | the two in `charm/main/talk.c` and the two `charmBriefing` answers |
 | where the **charm's update** lives | `FIRMWARE_URL` in `charm/main/net.h`, and the bucket and object `.github/workflows/charm.yml` makes and writes; the version it writes beside the image, the one the build stamped, and the object `APP_VERSION_URL` in `doji-gladys` reads it from |
 | where the **charm's app** boots from | the first app slot's offset in `charm/partitions.csv` and the offset `.github/workflows/charm.yml` checks the image against |
@@ -452,8 +465,8 @@ single-sourced at run time:
 | the **number of scheduled jobs** | the `cron.schedule` calls in `schema.sql` and the count `verify.sql` asserts |
 | a **long door's deadline** | `DOOR_MS` in `doji-tradingview` and `READ_MS` in `doji-eugenia`, ten seconds apart for the boot, the sign-in and the wire |
 | the **paid worker wall clock** | `ceiling_ms` in `pace_line` and the sentence in `CLAUDE.md` on why the cron half answers first; its three-quarter share, `speak_at` in `pace_line` and `TURN_MS` in `doji-eugenia`; `WRITER_MS` beneath it |
-| each **function's name** | its directory, the triggers, the cron jobs, the Apps Script, the charm's `charm/main/net.h` |
-| the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow, the Apps Script and the charm's `charm/main/net.h` |
+| each **function's name** | its directory, the triggers, the cron jobs, the Apps Script, the charm's `charm/main/net.h`, the laptop's `laptop/main.mjs` |
+| the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow, the Apps Script, the charm's `charm/main/net.h` and the laptop's `laptop/main.mjs` |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
 | each function's **gateway setting** | `config.toml`'s stanza and the deploy command's flag |
 | her **map's grid and candle count** | `GRID` and `CANDLES` in `structure.ts`, said in words by `get_structure`'s description and by `SYSTEM`; the grid is §4's, in `strategy.ts` |
@@ -2122,6 +2135,76 @@ curl -sN -H "x-laptop-key: $EUGENIA_LAPTOP_SECRET" \
      -F "voice=@ask.webm;type=audio/webm" -F "chart=@chart.png;type=image/png" \
      "https://<project>.supabase.co/functions/v1/doji-eugenia" | node -e '…' | play …
 ```
+
+**The app is `laptop/`**, an Electron app for the Mac, built and published by
+`.github/workflows/laptop.yml` as the charm's firmware is by its own. It lives
+in the menu bar, not the Dock, and **her face floats in a corner over
+everything**, TradingView in full screen included: the charm's render with its
+black made clear, and the charm's drawing over it at the charm's own
+coordinates — eyes, highlight, smile, thought dots, the listening ring —
+which `agree.test.mjs` holds to `charm/main/face.c` and `palette.h`. What the
+laptop adds is a body: **she breathes** (about 1.5% over 4.6 seconds, from her
+base) **and floats** (a few pixels over 3.3 seconds, a rhythm that never falls
+into step with the breath), **leans in** to listen, **sways** while she thinks
+and **gives with the loud moments** of her voice; eyes and mouth ride the same
+transform. Reduce Motion in macOS stops the breathing and floating and keeps
+the rest. Clicks outside her shape go through to the chart beneath, she can be
+dragged anywhere, and a click on her never takes the focus from TradingView.
+Three sizes and *Start with the Mac* are in the menu.
+
+**One gesture does everything**: ⌥Space anywhere, or a click on her. At rest
+she listens, with the ring; again, and she thinks, then speaks, the mouth
+following her voice; again while she thinks or speaks, and she stops — the
+door keeps the turn, so the copy and the memory still land. **⇧⌥Space** is the
+same with **the chart**: captured at the press, beside the listening rather
+than before it, so the first words are not lost to the seconds a capture
+takes. It is the window whose title names TradingView, or else the screen she
+floats on, with her own window kept out of every capture; a question whose
+chart could not be captured is not asked, and her face says so. The
+microphone is opened at the press and closed with the recording, so macOS
+shows it in use only while she listens; a press shorter than 0.4 seconds is
+one he took back, and a recording stops itself at five minutes, at a bitrate
+that keeps it well inside `FILE_MAX`.
+
+**The briefing is the charm's**: asked every five minutes until it lands, then
+an emerald dot beside her until he clicks it, gone at midnight in New York.
+The ready line is not played — the dot is the news. A failure of any kind —
+no internet, a refusal, a chart she could not see — is her confused face for
+four seconds; a 401 also opens the window for her key.
+
+**Her key** is `EUGENIA_LAPTOP_SECRET`, asked once in a small window, tried
+at her door before it is kept — an empty form, which a right key is refused
+with a `400` for, or a `503` at a door short of its vendors — and kept
+encrypted by the Keychain. The key and the door live in the app's main
+process alone; the page that draws her has neither, and asks for nothing but
+what `preload.cjs` names.
+
+**It is signed with his own certificate, never Apple's**, which costs nothing
+and is why macOS keeps her microphone and screen permissions from one version
+to the next: they belong to a signer, and an ad-hoc signature is a new signer
+every build. A build without the certificate is signed ad hoc, proves only
+that the app packages, and is never published. Unsigned by Apple, the first
+launch is refused once: System Settings → Privacy & Security → *Open Anyway*.
+
+**She updates from `main`.** The workflow publishes `Eugenia.zip` and its
+version — the commit, stamped into the app as `build.txt` — to a public
+bucket, `laptop`; at launch and daily she compares it with her own, and a
+newer one is offered in the menu, never installed unasked. One click
+downloads it, quits, and a shell left behind swaps the app and opens the new
+one. Downloaded by the app rather than a browser, it carries no quarantine, so
+*Open Anyway* is never asked again. A copy run from the repository has no
+`build.txt` and never offers one.
+
+To work on it, `npm ci` and `npm start` in `laptop/` — the render is copied in
+from `charm/art/`, the one copy of it in the repository.
+
+**To check on the Mac first**, which no suite and no Linux run can: that she
+floats over TradingView in full screen and on every Space, that a click on her
+leaves TradingView focused, that ⌥Space reaches her from inside TradingView
+(and that nothing else on the Mac claims it), that macOS asks once each for
+the microphone and Screen Recording and keeps both across an update, which
+window ⇧⌥Space captures — TradingView's title is the guess — that her voice
+and her mouth keep time, and that the update swaps and reopens her.
 
 ### Whether it landed
 
@@ -3980,6 +4063,21 @@ the jobs, and `agree.test.mjs` holds that count against `schema.sql`.
    Connect TradingView (see **TradingView**), then walk the history door once
    from a year back — see **Applying her schema**.
 8. Run `supabase/verify.sql`. Nothing is set up until it agrees.
+9. For the laptop, when it is wanted:
+   - **His certificate**, once, in Keychain Access: Certificate Assistant →
+     Create a Certificate…, named `Eugenia`, Identity Type *Self Signed Root*,
+     Certificate Type *Code Signing*. Export it from My Certificates as a
+     `.p12` with a password, and store it in the repository's Actions secrets:
+     `base64 -i Eugenia.p12` as `LAPTOP_CERT_P12`, the password as
+     `LAPTOP_CERT_PASSWORD`.
+   - **Room for the app** in Storage: the project's upload limit (Project
+     Settings → Storage) must pass the zipped app, about a hundred megabytes;
+     the workflow's bucket allows three hundred.
+   - `supabase secrets set EUGENIA_LAPTOP_SECRET=$(openssl rand -hex 32)`.
+   - Run Actions → laptop on `main`, download
+     `https://<project>.supabase.co/storage/v1/object/public/laptop/Eugenia.zip`,
+     put Eugenia in Applications, open it, *Open Anyway* once, paste the key,
+     and allow the microphone; Screen Recording is asked at the first ⇧⌥Space.
 
 ---
 
@@ -4097,7 +4195,8 @@ home-screen shortcut and every bookmark open `/`.
 | `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the charm driven end to end through the real turn — the reply read as the charm reads its frames, silence first, the recording transcribed as the Ogg it is, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, its headers in her turn and the volume she set sent ahead of her voice and nowhere else, the battery line spoken after her answer and neither copied nor stored, a wordless recording answered on the charm alone, and the door refusing a missing vendor, an empty recording and a wrong key; and the briefing on the charm, her ready line then today's briefing read as `pcm` in frames, the right day's briefing asked for, a `204` while none is stored; and the laptop through the same turn — the recording transcribed under the name and type it sent, the chart reaching her turn as the image he showed and named in the copy, no image and no chart named when he showed none, her turn told nothing of a charm, the door refusing a missing vendor, a missing, empty or oversized recording, a chart she cannot read or too large, a body that is not a form, a wrong key and the charm's, shut while its secret is unset with the charm's still open, and the briefing answered as on the charm; and Gladys's charm told what waits oldest first and a week back, its answer writing exactly one of the four columns, an edit, a stray column and a malformed body refused, and the door shut without its secret; and between the functions, every door Eugenia reads but the quote — the calendar, the market, its weeks, the rate odds, the wires, futures volume, the flows, his charts and the bars her calls are scored on — served by the real `doji-tradingview` and poller handlers off stubbed vendors, and read by her as she reads it |
 | `test/charm.test.mjs` | the charm's pure C — `charm/main/briefing.c`, `charm/main/errand.c`, `charm/main/lift.c`, `charm/main/dns.c`, `charm/main/ogg.c` and `charm/main/frames.c` — compiled on the machine running the suite and driven in the zone the charm reads its clock in, out of `charm/main/net.c`: the briefing watch against `briefDue` and `retryDue` every five minutes of both weeks the clocks change in, an announced briefing not asked for again until the next day, and waiting until New York's midnight and no longer, on the server's own day, never before the clock is set, the wait between errands longer for each that found no network and never an hour, and over the weekend, every five minutes of both weeks the clocks change in against `marketOpen`, half-hourly with the open woken for unless a trade waits, a lift judged on readings, held and put down told apart, the setup's answer to a name, with and without the EDNS record a phone may add, a recording's Ogg file page by page against the specification's CRC, and her answer read out of `charmFrame`'s own bytes however the reads fall; and the firmware's names, the other of the two scope questions in C — every static, macro and enum constant a file declares used in it, every function a header declares called from another file, every non-static function in a header — since the ESP-IDF build refuses a name declared nowhere and only warns of one used nowhere |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
-| `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions and the app as two programs — with one planted defect per question proving the check can fail |
+| `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions, the app and the laptop as three programs — with one planted defect per question proving the check can fail |
+| `test/laptop.test.mjs` | the laptop's pure half, `laptop/frames.mjs`: her frames read back whole off `charmFrame`'s own bytes however the reads cut them — inside a header, at every frame's edges, a few bytes at a time — and her voice read as 16-bit samples across a frame that ends mid-sample, silence as exact zeros |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, `syncPepperstone`'s three outcomes, and a run that finds nothing reaching for no label |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |

@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'unsafe-inline'">
+<title>Eugenia</title>
+<style>
+  body { font: 13px -apple-system, system-ui, sans-serif; margin: 20px; }
+  p { margin: 0 0 12px; }
+  input { width: 100%; box-sizing: border-box; font: inherit; padding: 6px; }
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+  #said { flex: 1; }
+</style>
+</head>
+<body>
+<p>Her key is <code>EUGENIA_LAPTOP_SECRET</code>, as set in Supabase.</p>
+<form id="form">
+  <input id="key" type="password" autocomplete="off" spellcheck="false" autofocus required>
+  <div class="row"><span id="said" role="status"></span><button>Try it</button></div>
+</form>
+<script type="module" src="key.mjs"></script>
+</body>
+</html>
