@@ -30,7 +30,7 @@ void face_draw_dark(void);
 // How long FACE_ASLEEP takes to close her eyes.
 #define FACE_GOODNIGHT_MS 1200
 
-// A frame of anything drawn moving: her face, the dial, the journal's done.
+// A frame of anything drawn moving: her face and the journal's done.
 #define FACE_FRAME_MS 33
 
 // How loud her voice is right now, 0 to 1: the mouth follows it.
