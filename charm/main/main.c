@@ -269,11 +269,13 @@ static void errand(void) {
             briefing_waits = true;
             briefing_announced(time(NULL));
         }
-        // A new app from main, in the small hours: she wakes into it at once,
-        // quietly, for this errand's place. The battery is asked first, since
-        // asking ota_due spends the night's look: one a low battery skips
-        // waits for a later errand in the hour, on the cable perhaps.
-        if (!power_low() && ota_due(time(NULL)) && ota_update()) {
+        // A new app from main — the day Gladys's door names one she has not
+        // run or seen fail, or at the night's look in the small hours: she
+        // wakes into it at once, quietly, for this errand's place. The battery
+        // is asked first, since asking ota_due spends the night's look: one a
+        // low battery skips waits for a later errand in the hour, on the cable
+        // perhaps.
+        if (!power_low() && (ota_offered(gladys_app()) || ota_due(time(NULL))) && ota_update()) {
             errand_at = time(NULL);
             sound_stop();
             sleep_until(errand_at, false);

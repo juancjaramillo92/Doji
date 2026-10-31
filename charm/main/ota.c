@@ -33,6 +33,13 @@ bool ota_due(time_t now) {
     return true;
 }
 
+bool ota_offered(const char *version) {
+    if (!version[0] || !strcmp(version, esp_app_get_description()->version)) return false;
+    const esp_partition_t *failed = esp_ota_get_last_invalid_partition();
+    esp_app_desc_t was;
+    return !(failed && esp_ota_get_partition_description(failed, &was) == ESP_OK && !strcmp(was.version, version));
+}
+
 bool ota_update(void) {
     esp_http_client_config_t http = { .url = FIRMWARE_URL, .timeout_ms = READ_MS,
                                       .crt_bundle_attach = esp_crt_bundle_attach };
@@ -41,7 +48,7 @@ bool ota_update(void) {
     if (esp_https_ota_begin(&config, &h) != ESP_OK) return false;
     esp_app_desc_t next;
     const char *mine = esp_app_get_description()->version;
-    bool newer = esp_https_ota_get_img_desc(h, &next) == ESP_OK && strcmp(next.version, mine);
+    bool newer = esp_https_ota_get_img_desc(h, &next) == ESP_OK && ota_offered(next.version);
     esp_err_t err = ESP_OK;
     while (newer && (err = esp_https_ota_perform(h)) == ESP_ERR_HTTPS_OTA_IN_PROGRESS) {}
     // Finishing closes the update either way; anything short of it is abandoned.
