@@ -303,6 +303,10 @@ test('the charm waits out her silence, records what her door takes, and asks the
   const door = BRIEFING_WORDS();
   assert.ok(asked.length, 'talk.c no longer names the briefing as this test reads it');
   for (const word of asked) assert.ok(door.includes(word), `the charm asks ?briefing=${word} and her door answers ${door.join(', ')}`);
+  // The waking's report: the flag the charm sends is the one her door reads.
+  const sent = talk.match(/EUGENIA_DOOR "\?(\w+)=1", HTTP_METHOD_POST/)?.[1];
+  assert.ok(sent && EUGENIA_TS.includes(`searchParams.has("${sent}")`),
+    `the charm files its report under ?${sent}= and her door reads no such flag`);
 });
 
 /* The rest of what the charm reads off her door is not a name but a value:
