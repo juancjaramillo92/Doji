@@ -204,11 +204,7 @@ static void light(face_mode_t mode) {
     lv_refr_now(NULL);
     bsp_display_unlock();
     vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
-    // Under the lock: LVGL's task sends frames to the same panel, and a
-    // command between its transfers waits for them only if it is not mid-send.
-    bsp_display_lock(-1);
     esp_lcd_panel_disp_on_off(panel, true);
-    bsp_display_unlock();
     // Timestamped from boot, beside talk.c's "listening": how much of a press's
     // wait is the panel starting. And what internal RAM the screen and Wi-Fi
     // leave the codecs and TLS, the board's scarcest memory.
