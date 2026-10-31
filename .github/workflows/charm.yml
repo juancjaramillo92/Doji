@@ -87,3 +87,7 @@ jobs:
               -H "Content-Type: application/json" -d '{"id":"charm","name":"charm","public":true}'
           curl -sf -X POST "$SUPABASE_URL/storage/v1/object/charm/charm.bin" -H "apikey: $SB_SECRET_KEY" \
             -H "x-upsert: true" -H "Content-Type: application/octet-stream" --data-binary @charm.bin
+          # Its version beside it, after it, so it never names an image not yet
+          # there: Gladys's door hands it to the charm, which updates that day.
+          printf '%s' "${GITHUB_SHA:0:12}" | curl -sf -X POST "$SUPABASE_URL/storage/v1/object/charm/version" \
+            -H "apikey: $SB_SECRET_KEY" -H "x-upsert: true" -H "Content-Type: text/plain" --data-binary @-

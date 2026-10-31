@@ -1,5 +1,6 @@
 #pragma once
 #include <stdbool.h>
+#include <stdint.h>
 
 /* One exchange with Eugenia: he talks, she answers. Call from her task after
    PWR; PWR while it runs — a notification to that task — ends his turn, or
@@ -20,3 +21,10 @@ bool talk_ready(void (*lit)(void));
 // Today's briefing, read to him: what her door answered, 204 while none is
 // stored, -1 out of reach or cut off.
 int talk_briefing(void);
+
+// When she first listened this waking, in microseconds since boot; 0 if not.
+int64_t talk_listened(void);
+
+/* One line about the waking for her door to file, `text` as it is: never
+   retried, never held for, and a few seconds at most. */
+void talk_report(const char *text);

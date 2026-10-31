@@ -5048,6 +5048,13 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       return json({ ok: true, accepted: url.search.slice(1) || "hourly" });
     }
     if (secretMatches(fromCharm, CHARM_SECRET)) {
+      /* A waking's report, one line the charm writes as it goes to sleep: filed
+         beside her runs as it came, so the board is read without a cable. It
+         needs no vendor, so it is answered before they are asked for. */
+      if (new URL(req.url).searchParams.has("report")) {
+        await recordRun({ caller: 'charm', ok: true, detail: (await req.text()).slice(0, 500) });
+        return new Response(null, { status: 204 });
+      }
       // Without both vendors it can neither hear nor speak, said at the door
       // rather than as silence.
       if (!STT_URL || !STT_KEY || !TTS_KEY) {
