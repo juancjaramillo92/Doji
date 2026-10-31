@@ -1348,13 +1348,13 @@ redelivers anything else, and a failed write is better retried by his second tap
 ## Eugenia — the market bot
 
 A daily XAU/USD briefing, a word when a close takes his day past its limit, a
-review of his week on Saturday, and a conversation about any of it. **A print
+review of his week inside Sunday's, and a conversation about any of it. **A print
 that lands after the briefing gets no message of its own**: its actual is on the
 calendar within a quarter hour for when he asks, and the next morning opens on
 how it landed — his instruction is the weeks behind the chart, not the hours on
 it, and a look per print spends the quota the briefing reads on. **Weekdays at
 08:00 ET, Sunday at 17:00 ET** — the gold open, so the week's first briefing
-lands with the market. She says hello her own way, Spanish or English, inside
+lands with the market, carrying the review of the week behind it. She says hello her own way, Spanish or English, inside
 the first paragraph, and goes straight to the number. Reply and she answers —
 typed, by voice, or to a chart. And she trades beside you on paper, on your
 rules, scored on price — *Her own calls*.
@@ -1555,17 +1555,19 @@ handed the failures and told when nothing broke. A breach gets the fact, her
 verdict and the lesson in three short sentences, then back to the market. Closed
 trades only: a verdict on an open one is a hard prohibition.
 
-### Saturday, a review of his week
+### Sunday, a review of his week
 
 **Every coach has a cadence that is not about one trade**; otherwise she speaks
-about his trading only when a rule breaks. So at 10:00 New York on
-Saturday, the one morning no market is open and nothing else is due
-(`reviewDue`, composed into `dueNow`), she reviews his week: how he followed
+about his trading only when a rule breaks. So the Sunday briefing carries a
+review of his week after it, as one message — he asked for one thing on Sunday
+rather than a Saturday message of its own. `weekReview` is written beside the
+briefing on the writer's clock, and reviews his week: how he followed
 the rules a row can check, his own answers — how often he marked his rules
 broken and how many he left blank, the one record of entering on the touch —
 what he committed to and whether he kept it, one thing to keep and one to
 change, and her own calls in a sentence. Process, never P&L as the measure,
-and nothing about where price goes next week, which is Sunday's briefing.
+and nothing about where price goes next week, which is the briefing above it;
+no hello, since the briefing has said it.
 Under 250 words, with what to cut first named beside the count — figures from
 his journal, then her calls, then a commitment kept — and the verdict and the
 one thing to keep and one to change never cut, since a ceiling alone cuts what
@@ -1577,9 +1579,11 @@ she cut only at the ceiling.
 She is handed the week computed — `get_stats`' summary with his answers,
 `check_rules`' verdicts, her calls and her record — with his notes, the
 portrait and what he has on, and may read a trade or a section of his rules
-(`REVIEW_TOOLS`). `TRIM` gates it, it is spoken through `sayAloud`, and it is
-stored under `[saturday review]`. **No retry**: a review a day late is about a
-week already behind him, so a failure apologises and `?review=1` runs it by hand.
+(`REVIEW_TOOLS`). `TRIM` gates it, since the critic reads the briefing alone;
+the two are joined, then stored under the Sunday briefing's marker and spoken
+as one, so the charm plays both. **A broken review never costs the briefing**:
+`weekReview` catches, writes a `review job` row, and its apology goes out in its
+place. A Sunday whose message failed retries whole, review included.
 
 ### The calendar — filed for her every quarter hour
 
@@ -1893,9 +1897,9 @@ gives `[object Object]` on exactly the turns carrying most context.
 
 **Everything she writes is spoken.** The old rule — answer in the channel he
 used — only ever decided a reply, so the briefing, the one message he wanted read
-to him, was never spoken. He decided it the other way. Five call sites speak:
-the briefing twice (its speaking worker, and its own fallback), the trade event,
-the reply and the Saturday review. `say()` keeps the
+to him, was never spoken. He decided it the other way. Four call sites speak:
+the briefing twice (its speaking worker, and its own fallback), the trade event
+and the reply; the week's review rides the Sunday briefing. `say()` keeps the
 `/notes` audit (a table, unlistenable), the apologies (failure notices, not her
 words), the short operational lines and the charm's copy, whose voice is on the
 charm.
@@ -2481,7 +2485,7 @@ speaking worker's budget are taken only if they are a briefing and its marker
 sharing one instant — otherwise no quote rather than a wrong one.
 
 **Who gets what.** `notesBlock()` reaches **every path** — the briefing, a
-reply, the nightly pass, the Saturday review and the trade look — and its absence would be silent:
+reply, the nightly pass, the week's review and the trade look — and its absence would be silent:
 she carries on ignoring an instruction he believes she took. `portraitBlock()`,
 `recordBlock()` and `callsBlock()` go to the briefing, a reply, the pass and the review, and a
 test asserts none reaches the trade look: it lands the moment a loss closes his day,
@@ -3968,7 +3972,7 @@ that matters most about her is a sentence, and no suite can say whether the
 model still obeys it. The eval sends the cases in
 `test/fixtures/eval-cases.json` — the failures this README records and the rules
 his decisions added — through her real prompts, built as the reply, both gates,
-the trade look, the Saturday review's draft and the weekday briefing's draft
+the trade look, the Sunday review's draft and the weekday briefing's draft
 build them, and grades the answer: what is countable in code (em-dashes,
 sentences a paragraph, words, questions, patterns that must or must not appear),
 the rest by an Opus judge against a criterion written per case, answered as JSON

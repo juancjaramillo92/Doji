@@ -4586,8 +4586,6 @@ const BY_HAND = {
   history:     'the weeks he has already traded, walked once from the date ' +
                'given so R-19 can judge them — the nightly pass only ' +
                'ever files the week it runs in',
-  review:      'the Saturday review out of its hour — it has no retry, so a ' +
-               'failed one is made up by hand rather than a week late',
   speak:       'the briefing\'s second worker, opened by postBriefing itself ' +
                'rather than by a schedule — and by a person re-sending a ' +
                'briefing that was stored and never reached him',
@@ -5549,14 +5547,14 @@ test('the briefing goes out as she wrote it, hello included, and the hello is he
 
 test('every message she writes goes out through sayAloud', () => {
   /* THE HALF THE FUNCTION CANNOT GUARANTEE: a path calling `say` directly works
-     and is silent. Five sites — the briefing's two (the speaking worker and
-     postBriefing's fallback), then the Saturday review, the trade event and the
-     reply. `/notes`, the apologies, the short operational lines and the
+     and is silent. Four sites — the briefing's two (the speaking worker and
+     postBriefing's fallback), then the trade event and the reply; the week's
+     review rides the Sunday briefing. `/notes`, the apologies, the short operational lines and the
      charm's copy keep `say` deliberately — the charm's voice is on the charm. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
-  assert.equal(spoken, 5,
-    `${spoken} call sites speak where five should — a message she writes that goes ` +
+  assert.equal(spoken, 4,
+    `${spoken} call sites speak where four should — a message she writes that goes ` +
     `out through say() alone arrives correctly and silently`);
 });
 
@@ -6988,7 +6986,6 @@ const SENDS = {
                          'Telegram received',
                     stored: 'by postBriefing — this reads the stored turn ' +
                             'rather than writing one' },
-  postReview:     { gate: 'trim',     carries: 'review' },
   handleMessage:  { gate: 'trim',     carries: 'answer', through: 'converse' },
   hearCharm:      { gate: 'trim',     carries: 'answer', through: 'converse',
                     copy: 'the charm speaks what this returns, through ' +
@@ -7095,6 +7092,23 @@ test('every censused path gates, speaks and stores the same one text', () => {
         `${fn} stores what it sends only after speaking it, so a message he sends meanwhile reads a history without it`);
     }
   }
+});
+
+test('the week\'s review rides the Sunday briefing, gated by TRIM', () => {
+  /* THE CENSUS SEES ONE SENDER, and the review is a second text inside its
+     message. The critic reads the briefing alone, so the review carries its own
+     gate, and it is joined to what postBriefing stores and speaks — not sent
+     beside it, which is the two Sunday messages he asked to be one. */
+  const brief = bodyOf(EUGENIA_TS, 'async function postBriefing(', 'doji-eugenia no longer has postBriefing()');
+  assert.match(brief, /const review = due === 'sunday' \? weekReview\(left\) : null;/,
+    'the Sunday briefing no longer writes the week\'s review beside it');
+  assert.match(brief, /brief = await critique\([^;]*\+ \(review \? `\\n\\n\$\{await review\}` : ""\);/,
+    'the review is no longer joined to the briefing it rides with, so what is stored and spoken leaves it out');
+  const review = bodyOf(EUGENIA_TS, 'async function weekReview(', 'doji-eugenia no longer has weekReview()');
+  assert.match(review, /return await trim\(draft, desk, story\);/,
+    'the week\'s review goes out ungated: the critic reads the briefing alone');
+  assert.match(review, /catch \(err\) \{[\s\S]*return APOLOGY\.review;/,
+    'a broken review no longer says so in its place, or costs the briefing it rides with');
 });
 
 test('the two gates share the half that makes a gate safe', () => {

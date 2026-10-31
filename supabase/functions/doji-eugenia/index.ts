@@ -100,21 +100,12 @@ export function consolidateRetryDue(now: Date): boolean {
   return nyClock(now).hour === 23;
 }
 
-/* The weekly review: Saturday at 10:00 New York, the one morning no market is
-   open and nothing else is due. No retry: a review a day late is about a week
-   already behind him. A failure apologises, and ?review=1 runs it by hand. */
-export function reviewDue(now: Date): boolean {
-  const { wd, hour } = nyClock(now);
-  return wd === 6 && hour === 10;
-}
-
 /* What this hour owes — one answer, because the schedules overlap and each
    being right alone settles nothing. */
 export function dueNow(now: Date, briefed: boolean, consolidated: boolean):
-    Brief | 'consolidate' | 'review' | null {
+    Brief | 'consolidate' | null {
   const brief = briefDue(now);
   if (brief) return brief;
-  if (reviewDue(now)) return 'review';
   const retry = retryDue(now);
   if (retry && !briefed) return retry;
   // The gate makes 23:00 a retry rather than a second pass.
@@ -4022,9 +4013,6 @@ async function postScheduled(url: URL): Promise<Response> {
     const speak = url.searchParams.get("speak");
     if (speak) { job = 'speak'; return await postSpeak(speak); }
 
-    // The weekly review, by hand: a failed Saturday has no retry.
-    if (url.searchParams.get("review") === "1") { job = 'review'; return await postReview(); }
-
     const now = new Date();
     if (url.searchParams.get("force") === "1") {
       return await postBriefing(briefDue(now) ?? briefKind(now));
@@ -4034,7 +4022,6 @@ async function postScheduled(url: URL): Promise<Response> {
     const [briefed, consolidated] = await Promise.all([briefedToday(), consolidatedToday()]);
     const due = dueNow(now, briefed, consolidated);
     if (due === 'consolidate') { job = 'consolidate'; return await postConsolidation(); }
-    if (due === 'review') { job = 'review'; return await postReview(); }
     if (due) return await postBriefing(due);
 
     return json({ ok: true, skipped: "nothing due this hour" });
@@ -4192,6 +4179,9 @@ const WRITER_MS = 370_000;
    sent text, which is rebuilt every morning and would resend stale as history. */
 async function postBriefing(due: Brief): Promise<Response> {
   const opened = Date.now();
+  const left = () => Math.max(0, opened + WRITER_MS - Date.now());
+  // On Sunday the week behind is written beside it, on the same clock.
+  const review = due === 'sunday' ? weekReview(left) : null;
   // Filed before the reads, so she is handed this morning's calendar — and on a
   // Sunday the whole week.
   await (due === 'sunday' ? filedWeek(weekOf(new Date())) : filed());
@@ -4214,10 +4204,10 @@ async function postBriefing(due: Brief): Promise<Response> {
     + story + loops + calendar + desk + record + calls;
 
   await keepInput(`${due} briefing`, asked);
-  const left = () => Math.max(0, opened + WRITER_MS - Date.now());
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
                           'high', `${due} briefing`, CHAT_TOOLS, Math.min(TURN_MS, left()));
-  const brief = await critique(draft, notes, channels, desk, story, left());
+  const brief = await critique(draft, notes, channels, desk, story, left())
+    + (review ? `\n\n${await review}` : "");
 
   // The length lives in prose past a model call, where nothing else sees it.
   console.log(`doji-eugenia: ${due} briefing — ${brief.length} characters`);
@@ -4311,30 +4301,36 @@ export async function postSpeak(due: string): Promise<Response> {
   return json({ ok: true, spoke: due, how });
 }
 
-/* ─── The weekly review ────────────────────────────────────────────────────
+/* ─── The week behind, on Sunday ───────────────────────────────────────────
    Every coach has a cadence that is not about one trade: a look at the week's
-   process. Saturday, when no market is open, so it lands on nothing he is in
-   the middle of. She is handed the week computed — his stats with his own
-   answers, his rules, her calls — so nothing in it is counted by eye. TRIM
-   gates it, as every message she starts but the briefing and the trade look.
+   process. It rides the Sunday briefing, after it, as one message: he asked
+   for one thing on Sunday rather than a Saturday message of its own. She is
+   handed the week computed — his stats with his own answers, his rules, her
+   calls — so nothing in it is counted by eye. TRIM gates it, since the critic
+   reads the briefing alone, and the briefing's marker stores the two as sent.
    ───────────────────────────────────────────────────────────────────────── */
-export const reviewMarker = '[saturday review]';
 
 // His journal and his rules, to look at one trade or read why a rule exists.
 const REVIEW_TOOLS = [TRADES_TOOL, STRATEGY_TOOL];
 
-async function postReview(): Promise<Response> {
-  const [history, notes, portrait, stats, rules, calls, record, desk, story] = await Promise.all([
-    recent(), notesBlock(), portraitBlock(), readStats(7), checkAdherence(7), callsBlock(), recordBlock(),
-    positionsBlock(), thesisBlock(),
-  ]);
-  const asked = `${REVIEW}\n\nHis week, computed from the rows:\n${stats}\n\nHis rules over the week:\n${rules}` +
-    notes + portrait + calls + record + desk;
-  const draft = await ask([...history, { role: 'user', content: asked }], 'high', 'saturday review', REVIEW_TOOLS);
-  const review = await trim(draft, desk, story);
-  await remember([{ role: 'user', content: reviewMarker }, { role: 'assistant', content: review }]);
-  await sayAloud(review);
-  return json({ ok: true, reviewed: review.length });
+/* Never throws: a review that breaks costs its own paragraph, said as the
+   apology in its place, and never the briefing it rides with. */
+async function weekReview(left: () => number): Promise<string> {
+  try {
+    const [history, notes, portrait, stats, rules, calls, record, desk, story] = await Promise.all([
+      recent(), notesBlock(), portraitBlock(), readStats(7), checkAdherence(7), callsBlock(), recordBlock(),
+      positionsBlock(), thesisBlock(),
+    ]);
+    const asked = `${REVIEW}\n\nHis week, computed from the rows:\n${stats}\n\nHis rules over the week:\n${rules}` +
+      notes + portrait + calls + record + desk;
+    const draft = await ask([...history, { role: 'user', content: asked }], 'high', 'sunday review', REVIEW_TOOLS,
+                            Math.min(TURN_MS, left()));
+    return await trim(draft, desk, story);
+  } catch (err) {
+    console.error("doji-eugenia: the week's review broke —", why(err));
+    await recordRun({ caller: 'review job', ok: false, detail: why(err).slice(0, 500) });
+    return APOLOGY.review;
+  }
 }
 
 /* How silence is said. The whole reply, allowing a full stop; "Nothing much
