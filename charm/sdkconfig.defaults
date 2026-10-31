@@ -13,9 +13,6 @@ CONFIG_SPIRAM_FETCH_INSTRUCTIONS=y
 CONFIG_SPIRAM_RODATA=y
 CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_XIP_FROM_PSRAM=y
-# Every waking is a boot: the PSRAM's self-test costs 220 ms of each before
-# her face, and its found-bad answer is a reset she cannot act on.
-CONFIG_SPIRAM_MEMTEST=n
 CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y
 # Waveshare's example takes 64 KB of data cache; the cache is carved from the
 # same internal SRAM as the heap, and the screen and Wi-Fi do not fit beside
@@ -23,11 +20,6 @@ CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB=y
 CONFIG_ESP32S3_DATA_CACHE_32KB=y
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
 CONFIG_ESP32S3_DATA_CACHE_LINE_64B=y
-
-# The log is written to the UART as it happens, and at 115200 baud each
-# waking's few kilobytes of it held her start by a third of a second. Over USB
-# the log is not paced by this.
-CONFIG_ESP_CONSOLE_UART_BAUDRATE=921600
 
 CONFIG_FREERTOS_HZ=1000
 CONFIG_LV_USE_CLIB_MALLOC=y

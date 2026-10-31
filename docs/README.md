@@ -3646,9 +3646,8 @@ off before sleep, and that the speaker's amplifier, enabled on GPIO46 and left
 floating in sleep, is quiet. That a battery run down resets her as a brownout
 and so switches her off, and whether a cable alone switches her back on. How
 long a press from sleep takes to reach the listening notes: the serial log's
-`lit` and `listening` lines are timestamped from boot. That the panel comes up
-clean on 120 ms after sleep-out, where the board package waited 1.2 s in all
-(`PANEL_START` in `charm/main/main.c`). How much internal RAM is left once she is lit,
+`lit` and `listening` lines are timestamped from boot, and the board package's
+panel start alone waits 1.2 s. How much internal RAM is left once she is lit,
 and in how large a piece, which the `lit` line says. That a phone opens her
 setup page by itself from the code, as her DHCP's option 114 asks of it. How
 she is judged held or put down, which the serial log says at each change with
