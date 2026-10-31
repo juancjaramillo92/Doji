@@ -3387,6 +3387,20 @@ whole and reach her Wi-Fi, under a task watchdog armed to reset her if any of it
 hangs. Any reset before it is kept — a crash, a frozen screen, a waking with no
 network — has the bootloader start the app that was (`charm/main/ota.c`), so a
 build that cannot do the basics never stays on her past one waking.
+
+**Each waking he uses reports itself** (`report` in `charm/main/main.c`), as
+she goes back to sleep, and so does a new app's proof: one line posted to her
+door's `?report=1`, filed in `eugenia_runs` under the caller `charm` with the
+line as its `detail` — the app, what woke her and why the chip last reset, the
+lifts seen and not seen since the last report (counted through sleep, so a
+lift that lit nothing is still told), when she was lit and first listened in ms
+from boot, internal RAM when lit and at its lowest, the Wi-Fi signal, and how
+long she was up. Online only, one try of five seconds, never a reason to stay
+awake. So the board is read without a cable:
+
+```sql
+select at, detail from eugenia_runs where caller = 'charm' order by at desc limit 20;
+```
 Only a power-on chimes, so neither an update nor the setup's restart wakes
 anyone.
 

@@ -297,6 +297,10 @@ test('the charm waits out her silence, records what her door takes, and asks the
   const door = EUGENIA_TS.match(/if \(which !== '(\w+)' && which !== '(\w+)'\) \{/);
   assert.ok(asked.length && door, 'talk.c or charmBriefing no longer names the briefing as this test reads it');
   assert.deepEqual(asked, door.slice(1).sort(), 'the charm asks ?briefing= for a word her door does not answer, or misses one');
+  // The waking's report: the flag the charm sends is the one her door reads.
+  const sent = talk.match(/EUGENIA_DOOR "\?(\w+)=1", HTTP_METHOD_POST/)?.[1];
+  assert.ok(sent && EUGENIA_TS.includes(`searchParams.has("${sent}")`),
+    `the charm files its report under ?${sent}= and her door reads no such flag`);
 });
 
 /* The rest of what the charm reads off her door is not a name but a value:
