@@ -18,7 +18,8 @@
    flat namespace, no bundler, and nothing that reads a name before the browser
    does. It is compiled as its OWN program — one is modules and the other a
    classic script, and a shim written for the browser must not declare a name
-   into Deno.
+   into Deno. The laptop app is a third, and JavaScript: checked as such, its
+   two processes and their shared module in one program.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -64,7 +65,7 @@ const CODES = /^(.+)\((\d+),\d+\): error (TS2304|TS2552|TS6133): (.+)$/;
 /* The probe rides in every program, so each is separately proved to be
    compiling anything at all — a tsc run that matched no files reports a clean
    tree in exactly the voice a clean tree does. */
-function scope(files, scratchFiles = {}) {
+function scope(files, scratchFiles = {}, flags = []) {
   const scratch = mkdtempSync(join(tmpdir(), 'doji-types-'));
   try {
     writeFileSync(join(scratch, PROBE), PROBE_SRC);
@@ -77,7 +78,7 @@ function scope(files, scratchFiles = {}) {
       // tsc exits non-zero on any finding, including the planted ones and the
       // whole-typecheck noise above that this deliberately ignores.
       output = execFileSync(process.execPath,
-        [TSC, ...FLAGS, ...files, ...written, join(scratch, PROBE)],
+        [TSC, ...FLAGS, ...flags, ...files, ...written, join(scratch, PROBE)],
         { cwd: ROOT, encoding: 'utf8' });
     } catch (err) {
       if (err.stdout === undefined) throw err;
@@ -156,4 +157,23 @@ test('the app uses no name nothing declares, and declares none nothing uses', ()
     `declares is a TypeError the first time that branch is reached and the ` +
     `browser is the only thing that would ever have said so:\n` +
     app.real.join('\n'));
+});
+
+/* ─── The laptop ─────────────────────────────────────────────────────────────
+   Found rather than listed, outside what npm installed there. `electron` is
+   an import --noResolve leaves unread, which declares its names all the same;
+   `window.doji` is a property question, as `window.supabase` is. */
+const LAPTOP = readdirSync(join(ROOT, 'laptop'))
+  .filter(f => /\.(mjs|cjs)$/.test(f)).map(f => `laptop/${f}`);
+const laptop = scope(LAPTOP, {}, ['--allowJs', '--checkJs']);
+
+test('the compiler is reading the laptop app', () => {
+  assert.ok(LAPTOP.length >= 4, `only ${LAPTOP.length} laptop sources found — the walk has gone blind`);
+  proved('the laptop', laptop);
+});
+
+test('the laptop uses no name nothing declares, and declares none nothing uses', () => {
+  assert.deepEqual(laptop.real, [],
+    `the laptop runs where no suite can reach it, so a free variable there is ` +
+    `found by him, on the Mac:\n` + laptop.real.join('\n'));
 });

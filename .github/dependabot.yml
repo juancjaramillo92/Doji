@@ -4,7 +4,7 @@
 # this file is what keeps the pins from going stale: it bumps the SHA and the
 # `# vX.Y.Z` beside it together.
 #
-# The npm half is two dev dependencies that never ship. test.yml runs on the
+# The npm half at the root is two dev dependencies that never ship. test.yml runs on the
 # bump branch, so a jsdom or tsc release that changes what the suites see lands
 # red on a pull request. NEVER answer a golden.test.mjs failure there with
 # GOLDEN=write: the snapshot going red on a DOM change is the snapshot working.
@@ -17,5 +17,12 @@ updates:
 
   - package-ecosystem: npm
     directory: /
+    schedule:
+      interval: monthly
+
+  # The laptop's Electron is a browser with her key in it: its security
+  # releases are the reason this entry exists. laptop.yml builds the bump.
+  - package-ecosystem: npm
+    directory: /laptop
     schedule:
       interval: monthly

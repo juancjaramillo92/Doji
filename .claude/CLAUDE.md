@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 850 tests, eight suites
+npm test      # 860 tests, nine suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -527,6 +527,28 @@ What a change most often breaks:
 - **Flash `charm-full.bin`, never `charm.bin`** — the workflow checks the image
   holds the app at the first slot's offset, and `agree.test.mjs` holds that
   offset to `partitions.csv`.
+
+## The laptop
+
+`laptop/` is Electron, a fourth runtime, and the README's *The laptop* says
+what it does. Three levels of proof, as on the charm:
+
+- **Pure, and driven in `npm test`.** `frames.mjs` alone, fed `charmFrame`'s
+  bytes by `laptop.test.mjs`. A decision that can be pure goes there.
+- **Read.** Every copy it holds of the door or the charm — the header, the
+  form, the frames, the face's numbers and colours, the update's path — is
+  read out of both by `agree.test.mjs`; `types.test.mjs` asks it the two
+  scope questions as its own program.
+- **Only the Mac.** The window, the keys, the microphone, the capture, the
+  sound, the signature and the update. The README's *To check on the Mac
+  first* is that list. A Linux run under Xvfb drives the page and the main
+  process against a stand-in door, which proves the sequence and the drawing
+  and nothing about macOS.
+
+The key and the door stay in the main process; the page asks for nothing
+`preload.cjs` does not name. A face change is a change to the charm's numbers
+or to the body's, never to both in one place without the other — the charm's
+are held.
 
 ## The journal and her memory are backed up from outside the browser
 

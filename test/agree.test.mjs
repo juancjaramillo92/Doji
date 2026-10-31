@@ -405,6 +405,137 @@ test('the charm updates from what the workflow publishes, and the image holds th
   assert.equal(Number(checked[1]), Number(slot[1]), 'the workflow checks for the app at an offset the partition table does not boot from');
 });
 
+/* ─── The laptop: a third door, and the charm's face ───────────────────────
+   laptop/ is JavaScript in Electron, a fourth runtime beside the door it
+   calls and the charm whose face it draws. Every fact it shares with either
+   is a copy, read here out of both. */
+const LAPTOP_MAIN = source('laptop/main.mjs');
+const LAPTOP_FACE = source('laptop/face.mjs');
+const LAPTOP_DOOR = EUGENIA_TS.slice(EUGENIA_TS.indexOf('if (secretMatches(fromLaptop, LAPTOP_SECRET))'));
+
+test('the laptop reads her frames as the door numbers them, at the rate she speaks', async () => {
+  const frames = await import('../laptop/frames.mjs');
+  assert.deepEqual({ ...frames.FRAME }, { ...FRAME }, 'the laptop and her door number the frames differently');
+  const pcm = EUGENIA_TS.match(/^const PCM_RATE = ([\d_]+);$/m);
+  assert.ok(pcm, 'doji-eugenia no longer names the rate as this test reads it');
+  assert.equal(frames.PCM_RATE, Number(pcm[1].replace(/_/g, '')), 'the laptop plays her voice at a rate the vendor does not speak it at');
+});
+
+/* Both halves of the door: the header the laptop presents and the one the
+   door reads, the form's names in both directions, the types it sends and
+   what the door takes, and the briefing's two words. */
+test('the laptop knocks with the key, the form and the words her door reads', () => {
+  const sent = [...new Set([...LAPTOP_MAIN.matchAll(/'(x-laptop-[\w-]+)'/g)].map(m => m[1]))];
+  const read = [...new Set([...EUGENIA_TS.matchAll(/req\.headers\.get\("(x-laptop-[\w-]+)"\)/g)].map(m => m[1]))];
+  assert.ok(sent.length && read.length, 'the laptop or her door no longer names the key\'s header as this test reads it');
+  assert.deepEqual(sent, read, 'the laptop presents its key under a header her door does not read');
+
+  const appended = [...LAPTOP_MAIN.matchAll(/form\.append\('(\w+)', new Blob\(\[\w+\], \{ type: '([\w/]+)' \}\), '[\w-]+\.(\w+)'\)/g)];
+  const taken = [...LAPTOP_DOOR.matchAll(/form\?\.get\("(\w+)"\)/g)].map(m => m[1]);
+  assert.ok(appended.length >= 2 && taken.length >= 2, 'the laptop or her door no longer names the form\'s fields as this test reads them');
+  assert.deepEqual(appended.map(m => m[1]).sort(), taken.sort(), 'the laptop sends a field her door does not read, or the door reads one it never sends');
+  // The transcriber reads the format off the file, so its name and its type must agree.
+  for (const [, field, type, ext] of appended) {
+    assert.equal(type.split('/')[1].replace('jpeg', 'jpg'), ext, `the laptop sends ${field} as ${type} under a .${ext} name`);
+  }
+  const images = JSON.parse(EUGENIA_TS.match(/^const IMAGE_TYPES = (\[[^\]]+\]);$/m)?.[1].replace(/'/g, '"') ?? 'null');
+  assert.ok(images, 'doji-eugenia no longer lists IMAGE_TYPES as this test reads it');
+  const chart = appended.find(m => m[1] === 'chart');
+  assert.ok(chart && images.includes(chart[2]), `the laptop sends its chart as ${chart?.[2]}, which her door refuses`);
+
+  const asked = [...LAPTOP_MAIN.matchAll(/\?briefing=(\w+)/g)].map(m => m[1]).sort();
+  const door = EUGENIA_TS.match(/if \(which !== '(\w+)' && which !== '(\w+)'\) \{/);
+  assert.ok(asked.length && door, 'the laptop or charmBriefing no longer names the briefing as this test reads it');
+  assert.deepEqual([...new Set(asked)], door.slice(1).sort(), 'the laptop asks ?briefing= for a word her door does not answer, or misses one');
+  assert.match(LAPTOP_DOOR, /if \(briefing !== null\) return await charmBriefing\(briefing\);/,
+    'the laptop\'s door no longer answers the briefing as the charm\'s does');
+});
+
+/* A key is proved by asking the door with an empty form, and the statuses the
+   laptop takes as proof are the door's answers to a right key. */
+test('the laptop proves a key by the answers her door gives a right one', () => {
+  const kept = LAPTOP_MAIN.match(/if \(res\.status !== (\d+) && res\.status !== (\d+)\) return 'wrong';/);
+  assert.ok(kept, 'tryKey no longer judges a key as this test reads it');
+  const [empty, short] = kept.slice(1);
+  assert.match(LAPTOP_DOOR, new RegExp(`a recording, up to \\$\\{FILE_MAX\\} bytes\` \\}, ${empty}\\)`),
+    `the laptop takes a ${empty} as a right key, and her door refuses an empty form otherwise`);
+  assert.match(LAPTOP_DOOR, new RegExp(`"the laptop needs STT_URL, STT_KEY and TTS_KEY" \\}, ${short}\\)`),
+    `the laptop takes a ${short} as a right key at a door short of its vendors, and her door answers that otherwise`);
+  assert.match(LAPTOP_MAIN, /body: new FormData\(\), headers: \{ 'x-laptop-key': candidate \}/,
+    'tryKey no longer asks the door with an empty form');
+});
+
+test('the laptop records no more than her door takes', () => {
+  const number = (text, pattern, what) => {
+    const m = text.match(pattern);
+    assert.ok(m && /^[\d\s*+()_]+$/.test(m[1]), `${what} is no longer defined as this test reads it`);
+    return Function(`return ${m[1].replace(/_/g, '')}`)();
+  };
+  const ms = number(LAPTOP_FACE, /^const RECORD_MS = (.+);$/m, "face.mjs's RECORD_MS");
+  const bps = number(LAPTOP_FACE, /^const RECORD_BPS = (.+);$/m, "face.mjs's RECORD_BPS");
+  const max = number(EUGENIA_TS, /^const FILE_MAX = (.+);$/m, "doji-eugenia's FILE_MAX");
+  // Opus at a set bitrate runs over it by a few percent; half the room is the margin.
+  assert.ok(ms / 1000 * bps / 8 <= max / 2,
+    `the laptop records up to ${ms / 1000 * bps / 8} bytes and her door refuses past ${max}`);
+  assert.match(LAPTOP_FACE, /audioBitsPerSecond: RECORD_BPS/, 'the recorder no longer records at RECORD_BPS');
+  assert.match(LAPTOP_FACE, /recorder\.stop\(\); \}, RECORD_MS\);/, 'nothing stops a recording at RECORD_MS');
+});
+
+/* The face is the charm's, drawn by a second hand. Its geometry in
+   face_geometry_t's order, its thought dots, the four colours of the drawing
+   itself and the emeralds of the ring, each read out of face.c and palette.h. */
+test('the laptop draws the charm\'s face, at the charm\'s numbers and in its colours', () => {
+  const face = source('charm/main/face.c');
+  const numbers = (text) => [...text.matchAll(/-?\d+(?:\.\d+)?/g)].map(m => Number(m[0]));
+  const block = (text, from, what) => {
+    const at = text.indexOf(from);
+    assert.ok(at > -1, `${what} no longer begins as this test reads it`);
+    return text.slice(at + from.length, text.indexOf(';', at));
+  };
+  const geometry = numbers(block(face, 'static const face_geometry_t F =', "face.c's F"));
+  assert.ok(geometry.length >= 15, `only ${geometry.length} numbers in face.c's F — the reader has gone blind`);
+  assert.deepEqual(numbers(block(LAPTOP_FACE, 'const F =', "face.mjs's F").replace(/eye_[lr]|mouth_w/g, '')), geometry,
+    'the laptop draws her eyes, highlight or smile somewhere the charm does not');
+  assert.deepEqual(numbers(block(LAPTOP_FACE, 'const DOTS =', "face.mjs's DOTS")),
+    numbers(block(face, 'static const float dots[3][3] =', "face.c's thought dots").replace(/\[3\]\[3\]/, '')),
+    'the laptop\'s thought dots are not where the charm\'s are');
+
+  const drawn = bodyOf(face, 'static void draw_face(', 'face.c has no draw_face()');
+  const inks = [...new Set([...drawn.matchAll(/lv_color_hex\(0x([0-9a-f]{6})\)/gi)].map(m => `#${m[1].toLowerCase()}`))].sort();
+  const copied = LAPTOP_FACE.match(/^const FEATURES = '(#\w+)', SHINE = '(#\w+)', THROAT = '(#\w+)', THOUGHT = '(#\w+)';$/m);
+  assert.ok(inks.length >= 4 && copied, 'face.c or face.mjs no longer names the drawing\'s colours as this test reads them');
+  assert.deepEqual(copied.slice(1).sort(), inks, 'the laptop draws her face in colours the charm does not');
+
+  const palette = Object.fromEntries([...source('charm/main/palette.h').matchAll(/^#define (\w+)\s+0x([0-9a-f]{6})/gim)]
+    .map(m => [m[1], `#${m[2].toLowerCase()}`]));
+  const emeralds = [...LAPTOP_FACE.matchAll(/\b([A-Z]+) = '(#[0-9a-f]{6})'/g)].filter(m => m[1] in palette);
+  assert.ok(emeralds.length >= 4, `only ${emeralds.length} of palette.h's colours found in face.mjs — the reader has gone blind`);
+  for (const [, name, hex] of emeralds) assert.equal(hex, palette[name], `face.mjs's ${name} is not palette.h's`);
+  // The ring turns through the charm's RING, in its order.
+  const ring = face.match(/static const uint32_t RING\[\] = \{ ([A-Z, ]+) \};/)?.[1].split(', ');
+  assert.ok(ring, 'face.c no longer lists RING as this test reads it');
+  assert.match(LAPTOP_FACE, new RegExp(`\\[${ring.join(', ')}\\]\\.forEach`), 'the laptop\'s ring turns through other colours than the charm\'s');
+});
+
+/* Where the laptop's update lives: the objects the workflow writes, the ones
+   the app reads, and the version the build stamped, written beside it. */
+test('the laptop looks for its update where the workflow publishes it', () => {
+  const workflow = source('.github/workflows/laptop.yml');
+  const written = [...workflow.matchAll(/\/storage\/v1\/object\/(laptop\/[\w.]+)"/g)].map(m => m[1]).sort();
+  const base = LAPTOP_MAIN.match(/^const UPDATES = '[^']+\/storage\/v1\/object\/public\/(\w+)';$/m)?.[1];
+  const read = [...LAPTOP_MAIN.matchAll(/`\$\{UPDATES\}\/([\w.]+)`/g)].map(m => `${base}/${m[1]}`).sort();
+  assert.ok(written.length === 2 && base, 'laptop.yml or main.mjs no longer names the update as this test reads it');
+  assert.deepEqual(read, written, 'the laptop reads its update from where the workflow does not write it');
+  const stamped = workflow.match(/echo "\$\{GITHUB_SHA:0:12\}" > (\S+)/)?.[1];
+  assert.ok(stamped && LAPTOP_MAIN.includes(`join(here, '${stamped}')`), 'the app reads its version from another file than the build stamps');
+  assert.match(workflow, /printf '%s' "\$\{GITHUB_SHA:0:12\}" \| curl/, 'the version published is not the one the build stamped');
+  assert.match(workflow, /if: github\.ref == 'refs\/heads\/main' && env\.SIGNED == '1'/,
+    'an unsigned build can be published, and every one would be a stranger to macOS');
+  // The zipped app is what the swap unpacks, under the name the bundle has.
+  assert.match(workflow, /ditto -c -k --keepParent Eugenia\.app Eugenia\.zip/);
+  assert.match(LAPTOP_MAIN, /mv "\$\{unpacked\}\/Eugenia\.app"/, 'the update unpacks an app by another name than the workflow zips');
+});
+
 /* The conversation comes first, and a trade waits for it to end. Its
    questions come up only once the conversation is over with him looking —
    never after a single answer, never before a waiting briefing, which is read
@@ -1088,18 +1219,19 @@ const read = (path) => ({ path, text: source(path) });
 
 // Everything that names a FUNCTION, each on its own, so one that stops naming
 // any is not covered by the others: Gladys's trigger, the trade event, the
-// schedules, the Apps Script and the charm.
+// schedules, the Apps Script, the charm and the laptop.
 const CALLERS = [
   ...['Gladys', 'Her senses', 'Everything that runs on a timer']
     .map(t => ({ path: `schema.sql (${t})`, text: subject(t) })),
   read('doji_gmail_sync.gs'),
   read('charm/main/net.h'),
+  read('laptop/main.mjs'),
 ];
 
 // Every file that names the PROJECT, which is a longer list: the app connects
 // to it, config.toml links the CLI to it and the deploy workflow pushes to it.
 const PROJECT_FILES = ['supabase/schema.sql', 'doji_gmail_sync.gs', 'index.html',
-  'supabase/config.toml', '.github/workflows/deploy-functions.yml', 'charm/main/net.h'].map(read);
+  'supabase/config.toml', '.github/workflows/deploy-functions.yml', 'charm/main/net.h', 'laptop/main.mjs'].map(read);
 
 const called = (text) =>
   [...text.matchAll(/https:\/\/([a-z0-9]+)\.supabase\.co\/functions\/v1\/([a-z0-9-]+)/g)]
