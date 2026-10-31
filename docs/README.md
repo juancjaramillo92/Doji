@@ -2080,6 +2080,49 @@ curl -sN --data-binary @ask.ogg -H "x-charm-key: $EUGENIA_CHARM_SECRET" \
   play -t raw -r 24000 -e signed -b 16 -c 1 -
 ```
 
+### The laptop — her face over his charts
+
+When he trades away from home without the charm, the laptop is a third door
+into the same conversation. **Nothing about her changes**: the turn is
+`hear`, the charm's own — `converse`, the same memory, gate, prohibitions and
+voice — and she is told nothing of the device, as she is told nothing of
+Telegram. The charm's door hands her its battery and volume; the laptop has
+neither to tell.
+
+The laptop posts a **form** to `doji-eugenia` with `x-laptop-key:
+<EUGENIA_LAPTOP_SECRET>`: the recording as `voice`, and the **TradingView
+window** as `chart` when he asks her to look. The chart rides beside his words
+as a chart sent in Telegram does — one of the four image types the API reads,
+up to `FILE_MAX` — and is not stored; the Telegram copy says it was there,
+`«what she heard» — with your chart`. The answer is the charm's: the same
+frames, the same silence while she thinks, kept past a laptop that hangs up.
+`?briefing=ready` and `?briefing=today` answer the laptop as they answer the
+charm.
+
+**The recording keeps the name and type the laptop gave it.** A laptop's
+browser engine records WebM, not the charm's Ogg, and the transcriber reads
+the format off the file, so the door passes both through rather than naming
+the file itself.
+
+**The door refuses before it works**, as the charm's does: a wrong key is a
+401; without `STT_URL`, `STT_KEY` and `TTS_KEY` a 503 naming them; no
+recording, an empty one or one past `FILE_MAX` a 400, and so is a chart that
+is not an image the API reads, or too large. **`EUGENIA_LAPTOP_SECRET` is
+optional and its own** — unset, the door is shut, and a lost laptop is cut off
+without touching the charm.
+
+On a Mac, `sox`, `ffmpeg` and `screencapture` stand in for it — the same pipe
+as the charm's above, with the form in place of the body:
+
+```sh
+rec -r 16000 -c 1 -b 16 ask.wav      # talk, then Ctrl-C
+ffmpeg -loglevel error -i ask.wav -c:a libopus -b:a 24k ask.webm
+screencapture -x chart.png           # optional: what she looks at
+curl -sN -H "x-laptop-key: $EUGENIA_LAPTOP_SECRET" \
+     -F "voice=@ask.webm;type=audio/webm" -F "chart=@chart.png;type=image/png" \
+     "https://<project>.supabase.co/functions/v1/doji-eugenia" | node -e '…' | play …
+```
+
 ### Whether it landed
 
 An instruction note is the only correction channel he has, and it fires only
@@ -3015,6 +3058,7 @@ Three things outside the SQL, none of which fails loudly:
   supabase secrets set TTS_KEY=<key>
   supabase secrets set EMBED_KEY=<key>
   supabase secrets set EUGENIA_CHARM_SECRET=$(openssl rand -hex 32)   # her charm, which needs STT and TTS
+  supabase secrets set EUGENIA_LAPTOP_SECRET=$(openssl rand -hex 32)  # her face on the laptop, which needs STT and TTS
   supabase secrets set GLADYS_CHARM_SECRET=$(openssl rand -hex 32)    # Gladys's charm
   ```
 
@@ -4050,7 +4094,7 @@ home-screen shortcut and every bookmark open `/`.
 | `test/fold.test.mjs` | the pure logic of all five Edge Functions, `_shared` and `adherence.ts`: a real `get_deals` capture folded and cross-checked against the real email for the trade they share; the poller's fold, windows, balance and plan rules; the email boundary and its three outcomes; Gladys's grammar, rendering and settling, with the two redraws agreeing on every before-state; Eugenia's schedules walked hour by hour, her renderings, gates, voice fallback and tool loop driven through `ask()`; every one of the twelve rules in both directions; and the TradingView sign-in and folds |
 | `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load — past one page — save and soft delete, the scratch rule and aggregates, the money split and averages, the week boundary, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the snapshot, the offline boot, and the watch card |
 | `test/golden.test.mjs` | the snapshot: the real page on fixed fixtures and a frozen clock, every derived value and every panel's markup compared against `test/golden.json`, plus `Dates.session` swept across the four DST changeovers; and `test/golden-fold.json`, everything the folds return off the real captures — the rows the poller writes through its two windows, the email parsed and bounded, the calendar folded, and Eugenia's rule verdicts, day standings and stats over that week, with what she is told about each. Regenerate with `GOLDEN=write npm test`, deliberately, in the commit that changes behaviour — never to make a red run go away |
-| `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the charm driven end to end through the real turn — the reply read as the charm reads its frames, silence first, the recording transcribed as the Ogg it is, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, its headers in her turn and the volume she set sent ahead of her voice and nowhere else, the battery line spoken after her answer and neither copied nor stored, a wordless recording answered on the charm alone, and the door refusing a missing vendor, an empty recording and a wrong key; and the briefing on the charm, her ready line then today's briefing read as `pcm` in frames, the right day's briefing asked for, a `204` while none is stored; and Gladys's charm told what waits oldest first and a week back, its answer writing exactly one of the four columns, an edit, a stray column and a malformed body refused, and the door shut without its secret; and between the functions, every door Eugenia reads but the quote — the calendar, the market, its weeks, the rate odds, the wires, futures volume, the flows, his charts and the bars her calls are scored on — served by the real `doji-tradingview` and poller handlers off stubbed vendors, and read by her as she reads it |
+| `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the charm driven end to end through the real turn — the reply read as the charm reads its frames, silence first, the recording transcribed as the Ogg it is, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, its headers in her turn and the volume she set sent ahead of her voice and nowhere else, the battery line spoken after her answer and neither copied nor stored, a wordless recording answered on the charm alone, and the door refusing a missing vendor, an empty recording and a wrong key; and the briefing on the charm, her ready line then today's briefing read as `pcm` in frames, the right day's briefing asked for, a `204` while none is stored; and the laptop through the same turn — the recording transcribed under the name and type it sent, the chart reaching her turn as the image he showed and named in the copy, no image and no chart named when he showed none, her turn told nothing of a charm, the door refusing a missing vendor, a missing, empty or oversized recording, a chart she cannot read or too large, a body that is not a form, a wrong key and the charm's, shut while its secret is unset with the charm's still open, and the briefing answered as on the charm; and Gladys's charm told what waits oldest first and a week back, its answer writing exactly one of the four columns, an edit, a stray column and a malformed body refused, and the door shut without its secret; and between the functions, every door Eugenia reads but the quote — the calendar, the market, its weeks, the rate odds, the wires, futures volume, the flows, his charts and the bars her calls are scored on — served by the real `doji-tradingview` and poller handlers off stubbed vendors, and read by her as she reads it |
 | `test/charm.test.mjs` | the charm's pure C — `charm/main/briefing.c`, `charm/main/errand.c`, `charm/main/lift.c`, `charm/main/dns.c`, `charm/main/ogg.c` and `charm/main/frames.c` — compiled on the machine running the suite and driven in the zone the charm reads its clock in, out of `charm/main/net.c`: the briefing watch against `briefDue` and `retryDue` every five minutes of both weeks the clocks change in, an announced briefing not asked for again until the next day, and waiting until New York's midnight and no longer, on the server's own day, never before the clock is set, the wait between errands longer for each that found no network and never an hour, and over the weekend, every five minutes of both weeks the clocks change in against `marketOpen`, half-hourly with the open woken for unless a trade waits, a lift judged on readings, held and put down told apart, the setup's answer to a name, with and without the EDNS record a phone may add, a recording's Ogg file page by page against the specification's CRC, and her answer read out of `charmFrame`'s own bytes however the reads fall; and the firmware's names, the other of the two scope questions in C — every static, macro and enum constant a file declares used in it, every function a header declares called from another file, every non-static function in a header — since the ESP-IDF build refuses a name declared nowhere and only warns of one used nowhere |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions and the app as two programs — with one planted defect per question proving the check can fail |
