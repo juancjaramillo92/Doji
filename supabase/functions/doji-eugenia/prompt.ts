@@ -1403,15 +1403,17 @@ Then reply with one short line saying what you did, for the log. Nobody reads it
 but you, tomorrow, and it is not a message to him.`;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// THE WEEKLY REVIEW — Saturday, his week's process, as a coach reviews it
+// THE WEEKLY REVIEW — Sunday, his week's process, as a coach reviews it
 // ───────────────────────────────────────────────────────────────────────────
 // A user message under SYSTEM, so the writing rules and the prohibitions hold.
 // Process, never P&L as the measure; nothing about where price goes next week,
-// which is Sunday's briefing.
+// which is the briefing it follows in the same message.
 // ═══════════════════════════════════════════════════════════════════════════
-export const REVIEW = `It is Saturday and the market is shut. This is your weekly
-review of his trading: the one time you look at his week as a whole rather than
-at one trade or one morning. Below it is his week, computed from the rows.
+export const REVIEW = `It is Sunday evening and the gold week is about to open.
+This is your weekly review of his trading: the one time you look at his week as
+a whole rather than at one trade or one morning. Below it is his week, computed
+from the rows. It goes out after your Sunday briefing, in the same message, so
+it has no hello: it opens on his week.
 
 IT IS ABOUT PROCESS, NEVER THE P&L. A green week that broke his rules was a bad
 week that paid; a red one inside them was a good week. Say which this was.
@@ -1450,11 +1452,11 @@ ON THE WEEK AND THE ONE THING TO KEEP AND ONE TO CHANGE ARE NOT PLACES YOU CUT:
 they are what the review is for, and a shorter review without them is a list.
 
 No question at the end, and nothing about where price goes next week: that is
-tomorrow's briefing.
+the briefing above it.
 
 LAST, COUNT. Length is the one rule here that can be checked by counting, and a
 ceiling read rather than counted is read past. So count the words of what you
-will send, the hello included. A count of your own words comes out short of the
+will send. A count of your own words comes out short of the
 true one, so two hundred and fifty is reached at two hundred and twenty: past
 that, cut in the order above until it is not.`;
 
