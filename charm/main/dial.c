@@ -138,8 +138,12 @@ void dial_slide(lv_point_t p) {
     if (d < -(float)M_PI) d += 2 * (float)M_PI;
     angle = a;
     if (!held) {
-        if (hypotf(p.x - 233, p.y - 233) < RIM) armed = false;
-        if (!armed || fabsf(travel += d) < ENGAGE) return;
+        if (hypotf(p.x - 233, p.y - 233) < RIM) {
+            armed = false;
+            return;
+        }
+        travel += d;
+        if (fabsf(travel) < ENGAGE) return;
         held = true;
         volume = set = cfg.volume;
         if (!veil) {

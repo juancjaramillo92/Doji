@@ -420,13 +420,13 @@ single-sourced at run time:
 | the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys`, two in `doji-eugenia` — each stating `hourCycle: 'h23'`, since a locale resolving to h24 renders midnight as 24 and breaks `nyParts` and `nyWall` |
 | the **charm's answer frames** | `FRAME` and `charmFrame` in `doji-eugenia`, and `FRAME_VOICE` and `FRAME_VOLUME` in `charm/main/frames.h`, whose parser `charm.test.mjs` feeds `charmFrame`'s own bytes |
 | the **charm's headers** | each `x-charm-` header `charm/main/talk.c` sets and `doji-eugenia` reads, in both directions, and the value she compares two of them with |
-| the **rate her voice plays at** | `HER_RATE` in `charm/main/talk.c` and `PCM_RATE` in `doji-eugenia`, the vendor's `pcm` |
+| the **rate her voice plays at** | `HER_RATE` in `charm/main/talk.c` and `PCM_RATE` in `doji-eugenia`, the vendor's `pcm`, and `SOUND_RATE` in `charm/main/sound.h`, which the codecs open at for his words and the notes, so her voice never reopens them |
 | what **Gladys's charm** reads and posts | the keys `charm/main/gladys.c` reads off her door's answer and the trade in it, against `waiting()`'s answer and `SELECT`, and the one key it posts, against what `charmAnswer` reads |
 | what a **right key** gets at each door | the statuses `charm/main/setup.c` takes as a key proved, and the refusals and the answer each door gives a right one |
 | how long the **charm waits out her silence** | `READ_MS` in `charm/main/talk.c`, at least two of `BEAT_MS` in `doji-eugenia`, or the charm hangs up while she thinks |
 | the **largest recording** | `FILE_ROOM` in `charm/main/talk.c`, at most `FILE_MAX` in `doji-eugenia` |
 | what the charm asks **`?briefing=`** for | the two in `charm/main/talk.c` and the two `charmBriefing` answers |
-| where the **charm's update** lives | `FIRMWARE_URL` in `charm/main/net.h`, and the bucket and object `.github/workflows/charm.yml` makes and writes |
+| where the **charm's update** lives | `FIRMWARE_URL` in `charm/main/net.h`, and the bucket and object `.github/workflows/charm.yml` makes and writes; the version it writes beside the image, the one the build stamped, and the object `APP_VERSION_URL` in `doji-gladys` reads it from |
 | where the **charm's app** boots from | the first app slot's offset in `charm/partitions.csv` and the offset `.github/workflows/charm.yml` checks the image against |
 | the **briefing's hours** | `briefDue` and `retryDue` in `doji-eugenia`, and the charm's `BRIEF_WEEKDAY`, `BRIEF_SUNDAY` and `BRIEF_RETRIES` with the line that gives each day its hour — the charm sleeps, so it wakes to ask in those hours |
 | the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts`, `ROLL_HOUR` in `index.ts`, and the charm's `ROLL_HOUR` in `charm/main/errand.c` with the days its weekend is made of, which `charm.test.mjs` walks against `marketOpen` |
@@ -3670,15 +3670,19 @@ an empty sleep screen, and that it shows black while held; the codecs switched
 off before sleep, and that the speaker's amplifier, enabled on GPIO46 and left
 floating in sleep, is quiet. That a battery run down resets her as a brownout
 and so switches her off, and whether a cable alone switches her back on. How
-long a press from sleep takes to reach the listening notes: the serial log's
-`lit` and `listening` lines are timestamped from boot, and the board package's
-panel start alone waits 1.2 s. How much internal RAM is left once she is lit,
-and in how large a piece, which the `lit` line says. That a phone opens her
+long a press from sleep takes to reach the listening notes: the report's `lit`
+and `listen` are timestamped from boot, as the serial log's lines are, and the
+board package's panel start alone waits 1.2 s. How much internal RAM is left
+once she is lit, and in how large a piece, which the report's `free` and
+`largest` say. Whether lifts wake her at all, which the report's `lifts` counts.
+That the louder levels — 33 dB at the microphones, her voice doubled and
+rounded off — neither hiss nor crack. That a new app whose screen hangs trips
+the watchdog in its proof and is rolled back. That a phone opens her
 setup page by itself from the code, as her DHCP's option 114 asks of it. How
 she is judged held or put down, which the serial log says at each change with
 the reading. That the emeralds read on the panel as they
 were chosen on a screen: the ring, the journal's halves, the dial, the sleep
-marks and her blob, where a dark green in RGB565 may band or go muddy.
+marks, where a dark green in RGB565 may band or go muddy.
 
 ---
 
