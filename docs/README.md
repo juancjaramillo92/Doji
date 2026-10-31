@@ -102,7 +102,7 @@ test/                                   node:test suites — see Tests
 .github/workflows/backup.yml            the daily copy of the tables nothing else holds
 .github/workflows/health.yml            the hourly outside check; a failed run is the alarm
 .github/workflows/charm.yml             builds the charm firmware, kept as a download; main's is her update
-.github/workflows/laptop.yml            builds the laptop app, signed with his certificate; main's is her update
+.github/workflows/laptop.yml            builds the laptop app, signed with the certificate it keeps; main's is her update
 .github/workflows/calibrate.yml         runs scripts/calibrate.mjs, by hand from the Actions tab
 .github/workflows/eval.yml              runs scripts/eval.mjs --plant, or one case alone, by hand from the Actions tab
 .github/workflows/replay.yml            runs scripts/replay.mjs, by hand from the Actions tab
@@ -2179,12 +2179,17 @@ encrypted by the Keychain. The key and the door live in the app's main
 process alone; the page that draws her has neither, and asks for nothing but
 what `preload.cjs` names.
 
-**It is signed with his own certificate, never Apple's**, which costs nothing
-and is why macOS keeps her microphone and screen permissions from one version
-to the next: they belong to a signer, and an ad-hoc signature is a new signer
-every build. A build without the certificate is signed ad hoc, proves only
-that the app packages, and is never published. Unsigned by Apple, the first
-launch is refused once: System Settings → Privacy & Security → *Open Anyway*.
+**It is signed with a certificate of its own, never Apple's**, which costs
+nothing and is why macOS keeps her microphone and screen permissions from one
+version to the next: they belong to a signer, and an ad-hoc signature is a new
+signer every build. The first build makes the certificate and keeps it in a
+private bucket, `laptop-signing`, read only with the secret key; every build
+after signs with that one. Only the bucket's answer that there is none makes
+a new one — any other failure to read it stops the build rather than signing
+with a stranger — and a new one never overwrites the kept one. Lost, the next
+build makes another, and macOS asks for her permissions once more. Unsigned
+by Apple, the first launch is refused once: System Settings → Privacy &
+Security → *Open Anyway*.
 
 **She updates from `main`.** The workflow publishes `Eugenia.zip` and its
 version — the commit, stamped into the app as `build.txt` — to a public
@@ -4063,17 +4068,13 @@ the jobs, and `agree.test.mjs` holds that count against `schema.sql`.
    Connect TradingView (see **TradingView**), then walk the history door once
    from a year back — see **Applying her schema**.
 8. Run `supabase/verify.sql`. Nothing is set up until it agrees.
-9. For the laptop, when it is wanted:
-   - **His certificate**, once, in Keychain Access: Certificate Assistant →
-     Create a Certificate…, named `Eugenia`, Identity Type *Self Signed Root*,
-     Certificate Type *Code Signing*. Export it from My Certificates as a
-     `.p12` with a password, and store it in the repository's Actions secrets:
-     `base64 -i Eugenia.p12` as `LAPTOP_CERT_P12`, the password as
-     `LAPTOP_CERT_PASSWORD`.
+9. For the laptop, when it is wanted — its certificate is the workflow's to
+   make:
    - **Room for the app** in Storage: the project's upload limit (Project
      Settings → Storage) must pass the zipped app, about 130 megabytes;
      the workflow's bucket allows three hundred.
-   - `supabase secrets set EUGENIA_LAPTOP_SECRET=$(openssl rand -hex 32)`.
+   - `EUGENIA_LAPTOP_SECRET` in Edge Function secrets, a long random value
+     kept somewhere he can copy it from: the app asks for it once.
    - Run Actions → laptop on `main`, download
      `https://<project>.supabase.co/storage/v1/object/public/laptop/Eugenia.zip`,
      put Eugenia in Applications, open it, *Open Anyway* once, paste the key,

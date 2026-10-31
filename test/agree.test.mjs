@@ -529,8 +529,21 @@ test('the laptop looks for its update where the workflow publishes it', () => {
   const stamped = workflow.match(/echo "\$\{GITHUB_SHA:0:12\}" > (\S+)/)?.[1];
   assert.ok(stamped && LAPTOP_MAIN.includes(`join(here, '${stamped}')`), 'the app reads its version from another file than the build stamps');
   assert.match(workflow, /printf '%s' "\$\{GITHUB_SHA:0:12\}" \| curl/, 'the version published is not the one the build stamped');
-  assert.match(workflow, /if: github\.ref == 'refs\/heads\/main' && env\.SIGNED == '1'/,
-    'an unsigned build can be published, and every one would be a stranger to macOS');
+  // One signer for every build, or macOS asks again for her permissions after
+  // each update: the kept certificate signs, one is made only when the bucket
+  // answers that there is none, and the upload of a new one never overwrites.
+  const sign = workflow.slice(workflow.indexOf('- name: Sign'), workflow.indexOf('- name: Check the signature'));
+  assert.match(sign, /kept="\$SUPABASE_URL\/storage\/v1\/object\/laptop-signing\/Eugenia\.p12"/,
+    'the build no longer signs with the certificate it keeps');
+  assert.match(sign, /if \[ "\$status" = 400 \] \|\| \[ "\$status" = 404 \]; then/,
+    'a new certificate is made on some answer other than that there is none');
+  assert.match(sign, /elif \[ "\$status" != 200 \]; then[^\n]*\n[^\n]*exit 1/,
+    'a certificate that could not be read no longer stops the build, so a stranger can sign it');
+  assert.doesNotMatch(sign, /x-upsert/, 'a new certificate can overwrite the kept one');
+  assert.match(sign, /"public":false/, 'the signing certificate is kept in a bucket anyone can read');
+  assert.doesNotMatch(sign, /--sign -/, 'a build can still be signed ad hoc');
+  assert.match(workflow, /- name: Publish the update\n\s*if: github\.ref == 'refs\/heads\/main'\n/,
+    'a build of a branch can publish the update');
   // The zipped app is what the swap unpacks, under the name the bundle has.
   assert.match(workflow, /ditto -c -k --keepParent Eugenia\.app Eugenia\.zip/);
   assert.match(LAPTOP_MAIN, /mv "\$\{unpacked\}\/Eugenia\.app"/, 'the update unpacks an app by another name than the workflow zips');
