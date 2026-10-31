@@ -4071,7 +4071,7 @@ the jobs, and `agree.test.mjs` holds that count against `schema.sql`.
      `base64 -i Eugenia.p12` as `LAPTOP_CERT_P12`, the password as
      `LAPTOP_CERT_PASSWORD`.
    - **Room for the app** in Storage: the project's upload limit (Project
-     Settings → Storage) must pass the zipped app, about a hundred megabytes;
+     Settings → Storage) must pass the zipped app, about 130 megabytes;
      the workflow's bucket allows three hundred.
    - `supabase secrets set EUGENIA_LAPTOP_SECRET=$(openssl rand -hex 32)`.
    - Run Actions → laptop on `main`, download
