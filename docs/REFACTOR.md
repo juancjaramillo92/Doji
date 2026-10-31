@@ -1166,6 +1166,39 @@ Those emails are the only alarm on the script itself.
 **Revisit if:** something other than Google's emails comes to watch the script
 run.
 
+### R-130 — the Sunday review's TRIM on the writer's clock
+**Deferred.** `weekReview` drafts within what is left of `WRITER_MS`, but its
+`trim()` runs on `TURN_MS`, since `trim` takes no budget and four tests read its
+shape. The review runs beside the briefing, not after it, and TRIM is a short
+Sonnet call, so it adds to the worker's time only when the review is the slower
+half. Giving `trim` a budget for one caller is the options-for-one-caller this
+file refuses until a run needs it.
+**Revisit if:** a `sunday briefing delivered` row's `ms` nears `pace_line`'s
+ceiling.
+
+### R-131 — the week's review kept as a door of its own
+**Why refused:** `?review=1` sent the Saturday review by hand when its hour
+failed. The review now rides the Sunday briefing: a failed Sunday retries whole,
+review included, and a review that alone breaks says so in its place and costs
+the briefing nothing. A door that sends a review on its own would be the second
+Sunday message he asked to be one; he can ask her for his week.
+**Revisit if:** he asks for the review on a day other than Sunday.
+
+### R-132 — `ota_confirm` inlined into `prove`
+**Why refused:** it only forwards to `esp_ota_mark_app_valid_cancel_rollback`,
+and has one caller since the join stopped confirming. It stays: `ota.h` is
+where an update's lifetime is told — offered, written, unproven, kept — and
+`agree.test.mjs` finds the one place an app is kept by that name.
+**Revisit if:** `ota.c` is folded into `main.c`.
+
+### R-133 — a guard on an empty version in the charm workflow's publish
+**Why refused:** the publish writes `$CHARM_VERSION`, which the build step
+hands it through `GITHUB_ENV`. Were it ever empty, Gladys's door would answer
+an empty `app`, which `ota_offered` refuses, so the cost is the same-day update
+alone: the night's look reads the version out of the image itself. A check for
+a runner failing its own mechanism is padding.
+**Revisit if:** a published `charm/version` is ever found empty.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED
