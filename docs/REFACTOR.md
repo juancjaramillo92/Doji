@@ -22,7 +22,7 @@ any change that touches it.
 | realtime, auth | a live two-tab and sign-in test |
 | the live database | `verify.sql`, run by hand |
 | retrieval quality | a golden set that does not exist |
-| the Apps Script's Gmail half | `gs.mjs` reaches the parser only |
+| the Apps Script's Gmail half | the Executions log in the Apps Script editor; `gs.mjs` drives the parser and `syncPepperstone`'s labelling against stubs, never Gmail |
 | an Edge Function path no test can drive | `types.test.mjs` for the names in it; the rest by reading |
 | whether a prompt still behaves | `scripts/eval.mjs`, run by hand with his key — nothing in `npm test` calls the model |
 | whether a tool's description still says what she needs | reading it against the column or door it describes — the eval sends no tools (R-111) |

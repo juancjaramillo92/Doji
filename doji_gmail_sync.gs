@@ -34,7 +34,8 @@
  *   4. Run `testSecret` → confirms the function accepts the secret. Writes
  *      nothing: it deliberately sends a fill that cannot be valid.
  *   5. Run `syncPepperstone` once by hand → confirm a row moved in Supabase.
- *   6. Triggers → syncPepperstone · Time-driven · Minutes · Every minute.
+ *   6. Triggers → syncPepperstone · Time-driven · Minutes · Every minute ·
+ *      Failure notifications · Daily, never off (README, Deployment, says why).
  */
 
 var SYNC_URL = 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-email-sync';

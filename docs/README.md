@@ -3877,11 +3877,12 @@ the jobs, and `agree.test.mjs` holds that count against `schema.sql`.
    store it in Edge Function secrets and in the script's Script Properties —
    never in the file. It is separate from the cron secret because it is the only
    one living outside your own infrastructure, so it opens the narrowest door
-   there is. Run `testParse`, then `testSecret`, then trigger `syncPepperstone`
-   every minute, with its failure notifications **daily**, never off. A run a
-   minute meets Google's transient *server error* a few times a day, and the
-   next run is the retry; but those emails are the only alarm on the script
-   itself, since `sync_health` reads the email path's silence as a quiet week.
+   there is. Then follow the SETUP block at the head of `doji_gmail_sync.gs`,
+   the one list of the script's steps, kept where it is followed. Its trigger's
+   failure notifications stay **daily**, never off: a run a minute meets
+   Google's transient *server error* a few times a day, and the next run is the
+   retry, but those emails are the only alarm on the script itself, since
+   `sync_health` reads the email path's silence as a quiet week.
 5. For Gladys: create the bot with BotFather and send it `/start`, set
    `GLADYS_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and `GLADYS_WEBHOOK_SECRET`, and point
    Telegram at her function:
