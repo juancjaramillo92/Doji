@@ -44,7 +44,7 @@ docs/REFACTOR.md                        every move refused, and why
 .claude/settings.json                   registers the session-start hook
 .claude/hooks/session-start.sh          a cloud session's Node floor and npm ci
 index.html                              the entire application
-icon-512.png                            home-screen icon
+icon-512.png                            home-screen icon, and the laptop app's
 vercel.json                             no-cache header for the app shell
 supabase/config.toml                    Edge Function deploy settings
 supabase/schema.sql                     the whole database, safe to re-run in full
@@ -2199,6 +2199,11 @@ downloads it, quits, and a shell left behind swaps the app and opens the new
 one. Downloaded by the app rather than a browser, it carries no quarantine, so
 *Open Anyway* is never asked again. A copy run from the repository has no
 `build.txt` and never offers one.
+
+**Her app wears Doji's icon**, the phone's `icon-512.png`, made into the sizes
+macOS asks for at build time; the menu bar shows her own face, small. Nothing
+is drawn larger than the icon is, so the largest Retina size, which would be
+1024, is left to macOS to scale.
 
 To work on it, `npm ci` and `npm start` in `laptop/` — the render is copied in
 from `charm/art/`, the one copy of it in the repository.

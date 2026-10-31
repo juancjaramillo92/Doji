@@ -15,6 +15,7 @@ on:
     paths:
       - 'laptop/**'
       - 'charm/art/eugenia.png'
+      - 'icon-512.png'
       - '.github/workflows/laptop.yml'
   workflow_dispatch:
 
@@ -43,6 +44,15 @@ jobs:
           npm ci
           # The commit, which the app compares with the version published beside it.
           echo "${GITHUB_SHA:0:12}" > build.txt
+          # Her app wears Doji's icon, the one the phone has, made into the
+          # sizes macOS asks for from the one copy of it. Nothing is made
+          # larger than it is: the 1024 that would be its own double is left out.
+          mkdir Eugenia.iconset
+          for side in 16 32 128 256 512; do
+            sips -z $side $side ../icon-512.png --out "Eugenia.iconset/icon_${side}x${side}.png" > /dev/null
+            [ $side = 512 ] || sips -z $((side * 2)) $((side * 2)) ../icon-512.png --out "Eugenia.iconset/icon_${side}x${side}@2x.png" > /dev/null
+          done
+          iconutil -c icns Eugenia.iconset
           npm run package
       # The certificate is fetched, or made when there is none yet. Only an
       # answer that it is not there makes one: any other failure stops the
@@ -87,6 +97,8 @@ jobs:
         working-directory: laptop/out/Eugenia-darwin-arm64
         run: |
           codesign --verify --deep --strict Eugenia.app
+          # The packager skips an icon it cannot find with only a warning.
+          cmp ../../Eugenia.icns "Eugenia.app/Contents/Resources/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' Eugenia.app/Contents/Info.plist)"
           ditto -c -k --keepParent Eugenia.app Eugenia.zip
           ls -l Eugenia.zip
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

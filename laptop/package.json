@@ -9,7 +9,7 @@
     "prestart": "cp ../charm/art/eugenia.png .",
     "start": "electron .",
     "prepackage": "cp ../charm/art/eugenia.png .",
-    "package": "electron-packager . Eugenia --platform=darwin --arch=arm64 --overwrite --out=out --app-bundle-id=app.doji.eugenia --extend-info=Info.plist --ignore=^/out --ignore=^/Info\\.plist"
+    "package": "electron-packager . Eugenia --platform=darwin --arch=arm64 --overwrite --out=out --app-bundle-id=app.doji.eugenia --extend-info=Info.plist --icon=Eugenia.icns --ignore=^/out --ignore=^/Info\\.plist --ignore=^/Eugenia\\.icns --ignore=^/Eugenia\\.iconset"
   },
   "devDependencies": {
     "@electron/packager": "20.3.0",

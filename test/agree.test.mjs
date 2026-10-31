@@ -544,6 +544,12 @@ test('the laptop looks for its update where the workflow publishes it', () => {
   assert.doesNotMatch(sign, /--sign -/, 'a build can still be signed ad hoc');
   assert.match(workflow, /- name: Publish the update\n\s*if: github\.ref == 'refs\/heads\/main'\n/,
     'a build of a branch can publish the update');
+  // Her icon is made from the phone's, and is the one the packager is handed.
+  const made = workflow.match(/iconutil -c icns (\w+)\.iconset/)?.[1];
+  assert.ok(made && workflow.includes('../icon-512.png') && workflow.includes("'icon-512.png'"),
+    'the laptop app is no longer drawn from icon-512.png, or not rebuilt when it changes');
+  assert.match(JSON.parse(source('laptop/package.json')).scripts.package, new RegExp(`--icon=${made}\\.icns`),
+    'the packager is handed another icon than the one the workflow makes');
   // The zipped app is what the swap unpacks, under the name the bundle has.
   assert.match(workflow, /ditto -c -k --keepParent Eugenia\.app Eugenia\.zip/);
   assert.match(LAPTOP_MAIN, /mv "\$\{unpacked\}\/Eugenia\.app"/, 'the update unpacks an app by another name than the workflow zips');
