@@ -60,9 +60,13 @@ var GMAIL_QUERY = 'from:' + ALERT_FROM + ' -label:' + DONE_LABEL +
 // MAIN — attach the every-minute trigger to this
 // ═══════════════════════════════════════════════════════════════════════════
 function syncPepperstone() {
+  // Search first: almost every run finds nothing, and each Gmail call it skips
+  // is one fewer chance at Google's transient "server error".
+  var threads = GmailApp.search(GMAIL_QUERY, 0, 20);
+  if (!threads.length) return;
+
   var done = getOrCreateLabel_(DONE_LABEL);
   var fail = getOrCreateLabel_(FAIL_LABEL);
-  var threads = GmailApp.search(GMAIL_QUERY, 0, 20);
 
   threads.forEach(function (thread) {
     // Three outcomes, not two. A PERMANENT failure — a body that will never
