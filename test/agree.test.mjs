@@ -1948,15 +1948,15 @@ const guardClause = (text) => {
 /* SECRETS A FUNCTION CAN GENUINELY RUN WITHOUT, each a decision written down.
    Four are external vendors for one capability: speech-to-text (the Messages
    API takes no audio), embeddings (unset, search is full text and trigram),
-   and speech (unset, the text goes). The fifth is the charm's door: unset,
-   there is no charm. Unlike a missing bot token, one capability is absent and
+   and speech (unset, the text goes). The fifth and sixth are the charm's door
+   and the laptop's: unset, there is no charm, or no laptop. Unlike a missing bot token, one capability is absent and
    every other path is untouched.
 
    NOT FREE: each must be guarded where it is USED — a branch that handles its
    absence rather than an empty string reaching a fetch. A door's own secret is
    guarded by the door, since secretMatches refuses an empty one and
    fold.test.mjs holds that. That check is below. */
-const OPTIONAL = new Set(['STT_URL', 'STT_KEY', 'EMBED_KEY', 'TTS_KEY', 'CHARM_SECRET']);
+const OPTIONAL = new Set(['STT_URL', 'STT_KEY', 'EMBED_KEY', 'TTS_KEY', 'CHARM_SECRET', 'LAPTOP_SECRET']);
 
 test('an optional secret is guarded where it is used', () => {
   for (const { name, text } of FUNCTIONS) {

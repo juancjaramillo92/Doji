@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // EUGENIA — market briefing and conversation  ·  Supabase Edge Function (Deno)
 // ───────────────────────────────────────────────────────────────────────────
-// The second bot: Gladys collects the journal, Eugenia does macro. Three
+// The second bot: Gladys collects the journal, Eugenia does macro. Four
 // callers, told apart by the secret they present:
 //
 //   x-doji-key                        the scheduled jobs and the trades
@@ -11,6 +11,8 @@
 //   x-telegram-bot-api-secret-token   Telegram — he replied, answer him.
 //   x-charm-key                       her charm — he spoke to it, or it asks
 //                                     after the briefing.
+//   x-laptop-key                      her face on his laptop — the same, with
+//                                     his chart when he shows it.
 //
 // She owns no column of `trades` and has no write path to it: she reads the
 // journal through eugenia_trades, granted SELECT alone, and writes only her
@@ -30,7 +32,8 @@
 // Secrets:  EUGENIA_BOT_TOKEN, EUGENIA_WEBHOOK_SECRET, TELEGRAM_CHAT_ID,
 //           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY; optional —
 //           each guarded where it is used — STT_URL, STT_KEY, TTS_KEY,
-//           EMBED_KEY and EUGENIA_CHARM_SECRET, unset, the charm's door is shut
+//           EMBED_KEY, and EUGENIA_CHARM_SECRET and EUGENIA_LAPTOP_SECRET,
+//           each of which, unset, shuts its door
 // ═══════════════════════════════════════════════════════════════════════════
 import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, TRADE_EVENT, REVIEW, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
@@ -4893,7 +4896,7 @@ async function hear(heard: Heard, blocks: any[], device: string): Promise<Spoken
   if ('trouble' in heard) return { answer: VOICE_TROUBLE[heard.trouble], volume: null };
   try {
     const { asked, answer, volume } = await converse(`[voice note] ${heard.said}`, blocks, Promise.resolve(null), device);
-    background(say(`«${heard.said}»\n\n${answer}`));
+    background(say(`«${heard.said}»${blocks.length ? ' — with your chart' : ''}\n\n${answer}`));
     background(remember([{ role: 'user', content: asked }, { role: 'assistant', content: answer }]));
     return { answer, volume };
   } catch (err) {
@@ -4987,7 +4990,8 @@ async function* charmAudio(words: Promise<Spoken>): AsyncGenerator<Uint8Array> {
    line that it has landed, or 204 while it has not; then the charm shows its
    dot until he presses and asks `?briefing=today` for the briefing itself. The
    text is the one postBriefing stored, read back as the speaking worker reads
-   it, so the charm says exactly what Telegram received. */
+   it, so the charm says exactly what Telegram received. The laptop asks the
+   same two questions and is answered the same way. */
 const CHARM_READY = "Your briefing is ready, jefe.";
 
 async function charmBriefing(which: string): Promise<Response> {
@@ -5001,11 +5005,34 @@ async function charmBriefing(which: string): Promise<Response> {
                       { headers: { "Content-Type": "application/octet-stream" } });
 }
 
+/* ─── The laptop half: he spoke to her face on his laptop ──────────────────
+   Her face floats over his charts, and he talks to it as he talks to the
+   charm: one request, the same turn, the same frames back, the same copy in
+   Telegram. Nothing about her changes — she is told nothing of the device,
+   as she is told nothing of Telegram. What the laptop adds is sight: the
+   TradingView window, when he asks her to look, rides beside his words as a
+   chart sent in Telegram does, for this turn only.
+
+   The laptop's browser engine records WebM, not the charm's Ogg; the file
+   goes to the transcriber under the name and type the laptop gave it, which
+   is what the vendor reads the format from. Its own key, so a lost laptop is
+   cut off without the charm. */
+const LAPTOP_SECRET = env("EUGENIA_LAPTOP_SECRET");
+
+async function hearLaptop(voice: File, chart: File | null): Promise<Spoken> {
+  const blocks = chart ? [{
+    type: "image",
+    source: { type: "base64", media_type: chart.type, data: base64(new Uint8Array(await chart.arrayBuffer())) },
+  }] : [];
+  return await hear(await transcribe(new Uint8Array(await voice.arrayBuffer()), voice.name, voice.type), blocks, "");
+}
+
 // ─── Entry point ───────────────────────────────────────────────────────────
 if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: Request) => {
   const fromTelegram = req.headers.get("x-telegram-bot-api-secret-token");
   const fromCron     = req.headers.get("x-doji-key");
   const fromCharm    = req.headers.get("x-charm-key");
+  const fromLaptop   = req.headers.get("x-laptop-key");
 
   if (!BOT_TOKEN || !CHAT_ID || !WEBHOOK_SECRET || !CRON_SECRET || !ANTHROPIC_KEY || !SB_KEY) {
     console.error("doji-eugenia: a required secret is not set — refusing all requests");
@@ -5074,6 +5101,26 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       const low = req.headers.get('x-charm-low') === '1';
       const spoken = words.then(w => low ? { ...w, answer: `${w.answer} ${CHARM_LOW}` } : w);
       return new Response(ReadableStream.from(charmAudio(spoken)),
+                          { headers: { "Content-Type": "application/octet-stream" } });
+    }
+    if (secretMatches(fromLaptop, LAPTOP_SECRET)) {
+      if (!STT_URL || !STT_KEY || !TTS_KEY) {
+        return json({ ok: false, error: "the laptop needs STT_URL, STT_KEY and TTS_KEY" }, 503);
+      }
+      const briefing = new URL(req.url).searchParams.get("briefing");
+      if (briefing !== null) return await charmBriefing(briefing);
+      // A form: the recording as `voice`, and `chart` when he asked her to look.
+      const form = await req.formData().catch(() => null);
+      const voice = form?.get("voice"), chart = form?.get("chart") ?? null;
+      if (!(voice instanceof File) || !voice.size || voice.size > FILE_MAX) {
+        return json({ ok: false, error: `a recording, up to ${FILE_MAX} bytes` }, 400);
+      }
+      if (chart !== null && !(chart instanceof File && IMAGE_TYPES.includes(chart.type) && chart.size <= FILE_MAX)) {
+        return json({ ok: false, error: `a chart is ${IMAGE_TYPES.join(', ')}, up to ${FILE_MAX} bytes` }, 400);
+      }
+      const words = hearLaptop(voice, chart instanceof File ? chart : null);
+      background(words);
+      return new Response(ReadableStream.from(charmAudio(words)),
                           { headers: { "Content-Type": "application/octet-stream" } });
     }
     return json({ ok: false, error: "unauthorized" }, 401);

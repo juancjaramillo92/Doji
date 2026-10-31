@@ -23,7 +23,7 @@ const ENV = {
   GLADYS_BOT_TOKEN: 'gladys', GLADYS_WEBHOOK_SECRET: 'gladys-hook',
   EUGENIA_BOT_TOKEN: 'eugenia', EUGENIA_WEBHOOK_SECRET: 'eugenia-hook',
   ANTHROPIC_API_KEY: 'sk-ant-test', CTRADER_MCP_TOKEN: 'ctrader',
-  EUGENIA_CHARM_SECRET: 'charm', STT_URL: 'https://stt.test/v1/audio/transcriptions',
+  EUGENIA_CHARM_SECRET: 'charm', EUGENIA_LAPTOP_SECRET: 'laptop', STT_URL: 'https://stt.test/v1/audio/transcriptions',
   STT_KEY: 'stt', TTS_KEY: 'tts', GLADYS_CHARM_SECRET: 'gladys-charm',
 };
 
@@ -476,6 +476,109 @@ test('doji-eugenia: a briefing not stored yet is a 204, and nothing is spoken', 
   calls.length = 0;
   assert.equal((await serve(briefingDoor('yesterday'))).status, 400, 'a briefing door it does not open answered');
   assert.deepEqual(calls, [], 'a briefing door it does not open made a request');
+});
+
+/* ─── The laptop: the charm's turn, with his chart when he shows it ────────
+   The same door, a form for a body: the recording under the name and type the
+   laptop gave it, and the TradingView window beside his words. */
+
+const laptopForm = (voice, chart) => {
+  const form = new FormData();
+  if (voice) form.append('voice', voice, 'laptop.webm');
+  if (chart) form.append('chart', chart, 'chart.png');
+  return form;
+};
+const laptop = (body, key = 'laptop', path = '') =>
+  new Request(`https://fn.test/functions/v1/doji-eugenia${path}`,
+    { method: body === undefined ? 'GET' : 'POST', body, headers: { 'x-laptop-key': key } });
+const webm = new Blob([new Uint8Array(64)], { type: 'audio/webm' });
+const png = new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' });
+
+test('doji-eugenia: the laptop is answered as the charm is, and sees the chart he shows her', async () => {
+  const serve = await serving('doji-eugenia');
+  respond = charmTurn('what do you make of this', 'A clean break of the Asian high.');
+  const res = await serve(laptop(laptopForm(webm, png)));
+  assert.equal(res.status, 200);
+  assert.equal(kept.length, 1, 'the turn was not handed to EdgeRuntime.waitUntil, so a laptop that hangs up kills it');
+  const played = voiceOf(await framesOf(res));
+  await Promise.all(kept);
+  assert.deepEqual(played.slice(-PCM.length), PCM, 'her answer is not what the laptop played');
+
+  const file = calls.find(c => c.url.startsWith('https://stt.test/')).body.get('file');
+  assert.deepEqual([file.name, file.type], ['laptop.webm', 'audio/webm'],
+    'the recording was handed to transcription as something other than what the laptop sent');
+  const turn = bodies('api.anthropic.com/v1/messages')[0].messages.at(-1);
+  assert.deepEqual(turn.content[0], { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'iVBORw==' } },
+    'the chart did not reach her turn as the image he showed her');
+  assert.ok(!JSON.stringify(turn).includes('charm'), 'her turn was told about a charm he is not holding');
+  assert.deepEqual(bodies('/sendMessage').map(b => b.text),
+    ['«what do you make of this» — with your chart\n\nA clean break of the Asian high.'],
+    'Telegram did not get the copy, his words first and the chart named');
+  assert.deepEqual(calls.filter(c => c.url.endsWith('/rest/v1/eugenia_turns')).map(c => JSON.parse(c.body)),
+    [[{ role: 'user', content: '[voice note] what do you make of this' },
+      { role: 'assistant', content: 'A clean break of the Asian high.' }]],
+    'the exchange was not stored as one conversation, or the chart was stored with it');
+});
+
+test('doji-eugenia: the laptop talks without a chart, and its copy names none', async () => {
+  const serve = await serving('doji-eugenia');
+  respond = charmTurn('how is gold doing', 'Gold is holding 4,410.');
+  await framesOf(await serve(laptop(laptopForm(webm))));
+  await Promise.all(kept);
+  assert.equal(typeof bodies('api.anthropic.com/v1/messages')[0].messages.at(-1).content, 'string',
+    'her turn carried an image he never showed her');
+  assert.deepEqual(bodies('/sendMessage').map(b => b.text), ['«how is gold doing»\n\nGold is holding 4,410.']);
+});
+
+test('doji-eugenia: the laptop is refused at the door without its vendors, a recording or a chart she can read', async () => {
+  for (const unset of ['STT_URL', 'STT_KEY', 'TTS_KEY']) {
+    calls.length = 0;
+    const serve = await serving('doji-eugenia', [unset]);
+    const res = await answer(await serve(laptop(laptopForm(webm))));
+    assert.equal(res.status, 503, `the laptop was let in with ${unset} unset`);
+    assert.deepEqual(calls, [], `the laptop made a request with ${unset} unset`);
+  }
+  const serve = await serving('doji-eugenia');
+  const big = new Blob([new Uint8Array(3 * 1024 * 1024 + 1)], { type: 'image/png' });
+  for (const [what, body] of [
+    ['no recording', laptopForm(null, png)],
+    ['an empty recording', laptopForm(new Blob([], { type: 'audio/webm' }))],
+    ['a recording past FILE_MAX', laptopForm(new Blob([new Uint8Array(3 * 1024 * 1024 + 1)], { type: 'audio/webm' }))],
+    ['a chart that is not an image she reads', laptopForm(webm, new Blob([new Uint8Array(4)], { type: 'image/heic' }))],
+    ['a chart past FILE_MAX', laptopForm(webm, big)],
+    ['a body that is not a form', new Uint8Array(64)],
+  ]) {
+    calls.length = 0;
+    assert.equal((await serve(laptop(body))).status, 400, `${what} was let in`);
+    assert.deepEqual(calls, [], `${what} made a request`);
+  }
+  assert.equal((await serve(laptop(laptopForm(webm), 'wrong'))).status, 401, 'the laptop door admitted a wrong key');
+  assert.equal((await serve(laptop(laptopForm(webm), 'charm'))).status, 401, 'the laptop door admitted the charm\'s key');
+});
+
+test('doji-eugenia: the laptop\'s door is shut while its secret is unset, and the charm\'s stays open', async () => {
+  const serve = await serving('doji-eugenia', ['EUGENIA_LAPTOP_SECRET']);
+  for (const key of ['', 'laptop']) {
+    calls.length = 0;
+    assert.equal((await serve(laptop(laptopForm(webm), key))).status, 401,
+      `the laptop door opened to ${JSON.stringify(key)} with no secret set`);
+    assert.deepEqual(calls, [], 'a shut laptop door made a request');
+  }
+  respond = briefingStored(null);
+  assert.equal((await serve(briefingDoor('ready'))).status, 204, 'the charm\'s door shut with the laptop\'s');
+});
+
+test('doji-eugenia: the laptop hears that the briefing landed, then the briefing itself', async () => {
+  const serve = await serving('doji-eugenia');
+  respond = briefingStored('Gold opened quiet.');
+  for (const [which, said] of [['ready', 'Your briefing is ready, jefe.'], ['today', 'Gold opened quiet.']]) {
+    calls.length = 0;
+    const res = await serve(laptop(undefined, 'laptop', `?briefing=${which}`));
+    assert.equal(res.status, 200, `?briefing=${which} did not answer the laptop with audio`);
+    assert.deepEqual(voiceOf(await framesOf(res)).slice(-PCM.length), PCM);
+    assert.deepEqual(bodies('/audio/speech').map(b => b.input), [said],
+      `?briefing=${which} read the laptop something other than ${JSON.stringify(said)}`);
+  }
 });
 
 /* ─── Gladys's charm: what waits, and an answer on its screen ─────────────
