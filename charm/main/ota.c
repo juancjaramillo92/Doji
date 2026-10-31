@@ -3,8 +3,9 @@
    night she reads the newest image's description, from its first bytes; when
    the version differs from hers, the rest is written into her other app slot,
    which she starts from at her next wake. A new app is good only once it has
-   reached her Wi-Fi (ota_confirm): one that never does is rolled back by the
-   bootloader at the wake after, to the app that was. */
+   proved itself (main.c's prove): her screen started and drawn on, and her
+   Wi-Fi reached. One that never does — that freezes, crashes or never joins —
+   is rolled back by the bootloader at the wake after, to the app that was. */
 #include "ota.h"
 
 #include <string.h>
@@ -51,6 +52,12 @@ bool ota_update(void) {
     bool written = esp_https_ota_finish(h) == ESP_OK;
     ESP_LOGI(TAG, "%s %s over %s", next.version, written ? "written" : "refused", mine);
     return written;
+}
+
+bool ota_unproven(void) {
+    esp_ota_img_states_t state;
+    return esp_ota_get_state_partition(esp_ota_get_running_partition(), &state) == ESP_OK &&
+           state == ESP_OTA_IMG_PENDING_VERIFY;
 }
 
 void ota_confirm(void) {

@@ -3380,9 +3380,13 @@ night, in the 03:00 hour in New York and off a low battery, an errand reads the
 newest image's description from its first bytes — a low battery leaves the
 look to a later errand in that hour — and when its version is not
 hers, the rest is written into her other app slot (`charm/partitions.csv`
-gives her two of 7 MB) and she wakes into it at once, quietly. A new app is
-good only once it has reached her Wi-Fi: one that never does is rolled back by
-the bootloader at the wake after, to the app that was (`charm/main/ota.c`).
+gives her two of 7 MB) and she wakes into it at once, quietly. **A new app is
+kept only once it has proved itself** (`prove` in `charm/main/main.c`): the
+first thing every waking of it does is start her screen, draw the sleep screen
+whole and reach her Wi-Fi, under a task watchdog armed to reset her if any of it
+hangs. Any reset before it is kept — a crash, a frozen screen, a waking with no
+network — has the bootloader start the app that was (`charm/main/ota.c`), so a
+build that cannot do the basics never stays on her past one waking.
 Only a power-on chimes, so neither an update nor the setup's restart wakes
 anyone.
 
