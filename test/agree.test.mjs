@@ -1697,7 +1697,7 @@ test('the charm keeps the market\'s week the server keeps', () => {
    though the cable went in minutes later. */
 test('a low battery leaves the night\'s look for an update to a later errand', () => {
   const errand = bodyOf(source('charm/main/main.c'), 'static void errand(void) {');
-  assert.match(errand, /if \(!power_low\(\) && ota_due\(time\(NULL\)\) && ota_update\(\)\)/,
+  assert.match(errand, /if \(!power_low\(\) && \(ota_offered\(gladys_app\(\)\) \|\| ota_due\(time\(NULL\)\)\) && ota_update\(\)\)/,
     'the errand asks for an update before the battery, so a low one spends the night\'s look');
   // And ota_due is what marks the night looked.
   assert.match(bodyOf(source('charm/main/ota.c'), 'bool ota_due(time_t now) {'), /looked = day;\s*return true;/,

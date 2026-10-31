@@ -3386,7 +3386,13 @@ first thing every waking of it does is start her screen, draw the sleep screen
 whole and reach her Wi-Fi, under a task watchdog armed to reset her if any of it
 hangs. Any reset before it is kept — a crash, a frozen screen, a waking with no
 network — has the bootloader start the app that was (`charm/main/ota.c`), so a
-build that cannot do the basics never stays on her past one waking.
+build that cannot do the basics never stays on her past one waking. **An
+update reaches her the day it is built**, not only at the night's look: the
+workflow writes the version beside the image (`charm/version`), Gladys's door
+hands it to her in every answer (`app`), and the first errand that sees one
+she has not run fetches it. A version that was on her and failed its proof is
+never fetched again (`ota_offered`, asked of the bootloader's record, not the
+network), so a broken build is tried once, not every five minutes.
 
 **Each waking he uses reports itself** (`report` in `charm/main/main.c`), as
 she goes back to sleep, and so does a new app's proof: one line posted to her

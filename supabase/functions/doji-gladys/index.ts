@@ -358,7 +358,23 @@ async function waiting(): Promise<Response> {
     `&order=entry_time.desc&limit=${WAITING_MAX}`, { headers: sbHeaders() });
   if (!res.ok) throw new Error(`Read failed (HTTP ${res.status}): ${await res.text()}`);
   const rows: Row[] = (await res.json()).reverse();
-  return json({ ok: true, waiting: rows.length, trade: rows[0] ?? null });
+  return json({ ok: true, waiting: rows.length, trade: rows[0] ?? null, app: await newestApp() });
+}
+
+/* The newest app the charm workflow published, as the version it writes beside
+   the image: the charm asks this door every few minutes, so an update reaches
+   her that day rather than at the night's look. Null when it cannot be read
+   in APP_MS, which costs only the early update, never the answer. */
+const APP_VERSION_URL = `${SB_URL}/storage/v1/object/public/charm/version`;
+const APP_MS = 3000;
+
+async function newestApp(): Promise<string | null> {
+  try {
+    const res = await fetch(APP_VERSION_URL, { signal: AbortSignal.timeout(APP_MS) });
+    return res.ok ? (await res.text()).trim() || null : null;
+  } catch {
+    return null;
+  }
 }
 
 // Answers only: [Edit] and [Done] belong to the Telegram form. Answered with
