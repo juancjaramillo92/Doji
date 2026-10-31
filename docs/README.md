@@ -3877,8 +3877,12 @@ the jobs, and `agree.test.mjs` holds that count against `schema.sql`.
    store it in Edge Function secrets and in the script's Script Properties —
    never in the file. It is separate from the cron secret because it is the only
    one living outside your own infrastructure, so it opens the narrowest door
-   there is. Run `testParse`, then `testSecret`, then trigger `syncPepperstone`
-   every minute.
+   there is. Then follow the SETUP block at the head of `doji_gmail_sync.gs`,
+   the one list of the script's steps, kept where it is followed. Its trigger's
+   failure notifications stay **daily**, never off: a run a minute meets
+   Google's transient *server error* a few times a day, and the next run is the
+   retry, but those emails are the only alarm on the script itself, since
+   `sync_health` reads the email path's silence as a quiet week.
 5. For Gladys: create the bot with BotFather and send it `/start`, set
    `GLADYS_BOT_TOKEN`, `TELEGRAM_CHAT_ID` and `GLADYS_WEBHOOK_SECRET`, and point
    Telegram at her function:
@@ -4022,7 +4026,7 @@ home-screen shortcut and every bookmark open `/`.
 | `test/charm.test.mjs` | the charm's pure C — `charm/main/briefing.c`, `charm/main/errand.c`, `charm/main/lift.c`, `charm/main/dns.c`, `charm/main/ogg.c` and `charm/main/frames.c` — compiled on the machine running the suite and driven in the zone the charm reads its clock in, out of `charm/main/net.c`: the briefing watch against `briefDue` and `retryDue` every five minutes of both weeks the clocks change in, an announced briefing not asked for again until the next day, and waiting until New York's midnight and no longer, on the server's own day, never before the clock is set, the wait between errands longer for each that found no network and never an hour, and over the weekend, every five minutes of both weeks the clocks change in against `marketOpen`, half-hourly with the open woken for unless a trade waits, a lift judged on readings, held and put down told apart, the setup's answer to a name, with and without the EDNS record a phone may add, a recording's Ogg file page by page against the specification's CRC, and her answer read out of `charmFrame`'s own bytes however the reads fall; and the firmware's names, the other of the two scope questions in C — every static, macro and enum constant a file declares used in it, every function a header declares called from another file, every non-static function in a header — since the ESP-IDF build refuses a name declared nowhere and only warns of one used nowhere |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions and the app as two programs — with one planted defect per question proving the check can fail |
-| `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, and `syncPepperstone`'s three outcomes |
+| `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, `syncPepperstone`'s three outcomes, and a run that finds nothing reaching for no label |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |
 | `test/db/schema.test.mjs` | `schema.sql` applied to a real Postgres: a re-run changes nothing, and main's copy brought forward by `upgrade.sql` and then this one leaves what a fresh apply leaves, as `upgrade.sql` run twice over a fresh apply does; `verify.sql` passes against what it builds; the trades triggers fire on what they should and nothing else, and a missing secret costs the message, never the write; the app's grants and RLS; the README's restore run over a backup's rows; the calendar's clock; both watchers driven from planted rows; her search by words, spelling and vector; every scheduled job's command run once; and a census that every PL/pgSQL function was driven |

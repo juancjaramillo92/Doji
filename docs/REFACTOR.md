@@ -22,7 +22,7 @@ any change that touches it.
 | realtime, auth | a live two-tab and sign-in test |
 | the live database | `verify.sql`, run by hand |
 | retrieval quality | a golden set that does not exist |
-| the Apps Script's Gmail half | `gs.mjs` reaches the parser only |
+| the Apps Script's Gmail half | the Executions log in the Apps Script editor; `gs.mjs` drives the parser and `syncPepperstone`'s labelling against stubs, never Gmail |
 | an Edge Function path no test can drive | `types.test.mjs` for the names in it; the rest by reading |
 | whether a prompt still behaves | `scripts/eval.mjs`, run by hand with his key — nothing in `npm test` calls the model |
 | whether a tool's description still says what she needs | reading it against the column or door it describes — the eval sends no tools (R-111) |
@@ -1147,6 +1147,24 @@ descriptors for the larger size out of internal RAM, a couple of kilobytes by
 reading. Sizing it to the rows is a change to the panel's driver to prove on
 the board, for memory the `lit` line says she now has.
 **Revisit if:** the `lit` line runs short again.
+
+### R-128 — the Apps Script every five minutes, for fewer failure emails
+**Why refused:** a behaviour change dressed as quiet. The email's `fill_time`
+and the poller's two-minute stamp race to close a row, and whichever lands
+first fires `trades_eugenia_closed`; the email usually wins, carrying `net_pnl`
+in the same write. Slowed, it would hand the close to the poller more often,
+and she would read the swap-less `computed_pnl` for it. The emails are quieted
+by their notification setting instead (README, Deployment).
+**Revisit if:** the email path stops writing `fill_time`.
+
+### R-129 — catching Google's transient error inside `syncPepperstone`
+**Why refused:** a `try/catch` around the symptom. Nothing is lost when a run
+throws — a thread is labelled only once its fill is settled, and the merge is
+idempotent — so the next minute is the retry, and a catch would silence the
+same email when the failure is permanent: revoked access, a quota spent.
+Those emails are the only alarm on the script itself.
+**Revisit if:** something other than Google's emails comes to watch the script
+run.
 
 ---
 
