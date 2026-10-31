@@ -3401,10 +3401,7 @@ emeralds stand still round the rim, redrawing the full screen once as they come
 and once as they go; the ring emptying while PWR is held is the only thing that
 redraws it on every frame. **Nothing flashes between screens**: whatever
 comes up first is the only thing seen, so no face shows for a moment before the
-journal's questions or after them. The panel keeps its last picture through
-sleep and would show it again as it starts, so it stays switched off until the
-first frame is drawn whole; and the sleep screen is drawn whole before she
-sleeps, so none of what was there is left on it. Her state — a low battery, no internet — is
+journal's questions or after them. Her state — a low battery, no internet — is
 never an expression on her face; it is a mark on the sleep screen.
 
 **The sleep screen is black but for its marks**, still, so they stay on the

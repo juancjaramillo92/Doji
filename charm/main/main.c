@@ -43,7 +43,6 @@
 #include "esp_attr.h"
 #include "esp_flash.h"
 #include "esp_heap_caps.h"
-#include "esp_lcd_panel_ops.h"
 #include "esp_log.h"
 #include "esp_psram.h"
 #include "esp_sleep.h"
@@ -73,7 +72,7 @@ static const char *TAG = "charm";
 #define LIFE_STACK    40960  // bytes
 #define DRAW_ROWS     12     // drawn at a time, twice over: 22 KB of internal RAM
 #define AWAKE_MS      30000
-#define LAST_FRAME_MS 200    // a rendered frame's last rows reaching the panel
+#define LAST_FRAME_MS 200    // the sleep screen's last rows reaching the panel, once rendered
 #define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
 #define EARLY_S       5      // how early a timer may wake her and still be the errand's
 #define OFFLINE_TRY_MS 8000  // woken offline, how long the network has to answer
@@ -117,9 +116,7 @@ static void even_area(lv_event_t *e) {
    which the SPI driver will not send from, so it copies each draw into an
    internal buffer as large as the draw, 46 KB, which a board running Wi-Fi
    seldom has free. DRAW_ROWS rows at a time in internal RAM are sent as they
-   are. The panel keeps its picture through sleep and shows it again the
-   moment it is switched on, so it stays off until her first frame is
-   rendered whole: otherwise what was last there flashes up first. */
+   are. */
 static void light(face_mode_t mode) {
     if (lit) return;
     lit = true;
@@ -134,7 +131,6 @@ static void light(face_mode_t mode) {
     esp_lcd_touch_handle_t touch;
     ESP_ERROR_CHECK(esp_lv_adapter_init(&cfg.lv_adapter_cfg));
     ESP_ERROR_CHECK(bsp_display_new(&whole, &panel, &io));
-    esp_lcd_panel_disp_on_off(panel, false);
     const esp_lv_adapter_display_config_t screen = {
         .panel = panel,
         .panel_io = io,
@@ -160,10 +156,7 @@ static void light(face_mode_t mode) {
     face_set_mode(mode);
     bsp_display_lock(-1);
     face_start();
-    lv_refr_now(NULL);
     bsp_display_unlock();
-    vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
-    esp_lcd_panel_disp_on_off(panel, true);
     // Timestamped from boot, beside talk.c's "listening": how much of a press's
     // wait is the panel starting. And what internal RAM the screen and Wi-Fi
     // leave the codecs and TLS, the board's scarcest memory.
