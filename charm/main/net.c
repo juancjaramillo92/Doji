@@ -12,7 +12,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
-#include "ota.h"
 
 static const char *TAG = "net";
 
@@ -96,15 +95,14 @@ static void join(void *arg) {
         last.channel = ap.primary;
         ESP_LOGI(TAG, "joined %s", last.ssid);
     }
-    // Reaching her Wi-Fi is what makes a new app good, whichever waking it is:
-    // a press in the second after an update would otherwise roll it back.
-    ota_confirm();
     esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
     esp_netif_sntp_init(&sntp);
     vTaskDelete(NULL);
 }
 
+// Once a waking: a new app's proof starts it before whatever the waking is for.
 void net_start(void) {
+    if (events) return;
     events = xEventGroupCreate();
     esp_netif_init();
     esp_event_loop_create_default();

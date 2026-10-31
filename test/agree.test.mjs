@@ -2241,18 +2241,32 @@ test('a low battery leaves the night\'s look for an update to a later errand', (
     'ota_due no longer marks the night as this test reads it');
 });
 
-/* A new app is good once she has reached her Wi-Fi, whichever waking it is:
-   confirmed where every join succeeds, and nowhere else. Confirmed on one
-   path only, a press in the second after an update took the other, and the
-   bootloader rolled a good app back at the next wake. */
-test('the charm keeps a new app wherever she reaches her Wi-Fi', () => {
+/* A new app is good once it has proved itself, whichever waking it is: her
+   screen started and drawn on, her Wi-Fi reached, under a watchdog that
+   resets her on a hang, and any reset before the confirmation rolls it back.
+   Confirmed on one path only, a press in the second after an update took the
+   other, and the bootloader rolled a good app back at the next wake; confirmed
+   at the join alone, an app whose screen froze was kept. So the proof is the
+   first thing life() does after the battery's check, before any path sleeps,
+   and the one place a new app is confirmed. */
+test('the charm keeps a new app only once it has proved itself, before anything sleeps', () => {
   const callers = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n')
     .filter(f => f.endsWith('.c') && /\bota_confirm\(\);/.test(source(f)));
-  assert.deepEqual(callers, ['charm/main/net.c'], 'a new app is confirmed somewhere other than where she joins, or nowhere');
-  const join = bodyOf(source('charm/main/net.c'), 'static void join(void *arg) {', 'net.c has no join()');
-  const gaveUp = join.indexOf('xEventGroupSetBits(events, GAVE_UP);');
-  assert.ok(gaveUp > -1 && join.indexOf('ota_confirm();') > gaveUp,
-    'join() confirms the app before it knows she joined');
+  assert.deepEqual(callers, ['charm/main/main.c'], 'a new app is confirmed somewhere other than its proof, or nowhere');
+  const main = source('charm/main/main.c');
+  const prove = bodyOf(main, 'static void prove(void) {', 'main.c has no prove()');
+  for (const step of ['esp_task_wdt_add(NULL);', 'light(FACE_DARK);', 'face_draw_dark();', 'esp_task_wdt_delete(NULL);', 'if (joined) ota_confirm();']) {
+    assert.ok(prove.includes(step), `prove() no longer does ${step}`);
+  }
+  assert.ok(prove.indexOf('esp_task_wdt_add(NULL);') < prove.indexOf('light(FACE_DARK);') &&
+            prove.indexOf('esp_task_wdt_delete(NULL);') < prove.indexOf('if (joined) ota_confirm();'),
+    'the screen is no longer started under the watchdog, or the app is kept before the watchdog stands down');
+  const life = bodyOf(main, 'static void life(void *arg) {', 'main.c has no life()');
+  const proved = life.indexOf('if (ota_unproven()) prove();');
+  assert.ok(proved > life.indexOf('power_off();') && proved > -1, 'life() proves a new app before the battery is judged, or not at all');
+  for (const sleeps of ['sleep_until(', 'errand();', 'awake();']) {
+    assert.ok(life.indexOf(sleeps) > proved, `life() reaches ${sleeps} before a new app is proved`);
+  }
 });
 
 /* The charm joins a network by waiting for an address or a refusal, and gives
