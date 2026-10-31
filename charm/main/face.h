@@ -30,7 +30,7 @@ void face_draw_dark(void);
 // How long FACE_ASLEEP takes to close her eyes.
 #define FACE_GOODNIGHT_MS 1200
 
-// A frame of anything drawn moving: her face, the dial, the journal's done.
+// A frame of anything drawn moving: her face and the journal's done.
 #define FACE_FRAME_MS 33
 
 // How loud her voice is right now, 0 to 1: the mouth follows it.
@@ -51,6 +51,6 @@ void face_set_marks(bool briefing, bool trade, bool low, bool offline, int charg
    what the sleep screen redraws on, and what main.c compares across sleep. */
 int face_marks(bool briefing, bool trade, bool low, bool offline, int charge);
 
-/* Doji's emeralds round the rim, from the top for `part` of a turn, `turn`
-   turning the colours round: her listening ring, the charge, the journal's done. */
-void face_ring(lv_layer_t *layer, int32_t radius, int32_t width, float part, float turn, float opa);
+/* Doji's emeralds round the rim, from the top for `part` of a turn: her
+   listening ring, the charge, the journal's done. */
+void face_ring(lv_layer_t *layer, int32_t radius, int32_t width, float part, float opa);

@@ -88,5 +88,6 @@ CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=64
 CONFIG_LWIP_DHCP_DOES_NOT_CHECK_OFFERED_IP=y
 CONFIG_LWIP_DHCP_RESTORE_LAST_IP=y
 
-# An update that never reaches her Wi-Fi is rolled back by the bootloader.
+# An update that never proves itself — her screen drawn, her Wi-Fi reached
+# (main.c's prove) — is rolled back by the bootloader.
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
