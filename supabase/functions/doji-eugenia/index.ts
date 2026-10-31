@@ -4885,16 +4885,27 @@ const CHARM_SECRET = env("EUGENIA_CHARM_SECRET");
 
 type Spoken = { answer: string; volume: number | null };
 
-/* Never throws: whatever happens, the charm has something to say. The copy
-   and the write go after the charm has her words, which are what he is
-   waiting on, and the pair is stored whether or not the copy lands.
+/* A recording heard, answered as a turn of the conversation. Never throws:
+   whatever happens, the device that asked has something to say. The copy and
+   the write go after it has her words, which are what he is waiting on, and
+   the pair is stored whether or not the copy lands. */
+async function hear(heard: Heard, blocks: any[], device: string): Promise<Spoken> {
+  if ('trouble' in heard) return { answer: VOICE_TROUBLE[heard.trouble], volume: null };
+  try {
+    const { asked, answer, volume } = await converse(`[voice note] ${heard.said}`, blocks, Promise.resolve(null), device);
+    background(say(`«${heard.said}»\n\n${answer}`));
+    background(remember([{ role: 'user', content: asked }, { role: 'assistant', content: answer }]));
+    return { answer, volume };
+  } catch (err) {
+    console.error("doji-eugenia:", why(err));
+    return { answer: APOLOGY.reply, volume: null };
+  }
+}
 
-   The headers are the charm telling her about itself — its battery, whether
+/* The headers are the charm telling her about itself — its battery, whether
    it is charging, its volume — for this turn only, and how she sets its volume
    when he asks. Clamped: a header is only what the charm sent. */
 async function hearCharm(bytes: Uint8Array, h: Headers): Promise<Spoken> {
-  const heard = await transcribe(bytes, "charm.ogg", "audio/ogg");
-  if ('trouble' in heard) return { answer: VOICE_TROUBLE[heard.trouble], volume: null };
   const percent = (name: string) => {
     const v = parseInt(h.get(name) ?? '', 10);
     return Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : null;
@@ -4906,15 +4917,7 @@ async function hearCharm(bytes: Uint8Array, h: Headers): Promise<Spoken> {
     `. If he asks you to speak louder or softer, or for a volume, open your answer with ` +
     `[volume N], N from 0 to 100: the charm sets it before your answer plays, so answer ` +
     `as if it already sounds that way.`;
-  try {
-    const { asked, answer, volume } = await converse(`[voice note] ${heard.said}`, [], Promise.resolve(null), device);
-    background(say(`«${heard.said}»\n\n${answer}`));
-    background(remember([{ role: 'user', content: asked }, { role: 'assistant', content: answer }]));
-    return { answer, volume };
-  } catch (err) {
-    console.error("doji-eugenia:", why(err));
-    return { answer: APOLOGY.reply, volume: null };
-  }
+  return await hear(await transcribe(bytes, "charm.ogg", "audio/ogg"), [], device);
 }
 
 /* What the charm plays is the vendor's raw `pcm`: 24 kHz, 16-bit little-endian,

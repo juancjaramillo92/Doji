@@ -6987,7 +6987,7 @@ const SENDS = {
                     stored: 'by postBriefing — this reads the stored turn ' +
                             'rather than writing one' },
   handleMessage:  { gate: 'trim',     carries: 'answer', through: 'converse' },
-  hearCharm:      { gate: 'trim',     carries: 'answer', through: 'converse',
+  hear:           { gate: 'trim',     carries: 'answer', through: 'converse',
                     copy: 'the charm speaks what this returns, through ' +
                           'charmAudio — the voice goes to his keyring, so ' +
                           'Telegram is sent the text as its copy, not a ' +
