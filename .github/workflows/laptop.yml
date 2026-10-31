@@ -3,11 +3,11 @@
 # published for the app to update itself from, to a public Storage bucket, its
 # version the commit — as the charm's firmware is.
 #
-# Signed with his own certificate, made once in Keychain Access, never with
-# Apple's: macOS keeps the microphone and screen permissions for an app whose
-# signer is the same from one version to the next, and asks again for one
-# whose signature is new each build. So a build without the certificate is
-# signed ad hoc, proves only that the app packages, and is never published.
+# Signed with a certificate of its own, never Apple's: macOS keeps the
+# microphone and screen permissions for an app whose signer is the same from
+# one version to the next, and asks again for one whose signature is new each
+# build — which an ad-hoc signature is. The first build makes the certificate
+# and keeps it in a private bucket; every build after signs with that one.
 name: laptop
 
 on:
@@ -44,29 +44,45 @@ jobs:
           # The commit, which the app compares with the version published beside it.
           echo "${GITHUB_SHA:0:12}" > build.txt
           npm run package
-      # A self-signed certificate is not trusted, so it is named by its hash
-      # rather than found by trust; codesign signs with it all the same.
+      # The certificate is fetched, or made when there is none yet. Only an
+      # answer that it is not there makes one: any other failure stops the
+      # build rather than signing with a stranger, and the upload never
+      # overwrites. Its password guards nothing the private bucket does not;
+      # the bucket is read only with the secret key. A self-signed
+      # certificate is not trusted, so it is named by its hash rather than
+      # found by trust; codesign signs with it all the same.
       - name: Sign
         working-directory: laptop/out/Eugenia-darwin-arm64
         env:
-          LAPTOP_CERT_P12: ${{ secrets.LAPTOP_CERT_P12 }}
-          LAPTOP_CERT_PASSWORD: ${{ secrets.LAPTOP_CERT_PASSWORD }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SB_SECRET_KEY: ${{ secrets.SB_SECRET_KEY }}
         run: |
-          if [ -z "$LAPTOP_CERT_P12" ]; then
-            codesign --force --deep --sign - Eugenia.app
-            exit 0
+          p12="$RUNNER_TEMP/eugenia.p12"
+          kept="$SUPABASE_URL/storage/v1/object/laptop-signing/Eugenia.p12"
+          status=$(curl -s -o "$p12" -w '%{http_code}' "$kept" -H "apikey: $SB_SECRET_KEY")
+          if [ "$status" = 400 ] || [ "$status" = 404 ]; then
+            curl -sf "$SUPABASE_URL/storage/v1/bucket/laptop-signing" -H "apikey: $SB_SECRET_KEY" > /dev/null ||
+              curl -sf -X POST "$SUPABASE_URL/storage/v1/bucket" -H "apikey: $SB_SECRET_KEY" \
+                -H "Content-Type: application/json" -d '{"id":"laptop-signing","name":"laptop-signing","public":false}'
+            /usr/bin/openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=Eugenia" \
+              -addext "keyUsage=critical,digitalSignature" -addext "extendedKeyUsage=critical,codeSigning" \
+              -keyout "$RUNNER_TEMP/key.pem" -out "$RUNNER_TEMP/cert.pem"
+            /usr/bin/openssl pkcs12 -export -inkey "$RUNNER_TEMP/key.pem" -in "$RUNNER_TEMP/cert.pem" \
+              -name Eugenia -out "$p12" -passout pass:eugenia
+            curl -sf -X POST "$kept" -H "apikey: $SB_SECRET_KEY" \
+              -H "Content-Type: application/x-pkcs12" --data-binary @"$p12"
+          elif [ "$status" != 200 ]; then
+            echo "the signing certificate could not be read (HTTP $status)"; exit 1
           fi
           keychain="$RUNNER_TEMP/eugenia.keychain-db"
-          echo "$LAPTOP_CERT_P12" | base64 --decode > "$RUNNER_TEMP/eugenia.p12"
           security create-keychain -p "" "$keychain"
           security set-keychain-settings "$keychain"
           security unlock-keychain -p "" "$keychain"
-          security import "$RUNNER_TEMP/eugenia.p12" -k "$keychain" -P "$LAPTOP_CERT_PASSWORD" -T /usr/bin/codesign
+          security import "$p12" -k "$keychain" -P eugenia -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "" "$keychain" > /dev/null
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           identity=$(security find-identity -p codesigning "$keychain" | awk '/\)/ { print $2; exit }')
           codesign --force --deep --sign "$identity" --keychain "$keychain" Eugenia.app
-          echo "SIGNED=1" >> "$GITHUB_ENV"
       - name: Check the signature and pack the app
         working-directory: laptop/out/Eugenia-darwin-arm64
         run: |
@@ -81,7 +97,7 @@ jobs:
       # The bucket is made on first use, with room for an app of Electron's
       # size: the project's own upload limit must allow as much (README).
       - name: Publish the update
-        if: github.ref == 'refs/heads/main' && env.SIGNED == '1'
+        if: github.ref == 'refs/heads/main'
         working-directory: laptop/out/Eugenia-darwin-arm64
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
