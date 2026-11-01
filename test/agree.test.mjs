@@ -578,6 +578,21 @@ test('the laptop keeps its Dock icon, and makes the render clear by one rule', (
   }
 });
 
+/* Her window goes first when she quits, and anything answering late — a
+   clock, the check for the app in front, a reply — met it destroyed on his
+   Mac: an exception, whose dialog kept her alive. So every clock in the main
+   process is one the quit stops, and what touches her window asks first
+   whether it is there. */
+test('the laptop stops its clocks when it quits, and touches no window that is gone', () => {
+  const raw = [...LAPTOP_MAIN.matchAll(/setInterval\(/g)].length;
+  assert.equal(raw, 1, `main.mjs starts ${raw} clocks of its own — each must go through every(), which the quit stops`);
+  assert.match(LAPTOP_MAIN, /^const every = \(fn, ms\) => timers\.push\(setInterval\(fn, ms\)\);$/m, 'every() no longer keeps the clocks it starts');
+  assert.match(LAPTOP_MAIN, /app\.on\('before-quit', \(\) => timers\.forEach\(clearInterval\)\);/, 'quitting no longer stops her clocks');
+  assert.match(LAPTOP_MAIN, /const send = \(channel, \.\.\.args\) => \{ if \(present\(\)\) face\.webContents\.send/, 'send() no longer asks whether her window is there');
+  assert.match(bodyOf(LAPTOP_MAIN, 'function appear('), /^function appear\(\) \{\n  if \(!present\(\)\) return;/, 'appear() no longer asks whether her window is there');
+  assert.match(bodyOf(LAPTOP_MAIN, 'function front('), /if \(!present\(\) \|\| name === app\.getName\(\)\) return;/, 'the check for the app in front no longer asks whether her window is there');
+});
+
 /* What the laptop copies of the charm's ear and voice, and of the door's
    beat. Her two notes and the tick are drawn by the charm's own formula;
    his voice is heard past the charm's VOICE on the charm's scale, let go
