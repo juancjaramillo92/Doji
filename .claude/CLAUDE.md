@@ -545,7 +545,9 @@ what it does. Three levels of proof, as on the charm:
   scope questions as its own program.
 - **Only the Mac.** The window, the keys, the microphone, the capture, the
   sound, the signature and the update. The README's *To check on the Mac
-  first* is that list. A Linux run under Xvfb drives the page and the main
+  first* is that list. `spaces.m` is the one part a Mac answers in CI: the
+  workflow asks the runner whether a raised window took it, beside a panel
+  as the defect it must see. A Linux run under Xvfb drives the page and the main
   process against a stand-in door, which proves the sequence and the drawing
   and nothing about macOS.
 

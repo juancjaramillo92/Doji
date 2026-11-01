@@ -54,6 +54,30 @@ jobs:
           done
           iconutil -c icns Eugenia.iconset
           npm run package
+      # The one decision in her that only macOS answers, asked of it here: a
+      # window raised as hers is, given spaces.node, belongs to one desktop and
+      # floats across none. A panel given the same call rides along as the
+      # defect the check must see — Electron's panel joins every desktop
+      # whatever it is told.
+      - name: Check she keeps to one desktop
+        working-directory: laptop
+        run: |
+          cat > "$RUNNER_TEMP/spaces.cjs" <<'EOF'
+          const { app, BrowserWindow } = require('electron');
+          const { managed } = require(process.env.SPACES);
+          const ALL = 1, MANAGED = 4, TRANSIENT = 8;
+          app.whenReady().then(() => {
+            const raised = (kind) => {
+              const w = new BrowserWindow({ ...kind, show: false, transparent: true, frame: false, fullscreenable: false });
+              w.setAlwaysOnTop(true, 'floating');
+              return managed(w.getNativeWindowHandle());
+            };
+            const face = raised({}), panel = raised({ type: 'panel' });
+            console.log(`her window ${face}, a panel ${panel}`);
+            app.exit((face & MANAGED) && !(face & TRANSIENT) && !(face & ALL) && (panel & ALL) ? 0 : 1);
+          });
+          EOF
+          SPACES="$PWD/spaces.node" npx electron "$RUNNER_TEMP/spaces.cjs"
       # The certificate is fetched, or made when there is none yet. Only an
       # answer that it is not there makes one: any other failure stops the
       # build rather than signing with a stranger, and the upload never
@@ -92,11 +116,13 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "" "$keychain" > /dev/null
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           identity=$(security find-identity -p codesigning "$keychain" | awk '/\)/ { print $2; exit }')
+          codesign --force --sign "$identity" --keychain "$keychain" Eugenia.app/Contents/Resources/app.asar.unpacked/spaces.node
           codesign --force --deep --sign "$identity" --keychain "$keychain" Eugenia.app
       - name: Check the signature and pack the app
         working-directory: laptop/out/Eugenia-darwin-arm64
         run: |
           codesign --verify --deep --strict Eugenia.app
+          codesign --verify --strict Eugenia.app/Contents/Resources/app.asar.unpacked/spaces.node
           # The packager skips an icon it cannot find with only a warning.
           cmp ../../Eugenia.icns "Eugenia.app/Contents/Resources/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' Eugenia.app/Contents/Info.plist)"
           ditto -c -k --keepParent Eugenia.app Eugenia.zip

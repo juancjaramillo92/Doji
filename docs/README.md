@@ -120,6 +120,7 @@ laptop/                                 Eugenia on the Mac — see The laptop
   place.mjs                             where her window goes, and the room around her
   art.mjs                               the render's black made clear, for her face and her icon
   update.mjs                            the swap an update leaves behind
+  spaces.m                              her window kept to one desktop, in the Mac's own code
   preload.cjs                           what the pages may ask the main process
   key.html                              her key, asked once; key.mjs tries it
   Info.plist                            why she asks for the microphone
@@ -2146,9 +2147,9 @@ curl -sN -H "x-laptop-key: $EUGENIA_LAPTOP_SECRET" \
 `.github/workflows/laptop.yml` as the charm's firmware is by its own. It has a
 Dock icon, Doji's, and an icon in the menu bar, her face cropped close and
 its black made clear by the face's own rule (`laptop/art.mjs`), which also
-carries the briefing's dot; the two hold the same menu. A window made to
-float over full-screen apps would by default turn the app into one with no
-Dock icon; hers is told not to. **Her face floats over
+carries the briefing's dot; the two hold the same menu. Electron hides the
+Dock icon or shows it again each time a window's desktops are set; hers is
+told to leave it. **Her face floats over
 TradingView**: the charm's render with its black made clear, and the charm's
 drawing over it at the charm's own coordinates — eyes, highlight, smile,
 thought dots, the listening ring — which `agree.test.mjs` holds to
@@ -2161,18 +2162,28 @@ eyes and mouth ride the same transform. Reduce Motion in macOS stops the
 breathing and floating and keeps the rest; at rest she is drawn at twenty
 frames a second rather than thirty, which a breath that slow does not show.
 Clicks outside her shape go through to the chart beneath, she can be dragged
-anywhere and stays where she is left, and a click on her never takes the
-focus from TradingView. She is the window's middle; the room above her head
+anywhere and stays where she is left. A click on her brings her app to the
+front, as a click on any app's window does; the talk key leaves TradingView
+there. She is the window's middle; the room above her head
 holds **a line she shows** when her face alone cannot say enough.
 
 **She lives on one desktop, as any window does.** He switches desktops all
-day, with TradingView full screen on its own, and wants her on its desktop
-alone — not even on another while she talks. So she is a window that
-belongs to the desktop she was put on, and macOS moves her with it: she
-slides away when he switches desktops and back when he returns, as every
-window does, and nothing watches for it. She is a panel, the one kind of
-window macOS lets onto another app's full-screen desktop, floating at the
-level panels float at. **Bring her here**, in her menu, puts her on the
+day and wants her on TradingView's alone — not even on another while she
+talks. So she is an ordinary window that belongs to the desktop she was put
+on, and macOS moves her with it: she slides away when he switches desktops
+and back when he returns, as every window does, and nothing watches for it.
+Two things stood in the way, and both put her on every desktop. She was a
+panel, and Electron's panel joins every desktop whatever it is told; she is
+not one now. And she is raised above the windows of her desktop, to sit on
+his chart, and macOS floats a raised window across every desktop unless the
+window says otherwise — a setting Electron does not offer, so `spaces.m`, a
+few lines of the Mac's own code built with her, says it. The workflow asks a
+Mac whether it took before it signs her, with a panel beside her as the
+failure it must see. **Another app's full-screen desktop is one no ordinary
+window joins**, so TradingView is *filled* rather than full screen —
+Window → Fill, or fn-Control-F, or its window dragged to the top of the
+screen — and with the menu bar and the Dock set to hide themselves it looks
+the same. **Bring her here**, in her menu, puts her on the
 desktop he is on — she joins every desktop for a moment, is shown, and
 leaves them all again, which leaves her on the one she is on — and so does
 her Dock icon clicked, or the app opened again; at launch she is put on the
@@ -2292,13 +2303,15 @@ macOS asks for at build time. Nothing is drawn larger than the icon is, so the
 largest Retina size, which would be 1024, is left to macOS to scale.
 
 To work on it, `npm ci` and `npm start` in `laptop/` — the render is copied in
-from `charm/art/`, the one copy of it in the repository.
+from `charm/art/`, the one copy of it in the repository. `spaces.node` is built
+only by `npm run package`, so a copy started this way shows on every desktop.
 
 **To check on the Mac first**, which no suite and no Linux run can: that
-*Bring her here* puts her on TradingView's full-screen desktop and that she
-then slides with it, as a window of that desktop, when he switches — the one
-thing this rests on that only macOS decides; that her Dock icon stays and her menu-bar icon has no black around her; that a click on her
-leaves TradingView focused; that ⌥Space reaches her from inside TradingView;
+*Bring her here* puts her on the desktop of a filled TradingView, above it,
+and that she then slides with that desktop, and shows on no other, when he
+switches; that her Dock icon stays and her menu-bar icon has no black around
+her; that a click on her brings her forward and a click on the chart gives
+TradingView back with her still above it; that ⌥Space reaches her from inside TradingView;
 that macOS asks once each for the microphone and Screen Recording and keeps
 both across an update; which window or screen the chart is; that her voice
 starts clean and her mouth keeps time with it, and her notes sound as the
