@@ -165,11 +165,23 @@ test('the app uses no name nothing declares, and declares none nothing uses', ()
    `window.doji` is a property question, as `window.supabase` is. */
 const LAPTOP = readdirSync(join(ROOT, 'laptop'))
   .filter(f => /\.(mjs|cjs)$/.test(f)).map(f => `laptop/${f}`);
-const laptop = scope(LAPTOP, {}, ['--allowJs', '--checkJs']);
+/* THE AUDIO THREAD'S SCOPE IS DECLARED, NOT DERIVED: voice.mjs runs where
+   these three are the platform's, and the DOM lib does not have them. */
+const WORKLET = {
+  sampleRate: 'declare const sampleRate: number;',
+  AudioWorkletProcessor: 'declare class AudioWorkletProcessor { port: MessagePort; }',
+  registerProcessor: 'declare function registerProcessor(name: string, processor: unknown): void;',
+};
+const laptop = scope(LAPTOP, { 'worklet.d.ts': Object.values(WORKLET).join('\n') }, ['--allowJs', '--checkJs']);
 
 test('the compiler is reading the laptop app', () => {
   assert.ok(LAPTOP.length >= 4, `only ${LAPTOP.length} laptop sources found — the walk has gone blind`);
   proved('the laptop', laptop);
+  const worklet = readFileSync(join(ROOT, 'laptop', 'voice.mjs'), 'utf8');
+  for (const name of Object.keys(WORKLET)) {
+    assert.ok(new RegExp(`\\b${name}\\b`).test(worklet),
+      `worklet.d.ts declares ${name} and voice.mjs no longer uses it — the shim declares a name nothing needs`);
+  }
 });
 
 test('the laptop uses no name nothing declares, and declares none nothing uses', () => {

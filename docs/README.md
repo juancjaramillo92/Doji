@@ -115,8 +115,10 @@ charm/.gitignore                        ESP-IDF's build output and fetched compo
 laptop/                                 Eugenia on the Mac — see The laptop
   main.mjs                              the window, the keys, the menu, her door, the chart, the update
   face.mjs                              her face and body, the line over her head, his microphone, her voice
-  frames.mjs                            her answer, read out of its frames
+  frames.mjs                            her answer, read out of its frames, and the queue her voice plays from
+  voice.mjs                             that queue's player, in the audio thread
   place.mjs                             where her window goes, and the room around her
+  art.mjs                               the render's black made clear, for her face and her icon
   update.mjs                            the swap an update leaves behind
   preload.cjs                           what the pages may ask the main process
   key.html                              her key, asked once; key.mjs tries it
@@ -2142,8 +2144,11 @@ curl -sN -H "x-laptop-key: $EUGENIA_LAPTOP_SECRET" \
 
 **The app is `laptop/`**, an Electron app for the Mac, built and published by
 `.github/workflows/laptop.yml` as the charm's firmware is by its own. It has a
-Dock icon, Doji's, and an icon in the menu bar, her face, which also carries
-the briefing's dot; the two hold the same menu. **Her face floats over
+Dock icon, Doji's, and an icon in the menu bar, her face cropped close and
+its black made clear by the face's own rule (`laptop/art.mjs`), which also
+carries the briefing's dot; the two hold the same menu. A window made to
+float over full-screen apps would by default turn the app into one with no
+Dock icon; hers is told not to. **Her face floats over
 TradingView**: the charm's render with its black made clear, and the charm's
 drawing over it at the charm's own coordinates — eyes, highlight, smile,
 thought dots, the listening ring — which `agree.test.mjs` holds to
@@ -2161,10 +2166,13 @@ focus from TradingView. She is the window's middle; the room above her head
 holds **a line she shows** when her face alone cannot say enough.
 
 **She shows beside TradingView, and nowhere else.** He switches desktops all
-day, with TradingView full screen on its own, so she asks macOS which app is
-in front — its own `lsappinfo`, which needs no permission — twice a second,
-and shows while TradingView is, on whichever desktop, full screen or not, and
-hides when it is not. Her own app in front — her Dock icon, her menu, her key
+day, with TradingView full screen on its own. Shown, she is **pinned to the
+desktop she is shown on**, so a switch to another desktop leaves her behind
+at once — macOS's own doing, with nothing to wait for. Which app is in front
+she asks of macOS's own `lsappinfo`, which needs no permission, four times a
+second: she shows while TradingView is, on whichever desktop, full screen or
+not, comes back with it, and goes from a desktop TradingView shares with an
+app he switches to. Her own app in front — her Dock icon, her menu, her key
 — is no switch, and an answer that cannot be read leaves her showing rather
 than lost. *Show her → Everywhere* in her menu puts her on every desktop
 instead, and *Hide her* hides her until unhidden. While she is busy —
@@ -2174,13 +2182,16 @@ after it. Her Dock icon clicked, or the app opened again, shows her wherever
 he is for as long as she says she is here.
 
 **One gesture does everything**: the talk key, ⌥Space unless he chose
-⌃⌥Space in her menu, or a click on her. At rest she listens — the charm's two
+⌃⌥Space in her menu, or a click on her, which goes through the main process
+as the key does. At rest she listens — the charm's two
 rising notes say when to start, and the ring swells with his voice, so he sees
 she hears him; again, and the two notes fall, she thinks, then speaks, the
 mouth following her voice; again while she thinks or speaks, and she stops —
 the door keeps the turn, so the copy and the memory still land. **Shift with
 the talk key** is the same with **the chart**, *Looking at your chart…* above
-her head: captured at the press, beside the listening rather than before it,
+her head — only when he asks, since a picture is paid for on every round of
+the turn it rides in, and it is not kept for the turn after, as a chart sent
+in Telegram is not; her answer about it is: captured at the press, beside the listening rather than before it,
 so the first words are not lost to the moment a capture takes. It is the
 window whose title names TradingView, or else the screen the cursor is on —
 TradingView's window title is his to set, and no source documents it — with
@@ -2192,6 +2203,15 @@ at thirty seconds, and the last thirty of a five-minute recording are ticked
 and empty the ring; a press shorter than 0.4 seconds is one he took back. The
 recording's bitrate keeps it well inside `FILE_MAX`. A key another app holds
 registers as nothing, so she says so, and the menu offers the other.
+
+**Her voice plays from one queue, in the audio thread** (`voice.mjs`, its
+logic `Queue` in `frames.mjs`): it holds `LEAD`, three tenths of a second of
+her voice, before it plays, plays it sample by sample, and after running dry
+waits for `LEAD` again. Her parts used to be scheduled one after another as
+they arrived, and her first words stammered: the vendor's stream starts
+slower than she speaks, every late part was a gap, and every join could
+click. Now a late part is one pause, never a stammer, at the cost of a pause
+before her first word too short to notice.
 
 **The briefing is the charm's**: asked every five minutes until it lands, then
 an emerald dot beside her and a dot by her menu-bar icon until he hears it —
@@ -2260,12 +2280,14 @@ To work on it, `npm ci` and `npm start` in `laptop/` — the render is copied in
 from `charm/art/`, the one copy of it in the repository.
 
 **To check on the Mac first**, which no suite and no Linux run can: that she
-shows over TradingView in full screen and hides on the other desktops, and
-that `lsappinfo` names TradingView as the app in front; that a click on her
+shows over TradingView in full screen and stays behind, at once, when he
+switches desktops, and that `lsappinfo` names TradingView as the app in front;
+that her Dock icon stays and her menu-bar icon has no black around her; that a click on her
 leaves TradingView focused; that ⌥Space reaches her from inside TradingView;
 that macOS asks once each for the microphone and Screen Recording and keeps
 both across an update; which window or screen the chart is; that her voice
-and mouth keep time, and her notes sound as the charm's; that her eyes follow
+starts clean and her mouth keeps time with it, and her notes sound as the
+charm's; that her eyes follow
 the cursor; and that the update swaps and reopens her.
 
 ### Whether it landed
@@ -4254,7 +4276,7 @@ home-screen shortcut and every bookmark open `/`.
 | `test/charm.test.mjs` | the charm's pure C — `charm/main/briefing.c`, `charm/main/errand.c`, `charm/main/lift.c`, `charm/main/dns.c`, `charm/main/ogg.c` and `charm/main/frames.c` — compiled on the machine running the suite and driven in the zone the charm reads its clock in, out of `charm/main/net.c`: the briefing watch against `briefDue` and `retryDue` every five minutes of both weeks the clocks change in, an announced briefing not asked for again until the next day, and waiting until New York's midnight and no longer, on the server's own day, never before the clock is set, the wait between errands longer for each that found no network and never an hour, and over the weekend, every five minutes of both weeks the clocks change in against `marketOpen`, half-hourly with the open woken for unless a trade waits, a lift judged on readings, held and put down told apart, the setup's answer to a name, with and without the EDNS record a phone may add, a recording's Ogg file page by page against the specification's CRC, and her answer read out of `charmFrame`'s own bytes however the reads fall; and the firmware's names, the other of the two scope questions in C — every static, macro and enum constant a file declares used in it, every function a header declares called from another file, every non-static function in a header — since the ESP-IDF build refuses a name declared nowhere and only warns of one used nowhere |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions, the app and the laptop as three programs — with one planted defect per question proving the check can fail |
-| `test/laptop.test.mjs` | the laptop's pure half: her frames read back whole off `charmFrame`'s own bytes however the reads cut them — inside a header, at every frame's edges, a few bytes at a time — and her voice read as 16-bit samples across a frame that ends mid-sample, silence as exact zeros; her window kept where he left it while a screen shows her, on a second screen too, and brought home when none does; and the update's swap run in a scratch folder under a path with a space and an apostrophe, `ditto` and `open` stood in for: the new app put in place and opened, and the old one kept and reopened when the download will not unpack, holds no app, or will not move into place |
+| `test/laptop.test.mjs` | the laptop's pure half: her frames read back whole off `charmFrame`'s own bytes however the reads cut them — inside a header, at every frame's edges, a few bytes at a time — and her voice read as 16-bit samples across a frame that ends mid-sample, silence as exact zeros; her voice played from its queue by a simulated speaker while it arrives slower than she speaks and then faster, and through a stall followed by uneven parts — no silence inside her voice but the stall's one, every sample once and in order, begun after the lead, and an answer shorter than the lead played whole; her window kept where he left it while a screen shows her, on a second screen too, and brought home when none does; and the update's swap run in a scratch folder under a path with a space and an apostrophe, `ditto` and `open` stood in for: the new app put in place and opened, and the old one kept and reopened when the download will not unpack, holds no app, or will not move into place |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, `syncPepperstone`'s three outcomes, and a run that finds nothing reaching for no label |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |

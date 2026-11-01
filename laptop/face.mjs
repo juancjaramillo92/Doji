@@ -13,6 +13,7 @@
    This page records him and plays her; the main process carries both to her
    door and back, and owns the key, the chart and the window.
    ═══════════════════════════════════════════════════════════════════════════ */
+import { opacity } from './art.mjs';
 import { FRAME, PCM_RATE, sampler } from './frames.mjs';
 import { ROOM } from './place.mjs';
 
@@ -102,13 +103,13 @@ let briefingWaits = false;
 let talkKey = '⌥Space';
 let recorder = null, recording = null, ear = null;
 let listen = null;           // the recording under way: when it began, whether he spoke, the tick
-let audio = null;            // her answer playing: its context, its queue and when her voice starts
+let audio = null;            // her answer playing: its context, its player, and what the player has said
 let confusedUntil = 0, sayUntil = 0;
 let cues = null;             // the context her two-note sounds and the ear share
 
-/* The render is drawn on black, which on a laptop is a black square. Its
-   black is made clear by brightness, and the edge un-darkened by the same
-   amount, so the glass keeps its colour to the rim without a dark fringe. */
+/* The render is drawn on black: its black made clear by art.mjs's rule, and
+   the edge un-darkened by the same amount, so the glass keeps its colour to
+   the rim without a dark fringe. */
 async function load() {
   const img = new Image();
   img.src = 'eugenia.png';
@@ -120,7 +121,7 @@ async function load() {
   alpha = new Uint8Array(466 * 466);
   for (let i = 0; i < alpha.length; i++) {
     const p = d.data.subarray(4 * i, 4 * i + 4);
-    const a = Math.min(1, Math.max(p[0], p[1], p[2]) / 48);
+    const a = opacity(p[0], p[1], p[2]);
     if (a > 0) { p[0] /= a; p[1] /= a; p[2] /= a; }
     p[3] = alpha[i] = 255 * a;
   }
@@ -362,20 +363,30 @@ function fit() {
 }
 
 /* ─── Her voice ─────────────────────────────────────────────────────────────
-   Played as it arrives, each part queued after the last. Her silence while
-   she thinks is exact zeros, so the first sample above nothing is her voice,
-   as on the charm: thinking until it plays, speaking from then until the
-   answer has played to its end. */
+   Played from one queue in the audio thread (voice.mjs), which holds a
+   moment of her voice before it starts and plays it sample by sample, so her
+   first words come whole. It says when her voice first sounds — thinking
+   until then, as on the charm — and when the answer has played to its end.
+   Its module loads while her first frames arrive; they wait for it. */
 function voice() {
   if (!audio) {
     const ctx = new AudioContext({ sampleRate: PCM_RATE });
-    const gain = ctx.createGain(), meter = ctx.createAnalyser();
-    meter.fftSize = 512;
-    gain.connect(meter).connect(ctx.destination);
-    audio = { ctx, gain, meter, sample: sampler(), next: 0, voiceAt: Infinity, done: false, playing: new Set() };
+    const a = audio = { ctx, gain: ctx.createGain(), meter: ctx.createAnalyser(), sample: sampler(),
+                        player: null, waiting: [], voiced: false, drained: false };
+    a.meter.fftSize = 512;
+    a.gain.connect(a.meter).connect(ctx.destination);
+    ctx.audioWorklet.addModule('voice.mjs').then(() => {
+      if (audio !== a) return;
+      a.player = new AudioWorkletNode(ctx, 'voice', { outputChannelCount: [1] });
+      a.player.connect(a.gain);
+      a.player.port.onmessage = ({ data }) => { a[data === 'voice' ? 'voiced' : 'drained'] = true; };
+      for (const said of a.waiting) a.player.port.postMessage(said);
+    });
   }
   return audio;
 }
+
+const tell = (a, said) => (a.player ? a.player.port.postMessage(said) : a.waiting.push(said));
 
 function answer(kind, bytes) {
   if (mode !== 'thinking' && mode !== 'speaking') return;
@@ -383,23 +394,11 @@ function answer(kind, bytes) {
   if (kind === FRAME.volume) { a.gain.gain.value = bytes[0] / 100; return; }
   if (kind !== FRAME.voice) return;
   const samples = a.sample(bytes);
-  if (!samples.length) return;
-  const buffer = a.ctx.createBuffer(1, samples.length, PCM_RATE);
-  buffer.copyToChannel(samples, 0);
-  const part = a.ctx.createBufferSource();
-  part.buffer = buffer;
-  part.connect(a.gain);
-  const at = Math.max(a.next, a.ctx.currentTime + 0.05);
-  part.start(at);
-  part.onended = () => a.playing.delete(part);
-  a.playing.add(part);
-  a.next = at + buffer.duration;
-  if (a.voiceAt === Infinity && samples.some(s => s !== 0)) a.voiceAt = at;
+  if (samples.length) tell(a, samples);
 }
 
 function silence() {
   if (!audio) return;
-  for (const part of audio.playing) part.stop();
   audio.ctx.close();
   audio = null;
   level = 0;
@@ -414,10 +413,9 @@ const loudness = (meter) => {
 // Once a frame: how loud she is now, and whether she has started or finished.
 function hearing() {
   if (!audio) { level = 0; return; }
-  const { ctx, meter } = audio;
-  if (mode === 'thinking' && ctx.currentTime >= audio.voiceAt) { mode = 'speaking'; unsay(); }
-  level = loudness(meter);
-  if (audio.done && ctx.currentTime >= audio.next) { silence(); mode = 'idle'; }
+  if (mode === 'thinking' && audio.voiced) { mode = 'speaking'; unsay(); }
+  level = loudness(audio.meter);
+  if (audio.drained) { silence(); mode = 'idle'; }
 }
 
 // And how loud he is, while she listens: the ring, the silence that lets go, the tick.
@@ -516,7 +514,8 @@ function briefing() {
   return true;
 }
 
-const click = () => briefing() || press(false);
+// Through the main process, as the key is, so she stays for the turn wherever he is.
+const click = () => briefing() || window.doji.talk();
 
 /* ─── Her shape, for the mouse ──────────────────────────────────────────────
    The window lets clicks through but where she is drawn; the briefing's dot
@@ -565,7 +564,7 @@ function near(x, y) {
 
 window.doji.on('press', press);
 window.doji.on('frame', answer);
-window.doji.on('done', () => { if (audio) audio.done = true; else if (mode === 'thinking') mode = 'idle'; });
+window.doji.on('done', () => { if (audio) tell(audio, 'end'); else if (mode === 'thinking') mode = 'idle'; });
 window.doji.on('trouble', trouble);
 window.doji.on('briefing', (yes) => { briefingWaits = yes; });
 window.doji.on('briefing-now', briefing);

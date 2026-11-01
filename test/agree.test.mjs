@@ -557,6 +557,27 @@ test('the laptop looks for its update where the workflow publishes it', () => {
   assert.match(LAPTOP_MAIN, /spawn\('\/bin\/sh', \['-c', swap\]/, 'the update no longer runs the swap update.mjs writes');
 });
 
+/* Two decisions the Mac alone would show broken. Electron turns an app whose
+   window floats over full-screen apps into one with no Dock icon unless told
+   not to, so every call that sets her desktops carries SPACES, which tells
+   it; and her face and her menu-bar icon make the render's black clear by
+   art.mjs's one rule, or the icon keeps a black square the face does not. */
+test('the laptop keeps its Dock icon, and makes the render clear by one rule', () => {
+  const spaces = LAPTOP_MAIN.match(/^const SPACES = (\{[^}]+\});$/m)?.[1];
+  assert.ok(spaces && /skipTransformProcessType: true/.test(spaces) && /visibleOnFullScreen: true/.test(spaces),
+    'SPACES no longer floats her over full-screen apps without taking the Dock icon away');
+  const calls = [...LAPTOP_MAIN.matchAll(/setVisibleOnAllWorkspaces\(([^)]*)\)/g)].map(m => m[1]);
+  assert.ok(calls.length >= 3, `only ${calls.length} calls set her desktops — the reader has gone blind`);
+  for (const args of calls) assert.match(args, /^(true|false), SPACES$/, `setVisibleOnAllWorkspaces(${args}) can take her Dock icon away`);
+
+  assert.match(LAPTOP_FACE, /const a = opacity\(p\[0\], p\[1\], p\[2\]\);/, 'her face no longer makes the render clear by art.mjs\'s rule');
+  assert.match(bodyOf(LAPTOP_MAIN, 'function trayIcon('), /opacity\(pixels\[i\], pixels\[i \+ 1\], pixels\[i \+ 2\]\)/,
+    'her menu-bar icon no longer makes the render clear by art.mjs\'s rule');
+  for (const [file, text] of [['face.mjs', LAPTOP_FACE], ['main.mjs', LAPTOP_MAIN]]) {
+    assert.doesNotMatch(text, /\/ 48\b/, `${file} makes the render clear by a rule of its own`);
+  }
+});
+
 /* What the laptop copies of the charm's ear and voice, and of the door's
    beat. Her two notes and the tick are drawn by the charm's own formula;
    his voice is heard past the charm's VOICE on the charm's scale, let go

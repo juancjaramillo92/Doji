@@ -5,7 +5,8 @@
    screen capture, none of which a suite can open. What it can drive is the
    pure half — her frames read off the wire, and her voice read out of them,
    fed the door's own bytes, from `charmFrame`, cut at every place a network
-   read can cut them; where her window goes when a screen is gone; and the
+   read can cut them; her voice played from its queue while it arrives late
+   and unevenly, as a real stream does; where her window goes when a screen is gone; and the
    swap an update leaves behind, run in a scratch folder with macOS's `ditto`
    and `open` stood in for, in every way it can fail. The copies the app holds of the
    door and of the charm are agree.test.mjs's; whether she looks, sounds and
@@ -18,7 +19,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { charmFrame } from '../supabase/functions/doji-eugenia/index.ts';
-import { FRAME, framer, sampler } from '../laptop/frames.mjs';
+import { FRAME, LEAD, PCM_RATE, Queue, framer, sampler } from '../laptop/frames.mjs';
 import { placed, room, ROOM } from '../laptop/place.mjs';
 import { BUNDLE, swapScript } from '../laptop/update.mjs';
 
@@ -148,4 +149,80 @@ test('an update that cannot take the old app\'s place leaves the old app, and op
     assert.equal(r.leftover, false, `${why} left the old app set aside`);
     assert.ok(r.opened?.endsWith(BUNDLE), `${why} did not reopen the app`);
   }
+});
+
+/* ─── Her voice, played from its queue ──────────────────────────────────────
+   A speaker pulling a block at a time, as the audio thread does, against her
+   voice arriving on a clock of its own: slow at first, as the vendor's stream
+   is before it gets ahead of her speaking, then fast. Every sample is its own
+   value, so a sample lost, repeated or out of order shows. */
+const BLOCK = 128;
+const PART = 480;  // 20 ms of her voice
+
+function playing(arrivals, { stopAt = Infinity } = {}) {
+  const q = new Queue(PCM_RATE), out = [], said = [];
+  const voiceSample = (j) => ((j % 997) + 1) / 2000;
+  let sent = 0;
+  for (let now = 0, step = 0; step < 4000; step++, now = step * BLOCK / PCM_RATE) {
+    while (sent < arrivals.length && arrivals[sent] <= now) {
+      q.push(Float32Array.from({ length: PART }, (_, i) => voiceSample(sent * PART + i)));
+      if (++sent === arrivals.length && stopAt === Infinity) q.end();
+    }
+    if (now >= stopAt && !q.ended) q.end();
+    const block = new Float32Array(BLOCK);
+    const event = q.fill(block);
+    if (event) said.push([event, out.length]);
+    out.push(...block);
+    if (event === 'drained') break;
+  }
+  // Her samples are 32-bit, so what she should play is too.
+  return { out, said, expected: Array.from({ length: arrivals.length * PART }, (_, j) => Math.fround(voiceSample(j))) };
+}
+
+// Her voice as played, against what was sent: the first sample lost, repeated or out of order, by its place.
+const whole = (out, expected) => {
+  const voiced = out.filter(s => s !== 0);
+  const wrong = voiced.findIndex((s, i) => s !== expected[i]);
+  return voiced.length === expected.length && wrong === -1 ? 'whole' : `sample ${wrong} of ${voiced.length}, ${expected.length} sent`;
+};
+
+// The positions of every run of silence inside her voice, once it has started.
+const pauses = (out) => {
+  const first = out.findIndex(s => s !== 0), last = out.findLastIndex(s => s !== 0);
+  let runs = 0;
+  for (let i = first; i <= last; i++) if (out[i] === 0 && out[i - 1] !== 0) runs++;
+  return runs;
+};
+
+test('her first words come whole while her voice arrives slower than she speaks, then faster', () => {
+  // Ten parts a little slower than real time, then the rest in a rush.
+  const arrivals = [...Array.from({ length: 10 }, (_, k) => 0.2 + k * 0.025), ...Array.from({ length: 60 }, (_, k) => 0.45 + k * 0.005)];
+  const { out, said, expected } = playing(arrivals);
+  assert.equal(pauses(out), 0, 'her voice stammered: a silence fell inside it');
+  assert.equal(whole(out, expected), 'whole', 'her voice lost, repeated or reordered a sample');
+  assert.deepEqual(said.map(([e]) => e), ['voice', 'drained'], 'the queue did not say once that she began and once that she ended');
+  // It waited for LEAD of her voice before the first sample went out.
+  const first = out.findIndex(s => s !== 0) / PCM_RATE;
+  assert.ok(first >= 0.2 + 0.25 && first < 0.2 + LEAD + 0.15, `her voice began at ${first.toFixed(3)} s`);
+});
+
+test('a stream that stalls is one pause, never a stammer, and nothing is lost', () => {
+  // Steady parts, a stall of half a second, then parts as uneven as a real
+  // stream's, on time on average — what plays the moment it arrives stammers.
+  const arrivals = [...Array.from({ length: 40 }, (_, k) => k * 0.02),
+                    ...Array.from({ length: 40 }, (_, k) => 1.3 + k * 0.02 + (k % 2 ? 0.012 : 0))];
+  const { out, expected } = playing(arrivals);
+  assert.equal(pauses(out), 1, `the stall was heard as ${pauses(out)} silences`);
+  assert.equal(whole(out, expected), 'whole', 'the stall cost a sample');
+});
+
+test('an answer shorter than the lead is played whole when it ends, and silence alone says nothing', () => {
+  const short = playing([0.1, 0.11, 0.12, 0.13, 0.14]);
+  assert.equal(whole(short.out, short.expected), 'whole', 'a short answer waited for a lead it would never reach');
+  const q = new Queue(PCM_RATE);
+  q.push(new Float32Array(2400));
+  q.end();
+  const events = [];
+  for (let i = 0; i < 40; i++) { const e = q.fill(new Float32Array(BLOCK)); if (e) events.push(e); if (e === 'drained') break; }
+  assert.deepEqual(events, ['drained'], 'her silence was taken for her voice');
 });

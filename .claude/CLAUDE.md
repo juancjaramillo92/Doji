@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 864 tests, nine suites
+npm test      # 868 tests, nine suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -533,8 +533,9 @@ What a change most often breaks:
 `laptop/` is Electron, a fourth runtime, and the README's *The laptop* says
 what it does. Three levels of proof, as on the charm:
 
-- **Pure, and driven in `npm test`.** `frames.mjs`, fed `charmFrame`'s bytes;
-  `place.mjs`; and `update.mjs`, whose swap `laptop.test.mjs` runs in a scratch
+- **Pure, and driven in `npm test`.** `frames.mjs`, fed `charmFrame`'s bytes,
+  and its `Queue`, played against a stream that arrives late and unevenly;
+  `art.mjs`; `place.mjs`; and `update.mjs`, whose swap `laptop.test.mjs` runs in a scratch
   folder with `ditto` and `open` stood in for. A decision that can be pure goes
   in one of these.
 - **Read.** Every copy it holds of the door or the charm — the header, the
