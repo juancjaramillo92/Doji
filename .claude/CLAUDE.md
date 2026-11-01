@@ -550,7 +550,8 @@ what it does. Three levels of proof, as on the charm:
   the runner whether a raised window took it, beside a panel as the defect
   it must see. A Linux run under Xvfb drives the page and the main process
   against a stand-in door, which proves the sequence and the drawing and
-  nothing about macOS.
+  nothing about macOS; it is built for the change at hand and not kept
+  (`REFACTOR.md` R-139).
 
 The key and the door stay in the main process; the page asks for nothing
 `preload.cjs` does not name. A face change is a change to the charm's numbers

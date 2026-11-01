@@ -1245,6 +1245,20 @@ What only split a body into halves was inlined: the two hearings in `live`,
 and the microphone's release in the recorder's stop.
 **Revisit if:** one of them grows a second caller or shrinks to one line.
 
+### R-139 — the laptop's Xvfb run kept as a suite
+**Deferred.** The laptop's page is driven by no suite. A run under Xvfb — the
+app copied with its door pointed at a stand-in, a script that presses, clicks
+and drags, and her mode, ticks and lines logged from the page — is what showed
+each change here kept her sequence: listening, thinking, speaking, idle, a
+recording let go when nothing was said, the tick before the end, compared
+between main and the change. It is not committed. It runs on waits of seconds,
+so as a CI job it would go red on a slow runner as often as on a defect, and a
+red that means nothing is soon not read; kept in the repository and run by no
+job, it drifts from the app it drives. Each change that needs it builds it,
+and compares main with the change.
+**Revisit if:** the page's sequence moves into a pure module a suite can
+drive without a clock, as the queue's did.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED
