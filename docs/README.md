@@ -114,11 +114,13 @@ package-lock.json                       committed — see Tests
 charm/.gitignore                        ESP-IDF's build output and fetched components
 laptop/                                 Eugenia on the Mac — see The laptop
   main.mjs                              the window, the keys, the menu, her door, the chart, the update
-  face.mjs                              her face and body, his microphone, her voice
+  face.mjs                              her face and body, the line over her head, his microphone, her voice
   frames.mjs                            her answer, read out of its frames
+  place.mjs                             where her window goes, and the room around her
+  update.mjs                            the swap an update leaves behind
   preload.cjs                           what the pages may ask the main process
   key.html                              her key, asked once; key.mjs tries it
-  Info.plist                            the menu-bar app, and why it asks for the microphone
+  Info.plist                            why she asks for the microphone
   .gitignore                            the copied render, the stamp and the build
 ```
 
@@ -437,7 +439,9 @@ single-sourced at run time:
 | the **laptop's answer frames and rate** | `FRAME` and `PCM_RATE` in `laptop/frames.mjs`, and the door's, whose bytes `laptop.test.mjs` feeds it |
 | what **the laptop sends her door** | the `x-laptop-` header, the form's fields with their types and names, and the briefing's two words in `laptop/main.mjs`, against what the laptop's door reads and `IMAGE_TYPES`; and the statuses `tryKey` takes as a key proved, against the door's answers to a right one |
 | **the charm's face on the laptop** | `F`, `DOTS`, the drawing's four colours and the ring's emeralds in `laptop/face.mjs`, against `F`, the thought dots, `draw_face`'s colours and `RING` in `charm/main/face.c`, and `charm/main/palette.h` |
-| where the **laptop's update** lives | the two objects `.github/workflows/laptop.yml` writes and the version it stamps, and `UPDATES`, the objects and `build.txt` in `laptop/main.mjs` |
+| the **charm's sounds and ear on the laptop** | `LISTEN`, `SENT`, the tick, `VOICE`, `SILENT_MS`, `WARN_LEFT` and the level's scale in `laptop/face.mjs`, against `sound_listen`, `sound_sent`, `sound_tick`, the level and `play_notes`' shape in `charm/main/sound.c`, and `VOICE`, `SILENT_MS`, `MAX_MS` and `WARN_MS` in `charm/main/talk.c` |
+| how long the **laptop waits out her silence** | `READ_MS` in `laptop/main.mjs`, at least two of `BEAT_MS` in `doji-eugenia`, or the laptop hangs up while she thinks |
+| where the **laptop's update** lives | the two objects `.github/workflows/laptop.yml` writes and the version it stamps, and `UPDATES`, the objects and `build.txt` in `laptop/main.mjs`; the bundle the workflow zips, and `BUNDLE` in `laptop/update.mjs`, which the swap unpacks |
 | what the charm asks **`?briefing=`** for | the two in `charm/main/talk.c` and the two `charmBriefing` answers |
 | where the **charm's update** lives | `FIRMWARE_URL` in `charm/main/net.h`, and the bucket and object `.github/workflows/charm.yml` makes and writes; the version it writes beside the image, the one the build stamped, and the object `APP_VERSION_URL` in `doji-gladys` reads it from |
 | where the **charm's app** boots from | the first app slot's offset in `charm/partitions.csv` and the offset `.github/workflows/charm.yml` checks the image against |
@@ -2137,47 +2141,93 @@ curl -sN -H "x-laptop-key: $EUGENIA_LAPTOP_SECRET" \
 ```
 
 **The app is `laptop/`**, an Electron app for the Mac, built and published by
-`.github/workflows/laptop.yml` as the charm's firmware is by its own. It lives
-in the menu bar, not the Dock, and **her face floats in a corner over
-everything**, TradingView in full screen included: the charm's render with its
-black made clear, and the charm's drawing over it at the charm's own
-coordinates — eyes, highlight, smile, thought dots, the listening ring —
-which `agree.test.mjs` holds to `charm/main/face.c` and `palette.h`. What the
-laptop adds is a body: **she breathes** (about 1.5% over 4.6 seconds, from her
-base) **and floats** (a few pixels over 3.3 seconds, a rhythm that never falls
-into step with the breath), **leans in** to listen, **sways** while she thinks
-and **gives with the loud moments** of her voice; eyes and mouth ride the same
-transform. Reduce Motion in macOS stops the breathing and floating and keeps
-the rest. Clicks outside her shape go through to the chart beneath, she can be
-dragged anywhere, and a click on her never takes the focus from TradingView.
-Three sizes and *Start with the Mac* are in the menu.
+`.github/workflows/laptop.yml` as the charm's firmware is by its own. It has a
+Dock icon, Doji's, and an icon in the menu bar, her face, which also carries
+the briefing's dot; the two hold the same menu. **Her face floats over
+TradingView**: the charm's render with its black made clear, and the charm's
+drawing over it at the charm's own coordinates — eyes, highlight, smile,
+thought dots, the listening ring — which `agree.test.mjs` holds to
+`charm/main/face.c` and `palette.h`. What the laptop adds is a body: **she
+breathes** (about 1.5% over 4.6 seconds, from her base) **and floats** (a few
+pixels over 3.3 seconds, a rhythm that never falls into step with the
+breath), **looks at the cursor** when it comes near, **leans in** to listen,
+**sways** while she thinks and **gives with the loud moments** of her voice;
+eyes and mouth ride the same transform. Reduce Motion in macOS stops the
+breathing and floating and keeps the rest; at rest she is drawn at twenty
+frames a second rather than thirty, which a breath that slow does not show.
+Clicks outside her shape go through to the chart beneath, she can be dragged
+anywhere and stays where she is left, and a click on her never takes the
+focus from TradingView. She is the window's middle; the room above her head
+holds **a line she shows** when her face alone cannot say enough.
 
-**One gesture does everything**: ⌥Space anywhere, or a click on her. At rest
-she listens, with the ring; again, and she thinks, then speaks, the mouth
-following her voice; again while she thinks or speaks, and she stops — the
-door keeps the turn, so the copy and the memory still land. **⇧⌥Space** is the
-same with **the chart**: captured at the press, beside the listening rather
-than before it, so the first words are not lost to the seconds a capture
-takes. It is the window whose title names TradingView, or else the screen she
-floats on, with her own window kept out of every capture; a question whose
-chart could not be captured is not asked, and her face says so. The
-microphone is opened at the press and closed with the recording, so macOS
-shows it in use only while she listens; a press shorter than 0.4 seconds is
-one he took back, and a recording stops itself at five minutes, at a bitrate
-that keeps it well inside `FILE_MAX`.
+**She shows beside TradingView, and nowhere else.** He switches desktops all
+day, with TradingView full screen on its own, so she asks macOS which app is
+in front — its own `lsappinfo`, which needs no permission — twice a second,
+and shows while TradingView is, on whichever desktop, full screen or not, and
+hides when it is not. Her own app in front — her Dock icon, her menu, her key
+— is no switch, and an answer that cannot be read leaves her showing rather
+than lost. *Show her → Everywhere* in her menu puts her on every desktop
+instead, and *Hide her* hides her until unhidden. While she is busy —
+listening, thinking, speaking or saying something — she stays wherever he
+is: **the talk key works from any app**, and she comes for the turn and goes
+after it. Her Dock icon clicked, or the app opened again, shows her wherever
+he is for as long as she says she is here.
+
+**One gesture does everything**: the talk key, ⌥Space unless he chose
+⌃⌥Space in her menu, or a click on her. At rest she listens — the charm's two
+rising notes say when to start, and the ring swells with his voice, so he sees
+she hears him; again, and the two notes fall, she thinks, then speaks, the
+mouth following her voice; again while she thinks or speaks, and she stops —
+the door keeps the turn, so the copy and the memory still land. **Shift with
+the talk key** is the same with **the chart**, *Looking at your chart…* above
+her head: captured at the press, beside the listening rather than before it,
+so the first words are not lost to the moment a capture takes. It is the
+window whose title names TradingView, or else the screen the cursor is on —
+TradingView's window title is his to set, and no source documents it — with
+her own window kept out of every capture it can be; a question whose chart
+could not be captured is not asked, and she says why. The microphone is opened
+at the press and closed with the recording, so macOS shows it in use only
+while she listens. As on the charm, a recording he never spoke into is let go
+at thirty seconds, and the last thirty of a five-minute recording are ticked
+and empty the ring; a press shorter than 0.4 seconds is one he took back. The
+recording's bitrate keeps it well inside `FILE_MAX`. A key another app holds
+registers as nothing, so she says so, and the menu offers the other.
 
 **The briefing is the charm's**: asked every five minutes until it lands, then
-an emerald dot beside her until he clicks it, gone at midnight in New York.
-The ready line is not played — the dot is the news. A failure of any kind —
-no internet, a refusal, a chart she could not see — is her confused face for
-four seconds; a 401 also opens the window for her key.
+an emerald dot beside her and a dot by her menu-bar icon until he hears it —
+a click on the dot or *Hear the briefing* — gone at midnight in New York. The
+ready line is not played; the dot is the news.
 
-**Her key** is `EUGENIA_LAPTOP_SECRET`, asked once in a small window, tried
-at her door before it is kept — an empty form, which a right key is refused
-with a `400` for, or a `503` at a door short of its vendors — and kept
-encrypted by the Keychain. The key and the door live in the app's main
-process alone; the page that draws her has neither, and asks for nothing but
-what `preload.cjs` names.
+**Every failure says what it is and what to do**, as her door's
+`VOICE_TROUBLE` lines do for a recording: her confused face for four seconds
+and a line above her head — no internet, her key refused, her voice not set
+up on the server, the line gone quiet, a chart she could not see, a
+permission to turn on. The line holds a word per failure in `SAY`. **Nothing
+waits without a deadline**: a question with a short answer has twenty
+seconds, and her answer is a dead line when nothing arrives for `READ_MS`,
+two of her door's beats, which `agree.test.mjs` holds to `BEAT_MS`.
+
+**Permissions are asked when they are needed, and said when they are
+missing.** The microphone is asked at the first launch, and refused, its
+pane in System Settings is opened. **Screen Recording** is asked at the first
+chart: without it macOS can hold a capture unanswered for ever, so its status
+is read first, the capture is asked only long enough to put her in macOS's
+list, the pane is opened, and she says to turn it on and then *Restart her*
+from her menu — macOS applies the grant only to an app started after it.
+
+**Her key** is `EUGENIA_LAPTOP_SECRET`, asked once in a small window that
+comes to the front, tried at her door before it is kept — an empty form,
+which a right key is refused with a `400` for, or a `503` at a door short of
+its vendors — and kept encrypted by the Keychain. The app's own menu holds
+the Edit menu ⌘V pastes it through. The key and the door live in the main
+process alone; the page that draws her has neither, asks for nothing but what
+`preload.cjs` names, opens no window and navigates nowhere.
+
+**The first launch** puts her in the bottom-right corner, turns on *Start
+with the Mac* — a companion is there when the Mac is; it is his to turn off —
+and says how to talk. Opened from anywhere but Applications, she offers to
+move herself there, where she updates and macOS keeps her permissions. A
+place left on a screen since unplugged brings her back to the main one.
 
 **It is signed with a certificate of its own, never Apple's**, which costs
 nothing and is why macOS keeps her microphone and screen permissions from one
@@ -2192,29 +2242,31 @@ by Apple, the first launch is refused once: System Settings → Privacy &
 Security → *Open Anyway*.
 
 **She updates from `main`.** The workflow publishes `Eugenia.zip` and its
-version — the commit, stamped into the app as `build.txt` — to a public
-bucket, `laptop`; at launch and daily she compares it with her own, and a
-newer one is offered in the menu, never installed unasked. One click
-downloads it, quits, and a shell left behind swaps the app and opens the new
-one. Downloaded by the app rather than a browser, it carries no quarantine, so
-*Open Anyway* is never asked again. A copy run from the repository has no
-`build.txt` and never offers one.
+version — the commit, stamped into the app as `build.txt` and shown in her
+menu — to a public bucket, `laptop`; at launch and daily she compares it with
+her own, and a newer one is offered in the menu, never installed unasked. One
+click downloads it, saying so, quits, and a shell left behind,
+`swapScript`, puts it in place and opens it: the old app is set aside first
+and put back if the new one cannot take its place, so a failed update leaves
+the app it found, never none. Downloaded by the app rather than a browser, it
+carries no quarantine, so *Open Anyway* is never asked again. A copy run from
+the repository has no `build.txt` and never offers one.
 
 **Her app wears Doji's icon**, the phone's `icon-512.png`, made into the sizes
-macOS asks for at build time; the menu bar shows her own face, small. Nothing
-is drawn larger than the icon is, so the largest Retina size, which would be
-1024, is left to macOS to scale.
+macOS asks for at build time. Nothing is drawn larger than the icon is, so the
+largest Retina size, which would be 1024, is left to macOS to scale.
 
 To work on it, `npm ci` and `npm start` in `laptop/` — the render is copied in
 from `charm/art/`, the one copy of it in the repository.
 
 **To check on the Mac first**, which no suite and no Linux run can: that she
-floats over TradingView in full screen and on every Space, that a click on her
-leaves TradingView focused, that ⌥Space reaches her from inside TradingView
-(and that nothing else on the Mac claims it), that macOS asks once each for
-the microphone and Screen Recording and keeps both across an update, which
-window ⇧⌥Space captures — TradingView's title is the guess — that her voice
-and her mouth keep time, and that the update swaps and reopens her.
+shows over TradingView in full screen and hides on the other desktops, and
+that `lsappinfo` names TradingView as the app in front; that a click on her
+leaves TradingView focused; that ⌥Space reaches her from inside TradingView;
+that macOS asks once each for the microphone and Screen Recording and keeps
+both across an update; which window or screen the chart is; that her voice
+and mouth keep time, and her notes sound as the charm's; that her eyes follow
+the cursor; and that the update swaps and reopens her.
 
 ### Whether it landed
 
@@ -4202,7 +4254,7 @@ home-screen shortcut and every bookmark open `/`.
 | `test/charm.test.mjs` | the charm's pure C — `charm/main/briefing.c`, `charm/main/errand.c`, `charm/main/lift.c`, `charm/main/dns.c`, `charm/main/ogg.c` and `charm/main/frames.c` — compiled on the machine running the suite and driven in the zone the charm reads its clock in, out of `charm/main/net.c`: the briefing watch against `briefDue` and `retryDue` every five minutes of both weeks the clocks change in, an announced briefing not asked for again until the next day, and waiting until New York's midnight and no longer, on the server's own day, never before the clock is set, the wait between errands longer for each that found no network and never an hour, and over the weekend, every five minutes of both weeks the clocks change in against `marketOpen`, half-hourly with the open woken for unless a trade waits, a lift judged on readings, held and put down told apart, the setup's answer to a name, with and without the EDNS record a phone may add, a recording's Ogg file page by page against the specification's CRC, and her answer read out of `charmFrame`'s own bytes however the reads fall; and the firmware's names, the other of the two scope questions in C — every static, macro and enum constant a file declares used in it, every function a header declares called from another file, every non-static function in a header — since the ESP-IDF build refuses a name declared nowhere and only warns of one used nowhere |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions, the app and the laptop as three programs — with one planted defect per question proving the check can fail |
-| `test/laptop.test.mjs` | the laptop's pure half, `laptop/frames.mjs`: her frames read back whole off `charmFrame`'s own bytes however the reads cut them — inside a header, at every frame's edges, a few bytes at a time — and her voice read as 16-bit samples across a frame that ends mid-sample, silence as exact zeros |
+| `test/laptop.test.mjs` | the laptop's pure half: her frames read back whole off `charmFrame`'s own bytes however the reads cut them — inside a header, at every frame's edges, a few bytes at a time — and her voice read as 16-bit samples across a frame that ends mid-sample, silence as exact zeros; her window kept where he left it while a screen shows her, on a second screen too, and brought home when none does; and the update's swap run in a scratch folder under a path with a space and an apostrophe, `ditto` and `open` stood in for: the new app put in place and opened, and the old one kept and reopened when the download will not unpack, holds no app, or will not move into place |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, `syncPepperstone`'s three outcomes, and a run that finds nothing reaching for no label |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |

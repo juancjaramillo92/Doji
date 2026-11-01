@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 860 tests, nine suites
+npm test      # 864 tests, nine suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -533,10 +533,13 @@ What a change most often breaks:
 `laptop/` is Electron, a fourth runtime, and the README's *The laptop* says
 what it does. Three levels of proof, as on the charm:
 
-- **Pure, and driven in `npm test`.** `frames.mjs` alone, fed `charmFrame`'s
-  bytes by `laptop.test.mjs`. A decision that can be pure goes there.
+- **Pure, and driven in `npm test`.** `frames.mjs`, fed `charmFrame`'s bytes;
+  `place.mjs`; and `update.mjs`, whose swap `laptop.test.mjs` runs in a scratch
+  folder with `ditto` and `open` stood in for. A decision that can be pure goes
+  in one of these.
 - **Read.** Every copy it holds of the door or the charm — the header, the
-  form, the frames, the face's numbers and colours, the update's path — is
+  form, the frames, the face's numbers and colours, the sounds and the ear,
+  the wait, the update's path — is
   read out of both by `agree.test.mjs`; `types.test.mjs` asks it the two
   scope questions as its own program.
 - **Only the Mac.** The window, the keys, the microphone, the capture, the
