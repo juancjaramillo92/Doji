@@ -544,6 +544,13 @@ test('the laptop looks for its update where the workflow publishes it', () => {
   assert.doesNotMatch(sign, /--sign -/, 'a build can still be signed ad hoc');
   assert.match(workflow, /- name: Publish the update\n\s*if: github\.ref == 'refs\/heads\/main'\n/,
     'a build of a branch can publish the update');
+  // A run without the secrets signs nothing and packs nothing; the publish is
+  // not gated on them, so main without them fails rather than skipping.
+  assert.match(workflow, /^ {6}SIGNING: \$\{\{ secrets\.SB_SECRET_KEY != '' \}\}$/m, 'SIGNING no longer says whether the run holds the secrets');
+  const gated = [...workflow.matchAll(/^ {6}- (?:name: (.+)|uses: (actions\/[\w-]+)[^\n]*)\n(?: {8}if: (.+)\n)?/gm)]
+    .filter(m => m[3]?.includes('env.SIGNING')).map(m => m[1] ?? m[2]);
+  assert.deepEqual(gated, ['Sign', 'Check the signature and pack the app', 'actions/upload-artifact'],
+    'a run without the secrets reaches a step that needs them, or main skips one it must not');
   // Her icon is made from the phone's, and is the one the packager is handed.
   const made = workflow.match(/iconutil -c icns (\w+)\.iconset/)?.[1];
   assert.ok(made && workflow.includes('../icon-512.png') && workflow.includes("'icon-512.png'"),
@@ -580,9 +587,9 @@ test('the laptop keeps its Dock icon, and makes the render clear by one rule', (
 
 /* She is a window on one desktop, as any window is, and macOS moves her with
    it: nothing watches which app is in front or which desktop is, and nothing
-   but he shows or hides her. Each watcher that was tried slid her in after
-   the switch had ended, where a window that belongs to its desktop slides
-   with it. So the main process asks macOS nothing about other apps' windows,
+   but he shows or hides her. A window that belongs to its desktop slides
+   with the switch, where a watcher answers once it is over (REFACTOR.md
+   R-134). So the main process asks macOS nothing about other apps' windows,
    puts her on the desktop in front only when asked, and does not move her
    for a turn. Two things would put her on every desktop again, and neither
    shows off a Mac: a panel, which Electron joins to every desktop whatever it
@@ -599,8 +606,10 @@ test('the laptop lives on one desktop, moved by macOS, and watches for nothing',
     'she is no longer put on the desktop in front by joining every desktop, showing, and leaving them all');
   assert.doesNotMatch(LAPTOP_MAIN.replace(bodyOf(LAPTOP_MAIN, 'function bringHere('), ''), /setVisibleOnAllWorkspaces\(true/,
     'something but bringHere() puts her on every desktop');
-  assert.match(bodyOf(LAPTOP_MAIN, 'function press('), /^function press\(chart\) \{\n  send\('press', chart\);\s*$/,
-    'a press moves or shows her: she answers where she is');
+  const presses = [...LAPTOP_MAIN.matchAll(/\(\) => send\('press', (true|false)\)/g)].map(m => m[1]);
+  assert.deepEqual(presses.sort(), ['false', 'false', 'true', 'true'], 'the keys and the menu no longer hand the page a press, and nothing else');
+  assert.doesNotMatch(LAPTOP_MAIN.replace(bodyOf(LAPTOP_MAIN, 'function bringHere('), ''), /\.show(Inactive)?\(/,
+    'something but bringHere() shows her: a press moves or shows her, and she answers where she is');
   assert.doesNotMatch(LAPTOP_MAIN, /type: 'panel'/, 'she is a panel again, which Electron joins to every desktop');
   assert.match(bodyOf(LAPTOP_MAIN, 'function float('),
     /face\.setAlwaysOnTop\(true, 'floating'\);\n\s*if \(spaces\) note\(`kept to one desktop \(\$\{spaces\.managed\(face\.getNativeWindowHandle\(\)\)\}\)`\);/,
@@ -615,13 +624,17 @@ test('the laptop lives on one desktop, moved by macOS, and watches for nothing',
   assert.ok(workflow.includes('codesign --force --sign "$identity" --keychain "$keychain" Eugenia.app/Contents/Resources/app.asar.unpacked/spaces.node'),
     'the workflow no longer signs spaces.node where the package puts it');
   assert.ok(workflow.includes('SPACES="$PWD/spaces.node" npx electron "$RUNNER_TEMP/spaces.cjs"'), 'the workflow no longer asks a Mac whether spaces.node took');
+  // The window the Mac is asked about is raised as hers is, or the check proves a window she is not.
+  const level = (text) => [...text.matchAll(/\.setAlwaysOnTop\(true, '([\w-]+)'\)/g)].map(m => m[1]);
+  assert.deepEqual(level(workflow), level(bodyOf(LAPTOP_MAIN, 'function float(')),
+    'the workflow asks a Mac about a window raised otherwise than hers');
   assert.match(LAPTOP_MAIN, /backgroundThrottling: false/, 'her page is throttled on a desktop he is not looking at, and a turn asked from another stalls');
   assert.match(LAPTOP_FACE, /setInterval\(live, FRAME_MS\);/, 'what she hears and does waits on her drawing, which a desktop out of sight pauses');
 });
 
 /* Her window goes first when she quits, and anything answering late — a
-   clock, the check for the app in front, a reply — met it destroyed on his
-   Mac: an exception, whose dialog kept her alive. So every clock in the main
+   clock, a reply — would meet it destroyed: an exception, whose dialog keeps
+   her alive. So every clock in the main
    process is one the quit stops, and what touches her window asks first
    whether it is there. */
 test('the laptop stops its clocks when it quits, and touches no window that is gone', () => {
@@ -641,18 +654,19 @@ test('the laptop stops its clocks when it quits, and touches no window that is g
 test('the laptop hears, sounds and waits as the charm and her door do', () => {
   const sound = source('charm/main/sound.c'), talk = source('charm/main/talk.c');
   const numbers = (text) => [...text.matchAll(/-?\d+(?:\.\d+)?/g)].map(m => Number(m[0]));
+  // How a note rises, dies and how loud, in the charm's order: play_notes' attack, decay and loudness.
+  const shaped = bodyOf(LAPTOP_FACE, 'function notes(').match(/Math\.min\(1, t \* (\d+)\) \* Math\.exp\(-t \* (\d+)\) \* (\d+) \/ 32768/)
+    ?.slice(1).map(Number);
+  assert.ok(shaped, 'the laptop no longer shapes a note as this test reads it');
   for (const [cue, fn] of [['LISTEN', 'sound_listen'], ['SENT', 'sound_sent']]) {
     const charm = bodyOf(sound, `void ${fn}(void) {`, `sound.c has no ${fn}()`);
     const copy = LAPTOP_FACE.match(new RegExp(`^const ${cue} = (\\[\\[[^;]+\\]\\]);$`, 'm'));
     assert.ok(copy, `face.mjs no longer lists ${cue} as this test reads it`);
     const played = numbers(charm.match(/play_notes\(notes, ([^)]+)\)/)?.[1] ?? '');
-    assert.deepEqual([...numbers(copy[1]), 400, 22, 6000], [...numbers(charm.match(/\{ \{[^;]+\} \}/)?.[0] ?? ''), ...played],
+    assert.deepEqual([...numbers(copy[1]), ...shaped], [...numbers(charm.match(/\{ \{[^;]+\} \}/)?.[0] ?? ''), ...played],
       `the laptop's ${cue} is not the charm's ${fn}: its notes, or how they rise, die and how loud`);
   }
-  assert.match(LAPTOP_FACE, /function notes\(pair, attack = 400, decay = 22, loud = 6000 \/ 32768\)/,
-    'the laptop draws its notes with other defaults than the charm\'s play_notes is called with');
   assert.match(sound, /float env = fminf\(1\.0f, t \* attack\) \* expf\(-t \* decay\);/, 'sound.c no longer shapes a note as this test reads it');
-  assert.match(LAPTOP_FACE, /Math\.min\(1, t \* attack\) \* Math\.exp\(-t \* decay\) \* loud/, 'the laptop shapes a note otherwise than the charm');
   const tick = bodyOf(sound, 'void sound_tick(void) {', 'sound.c has no sound_tick()');
   const [span, click, decay, hz, loud] = [/SOUND_RATE \* (\d+) \/ 100/, /t < (0\.\d+)f/, /expf\(-t \* ([\d.]+)f\)/, /M_PI \* ([\d.]+)f \* t/, /env \* (\d+)\)/]
     .map(re => Number(tick.match(re)?.[1]));

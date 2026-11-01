@@ -3,7 +3,7 @@
    a pixel's opacity is its brightest channel over CLEAR, so the glass keeps
    its colour to the rim and the black around it is gone. Pure, and shared by
    both processes. */
-export const CLEAR = 48;
+const CLEAR = 48;
 
 export const opacity = (r, g, b) => Math.min(1, Math.max(r, g, b) / CLEAR);
 

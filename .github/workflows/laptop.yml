@@ -31,6 +31,12 @@ permissions:
 jobs:
   build:
     runs-on: macos-latest
+    # GitHub hands a Dependabot run none of the secrets: it builds and asks the
+    # Mac its question, and stops short of signing (REFACTOR.md R-135). Main
+    # always has them, and a publish without a signed app fails rather than
+    # skips.
+    env:
+      SIGNING: ${{ secrets.SB_SECRET_KEY != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -86,6 +92,7 @@ jobs:
       # certificate is not trusted, so it is named by its hash rather than
       # found by trust; codesign signs with it all the same.
       - name: Sign
+        if: env.SIGNING == 'true'
         working-directory: laptop/out/Eugenia-darwin-arm64
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -119,6 +126,7 @@ jobs:
           codesign --force --sign "$identity" --keychain "$keychain" Eugenia.app/Contents/Resources/app.asar.unpacked/spaces.node
           codesign --force --deep --sign "$identity" --keychain "$keychain" Eugenia.app
       - name: Check the signature and pack the app
+        if: env.SIGNING == 'true'
         working-directory: laptop/out/Eugenia-darwin-arm64
         run: |
           codesign --verify --deep --strict Eugenia.app
@@ -128,6 +136,7 @@ jobs:
           ditto -c -k --keepParent Eugenia.app Eugenia.zip
           ls -l Eugenia.zip
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: env.SIGNING == 'true'
         with:
           name: eugenia-laptop
           path: laptop/out/Eugenia-darwin-arm64/Eugenia.zip

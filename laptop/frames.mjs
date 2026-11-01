@@ -53,8 +53,8 @@ export function sampler() {
 
 /* Her voice played from one queue, sample by sample. Parts scheduled one
    after another at computed times click at every join, and stammer whenever
-   one arrives late — which is how her first words sounded, while the vendor's
-   stream had not yet got ahead of her speaking. The queue waits until LEAD
+   one arrives late — as her first parts do, before the vendor's stream gets
+   ahead of her speaking. The queue waits until LEAD
    of her voice is in hand before it plays, and again after running dry, so a
    late part is one pause rather than a stammer; at the end it plays what is
    left, however little. `fill` writes one block of output, silence where
