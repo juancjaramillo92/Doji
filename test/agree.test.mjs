@@ -544,6 +544,13 @@ test('the laptop looks for its update where the workflow publishes it', () => {
   assert.doesNotMatch(sign, /--sign -/, 'a build can still be signed ad hoc');
   assert.match(workflow, /- name: Publish the update\n\s*if: github\.ref == 'refs\/heads\/main'\n/,
     'a build of a branch can publish the update');
+  // A run without the secrets signs nothing and packs nothing; the publish is
+  // not gated on them, so main without them fails rather than skipping.
+  assert.match(workflow, /^ {6}SIGNING: \$\{\{ secrets\.SB_SECRET_KEY != '' \}\}$/m, 'SIGNING no longer says whether the run holds the secrets');
+  const gated = [...workflow.matchAll(/^ {6}- (?:name: (.+)|uses: (actions\/[\w-]+)[^\n]*)\n(?: {8}if: (.+)\n)?/gm)]
+    .filter(m => m[3]?.includes('env.SIGNING')).map(m => m[1] ?? m[2]);
+  assert.deepEqual(gated, ['Sign', 'Check the signature and pack the app', 'actions/upload-artifact'],
+    'a run without the secrets reaches a step that needs them, or main skips one it must not');
   // Her icon is made from the phone's, and is the one the packager is handed.
   const made = workflow.match(/iconutil -c icns (\w+)\.iconset/)?.[1];
   assert.ok(made && workflow.includes('../icon-512.png') && workflow.includes("'icon-512.png'"),

@@ -2277,7 +2277,10 @@ private bucket, `laptop-signing`, read only with the secret key; every build
 after signs with that one. Only the bucket's answer that there is none makes
 a new one — any other failure to read it stops the build rather than signing
 with a stranger — and a new one never overwrites the kept one. Lost, the next
-build makes another, and macOS asks for her permissions once more. Unsigned
+build makes another, and macOS asks for her permissions once more. A
+Dependabot run is handed none of the secrets, so a bump's build is checked
+and not signed: it builds, and asks a Mac whether her window keeps to one
+desktop (`REFACTOR.md` R-135). Unsigned
 by Apple, the first launch is refused once: System Settings → Privacy &
 Security → *Open Anyway*.
 
