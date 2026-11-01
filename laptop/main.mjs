@@ -14,7 +14,7 @@
    the page at all.
    ═══════════════════════════════════════════════════════════════════════════ */
 import {
-  app, BrowserWindow, Menu, Tray, desktopCapturer, dialog, globalShortcut, ipcMain, nativeImage, safeStorage,
+  app, BrowserWindow, Menu, Tray, clipboard, desktopCapturer, dialog, globalShortcut, ipcMain, nativeImage, safeStorage,
   screen, shell, systemPreferences,
 } from 'electron';
 import { Buffer } from 'node:buffer';
@@ -79,6 +79,14 @@ const shown = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(
    minimised with nothing announced. */
 const FRONT_MS = 2000;
 const ASKED_MS = 3000;
+/* Right after a desktop switch is announced, macOS's list of windows on
+   screen can still hold the desktop left, mid-animation: asked then, it
+   answers TradingView, and she came back on the desktop he had moved to and
+   stayed until the backstop. So after a switch she asks only once it has
+   settled. */
+const SETTLE_MS = 400;
+// Her last decisions, kept for him to copy when something looks wrong.
+const LOG_LINES = 80;
 /* Over full-screen apps, as a panel may float, and without the process
    turned into a Dock-less one, which is what Electron does by default to
    let a window float there. */
@@ -112,6 +120,9 @@ let offered = null;    // a newer build than this one
 let updating = false;
 let beside = true;     // TradingView in front, or which app is in front not knowable
 let busy = false;      // she is listening, thinking, speaking or saying something
+let settled = 0;       // when the last desktop switch will have settled
+let answered;          // the last answer to which window is in front, for the log
+const log = [];
 
 const nyDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
 /* Her window, while it is there: what answers late — a check, a reply, a
@@ -119,6 +130,10 @@ const nyDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_Y
 const present = () => Boolean(face) && !face.isDestroyed();
 const send = (channel, ...args) => { if (present()) face.webContents.send(channel, ...args); };
 const timers = [];
+const note = (what) => {
+  log.push(`${new Date().toISOString().slice(11, 23)} ${what}`);
+  if (log.length > LOG_LINES) log.shift();
+};
 const every = (fn, ms) => timers.push(setInterval(fn, ms));
 const talkKey = () => (settings.key in KEYS ? settings.key : '⌥Space');
 
@@ -207,6 +222,7 @@ function appear() {
   if (!present()) return;
   const everywhere = settings.where === 'everywhere';
   const wanted = !settings.hidden && (busy || everywhere || beside);
+  if (wanted !== face.isVisible()) note(wanted ? `shown${busy ? ' (busy)' : ''}` : 'hidden');
   if (wanted && !face.isVisible()) {
     face.setVisibleOnAllWorkspaces(true, SPACES);
     face.showInactive();
@@ -234,6 +250,7 @@ function show() {
    question. Her own — her key's window — is no switch, and no answer at all
    leaves her showing rather than lost. */
 function front() {
+  if (Date.now() < settled) return;
   execFile('/usr/bin/osascript', ['-l', 'JavaScript', '-e', FRONT_JXA], { timeout: ASKED_MS }, (err, out) => {
     if (!err) return beheld(out.trim());
     execFile('/bin/sh', ['-c', 'lsappinfo info -only name "$(lsappinfo front)"'], { timeout: ASKED_MS }, (failed, said) =>
@@ -241,7 +258,10 @@ function front() {
   });
 }
 
+// Each answer goes in the log when it differs from the last, so the backstop's repeats leave room for what changed.
 function beheld(name) {
+  if (name !== answered) note(`in front: ${name === null ? 'no answer' : name || 'no window'}`);
+  answered = name;
   if (!present() || name === app.getName()) return;
   const was = beside;
   beside = name === null || TRADINGVIEW.test(name);
@@ -304,6 +324,7 @@ function menu() {
       click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }) },
     { label: 'Her key…', click: askForKey },
     { label: 'Restart her', click: () => { app.relaunch(); app.exit(0); } },
+    { label: 'Copy her log', click: () => clipboard.writeText([`Eugenia ${BUILD ?? 'from the repository'}`, ...log].join('\n')) },
     { type: 'separator' },
     ...(offered ? [{ label: updating ? 'Updating…' : 'Update her', enabled: !updating, click: update }] : []),
     { label: `Version ${BUILD ?? 'from the repository'}`, enabled: false },
@@ -521,11 +542,13 @@ app.whenReady().then(async () => {
   front();
   every(front, FRONT_MS);
   /* A desktop switched is announced the moment it happens: she leaves it at
-     once, unless busy or asked to be everywhere, and the question that
-     follows brings her back if TradingView is what is now in front. */
+     once, unless busy or asked to be everywhere, and the question asked once
+     it has settled brings her back if TradingView is what is now in front. */
   systemPreferences.subscribeWorkspaceNotification('NSWorkspaceActiveSpaceDidChangeNotification', () => {
+    note('desktop switched');
     if (present() && !busy && settings.where !== 'everywhere') face.hide();
-    front();
+    settled = Date.now() + SETTLE_MS;
+    setTimeout(front, SETTLE_MS);
   });
   systemPreferences.subscribeWorkspaceNotification('NSWorkspaceDidActivateApplicationNotification', front);
   every(() => {

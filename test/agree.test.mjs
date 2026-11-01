@@ -590,8 +590,14 @@ test('the laptop asks macOS what the workflow proves it can answer, and leaves a
   assert.match(workflow, /osascript -l JavaScript -e "\$question"/, 'the workflow no longer asks macOS the question');
   assert.match(bodyOf(LAPTOP_MAIN, 'function front('), /execFile\('\/usr\/bin\/osascript', \['-l', 'JavaScript', '-e', FRONT_JXA\]/,
     'front() no longer asks the question the workflow proves');
-  assert.match(LAPTOP_MAIN, /subscribeWorkspaceNotification\('NSWorkspaceActiveSpaceDidChangeNotification', \(\) => \{\n\s*if \(present\(\) && !busy && settings\.where !== 'everywhere'\) face\.hide\(\);\n\s*front\(\);/,
+  const switched = LAPTOP_MAIN.match(/subscribeWorkspaceNotification\('NSWorkspaceActiveSpaceDidChangeNotification', \(\) => \{([\s\S]*?)\n  \}\);/)?.[1] ?? '';
+  assert.match(switched, /if \(present\(\) && !busy && settings\.where !== 'everywhere'\) face\.hide\(\);/,
     'a desktop switched no longer hides her at once');
+  // Asked mid-switch, macOS still lists the desktop left: she asks once it has settled, and not before.
+  assert.match(switched, /settled = Date\.now\(\) \+ SETTLE_MS;\n\s*setTimeout\(front, SETTLE_MS\);/, 'a switch no longer waits to settle before she asks');
+  assert.doesNotMatch(switched, /\bfront\(\);/, 'a switch has her ask before it has settled');
+  assert.match(bodyOf(LAPTOP_MAIN, 'function front('), /^function front\(\) \{\n  if \(Date\.now\(\) < settled\) return;/,
+    'she can be asked mid-switch, by another app coming forward or the backstop');
   assert.match(LAPTOP_MAIN, /subscribeWorkspaceNotification\('NSWorkspaceDidActivateApplicationNotification', front\);/,
     'another app coming forward no longer has her ask');
 });
