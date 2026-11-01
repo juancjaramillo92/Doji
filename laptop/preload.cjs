@@ -14,7 +14,6 @@ contextBridge.exposeInMainWorld('doji', {
   ask: (voice) => ipcRenderer.send('ask', voice),
   hush: () => ipcRenderer.send('hush'),
   talk: () => ipcRenderer.send('talk'),
-  busy: (yes) => ipcRenderer.send('busy', yes),
   briefing: () => ipcRenderer.send('briefing'),
   open: (pane) => ipcRenderer.send('open', pane),
   solid: (yes) => ipcRenderer.send('solid', yes),

@@ -2165,30 +2165,26 @@ anywhere and stays where she is left, and a click on her never takes the
 focus from TradingView. She is the window's middle; the room above her head
 holds **a line she shows** when her face alone cannot say enough.
 
-**She shows beside TradingView, and nowhere else.** He switches desktops all
-day, with TradingView full screen on its own. **A desktop switch is
-announced the moment it happens**, and she leaves it at once; shown, she is
-also pinned to the desktop she is shown on. What she then asks is **whose
-window is frontmost on the desktop in front** — the first ordinary window in
-macOS's list of windows on screen, `FRONT_JXA`, asked through JavaScript for
-Automation, with no permission, since owners' names need none — and she shows
-when it is TradingView's, on whichever desktop, full screen or not. She asks
-it only once the switch has settled, `SETTLE_MS` after it: asked at the
-announcement, the list still held the desktop left, answered TradingView, and
-she came back on the desktop he had moved to. She asks
-again when another app comes forward, and every two seconds as a backstop.
-"Which app is in front" was the wrong question: a switch to an empty desktop
-can leave TradingView the app in front with none of it on screen, and she
-stayed until he clicked something. Should the question not answer, she falls
-back to it, through macOS's `lsappinfo`. Only a Mac can run the question, so
-the workflow runs it, read out of `main.mjs`, before every build. Her own app in front — her Dock icon, her menu, her key
-— is no switch, and an answer that cannot be read leaves her showing rather
-than lost. *Show her → Everywhere* in her menu puts her on every desktop
-instead, and *Hide her* hides her until unhidden. While she is busy —
-listening, thinking, speaking or saying something — she stays wherever he
-is: **the talk key works from any app**, and she comes for the turn and goes
-after it. Her Dock icon clicked, or the app opened again, shows her wherever
-he is for as long as she says she is here.
+**She lives on one desktop, as any window does.** He switches desktops all
+day, with TradingView full screen on its own, and wants her on its desktop
+alone — not even on another while she talks. So she is a window that
+belongs to the desktop she was put on, and macOS moves her with it: she
+slides away when he switches desktops and back when he returns, as every
+window does, and nothing watches for it. She is a panel, the one kind of
+window macOS lets onto another app's full-screen desktop, floating at the
+level panels float at. **Bring her here**, in her menu, puts her on the
+desktop he is on — she joins every desktop for a moment, is shown, and
+leaves them all again, which leaves her on the one she is on — and so does
+her Dock icon clicked, or the app opened again; at launch she is put on the
+desktop in front. *Hide her* hides her until she is brought back. A turn
+asked from another desktop is answered where she is: the key works from any
+app, she does not move for it, and what she hears and does keeps its own
+clock while her drawing waits on a desktop out of sight.
+
+Every way of watching that was tried — the app in front, the window in
+front, a desktop switch announced — slid her in only after the switch had
+ended, because macOS says a switch has happened when its animation is
+over. A window that belongs to its desktop moves with the animation itself.
 
 **One gesture does everything**: the talk key, ⌥Space unless he chose
 ⌃⌥Space in her menu, or a click on her, which goes through the main process
@@ -2253,13 +2249,12 @@ process alone; the page that draws her has neither, asks for nothing but what
 `preload.cjs` names, opens no window and navigates nowhere.
 
 **Her menu's *Copy her log*** puts her last decisions on the clipboard, with
-their times — each desktop switch, each change in whose window is in front,
-each time she showed or hid — for him to paste when something looks wrong,
-since nothing she does on the Mac is otherwise seen from here.
+their times — each desktop switch, each time she was brought or hidden — for
+him to paste when something looks wrong, since nothing she does on the Mac
+is otherwise seen from here.
 
 **Quitting stops her clocks first.** Her window goes before the process
-does, and the check for the app in front, answering a moment later, once met
-it destroyed — an exception whose dialog kept her, and her menu-bar icon,
+does, and a clock answering a moment later once met it destroyed — an exception whose dialog kept her, and her menu-bar icon,
 alive after Quit. Every clock in the main process is one the quit stops, and
 whatever answers late asks whether her window is still there.
 
@@ -2299,11 +2294,10 @@ largest Retina size, which would be 1024, is left to macOS to scale.
 To work on it, `npm ci` and `npm start` in `laptop/` — the render is copied in
 from `charm/art/`, the one copy of it in the repository.
 
-**To check on the Mac first**, which no suite and no Linux run can: that she
-shows over TradingView in full screen and stays behind, at once, when he
-switches desktops, and that `FRONT_JXA` names TradingView's window when it
-is in front;
-that her Dock icon stays and her menu-bar icon has no black around her; that a click on her
+**To check on the Mac first**, which no suite and no Linux run can: that
+*Bring her here* puts her on TradingView's full-screen desktop and that she
+then slides with it, as a window of that desktop, when he switches — the one
+thing this rests on that only macOS decides; that her Dock icon stays and her menu-bar icon has no black around her; that a click on her
 leaves TradingView focused; that ⌥Space reaches her from inside TradingView;
 that macOS asks once each for the microphone and Screen Recording and keeps
 both across an update; which window or screen the chart is; that her voice

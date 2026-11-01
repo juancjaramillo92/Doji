@@ -333,20 +333,24 @@ function draw(now) {
   if (briefingWaits) waits();
 }
 
-let last = 0, reported = false;
+/* What she hears and does keeps its own clock; only her drawing waits on the
+   screen. A window on a desktop he is not looking at is not drawn, and a
+   turn asked from another desktop must still listen, answer and end. */
+function live() {
+  const now = performance.now();
+  hearing();
+  hearingHim(now);
+  if (mode === 'confused' && now >= confusedUntil) mode = 'idle';
+  if (sayUntil && now >= sayUntil) unsay();
+}
+
+let last = 0;
 function frame(now) {
   requestAnimationFrame(frame);
   const resting = mode === 'idle' && !cursor;
   if (now - last < (resting ? REST_FRAME_MS : FRAME_MS)) return;
   const dt = Math.min(0.05, last ? (now - last) / 1000 : 0.033);
   last = now;
-  hearing();
-  hearingHim(now);
-  if (mode === 'confused' && now >= confusedUntil) mode = 'idle';
-  if (sayUntil && now >= sayUntil) unsay();
-  // Busy or saying something, she stays on the screen he is on, beside TradingView or not.
-  const busy = mode !== 'idle' || sayUntil > 0;
-  if (busy !== reported) window.doji.busy(reported = busy);
   step(now, dt);
   draw(now);
 }
@@ -580,4 +584,5 @@ briefingWaits = start.briefing;
 if (start.fresh) say('hello', HELLO_MS);
 else if (!start.micOk) say('mic');
 else if (start.taken) say('taken');
+setInterval(live, FRAME_MS);
 requestAnimationFrame(frame);

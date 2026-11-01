@@ -567,7 +567,7 @@ test('the laptop keeps its Dock icon, and makes the render clear by one rule', (
   assert.ok(spaces && /skipTransformProcessType: true/.test(spaces) && /visibleOnFullScreen: true/.test(spaces),
     'SPACES no longer floats her over full-screen apps without taking the Dock icon away');
   const calls = [...LAPTOP_MAIN.matchAll(/setVisibleOnAllWorkspaces\(([^)]*)\)/g)].map(m => m[1]);
-  assert.ok(calls.length >= 3, `only ${calls.length} calls set her desktops — the reader has gone blind`);
+  assert.ok(calls.length >= 2, `only ${calls.length} calls set her desktops — the reader has gone blind`);
   for (const args of calls) assert.match(args, /^(true|false), SPACES$/, `setVisibleOnAllWorkspaces(${args}) can take her Dock icon away`);
 
   assert.match(LAPTOP_FACE, /const a = opacity\(p\[0\], p\[1\], p\[2\]\);/, 'her face no longer makes the render clear by art.mjs\'s rule');
@@ -578,28 +578,27 @@ test('the laptop keeps its Dock icon, and makes the render clear by one rule', (
   }
 });
 
-/* Whether she shows beside TradingView rests on a question only a Mac can
-   run, so the workflow runs it — read out of main.mjs, never copied — and on
-   an announcement that a desktop changed, which hides her before any
-   question is answered. */
-test('the laptop asks macOS what the workflow proves it can answer, and leaves a desktop when told', () => {
-  const workflow = source('.github/workflows/laptop.yml');
-  const reader = workflow.match(/s\.match\(\/(\^const FRONT_JXA = [^/]+)\/m\)/)?.[1];
-  assert.ok(reader, 'the workflow no longer runs her question of macOS as main.mjs holds it');
-  assert.match(LAPTOP_MAIN, new RegExp(reader, 'm'), 'main.mjs no longer holds the question where the workflow reads it');
-  assert.match(workflow, /osascript -l JavaScript -e "\$question"/, 'the workflow no longer asks macOS the question');
-  assert.match(bodyOf(LAPTOP_MAIN, 'function front('), /execFile\('\/usr\/bin\/osascript', \['-l', 'JavaScript', '-e', FRONT_JXA\]/,
-    'front() no longer asks the question the workflow proves');
-  const switched = LAPTOP_MAIN.match(/subscribeWorkspaceNotification\('NSWorkspaceActiveSpaceDidChangeNotification', \(\) => \{([\s\S]*?)\n  \}\);/)?.[1] ?? '';
-  assert.match(switched, /if \(present\(\) && !busy && settings\.where !== 'everywhere'\) face\.hide\(\);/,
-    'a desktop switched no longer hides her at once');
-  // Asked mid-switch, macOS still lists the desktop left: she asks once it has settled, and not before.
-  assert.match(switched, /settled = Date\.now\(\) \+ SETTLE_MS;\n\s*setTimeout\(front, SETTLE_MS\);/, 'a switch no longer waits to settle before she asks');
-  assert.doesNotMatch(switched, /\bfront\(\);/, 'a switch has her ask before it has settled');
-  assert.match(bodyOf(LAPTOP_MAIN, 'function front('), /^function front\(\) \{\n  if \(Date\.now\(\) < settled\) return;/,
-    'she can be asked mid-switch, by another app coming forward or the backstop');
-  assert.match(LAPTOP_MAIN, /subscribeWorkspaceNotification\('NSWorkspaceDidActivateApplicationNotification', front\);/,
-    'another app coming forward no longer has her ask');
+/* She is a window on one desktop, as any window is, and macOS moves her with
+   it: nothing watches which app is in front or which desktop is, and nothing
+   but he shows or hides her. Each watcher that was tried slid her in after
+   the switch had ended, where a window that belongs to its desktop slides
+   with it. So the main process asks macOS nothing about other apps' windows,
+   puts her on the desktop in front only when asked, and does not move her
+   for a turn. */
+test('the laptop lives on one desktop, moved by macOS, and watches for nothing', () => {
+  for (const watcher of [/osascript/, /lsappinfo/, /CGWindowList/, /subscribeWorkspaceNotification\([^)]*DidActivate/]) {
+    assert.doesNotMatch(LAPTOP_MAIN, watcher, `main.mjs watches other apps again (${watcher}) — her desktop is macOS's to move`);
+  }
+  assert.match(bodyOf(LAPTOP_MAIN, 'function bringHere('),
+    /face\.setVisibleOnAllWorkspaces\(true, SPACES\);\n\s*face\.showInactive\(\);\n\s*face\.setVisibleOnAllWorkspaces\(false, SPACES\);/,
+    'she is no longer put on the desktop in front by joining every desktop, showing, and leaving them all');
+  assert.doesNotMatch(LAPTOP_MAIN.replace(bodyOf(LAPTOP_MAIN, 'function bringHere('), ''), /setVisibleOnAllWorkspaces\(true/,
+    'something but bringHere() puts her on every desktop');
+  assert.match(bodyOf(LAPTOP_MAIN, 'function press('), /^function press\(chart\) \{\n  send\('press', chart\);\s*$/,
+    'a press moves or shows her: she answers where she is');
+  assert.match(LAPTOP_MAIN, /face\.setAlwaysOnTop\(true, 'floating'\);/, 'she floats higher than panels do, where macOS can take her for a window of every desktop');
+  assert.match(LAPTOP_MAIN, /backgroundThrottling: false/, 'her page is throttled on a desktop he is not looking at, and a turn asked from another stalls');
+  assert.match(LAPTOP_FACE, /setInterval\(live, FRAME_MS\);/, 'what she hears and does waits on her drawing, which a desktop out of sight pauses');
 });
 
 /* Her window goes first when she quits, and anything answering late — a
@@ -613,8 +612,6 @@ test('the laptop stops its clocks when it quits, and touches no window that is g
   assert.match(LAPTOP_MAIN, /^const every = \(fn, ms\) => timers\.push\(setInterval\(fn, ms\)\);$/m, 'every() no longer keeps the clocks it starts');
   assert.match(LAPTOP_MAIN, /app\.on\('before-quit', \(\) => timers\.forEach\(clearInterval\)\);/, 'quitting no longer stops her clocks');
   assert.match(LAPTOP_MAIN, /const send = \(channel, \.\.\.args\) => \{ if \(present\(\)\) face\.webContents\.send/, 'send() no longer asks whether her window is there');
-  assert.match(bodyOf(LAPTOP_MAIN, 'function appear('), /^function appear\(\) \{\n  if \(!present\(\)\) return;/, 'appear() no longer asks whether her window is there');
-  assert.match(bodyOf(LAPTOP_MAIN, 'function beheld('), /if \(!present\(\) \|\| name === app\.getName\(\)\) return;/, 'the answer to which window is in front no longer asks whether her window is there');
 });
 
 /* What the laptop copies of the charm's ear and voice, and of the door's

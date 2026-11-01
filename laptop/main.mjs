@@ -18,7 +18,7 @@ import {
   screen, shell, systemPreferences,
 } from 'electron';
 import { Buffer } from 'node:buffer';
-import { execFile, spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
@@ -57,39 +57,11 @@ const BRIEFING_EVERY_MS = 5 * 60_000;
 const UPDATE_EVERY_MS = 24 * 60 * 60_000;
 // How often she looks for the cursor, to look at it when it comes near.
 const CURSOR_MS = 100;
-/* Where she shows: beside TradingView alone — in front, full screen or not,
-   on whichever desktop it is — or on every desktop. He switches desktops all
-   day and wants her only over the chart. */
-const WHERE = { 'With TradingView': 'tradingview', Everywhere: 'everywhere' };
-const TRADINGVIEW = /tradingview/i;
-/* Which app's window is frontmost on the desktop in front: the first
-   ordinary window — layer 0 — in macOS's list of windows on screen, which is
-   ordered front to back. Owners' names need no permission; their titles
-   would. Asked through JavaScript for Automation, which reaches CoreGraphics
-   with nothing installed. It is the right question where "which app is in
-   front" is not: a switch to an empty desktop, or one with only Finder's,
-   can leave TradingView the app in front with none of it on screen. 17 is
-   on-screen-only with the desktop's own elements left out; 0 is every
-   window. */
-const FRONT_JXA = `ObjC.import('CoreGraphics');
-const shown = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(17, 0))) || [];
-(shown.find(w => w.kCGWindowLayer === 0) || {}).kCGWindowOwnerName || ''`;
-/* She is told when the desktop changes and when another app comes forward,
-   and asks then; this is only the backstop, for a window closed or
-   minimised with nothing announced. */
-const FRONT_MS = 2000;
-const ASKED_MS = 3000;
-/* Right after a desktop switch is announced, macOS's list of windows on
-   screen can still hold the desktop left, mid-animation: asked then, it
-   answers TradingView, and she came back on the desktop he had moved to and
-   stayed until the backstop. So after a switch she asks only once it has
-   settled. */
-const SETTLE_MS = 400;
 // Her last decisions, kept for him to copy when something looks wrong.
 const LOG_LINES = 80;
-/* Over full-screen apps, as a panel may float, and without the process
-   turned into a Dock-less one, which is what Electron does by default to
-   let a window float there. */
+/* Allowed onto a full-screen app's desktop, as a panel may be, and without
+   the process turned into a Dock-less one, which is what Electron does by
+   default to let a window float there. */
 const SPACES = { visibleOnFullScreen: true, skipTransformProcessType: true };
 const PANES = {
   mic: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
@@ -118,10 +90,6 @@ let waiting = null;    // the New York date a landed briefing waits for him on
 let heard = null;      // the New York date he heard it
 let offered = null;    // a newer build than this one
 let updating = false;
-let beside = true;     // TradingView in front, or which app is in front not knowable
-let busy = false;      // she is listening, thinking, speaking or saying something
-let settled = 0;       // when the last desktop switch will have settled
-let answered;          // the last answer to which window is in front, for the log
 const log = [];
 
 const nyDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
@@ -176,8 +144,8 @@ function askForKey() {
 }
 
 /* ─── The window she floats in ──────────────────────────────────────────────
-   A panel: it floats over full-screen apps and a click on her does not take
-   the focus from TradingView. Clicks outside her shape go through to it — the
+   A panel, the one kind of window macOS lets onto another app's full-screen
+   desktop, and one a click on her does not take the focus from TradingView. Clicks outside her shape go through to it — the
    page says where her shape is. Kept out of every capture it can be, so the
    chart she is shown does not have her in it. */
 function bounds() {
@@ -190,15 +158,17 @@ function float() {
   face = new BrowserWindow({
     ...bounds(),
     type: 'panel', transparent: true, frame: false, resizable: false, hasShadow: false,
-    skipTaskbar: true, fullscreenable: false, acceptFirstMouse: true,
-    webPreferences: { preload: join(here, 'preload.cjs') },
+    skipTaskbar: true, fullscreenable: false, acceptFirstMouse: true, show: false,
+    // Her ear and her voice keep time on a desktop he is not looking at.
+    webPreferences: { preload: join(here, 'preload.cjs'), backgroundThrottling: false },
   });
-  face.setAlwaysOnTop(true, 'screen-saver');
-  face.setVisibleOnAllWorkspaces(true, SPACES);
+  // Above the windows of her desktop, at the level panels float at — not so high that macOS takes her for a window of every desktop.
+  face.setAlwaysOnTop(true, 'floating');
   face.setContentProtection(true);
   face.setIgnoreMouseEvents(true, { forward: true });
   face.on('moved', () => { [settings.x, settings.y] = face.getPosition(); save(); });
   face.loadFile(join(here, 'face.html'));
+  face.once('ready-to-show', () => { if (!settings.hidden) bringHere(); });
   // A screen unplugged or rearranged can take her place with it.
   for (const change of ['display-removed', 'display-metrics-changed']) {
     screen.on(change, () => present() && face.setBounds(placed(face.getBounds(),
@@ -213,61 +183,27 @@ function resize(name) {
   menu();
 }
 
-/* Whether she shows: not if he hid her; else while she is busy, wherever he
-   is; else beside TradingView, or everywhere if he asked for that. Shown
-   beside TradingView, she is pinned to the desktop she is shown on, so a
-   switch to another desktop leaves her behind at once — macOS's own doing,
-   with nothing to wait for. */
-function appear() {
-  if (!present()) return;
-  const everywhere = settings.where === 'everywhere';
-  const wanted = !settings.hidden && (busy || everywhere || beside);
-  if (wanted !== face.isVisible()) note(wanted ? `shown${busy ? ' (busy)' : ''}` : 'hidden');
-  if (wanted && !face.isVisible()) {
-    face.setVisibleOnAllWorkspaces(true, SPACES);
-    face.showInactive();
-    if (!everywhere) pin();
-  }
-  if (!wanted && face.isVisible()) face.hide();
+/* She lives on one desktop, as any window does, and macOS moves her with it:
+   she slides away when he switches desktops and back when he returns, full
+   screen or not, and nothing watches for it. To put her on the desktop in
+   front, she joins every desktop for a moment, is shown, and leaves them all
+   again — a window that leaves them stays on the one it is on. */
+function bringHere() {
+  settings.hidden = false;
+  save();
+  face.setVisibleOnAllWorkspaces(true, SPACES);
+  face.showInactive();
+  face.setVisibleOnAllWorkspaces(false, SPACES);
+  note('brought here');
   menu();
 }
 
-/* To the desktop in front, by joining every desktop and leaving them all
-   again: a window that leaves them stays on the one it is on. */
-function pin() {
-  face.setVisibleOnAllWorkspaces(true, SPACES);
-  face.setVisibleOnAllWorkspaces(false, SPACES);
-}
-
-function show() {
-  settings.hidden = false;
+function hideHer() {
+  settings.hidden = true;
   save();
-  appear();
-}
-
-/* Whose window is frontmost on this desktop, by FRONT_JXA — or, should
-   that not answer, which app is in front, by macOS's lsappinfo, the coarser
-   question. Her own — her key's window — is no switch, and no answer at all
-   leaves her showing rather than lost. */
-function front() {
-  if (Date.now() < settled) return;
-  execFile('/usr/bin/osascript', ['-l', 'JavaScript', '-e', FRONT_JXA], { timeout: ASKED_MS }, (err, out) => {
-    if (!err) return beheld(out.trim());
-    execFile('/bin/sh', ['-c', 'lsappinfo info -only name "$(lsappinfo front)"'], { timeout: ASKED_MS }, (failed, said) =>
-      beheld(failed ? null : said.match(/"LSDisplayName"="([^"]*)"/)?.[1] ?? null));
-  });
-}
-
-// Each answer goes in the log when it differs from the last, so the backstop's repeats leave room for what changed.
-function beheld(name) {
-  if (name !== answered) note(`in front: ${name === null ? 'no answer' : name || 'no window'}`);
-  answered = name;
-  if (!present() || name === app.getName()) return;
-  const was = beside;
-  beside = name === null || TRADINGVIEW.test(name);
-  // TradingView back in front while she shows elsewhere — on a turn asked from another desktop — brings her with it.
-  if (beside && !was && face.isVisible() && settings.where !== 'everywhere') pin();
-  appear();
+  face.hide();
+  note('hidden');
+  menu();
 }
 
 /* The keys, registered whole or reported: a key another app holds registers
@@ -282,12 +218,10 @@ function bind() {
   menu();
 }
 
-/* A press is heard wherever he is: she comes for the turn, and goes after
-   it. The chart goes only when he asks for it, with Shift — a picture on
-   every question is a cost on every answer, and his to choose. */
+/* A press is heard wherever he is, and she answers where she is: she does
+   not move for a turn. The chart goes only when he asks for it, with Shift —
+   a picture on every question is a cost on every answer, and his to choose. */
 function press(chart) {
-  busy = true;
-  show();
   send('press', chart);
 }
 
@@ -300,19 +234,10 @@ function menu() {
   const items = () => [
     { label: 'Talk to her', accelerator, registerAccelerator: false, click: () => press(false) },
     { label: 'Show her the chart', accelerator: `Shift+${accelerator}`, registerAccelerator: false, click: () => press(true) },
-    { label: 'Hear the briefing', enabled: Boolean(waiting), click: () => { busy = true; show(); send('briefing-now'); } },
+    { label: 'Hear the briefing', enabled: Boolean(waiting), click: () => send('briefing-now') },
     { type: 'separator' },
-    { label: settings.hidden ? 'Unhide her' : 'Hide her', click: () => { settings.hidden = !settings.hidden; save(); appear(); } },
-    { label: 'Show her', submenu: Object.entries(WHERE).map(([label, where]) => ({
-      label, type: 'radio', checked: (settings.where ?? 'tradingview') === where,
-      click: () => {
-        settings.where = where;
-        save();
-        if (where === 'everywhere') face.setVisibleOnAllWorkspaces(true, SPACES);
-        else if (face.isVisible()) pin();
-        appear();
-      },
-    })) },
+    { label: 'Bring her here', click: bringHere },
+    ...(settings.hidden ? [] : [{ label: 'Hide her', click: hideHer }]),
     { label: 'Size', submenu: Object.keys(SIZES).map(size => ({
       label: size, type: 'radio', checked: (settings.size ?? 'Medium') === size, click: () => resize(size),
     })) },
@@ -498,7 +423,6 @@ ipcMain.on('ask', (_, voice) => ask(voice));
 ipcMain.on('hush', () => { asking?.abort(); asking = null; looking = null; });
 ipcMain.on('briefing', hearBriefing);
 ipcMain.on('open', (_, pane) => { if (pane in PANES) shell.openExternal(PANES[pane]); });
-ipcMain.on('busy', (_, yes) => { busy = yes; appear(); });
 ipcMain.on('solid', (_, yes) => face.setIgnoreMouseEvents(!yes, { forward: true }));
 ipcMain.on('drag', (_, dx, dy) => {
   const [x, y] = face.getPosition();
@@ -512,9 +436,8 @@ app.on('web-contents-created', (_, contents) => {
   contents.on('will-navigate', (e) => e.preventDefault());
 });
 
-/* Her Dock icon clicked, or the app opened again, is him looking for her:
-   she shows wherever he is, for as long as she says she is here. */
-const found = () => { busy = true; show(); send('say', 'here'); };
+// Her Dock icon clicked, or the app opened again, is him looking for her: she comes to the desktop he is on.
+const found = () => { bringHere(); send('say', 'here'); };
 app.on('activate', found);
 app.on('second-instance', found);
 
@@ -539,18 +462,8 @@ app.whenReady().then(async () => {
   every(briefing, BRIEFING_EVERY_MS);
   lookForUpdate();
   every(lookForUpdate, UPDATE_EVERY_MS);
-  front();
-  every(front, FRONT_MS);
-  /* A desktop switched is announced the moment it happens: she leaves it at
-     once, unless busy or asked to be everywhere, and the question asked once
-     it has settled brings her back if TradingView is what is now in front. */
-  systemPreferences.subscribeWorkspaceNotification('NSWorkspaceActiveSpaceDidChangeNotification', () => {
-    note('desktop switched');
-    if (present() && !busy && settings.where !== 'everywhere') face.hide();
-    settled = Date.now() + SETTLE_MS;
-    setTimeout(front, SETTLE_MS);
-  });
-  systemPreferences.subscribeWorkspaceNotification('NSWorkspaceDidActivateApplicationNotification', front);
+  // Only for her log: the switch itself is macOS's to make, and she moves with her desktop.
+  systemPreferences.subscribeWorkspaceNotification('NSWorkspaceActiveSpaceDidChangeNotification', () => note('desktop switched'));
   every(() => {
     if (!present() || !face.isVisible()) return;
     const at = screen.getCursorScreenPoint(), { x, y } = face.getBounds();
@@ -559,10 +472,10 @@ app.whenReady().then(async () => {
   settle();
 });
 
-/* Her clocks stop when she quits. Her window goes first, and on his Mac the
-   check for the app in front, answering a moment later, met it destroyed: an
-   exception, whose dialog kept the process and her menu-bar icon alive —
-   and an update waits on the process ending before it swaps. */
+/* Her clocks stop when she quits. Her window goes first, and on his Mac a
+   clock answering a moment later met it destroyed: an exception, whose
+   dialog kept the process and her menu-bar icon alive — and an update waits
+   on the process ending before it swaps. */
 app.on('before-quit', () => timers.forEach(clearInterval));
 app.on('will-quit', () => globalShortcut.unregisterAll());
 // Closing the key's window is not leaving: she floats until he quits her.
