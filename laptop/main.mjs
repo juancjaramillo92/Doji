@@ -20,6 +20,7 @@ import {
 import { Buffer } from 'node:buffer';
 import { spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
 import { BLOB, opacity } from './art.mjs';
@@ -59,10 +60,9 @@ const UPDATE_EVERY_MS = 24 * 60 * 60_000;
 const CURSOR_MS = 100;
 // Her last decisions, kept for him to copy when something looks wrong.
 const LOG_LINES = 80;
-/* Allowed onto a full-screen app's desktop, as a panel may be, and without
-   the process turned into a Dock-less one, which is what Electron does by
-   default to let a window float there. */
-const SPACES = { visibleOnFullScreen: true, skipTransformProcessType: true };
+/* Her desktops set without her Dock icon touched: by default Electron hides
+   it or shows it again at every call. */
+const SPACES = { skipTransformProcessType: true };
 const PANES = {
   mic: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
   screen: 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
@@ -72,6 +72,8 @@ const here = import.meta.dirname;
 const kept = (name) => join(app.getPath('userData'), name);
 // Stamped by the workflow with the commit it built; a copy run from the repository has none and never updates.
 const BUILD = existsSync(join(here, 'build.txt')) ? readFileSync(join(here, 'build.txt'), 'utf8').trim() : null;
+// Built by `npm run package` (spaces.m); a copy run from the repository has none and floats on every desktop.
+const spaces = existsSync(join(here, 'spaces.node')) ? createRequire(import.meta.url)('./spaces.node') : null;
 
 // Her voice starts on a key press, which is no gesture inside the page.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
@@ -144,10 +146,11 @@ function askForKey() {
 }
 
 /* ─── The window she floats in ──────────────────────────────────────────────
-   A panel, the one kind of window macOS lets onto another app's full-screen
-   desktop, and one a click on her does not take the focus from TradingView. Clicks outside her shape go through to it — the
-   page says where her shape is. Kept out of every capture it can be, so the
-   chart she is shown does not have her in it. */
+   An ordinary window, never a panel: Electron's panel adds every desktop to
+   whatever it is told, so a panel cannot keep to one. Clicks outside her
+   shape go through to the chart — the page says where her shape is. Kept out
+   of every capture it can be, so the chart she is shown does not have her in
+   it. */
 function bounds() {
   const { width, height } = room(SIZES[settings.size] ?? SIZES.Medium);
   return placed({ x: settings.x, y: settings.y, width, height },
@@ -157,13 +160,14 @@ function bounds() {
 function float() {
   face = new BrowserWindow({
     ...bounds(),
-    type: 'panel', transparent: true, frame: false, resizable: false, hasShadow: false,
+    transparent: true, frame: false, resizable: false, hasShadow: false,
     skipTaskbar: true, fullscreenable: false, acceptFirstMouse: true, show: false,
     // Her ear and her voice keep time on a desktop he is not looking at.
     webPreferences: { preload: join(here, 'preload.cjs'), backgroundThrottling: false },
   });
-  // Above the windows of her desktop, at the level panels float at — not so high that macOS takes her for a window of every desktop.
+  // Above the windows of her desktop, and kept to it: a raised window is otherwise one of every desktop.
   face.setAlwaysOnTop(true, 'floating');
+  if (spaces) note(`kept to one desktop (${spaces.managed(face.getNativeWindowHandle())})`);
   face.setContentProtection(true);
   face.setIgnoreMouseEvents(true, { forward: true });
   face.on('moved', () => { [settings.x, settings.y] = face.getPosition(); save(); });
@@ -184,10 +188,12 @@ function resize(name) {
 }
 
 /* She lives on one desktop, as any window does, and macOS moves her with it:
-   she slides away when he switches desktops and back when he returns, full
-   screen or not, and nothing watches for it. To put her on the desktop in
-   front, she joins every desktop for a moment, is shown, and leaves them all
-   again — a window that leaves them stays on the one it is on. */
+   she slides away when he switches desktops and back when he returns, and
+   nothing watches for it. Another app's full-screen desktop is one no
+   ordinary window joins, so TradingView is filled rather than full screen.
+   To put her on the desktop in front, she joins every desktop for a moment,
+   is shown, and leaves them all again — a window that leaves them stays on
+   the one it is on. */
 function bringHere() {
   settings.hidden = false;
   save();

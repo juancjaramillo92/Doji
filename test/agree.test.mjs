@@ -557,15 +557,15 @@ test('the laptop looks for its update where the workflow publishes it', () => {
   assert.match(LAPTOP_MAIN, /spawn\('\/bin\/sh', \['-c', swap\]/, 'the update no longer runs the swap update.mjs writes');
 });
 
-/* Two decisions the Mac alone would show broken. Electron turns an app whose
-   window floats over full-screen apps into one with no Dock icon unless told
-   not to, so every call that sets her desktops carries SPACES, which tells
-   it; and her face and her menu-bar icon make the render's black clear by
-   art.mjs's one rule, or the icon keeps a black square the face does not. */
+/* Two decisions the Mac alone would show broken. Electron hides or shows
+   the Dock icon again at every call that sets a window's desktops unless told
+   not to, so every such call carries SPACES, which tells it and asks for no
+   full-screen desktop, where no ordinary window goes; and her face and her
+   menu-bar icon make the render's black clear by art.mjs's one rule, or the
+   icon keeps a black square the face does not. */
 test('the laptop keeps its Dock icon, and makes the render clear by one rule', () => {
-  const spaces = LAPTOP_MAIN.match(/^const SPACES = (\{[^}]+\});$/m)?.[1];
-  assert.ok(spaces && /skipTransformProcessType: true/.test(spaces) && /visibleOnFullScreen: true/.test(spaces),
-    'SPACES no longer floats her over full-screen apps without taking the Dock icon away');
+  assert.match(LAPTOP_MAIN, /^const SPACES = \{ skipTransformProcessType: true \};$/m,
+    'SPACES no longer leaves her Dock icon alone, or asks for another app\'s full-screen desktop');
   const calls = [...LAPTOP_MAIN.matchAll(/setVisibleOnAllWorkspaces\(([^)]*)\)/g)].map(m => m[1]);
   assert.ok(calls.length >= 2, `only ${calls.length} calls set her desktops — the reader has gone blind`);
   for (const args of calls) assert.match(args, /^(true|false), SPACES$/, `setVisibleOnAllWorkspaces(${args}) can take her Dock icon away`);
@@ -584,7 +584,12 @@ test('the laptop keeps its Dock icon, and makes the render clear by one rule', (
    the switch had ended, where a window that belongs to its desktop slides
    with it. So the main process asks macOS nothing about other apps' windows,
    puts her on the desktop in front only when asked, and does not move her
-   for a turn. */
+   for a turn. Two things would put her on every desktop again, and neither
+   shows off a Mac: a panel, which Electron joins to every desktop whatever it
+   is told, and a raised window left to macOS's default, which floats across
+   them all. So she is no panel, spaces.m makes her raised window one
+   desktop's, the package builds it and keeps it out of the archive, and the
+   workflow signs it and asks a Mac whether it took. */
 test('the laptop lives on one desktop, moved by macOS, and watches for nothing', () => {
   for (const watcher of [/osascript/, /lsappinfo/, /CGWindowList/, /subscribeWorkspaceNotification\([^)]*DidActivate/]) {
     assert.doesNotMatch(LAPTOP_MAIN, watcher, `main.mjs watches other apps again (${watcher}) — her desktop is macOS's to move`);
@@ -596,7 +601,20 @@ test('the laptop lives on one desktop, moved by macOS, and watches for nothing',
     'something but bringHere() puts her on every desktop');
   assert.match(bodyOf(LAPTOP_MAIN, 'function press('), /^function press\(chart\) \{\n  send\('press', chart\);\s*$/,
     'a press moves or shows her: she answers where she is');
-  assert.match(LAPTOP_MAIN, /face\.setAlwaysOnTop\(true, 'floating'\);/, 'she floats higher than panels do, where macOS can take her for a window of every desktop');
+  assert.doesNotMatch(LAPTOP_MAIN, /type: 'panel'/, 'she is a panel again, which Electron joins to every desktop');
+  assert.match(bodyOf(LAPTOP_MAIN, 'function float('),
+    /face\.setAlwaysOnTop\(true, 'floating'\);\n\s*if \(spaces\) note\(`kept to one desktop \(\$\{spaces\.managed\(face\.getNativeWindowHandle\(\)\)\}\)`\);/,
+    'her raised window is no longer kept to one desktop, and floats across them all');
+  assert.match(source('laptop/spaces.m'),
+    /window\.collectionBehavior = \(window\.collectionBehavior & ~NSWindowCollectionBehaviorTransient\) \|\s*NSWindowCollectionBehaviorManaged;/,
+    'spaces.m no longer makes her window one desktop\'s');
+  const { prepackage, package: pack } = JSON.parse(source('laptop/package.json')).scripts;
+  assert.match(prepackage, / spaces\.m -o spaces\.node$/, 'the package no longer builds spaces.node');
+  assert.ok(pack.includes("'--asar.unpack=*.node'"), 'spaces.node is packed into the archive, where macOS cannot load it');
+  const workflow = source('.github/workflows/laptop.yml');
+  assert.ok(workflow.includes('codesign --force --sign "$identity" --keychain "$keychain" Eugenia.app/Contents/Resources/app.asar.unpacked/spaces.node'),
+    'the workflow no longer signs spaces.node where the package puts it');
+  assert.ok(workflow.includes('SPACES="$PWD/spaces.node" npx electron "$RUNNER_TEMP/spaces.cjs"'), 'the workflow no longer asks a Mac whether spaces.node took');
   assert.match(LAPTOP_MAIN, /backgroundThrottling: false/, 'her page is throttled on a desktop he is not looking at, and a turn asked from another stalls');
   assert.match(LAPTOP_FACE, /setInterval\(live, FRAME_MS\);/, 'what she hears and does waits on her drawing, which a desktop out of sight pauses');
 });
