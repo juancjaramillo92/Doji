@@ -2166,13 +2166,19 @@ focus from TradingView. She is the window's middle; the room above her head
 holds **a line she shows** when her face alone cannot say enough.
 
 **She shows beside TradingView, and nowhere else.** He switches desktops all
-day, with TradingView full screen on its own. Shown, she is **pinned to the
-desktop she is shown on**, so a switch to another desktop leaves her behind
-at once — macOS's own doing, with nothing to wait for. Which app is in front
-she asks of macOS's own `lsappinfo`, which needs no permission, four times a
-second: she shows while TradingView is, on whichever desktop, full screen or
-not, comes back with it, and goes from a desktop TradingView shares with an
-app he switches to. Her own app in front — her Dock icon, her menu, her key
+day, with TradingView full screen on its own. **A desktop switch is
+announced the moment it happens**, and she leaves it at once; shown, she is
+also pinned to the desktop she is shown on. What she then asks is **whose
+window is frontmost on the desktop in front** — the first ordinary window in
+macOS's list of windows on screen, `FRONT_JXA`, asked through JavaScript for
+Automation, with no permission, since owners' names need none — and she shows
+when it is TradingView's, on whichever desktop, full screen or not. She asks
+again when another app comes forward, and every two seconds as a backstop.
+"Which app is in front" was the wrong question: a switch to an empty desktop
+can leave TradingView the app in front with none of it on screen, and she
+stayed until he clicked something. Should the question not answer, she falls
+back to it, through macOS's `lsappinfo`. Only a Mac can run the question, so
+the workflow runs it, read out of `main.mjs`, before every build. Her own app in front — her Dock icon, her menu, her key
 — is no switch, and an answer that cannot be read leaves her showing rather
 than lost. *Show her → Everywhere* in her menu puts her on every desktop
 instead, and *Hide her* hides her until unhidden. While she is busy —
@@ -2287,7 +2293,8 @@ from `charm/art/`, the one copy of it in the repository.
 
 **To check on the Mac first**, which no suite and no Linux run can: that she
 shows over TradingView in full screen and stays behind, at once, when he
-switches desktops, and that `lsappinfo` names TradingView as the app in front;
+switches desktops, and that `FRONT_JXA` names TradingView's window when it
+is in front;
 that her Dock icon stays and her menu-bar icon has no black around her; that a click on her
 leaves TradingView focused; that ⌥Space reaches her from inside TradingView;
 that macOS asks once each for the microphone and Screen Recording and keeps

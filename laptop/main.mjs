@@ -62,11 +62,23 @@ const CURSOR_MS = 100;
    day and wants her only over the chart. */
 const WHERE = { 'With TradingView': 'tradingview', Everywhere: 'everywhere' };
 const TRADINGVIEW = /tradingview/i;
-/* How often she asks which app is in front. A desktop switched away from
-   takes her with it at once — she belongs to the one she was shown on — so
-   this decides only how soon she comes back, and goes from a desktop shared
-   with another app. */
-const FRONT_MS = 250;
+/* Which app's window is frontmost on the desktop in front: the first
+   ordinary window — layer 0 — in macOS's list of windows on screen, which is
+   ordered front to back. Owners' names need no permission; their titles
+   would. Asked through JavaScript for Automation, which reaches CoreGraphics
+   with nothing installed. It is the right question where "which app is in
+   front" is not: a switch to an empty desktop, or one with only Finder's,
+   can leave TradingView the app in front with none of it on screen. 17 is
+   on-screen-only with the desktop's own elements left out; 0 is every
+   window. */
+const FRONT_JXA = `ObjC.import('CoreGraphics');
+const shown = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(17, 0))) || [];
+(shown.find(w => w.kCGWindowLayer === 0) || {}).kCGWindowOwnerName || ''`;
+/* She is told when the desktop changes and when another app comes forward,
+   and asks then; this is only the backstop, for a window closed or
+   minimised with nothing announced. */
+const FRONT_MS = 2000;
+const ASKED_MS = 3000;
 /* Over full-screen apps, as a panel may float, and without the process
    turned into a Dock-less one, which is what Electron does by default to
    let a window float there. */
@@ -217,20 +229,25 @@ function show() {
   appear();
 }
 
-/* Which app is in front, asked of macOS's own lsappinfo, which needs no
-   permission. Her own app in front — her Dock icon, her menu, her key — is
-   no switch, and an answer that cannot be read leaves her showing rather
-   than lost. */
+/* Whose window is frontmost on this desktop, by FRONT_JXA — or, should
+   that not answer, which app is in front, by macOS's lsappinfo, the coarser
+   question. Her own — her key's window — is no switch, and no answer at all
+   leaves her showing rather than lost. */
 function front() {
-  execFile('/bin/sh', ['-c', 'lsappinfo info -only name "$(lsappinfo front)"'], { timeout: FRONT_MS * 4 }, (err, out) => {
-    const name = err ? null : out.match(/"LSDisplayName"="([^"]*)"/)?.[1] ?? null;
-    if (!present() || name === app.getName()) return;
-    const was = beside;
-    beside = name === null || TRADINGVIEW.test(name);
-    // TradingView back in front while she shows elsewhere — on a turn asked from another desktop — brings her with it.
-    if (beside && !was && face.isVisible() && settings.where !== 'everywhere') pin();
-    appear();
+  execFile('/usr/bin/osascript', ['-l', 'JavaScript', '-e', FRONT_JXA], { timeout: ASKED_MS }, (err, out) => {
+    if (!err) return beheld(out.trim());
+    execFile('/bin/sh', ['-c', 'lsappinfo info -only name "$(lsappinfo front)"'], { timeout: ASKED_MS }, (failed, said) =>
+      beheld(failed ? null : said.match(/"LSDisplayName"="([^"]*)"/)?.[1] ?? null));
   });
+}
+
+function beheld(name) {
+  if (!present() || name === app.getName()) return;
+  const was = beside;
+  beside = name === null || TRADINGVIEW.test(name);
+  // TradingView back in front while she shows elsewhere — on a turn asked from another desktop — brings her with it.
+  if (beside && !was && face.isVisible() && settings.where !== 'everywhere') pin();
+  appear();
 }
 
 /* The keys, registered whole or reported: a key another app holds registers
@@ -503,6 +520,14 @@ app.whenReady().then(async () => {
   every(lookForUpdate, UPDATE_EVERY_MS);
   front();
   every(front, FRONT_MS);
+  /* A desktop switched is announced the moment it happens: she leaves it at
+     once, unless busy or asked to be everywhere, and the question that
+     follows brings her back if TradingView is what is now in front. */
+  systemPreferences.subscribeWorkspaceNotification('NSWorkspaceActiveSpaceDidChangeNotification', () => {
+    if (present() && !busy && settings.where !== 'everywhere') face.hide();
+    front();
+  });
+  systemPreferences.subscribeWorkspaceNotification('NSWorkspaceDidActivateApplicationNotification', front);
   every(() => {
     if (!present() || !face.isVisible()) return;
     const at = screen.getCursorScreenPoint(), { x, y } = face.getBounds();

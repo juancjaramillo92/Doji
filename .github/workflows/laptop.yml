@@ -38,6 +38,15 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: package.json
+      # Her question of which window is in front runs through macOS's own
+      # scripting bridge, which nothing but a Mac can run: asked here exactly
+      # as main.mjs asks it, read out of the file, it must answer.
+      - name: Check her question of macOS answers
+        working-directory: laptop
+        run: |
+          question=$(node -e 'const s = require("fs").readFileSync("main.mjs", "utf8"); process.stdout.write(eval(s.match(/^const FRONT_JXA = (`[^`]*`);$/m)[1]))')
+          test -n "$question"
+          echo "frontmost window's app: '$(osascript -l JavaScript -e "$question")'"
       - name: Build
         working-directory: laptop
         run: |
