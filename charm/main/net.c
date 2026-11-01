@@ -3,7 +3,6 @@
 #include <string.h>
 #include <time.h>
 #include "config.h"
-#include "esp_attr.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
@@ -15,20 +14,23 @@
 
 static const char *TAG = "net";
 
-#define JOINED  BIT0
-#define REFUSED BIT1
-#define GAVE_UP BIT2
+#define JOINED   BIT0
+#define REFUSED  BIT1
+#define GAVE_UP  BIT2
+#define JOINING  BIT3  // the join's task is running
+#define STOPPING BIT4  // the radio is going off: the join gives up where it is
 #define JOIN_MS 10000
 #define FAST_MS 4000   // the network she was last on, asked directly
 
 // New York, clock changes included: the briefing is at 08:00 there all year.
 #define NEW_YORK "EST5EDT,M3.2.0,M11.1.0"
 
-// The network she was last on, its access point and channel; kept through sleep.
-static RTC_DATA_ATTR struct { char ssid[33]; uint8_t bssid[6]; uint8_t channel; } last;
+// The network she was last on, its access point and channel.
+static struct { char ssid[33]; uint8_t bssid[6]; uint8_t channel; } last;
 
 static EventGroupHandle_t events;
 static uint8_t refusal;  // why the network last refused her
+static bool on;          // the radio started this waking
 
 /* Her own leaving, after an attempt that failed, is no network refusing her:
    it can arrive once the next attempt has begun, and would end that one
@@ -65,62 +67,85 @@ static bool attempt(const charm_net_t *net, bool fast) {
     while ((gone = xTaskGetTickCount() - start) < span) {
         xEventGroupClearBits(events, JOINED | REFUSED);
         esp_wifi_connect();
-        EventBits_t got = xEventGroupWaitBits(events, JOINED | REFUSED, pdFALSE, pdFALSE, span - gone);
+        EventBits_t got = xEventGroupWaitBits(events, JOINED | REFUSED | STOPPING, pdFALSE, pdFALSE, span - gone);
         if (got & JOINED) return true;
-        if (!(got & REFUSED) || refusal == WIFI_REASON_NO_AP_FOUND) break;
+        if (got & STOPPING || !(got & REFUSED) || refusal == WIFI_REASON_NO_AP_FOUND) break;
     }
     esp_wifi_disconnect();
     return false;
 }
 
+static bool stopping(void) { return xEventGroupGetBits(events) & STOPPING; }
+
+/* Given up for standby, it marks nothing: the network she was last on is
+   still the one to ask first at the next waking. */
 static void join(void *arg) {
     (void)arg;
+    static bool timed;  // the clock's own sync, started once and left running
     bool joined = false;
-    for (int i = 0; i < cfg.n_nets && !joined; i++) {
+    for (int i = 0; i < cfg.n_nets && !joined && !stopping(); i++) {
         if (!strcmp(cfg.nets[i].ssid, last.ssid)) joined = attempt(&cfg.nets[i], true);
     }
-    for (int i = 0; i < cfg.n_nets && !joined; i++) {
+    for (int i = 0; i < cfg.n_nets && !joined && !stopping(); i++) {
         joined = attempt(&cfg.nets[i], false);
         if (!joined) ESP_LOGW(TAG, "%s did not answer", cfg.nets[i].ssid);
     }
-    if (!joined) {
+    if (!joined && !stopping()) {
         last.ssid[0] = 0;
         xEventGroupSetBits(events, GAVE_UP);
-        vTaskDelete(NULL);
     }
     wifi_ap_record_t ap;
-    if (esp_wifi_sta_get_ap_info(&ap) == ESP_OK) {
+    if (joined && esp_wifi_sta_get_ap_info(&ap) == ESP_OK) {
         memcpy(last.ssid, ap.ssid, sizeof last.ssid);
         memcpy(last.bssid, ap.bssid, 6);
         last.channel = ap.primary;
         ESP_LOGI(TAG, "joined %s", last.ssid);
     }
-    esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
-    esp_netif_sntp_init(&sntp);
+    if (joined && !timed) {
+        timed = true;
+        esp_sntp_config_t sntp = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+        esp_netif_sntp_init(&sntp);
+    }
+    xEventGroupClearBits(events, JOINING);
     vTaskDelete(NULL);
 }
 
 // Once a waking: a new app's proof starts it before whatever the waking is for.
 void net_start(void) {
-    if (events) return;
-    events = xEventGroupCreate();
-    esp_netif_init();
-    esp_event_loop_create_default();
-    esp_netif_create_default_wifi_sta();
-    wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
-    esp_wifi_init(&init);
-    esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, on_event, NULL);
-    esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_event, NULL);
-    esp_wifi_set_mode(WIFI_MODE_STA);
+    if (on) return;
+    on = true;
+    if (!events) {
+        events = xEventGroupCreate();
+        esp_netif_init();
+        esp_event_loop_create_default();
+        esp_netif_create_default_wifi_sta();
+        wifi_init_config_t init = WIFI_INIT_CONFIG_DEFAULT();
+        esp_wifi_init(&init);
+        esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, on_event, NULL);
+        esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_event, NULL);
+        esp_wifi_set_mode(WIFI_MODE_STA);
+        setenv("TZ", NEW_YORK, 1);
+        tzset();
+    }
     esp_wifi_start();
     // Awake, nothing waits at the access point for a beacon: with the power
     // save on, her voice is held there in bursts and arrives slower than it
-    // plays. She is awake only in short spells, and asleep the radio is off.
+    // plays. She is awake only in short spells, and in standby the radio is off.
     esp_wifi_set_ps(WIFI_PS_NONE);
-    // The clock itself survives sleep; the zone it is read in does not.
-    setenv("TZ", NEW_YORK, 1);
-    tzset();
+    xEventGroupSetBits(events, JOINING);
     xTaskCreate(join, "join", 4096, NULL, 4, NULL);
+}
+
+/* Off for standby, where the radio is not kept. Leaving reports her own
+   leaving, which no one reads as a refusal (on_event), so the marks are
+   cleared here, for the next waking to join afresh. */
+void net_stop(void) {
+    if (!on) return;
+    on = false;
+    xEventGroupSetBits(events, STOPPING);
+    while (xEventGroupGetBits(events) & JOINING) vTaskDelay(pdMS_TO_TICKS(10));
+    esp_wifi_stop();
+    xEventGroupClearBits(events, JOINED | REFUSED | GAVE_UP | STOPPING);
 }
 
 bool net_wait(int ms) {

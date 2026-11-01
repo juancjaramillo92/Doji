@@ -1,54 +1,46 @@
 #include "sleep.h"
 
 #include "bsp/esp-bsp.h"
-#include "driver/gpio.h"
 #include "driver/rtc_io.h"
 #include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "power.h"
 
-// The BOOT button and the touch controller's interrupt pull low, as the
-// motion sensor's does once it is armed.
-static const gpio_num_t WAKE[] = { BOOT_PIN, BSP_LCD_TOUCH_INT, MOTION_PIN };
-
-/* What would reset or select the panel, or reset the touch controller, if it
-   floated. Held through sleep and through an errand that never starts the
-   screen, so the picture stays and a tap can still wake her. */
-static const gpio_num_t HELD[] = { BSP_LCD_RST, BSP_LCD_CS, BSP_LCD_TOUCH_RST };
+// The BOOT button and the touch controller's interrupt pull low.
+static const gpio_num_t WAKE[] = { BOOT_PIN, BSP_LCD_TOUCH_INT };
 
 #define COUNT(a) (sizeof a / sizeof *a)
+#define STACK    3072
 
-void sleep_release(void) {
-    for (size_t i = 0; i < COUNT(HELD); i++) gpio_hold_dis(HELD[i]);
-    gpio_deep_sleep_hold_dis();
-}
+static TaskHandle_t sleeper;
+static SemaphoreHandle_t woken;
 
-void sleep_blank(void) {
-    sleep_release();
-    gpio_set_direction(BSP_LCD_RST, GPIO_MODE_OUTPUT);
-    gpio_set_level(BSP_LCD_RST, 0);
-}
-
-void sleep_woke(void) {
-    rtc_gpio_deinit(PWR_PIN);
-    for (size_t i = 0; i < COUNT(WAKE); i++) rtc_gpio_deinit(WAKE[i]);
-}
-
-/* The last step, from a task of its own: deep sleep suspends the cache that
-   PSRAM is read through, and her task's stack is in PSRAM (main.c). */
+/* The sleep itself, from a task of its own: light sleep suspends the cache
+   that PSRAM is read through, and her task's stack is in PSRAM (main.c). It
+   says it has woken through a semaphore, since a notification to her task is
+   a press of PWR. */
 static void enter(void *arg) {
     (void)arg;
-    esp_deep_sleep_start();
+    for (;;) {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        esp_light_sleep_start();
+        xSemaphoreGive(woken);
+    }
 }
 
-void sleep_until(time_t wake_at, bool motion) {
-    for (size_t i = 0; i < COUNT(HELD); i++) gpio_hold_en(HELD[i]);
-    gpio_deep_sleep_hold_en();
-
+slept_t sleep_light(int64_t ms) {
+    if (!sleeper) {
+        static StaticTask_t task;
+        static StackType_t stack[STACK];
+        static StaticSemaphore_t done;
+        woken = xSemaphoreCreateBinaryStatic(&done);
+        sleeper = xTaskCreateStaticPinnedToCore(enter, "sleep", STACK, NULL, configMAX_PRIORITIES - 1,
+                                                stack, &task, xPortGetCoreID());
+    }
     uint64_t mask = 0;
     for (size_t i = 0; i < COUNT(WAKE); i++) {
-        if (WAKE[i] == MOTION_PIN && !motion) continue;
         rtc_gpio_pullup_en(WAKE[i]);
         rtc_gpio_pulldown_dis(WAKE[i]);
         mask |= 1ULL << WAKE[i];
@@ -61,11 +53,15 @@ void sleep_until(time_t wake_at, bool motion) {
     rtc_gpio_pullup_dis(PWR_PIN);
     rtc_gpio_pulldown_dis(PWR_PIN);
     esp_sleep_enable_ext0_wakeup(PWR_PIN, 1);
+    esp_sleep_enable_timer_wakeup((uint64_t)(ms > 0 ? ms : 1) * 1000);
 
-    // A time already past is a second from now: with no timer at all, only a
-    // press would wake her.
-    time_t now = time(NULL);
-    esp_sleep_enable_timer_wakeup((uint64_t)(wake_at > now ? wake_at - now : 1) * 1000000ULL);
-    xTaskCreatePinnedToCore(enter, "sleep", 3072, NULL, configMAX_PRIORITIES - 1, NULL, xPortGetCoreID());
-    vTaskSuspend(NULL);
+    xTaskNotifyGive(sleeper);
+    xSemaphoreTake(woken, portMAX_DELAY);
+
+    // A pin that can wake her stays with its sleep circuit, reading nothing,
+    // until it is given back.
+    rtc_gpio_deinit(PWR_PIN);
+    for (size_t i = 0; i < COUNT(WAKE); i++) rtc_gpio_deinit(WAKE[i]);
+    esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+    return cause == ESP_SLEEP_WAKEUP_EXT0 ? SLEPT_PRESS : cause == ESP_SLEEP_WAKEUP_EXT1 ? SLEPT_TOUCH : SLEPT;
 }

@@ -4,8 +4,12 @@
 /* Joins her Wi-Fi in the background: the network she was last on first, on
    its own radio channel and access point so no scan is needed, then each
    saved one in order; once joined, sets the clock from the internet. The
-   clock is read in New York time from the start. */
+   clock is read in New York time from the start. Once a waking: called
+   again before net_stop, it does nothing. */
 void net_start(void);
+
+// The radio off for standby, a join still trying given up first.
+void net_stop(void);
 
 // Whether she is online, waiting up to `ms` for it. False once every network
 // has been tried and none answered, or the one she joined has gone.

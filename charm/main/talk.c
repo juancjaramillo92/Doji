@@ -14,7 +14,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "config.h"
-#include "esp_attr.h"
 #include "esp_crt_bundle.h"
 #include "esp_heap_caps.h"
 #include "esp_http_client.h"
@@ -55,7 +54,7 @@ static const char *TAG = "talk";
 #define REPORT_MS 5000   // a waking's report is never a reason to stay awake
 
 static TickType_t began;
-static int64_t listened;  // since boot, the first time she listened this waking
+static int64_t listened;  // since boot, the first time she listened since it was asked
 static bool spoke, speaking, warned;
 static uint32_t heard_ms;
 
@@ -68,7 +67,7 @@ static int frame_bytes, packet_bytes, filled;
 static ogg_t file;
 
 // The battery line is hers to say once a charge: told, until a cable is in.
-static RTC_DATA_ATTR bool told_low;
+static bool told_low;
 
 // PWR is a notification to this task: it ends his turn or cuts her off.
 static bool tapped(void) { return ulTaskNotifyTake(pdTRUE, 0); }
@@ -279,7 +278,11 @@ int talk_briefing(void) {
     return status;
 }
 
-int64_t talk_listened(void) { return listened; }
+int64_t talk_listened(void) {
+    int64_t at = listened;
+    listened = 0;
+    return at;
+}
 
 /* The waking's report, filed beside her runs. One try on the kept connection,
    closed after, since she sleeps next. */
