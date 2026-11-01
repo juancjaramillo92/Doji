@@ -50,3 +50,55 @@ export function sampler() {
     return out;
   };
 }
+
+/* Her voice played from one queue, sample by sample. Parts scheduled one
+   after another at computed times click at every join, and stammer whenever
+   one arrives late — which is how her first words sounded, while the vendor's
+   stream had not yet got ahead of her speaking. The queue waits until LEAD
+   of her voice is in hand before it plays, and again after running dry, so a
+   late part is one pause rather than a stammer; at the end it plays what is
+   left, however little. `fill` writes one block of output, silence where
+   nothing plays, and says 'voice' the first time a sample above nothing goes
+   out — her silence while she thinks is exact zeros, as on the charm — and
+   'drained' once the answer has played to its end. */
+export const LEAD = 0.3;
+
+export class Queue {
+  constructor(rate) {
+    this.lead = Math.round(LEAD * rate);
+    this.parts = [];
+    this.at = 0;
+    this.held = 0;
+    this.playing = false;
+    this.ended = false;
+    this.voiced = false;
+  }
+
+  push(samples) {
+    this.parts.push(samples);
+    this.held += samples.length;
+  }
+
+  end() { this.ended = true; }
+
+  fill(out) {
+    out.fill(0);
+    if (!this.playing && this.held > 0 && (this.held >= this.lead || this.ended)) this.playing = true;
+    let said = null;
+    for (let i = 0; this.playing && i < out.length && this.parts.length;) {
+      const part = this.parts[0], n = Math.min(out.length - i, part.length - this.at);
+      const block = part.subarray(this.at, this.at + n);
+      out.set(block, i);
+      if (!this.voiced && block.some(s => s !== 0)) { this.voiced = true; said = 'voice'; }
+      i += n;
+      this.at += n;
+      this.held -= n;
+      if (this.at === part.length) { this.parts.shift(); this.at = 0; }
+    }
+    if (!this.parts.length) {
+      this.playing = false;
+      if (this.ended) return 'drained';
+    }
+    return said;
+  }
+}

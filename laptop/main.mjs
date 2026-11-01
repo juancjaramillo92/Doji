@@ -22,6 +22,7 @@ import { execFile, spawn } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
+import { BLOB, opacity } from './art.mjs';
 import { framer } from './frames.mjs';
 import { placed, room } from './place.mjs';
 import { swapScript } from './update.mjs';
@@ -61,8 +62,15 @@ const CURSOR_MS = 100;
    day and wants her only over the chart. */
 const WHERE = { 'With TradingView': 'tradingview', Everywhere: 'everywhere' };
 const TRADINGVIEW = /tradingview/i;
-// How often she asks which app is in front: half a second is a switch she follows.
-const FRONT_MS = 500;
+/* How often she asks which app is in front. A desktop switched away from
+   takes her with it at once — she belongs to the one she was shown on — so
+   this decides only how soon she comes back, and goes from a desktop shared
+   with another app. */
+const FRONT_MS = 250;
+/* Over full-screen apps, as a panel may float, and without the process
+   turned into a Dock-less one, which is what Electron does by default to
+   let a window float there. */
+const SPACES = { visibleOnFullScreen: true, skipTransformProcessType: true };
 const PANES = {
   mic: 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
   screen: 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
@@ -154,7 +162,7 @@ function float() {
     webPreferences: { preload: join(here, 'preload.cjs') },
   });
   face.setAlwaysOnTop(true, 'screen-saver');
-  face.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  face.setVisibleOnAllWorkspaces(true, SPACES);
   face.setContentProtection(true);
   face.setIgnoreMouseEvents(true, { forward: true });
   face.on('moved', () => { [settings.x, settings.y] = face.getPosition(); save(); });
@@ -174,12 +182,27 @@ function resize(name) {
 }
 
 /* Whether she shows: not if he hid her; else while she is busy, wherever he
-   is; else beside TradingView, or everywhere if he asked for that. */
+   is; else beside TradingView, or everywhere if he asked for that. Shown
+   beside TradingView, she is pinned to the desktop she is shown on, so a
+   switch to another desktop leaves her behind at once — macOS's own doing,
+   with nothing to wait for. */
 function appear() {
-  const wanted = !settings.hidden && (busy || settings.where === 'everywhere' || beside);
-  if (wanted && !face.isVisible()) face.showInactive();
+  const everywhere = settings.where === 'everywhere';
+  const wanted = !settings.hidden && (busy || everywhere || beside);
+  if (wanted && !face.isVisible()) {
+    face.setVisibleOnAllWorkspaces(true, SPACES);
+    face.showInactive();
+    if (!everywhere) pin();
+  }
   if (!wanted && face.isVisible()) face.hide();
   menu();
+}
+
+/* To the desktop in front, by joining every desktop and leaving them all
+   again: a window that leaves them stays on the one it is on. */
+function pin() {
+  face.setVisibleOnAllWorkspaces(true, SPACES);
+  face.setVisibleOnAllWorkspaces(false, SPACES);
 }
 
 function show() {
@@ -196,7 +219,10 @@ function front() {
   execFile('/bin/sh', ['-c', 'lsappinfo info -only name "$(lsappinfo front)"'], { timeout: FRONT_MS * 4 }, (err, out) => {
     const name = err ? null : out.match(/"LSDisplayName"="([^"]*)"/)?.[1] ?? null;
     if (name === app.getName()) return;
+    const was = beside;
     beside = name === null || TRADINGVIEW.test(name);
+    // TradingView back in front while she shows elsewhere — on a turn asked from another desktop — brings her with it.
+    if (beside && !was && face.isVisible() && settings.where !== 'everywhere') pin();
     appear();
   });
 }
@@ -213,7 +239,9 @@ function bind() {
   menu();
 }
 
-// A press is heard wherever he is: she comes for the turn, and goes after it.
+/* A press is heard wherever he is: she comes for the turn, and goes after
+   it. The chart goes only when he asks for it, with Shift — a picture on
+   every question is a cost on every answer, and his to choose. */
 function press(chart) {
   busy = true;
   show();
@@ -234,7 +262,13 @@ function menu() {
     { label: settings.hidden ? 'Unhide her' : 'Hide her', click: () => { settings.hidden = !settings.hidden; save(); appear(); } },
     { label: 'Show her', submenu: Object.entries(WHERE).map(([label, where]) => ({
       label, type: 'radio', checked: (settings.where ?? 'tradingview') === where,
-      click: () => { settings.where = where; save(); appear(); },
+      click: () => {
+        settings.where = where;
+        save();
+        if (where === 'everywhere') face.setVisibleOnAllWorkspaces(true, SPACES);
+        else if (face.isVisible()) pin();
+        appear();
+      },
     })) },
     { label: 'Size', submenu: Object.keys(SIZES).map(size => ({
       label: size, type: 'radio', checked: (settings.size ?? 'Medium') === size, click: () => resize(size),
@@ -397,12 +431,25 @@ async function settle() {
   if (response === 0) app.moveToApplicationsFolder();
 }
 
+/* Her menu-bar icon: the render cropped close around her, at the menu bar's
+   18 points on a Retina screen, its black made clear by the face's own rule.
+   The bitmap is premultiplied, which a pixel drawn over black already is:
+   only its opacity is set. */
+function trayIcon() {
+  const side = 36;
+  const art = nativeImage.createFromPath(join(here, 'eugenia.png')).crop(BLOB).resize({ width: side, height: side, quality: 'best' });
+  const pixels = art.toBitmap();
+  for (let i = 0; i < pixels.length; i += 4) pixels[i + 3] = Math.round(255 * opacity(pixels[i], pixels[i + 1], pixels[i + 2]));
+  return nativeImage.createFromBitmap(pixels, { width: side, height: side, scaleFactor: 2 });
+}
+
 /* ─── What the pages ask of this half ──────────────────────────────────── */
 ipcMain.handle('ready', () => ({ fresh, micOk, taken, talk: talkKey(), briefing: Boolean(waiting) }));
 ipcMain.handle('look', async () => {
   const seen = await (looking = look());
   return typeof seen === 'string' ? seen : null;
 });
+ipcMain.on('talk', () => press(false));
 ipcMain.on('ask', (_, voice) => ask(voice));
 ipcMain.on('hush', () => { asking?.abort(); asking = null; looking = null; });
 ipcMain.on('briefing', hearBriefing);
@@ -440,7 +487,7 @@ app.whenReady().then(async () => {
   // The app's own menu, for its name, Quit, and the Edit menu ⌘V pastes her key through.
   Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }]));
   float();
-  tray = new Tray(nativeImage.createFromPath(join(here, 'eugenia.png')).resize({ width: 18, height: 18 }));
+  tray = new Tray(trayIcon());
   tray.setToolTip('Eugenia');
   bind();
   if (!key) askForKey();
