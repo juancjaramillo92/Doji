@@ -624,6 +624,10 @@ test('the laptop lives on one desktop, moved by macOS, and watches for nothing',
   assert.ok(workflow.includes('codesign --force --sign "$identity" --keychain "$keychain" Eugenia.app/Contents/Resources/app.asar.unpacked/spaces.node'),
     'the workflow no longer signs spaces.node where the package puts it');
   assert.ok(workflow.includes('SPACES="$PWD/spaces.node" npx electron "$RUNNER_TEMP/spaces.cjs"'), 'the workflow no longer asks a Mac whether spaces.node took');
+  // The window the Mac is asked about is raised as hers is, or the check proves a window she is not.
+  const level = (text) => [...text.matchAll(/\.setAlwaysOnTop\(true, '([\w-]+)'\)/g)].map(m => m[1]);
+  assert.deepEqual(level(workflow), level(bodyOf(LAPTOP_MAIN, 'function float(')),
+    'the workflow asks a Mac about a window raised otherwise than hers');
   assert.match(LAPTOP_MAIN, /backgroundThrottling: false/, 'her page is throttled on a desktop he is not looking at, and a turn asked from another stalls');
   assert.match(LAPTOP_FACE, /setInterval\(live, FRAME_MS\);/, 'what she hears and does waits on her drawing, which a desktop out of sight pauses');
 });
