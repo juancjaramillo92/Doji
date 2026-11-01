@@ -544,9 +544,69 @@ test('the laptop looks for its update where the workflow publishes it', () => {
   assert.doesNotMatch(sign, /--sign -/, 'a build can still be signed ad hoc');
   assert.match(workflow, /- name: Publish the update\n\s*if: github\.ref == 'refs\/heads\/main'\n/,
     'a build of a branch can publish the update');
+  // Her icon is made from the phone's, and is the one the packager is handed.
+  const made = workflow.match(/iconutil -c icns (\w+)\.iconset/)?.[1];
+  assert.ok(made && workflow.includes('../icon-512.png') && workflow.includes("'icon-512.png'"),
+    'the laptop app is no longer drawn from icon-512.png, or not rebuilt when it changes');
+  assert.match(JSON.parse(source('laptop/package.json')).scripts.package, new RegExp(`--icon=${made}\\.icns`),
+    'the packager is handed another icon than the one the workflow makes');
   // The zipped app is what the swap unpacks, under the name the bundle has.
-  assert.match(workflow, /ditto -c -k --keepParent Eugenia\.app Eugenia\.zip/);
-  assert.match(LAPTOP_MAIN, /mv "\$\{unpacked\}\/Eugenia\.app"/, 'the update unpacks an app by another name than the workflow zips');
+  const bundle = source('laptop/update.mjs').match(/^export const BUNDLE = '([\w.]+)';$/m)?.[1];
+  assert.ok(bundle, 'update.mjs no longer names the bundle as this test reads it');
+  assert.ok(workflow.includes(`ditto -c -k --keepParent ${bundle} Eugenia.zip`), 'the update unpacks an app by another name than the workflow zips');
+  assert.match(LAPTOP_MAIN, /spawn\('\/bin\/sh', \['-c', swap\]/, 'the update no longer runs the swap update.mjs writes');
+});
+
+/* What the laptop copies of the charm's ear and voice, and of the door's
+   beat. Her two notes and the tick are drawn by the charm's own formula;
+   his voice is heard past the charm's VOICE on the charm's scale, let go
+   after its SILENT_MS and ticked WARN_LEFT before its ceiling; and a line
+   silent for READ_MS outlasts two of her door's beats, or the laptop hangs
+   up while she thinks. */
+test('the laptop hears, sounds and waits as the charm and her door do', () => {
+  const sound = source('charm/main/sound.c'), talk = source('charm/main/talk.c');
+  const numbers = (text) => [...text.matchAll(/-?\d+(?:\.\d+)?/g)].map(m => Number(m[0]));
+  for (const [cue, fn] of [['LISTEN', 'sound_listen'], ['SENT', 'sound_sent']]) {
+    const charm = bodyOf(sound, `void ${fn}(void) {`, `sound.c has no ${fn}()`);
+    const copy = LAPTOP_FACE.match(new RegExp(`^const ${cue} = (\\[\\[[^;]+\\]\\]);$`, 'm'));
+    assert.ok(copy, `face.mjs no longer lists ${cue} as this test reads it`);
+    const played = numbers(charm.match(/play_notes\(notes, ([^)]+)\)/)?.[1] ?? '');
+    assert.deepEqual([...numbers(copy[1]), 400, 22, 6000], [...numbers(charm.match(/\{ \{[^;]+\} \}/)?.[0] ?? ''), ...played],
+      `the laptop's ${cue} is not the charm's ${fn}: its notes, or how they rise, die and how loud`);
+  }
+  assert.match(LAPTOP_FACE, /function notes\(pair, attack = 400, decay = 22, loud = 6000 \/ 32768\)/,
+    'the laptop draws its notes with other defaults than the charm\'s play_notes is called with');
+  assert.match(sound, /float env = fminf\(1\.0f, t \* attack\) \* expf\(-t \* decay\);/, 'sound.c no longer shapes a note as this test reads it');
+  assert.match(LAPTOP_FACE, /Math\.min\(1, t \* attack\) \* Math\.exp\(-t \* decay\) \* loud/, 'the laptop shapes a note otherwise than the charm');
+  const tick = bodyOf(sound, 'void sound_tick(void) {', 'sound.c has no sound_tick()');
+  const [span, click, decay, hz, loud] = [/SOUND_RATE \* (\d+) \/ 100/, /t < (0\.\d+)f/, /expf\(-t \* ([\d.]+)f\)/, /M_PI \* ([\d.]+)f \* t/, /env \* (\d+)\)/]
+    .map(re => Number(tick.match(re)?.[1]));
+  assert.ok([span, click, decay, hz, loud].every(Number.isFinite), 'sound.c no longer draws the tick as this test reads it');
+  assert.ok(LAPTOP_FACE.includes(`span = Math.round(rate * ${span / 100})`) &&
+            LAPTOP_FACE.includes(`t < ${click} ? Math.sin(2 * Math.PI * ${hz} * t) * Math.exp(-t * ${decay}) * ${loud} / 32768`),
+    'the laptop\'s tick is not the charm\'s');
+
+  const scale = sound.match(/float l = rms \* ([\d.]+)f;/)?.[1];
+  assert.ok(scale && LAPTOP_FACE.includes(`Math.min(1, ${Number(scale)} * Math.sqrt(`), 'the laptop hears his voice on another scale than the charm');
+  const value = (text, re, what) => {
+    const m = text.match(re);
+    assert.ok(m, `${what} is no longer defined as this test reads it`);
+    return Function(`return ${m[1].replace(/_/g, '').replace(/f$/, '')}`)();
+  };
+  assert.equal(value(LAPTOP_FACE, /^const VOICE = ([\d.]+);$/m, "face.mjs's VOICE"), value(talk, /^#define VOICE\s+([\d.]+f?)/m, "talk.c's VOICE"),
+    'the laptop counts as his voice a level the charm does not');
+  assert.equal(value(LAPTOP_FACE, /^const SILENT_MS = ([\d_]+);$/m, "face.mjs's SILENT_MS"), value(talk, /^#define SILENT_MS\s+(\d+)/m, "talk.c's SILENT_MS"),
+    'the laptop lets a silent recording go at another time than the charm');
+  const max = value(talk, /^#define MAX_MS\s+(\(.+\))/m, "talk.c's MAX_MS");
+  const warn = Function('MAX_MS', `return ${talk.match(/^#define WARN_MS\s+(\(.+\))/m)?.[1]}`)(max);
+  assert.equal(value(LAPTOP_FACE, /^const WARN_LEFT = ([\d_]+);$/m, "face.mjs's WARN_LEFT"), max - warn,
+    'the laptop ticks a recording\'s end at another distance from it than the charm');
+
+  const read = value(LAPTOP_MAIN, /^const READ_MS = ([\d_]+);$/m, "main.mjs's READ_MS");
+  const beat = value(EUGENIA_TS, /^const BEAT_MS = ([\d_]+);$/m, "doji-eugenia's BEAT_MS");
+  assert.ok(read >= 2 * beat, `the laptop gives up after ${read} ms of nothing, inside two of her ${beat} ms beats`);
+  assert.match(bodyOf(LAPTOP_MAIN, 'async function talk('), /for await \(const chunk of res\.body\) \{ alive\(\); feed\(chunk\); \}/,
+    'the laptop no longer counts its silence from the last thing the door sent');
 });
 
 /* The conversation comes first, and a trade waits for it to end. Its

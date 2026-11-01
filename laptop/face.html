@@ -5,11 +5,23 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'">
 <title>Eugenia</title>
 <style>
-  html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; }
-  canvas { display: block; width: 100vw; height: 100vh; }
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; cursor: default; }
+  /* Her square at the bottom of the room, the line above her head. */
+  canvas { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); }
+  #said {
+    position: absolute; left: 50%; transform: translate(-50%, 6px);
+    max-width: calc(100% - 12px); box-sizing: border-box; width: max-content;
+    padding: 6px 11px; border-radius: 12px;
+    font: 500 12px/1.35 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; text-align: center;
+    opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none;
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  }
+  #said.shown { opacity: 1; transform: translate(-50%, 0); }
+  body.hand { cursor: pointer; }
 </style>
 </head>
 <body>
+<div id="said" role="status" aria-live="polite"></div>
 <canvas id="her"></canvas>
 <script type="module" src="face.mjs"></script>
 </body>

@@ -6,18 +6,21 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'unsafe-inline'">
 <title>Eugenia</title>
 <style>
-  body { font: 13px -apple-system, system-ui, sans-serif; margin: 20px; }
-  p { margin: 0 0 12px; }
-  input { width: 100%; box-sizing: border-box; font: inherit; padding: 6px; }
-  .row { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+  body { font: 13px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; margin: 22px; }
+  h1 { font-size: 15px; margin: 0 0 6px; }
+  p { margin: 0 0 14px; opacity: .8; }
+  input { width: 100%; box-sizing: border-box; font: 13px ui-monospace, SFMono-Regular, monospace; padding: 7px 8px; }
+  .row { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
   #said { flex: 1; }
+  button { font: inherit; padding: 4px 14px; }
 </style>
 </head>
 <body>
-<p>Her key is <code>EUGENIA_LAPTOP_SECRET</code>, as set in Supabase.</p>
+<h1>Her key</h1>
+<p>Paste the value you saved as <code>EUGENIA_LAPTOP_SECRET</code> in Supabase (Edge Functions → Secrets). She tries it before keeping it, in your Keychain.</p>
 <form id="form">
-  <input id="key" type="password" autocomplete="off" spellcheck="false" autofocus required>
-  <div class="row"><span id="said" role="status"></span><button>Try it</button></div>
+  <input id="key" type="password" autocomplete="off" spellcheck="false" autofocus required placeholder="Paste with ⌘V">
+  <div class="row"><span id="said" role="status" aria-live="polite"></span><button>Try it</button></div>
 </form>
 <script type="module" src="key.mjs"></script>
 </body>

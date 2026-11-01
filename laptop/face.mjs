@@ -3,15 +3,18 @@
    The same render and the same drawing over it — eyes, highlight, smile,
    thought dots, the listening ring — at the charm's own coordinates, in the
    charm's 466-pixel square, scaled to the window; agree.test.mjs holds the
-   numbers to charm/main/face.c. What the laptop adds is the body: she
-   breathes and floats a little at rest, leans in to listen, sways while she
+   numbers to charm/main/face.c, and her sounds to charm/main/sound.c. What the
+   laptop adds is the body: she breathes and floats a little at rest, looks
+   at the cursor when it comes near, leans in to listen, sways while she
    thinks and gives with the loud moments of her voice. Eyes and mouth ride
-   the same transform, so they stay on her.
+   the same transform, so they stay on her. And a line above her head, for
+   what her face alone cannot say: why something failed, and how to talk.
 
    This page records him and plays her; the main process carries both to her
    door and back, and owns the key, the chart and the window.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { FRAME, PCM_RATE, sampler } from './frames.mjs';
+import { ROOM } from './place.mjs';
 
 /* ─── The charm's face, copied ─────────────────────────────────────────────
    Measured from the drawing of her face over the render, in pixels of the
@@ -24,22 +27,38 @@ const F = {
 };
 const DOTS = [[208, 38, 3.2], [233, 30, 3.8], [258, 38, 3.2]];
 const FEATURES = '#0d0c0b', SHINE = '#f2f0ec', THROAT = '#1d0e0b', THOUGHT = '#ead3b6';
-// The charm's emeralds, copies of charm/main/palette.h.
+// Doji's colours as the charm has them, copies of charm/main/palette.h.
 const DEEP = '#0e6f5c', ACCENT = '#0c8650', GLOW = '#3cc488', TEAL = '#1f9e93';
+const INK = '#e6ece9', GROUND = '#070c0a', LINE = '#1c2922';
 const BLINK_EVERY_MS = 4000;
 const LOOK_RANGE = 6;
 const CONFUSED_MS = 4000;
 
+/* ─── The charm's ear and sounds, copied ───────────────────────────────────
+   His voice is heard when its level, a sixth of full scale, passes VOICE; a
+   recording he never spoke into is let go at SILENT_MS, and the last
+   WARN_LEFT of one is ticked, as on the charm. Two notes start her
+   listening and two in reverse send what she heard. */
+const VOICE = 0.12;
+const SILENT_MS = 30_000;
+const WARN_LEFT = 30_000;
+const LISTEN = [[660.0, 0.07], [990.0, 0.11]];
+const SENT = [[990.0, 0.07], [660.0, 0.11]];
+
 /* ─── What the laptop adds ─────────────────────────────────────────────────
    Tuned by eye and kept small: she is alive, not busy. The two rhythms differ
    so they never fall into step and repeat like a metronome. She gives from
-   her base, the lowest row of the render. */
+   her base, the lowest row of the render. At rest she is drawn at a lower
+   rate, which a breath this slow does not show, and the battery does. */
 const BASE = 381;
 const BREATH_S = 4.6, BREATH = 0.015;
 const BOB_S = 3.3, BOB = 2.5;
 const SWAY_S = 2.6, SWAY = 0.026;
 const LEAN = 0.02, SQUASH = 0.035, LIFT = 4;
-const FRAME_MIN_MS = 33;
+const FRAME_MS = 33, REST_FRAME_MS = 50;
+// The cursor within this many of her pixels has her eyes.
+const NEAR = 700;
+const HINT_AFTER_MS = 1200;
 
 /* A recording's ceiling, at the bitrate it is made at, is well inside her
    door's FILE_MAX; agree.test.mjs holds the arithmetic. Shorter than a
@@ -48,16 +67,44 @@ const RECORD_MS = 5 * 60_000;
 const RECORD_BPS = 32_000;
 const RECORD_MIN_MS = 400;
 
+/* ─── The line above her head ───────────────────────────────────────────────
+   Each failure says whose it is and what to do, as her door's VOICE_TROUBLE
+   does for a recording; `k` is the talk key he has chosen. */
+const SAY = {
+  hello: (k) => `Hi, jefe. ${k} or a click to talk — ⇧${k} and I look at your chart.`,
+  hint: (k) => `${k} or a click to talk · drag to move me`,
+  taken: (k) => `${k} is taken by another app — pick another Talk key in my menu.`,
+  here: () => "I'm here — and up in the menu bar.",
+  looking: () => 'Looking at your chart…',
+  key: () => 'My key was refused — paste it again.',
+  voice: () => "My voice isn't set up on the server yet.",
+  door: () => 'Something went wrong on my side. Try again.',
+  offline: () => "I can't reach the internet. Try again in a moment.",
+  lost: () => 'The line went quiet. Try again.',
+  screen: () => 'Turn on Screen Recording for Eugenia, then choose Restart her in my menu.',
+  sight: () => "I couldn't see your chart. Try again.",
+  mic: () => 'Turn on the Microphone for Eugenia in System Settings.',
+  silent: () => "I didn't hear anything.",
+  updating: () => 'Updating — back in a moment.',
+  update: () => "The update didn't download. Try again later.",
+};
+const SAY_MS = 4500, HELLO_MS = 9000;
+
 const canvas = document.getElementById('her');
+const said = document.getElementById('said');
 const g = canvas.getContext('2d');
 const still = matchMedia('(prefers-reduced-motion: reduce)');
+Object.assign(said.style, { color: INK, background: `${GROUND}e0`, border: `1px solid ${LINE}` });
 
 let art, alpha;              // the render with its black made clear, and her shape for clicks
 let mode = 'idle';           // idle · listening · thinking · speaking · confused
 let briefingWaits = false;
-let recorder = null, recording = null;
+let talkKey = '⌥Space';
+let recorder = null, recording = null, ear = null;
+let listen = null;           // the recording under way: when it began, whether he spoke, the tick
 let audio = null;            // her answer playing: its context, its queue and when her voice starts
-let confusedUntil = 0;
+let confusedUntil = 0, sayUntil = 0;
+let cues = null;             // the context her two-note sounds and the ear share
 
 /* The render is drawn on black, which on a laptop is a black square. Its
    black is made clear by brightness, and the edge un-darkened by the same
@@ -79,6 +126,47 @@ async function load() {
   }
   o.putImageData(d, 0, 0);
   art = off;
+}
+
+function say(reason, ms = SAY_MS) {
+  said.textContent = SAY[reason](talkKey);
+  said.classList.add('shown');
+  sayUntil = performance.now() + ms;
+}
+const unsay = () => { said.classList.remove('shown'); sayUntil = 0; };
+
+/* ─── Her sounds ─────────────────────────────────────────────────────────────
+   The charm's own: two notes rising in and dying away, and the tick, two
+   8 ms clicks of a high note 110 ms apart — each drawn sample by sample by
+   the charm's formula, at the charm's loudness. */
+const sounds = () => (cues ??= new AudioContext());
+
+function notes(pair, attack = 400, decay = 22, loud = 6000 / 32768) {
+  const ctx = sounds(), rate = ctx.sampleRate;
+  const parts = pair.map(([hz, s]) => Array.from({ length: Math.round(rate * s) }, (_, i) => {
+    const t = i / rate;
+    return Math.sin(2 * Math.PI * hz * t) * Math.min(1, t * attack) * Math.exp(-t * decay) * loud;
+  }));
+  play(Float32Array.from(parts.flat()));
+}
+
+function tick() {
+  const rate = sounds().sampleRate, span = Math.round(rate * 0.11);
+  const one = Array.from({ length: span }, (_, i) => {
+    const t = i / rate;
+    return t < 0.008 ? Math.sin(2 * Math.PI * 1800 * t) * Math.exp(-t * 600) * 7000 / 32768 : 0;
+  });
+  play(Float32Array.from([...one, ...one]));
+}
+
+function play(samples) {
+  const ctx = sounds();
+  const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
+  buffer.copyToChannel(samples, 0);
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(ctx.destination);
+  source.start();
 }
 
 /* ─── Drawing ─────────────────────────────────────────────────────────────── */
@@ -113,9 +201,12 @@ function curve(cx, y, half, sag, width, color) {
   g.restore();
 }
 
-const V = { open: 0, gx: 0, gy: 0, mouth: 0, smile: 1, dots: 0, confused: 0, lid: 1, lean: 0, sway: 0, squash: 0 };
+const V = {
+  open: 0, gx: 0, gy: 0, mouth: 0, smile: 1, dots: 0, confused: 0, lid: 1, lean: 0, sway: 0, squash: 0, heard: 0,
+};
 const gaze = [0, 0];
-let nextGlance = 0, nextBlink = 0, blinkAt = 0, blinking = false, level = 0;
+let nextGlance = 0, nextBlink = 0, blinkAt = 0, blinking = false, level = 0, heard = 0;
+let cursor = null;           // where the cursor is in her pixels, when it is near
 
 function features(now) {
   const open = V.open * V.lid;
@@ -153,14 +244,18 @@ function features(now) {
   }
 }
 
-// The listening ring round the rim, Doji's emeralds turning through it.
-function ring() {
+/* The listening ring round the rim, Doji's emeralds turning through it. It
+   swells with his voice, so he sees she hears him, and in a recording's last
+   WARN_LEFT it empties toward the end. */
+function ring(part) {
   const conic = g.createConicGradient(-Math.PI / 2, 233, 233);
   [DEEP, ACCENT, GLOW, TEAL, DEEP].forEach((c, i) => conic.addColorStop(i / 4, c));
   g.strokeStyle = conic;
-  g.lineWidth = 6;
+  g.lineWidth = 5 + 9 * V.heard;
+  g.lineCap = 'round';
   g.beginPath();
-  g.arc(233, 233, 228, 0, 2 * Math.PI);
+  // Inside her square at its widest, or the window's edge cuts it.
+  g.arc(233, 233, 222, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * part);
   g.stroke();
 }
 
@@ -174,8 +269,9 @@ function waits() {
 }
 
 /* The charm's tick, then the body. Each value eases toward what the mode asks
-   for, so nothing jumps between modes. */
-function tick(now, dt) {
+   for, so nothing jumps between modes. At rest, a cursor near her has her
+   eyes; otherwise she glances about, as on the charm. */
+function step(now, dt) {
   const m = mode;
   let tOpen = 1, tMouth = 0, tSmile = 1, tDots = 0, tConfused = 0, glance = 1, fixed = null;
   const pondering = [Math.floor(now / 1700) % 2 ? -LOOK_RANGE * 0.55 : LOOK_RANGE * 0.9, -LOOK_RANGE];
@@ -183,6 +279,7 @@ function tick(now, dt) {
   if (m === 'speaking')  { tMouth = level; tSmile = 0.9; glance = 0.4; }
   if (m === 'thinking')  { tOpen = 0.85; tSmile = 0.25; tDots = 1; fixed = pondering; }
   if (m === 'confused')  { tSmile = -0.35; tConfused = 1; fixed = [3, -2.5]; }
+  if (m === 'idle' && cursor) fixed = cursor;
 
   if (fixed) [gaze[0], gaze[1]] = fixed;
   else if (now >= nextGlance) {
@@ -210,6 +307,7 @@ function tick(now, dt) {
   V.lean = ease(V.lean, m === 'listening' ? 1 : 0, 6, dt);
   V.sway = ease(V.sway, m === 'thinking' ? Math.sin(2 * Math.PI * now / 1000 / SWAY_S) : 0, 4, dt);
   V.squash = ease(V.squash, m === 'speaking' ? level : 0, 14, dt);
+  V.heard = ease(V.heard, m === 'listening' ? heard : 0, 18, dt);
 }
 
 function draw(now) {
@@ -230,25 +328,37 @@ function draw(now) {
   g.drawImage(art, 0, 0);
   features(now);
   g.restore();
-  if (mode === 'listening') ring();
+  if (mode === 'listening') ring(Math.min(1, (RECORD_MS - (now - listen.began)) / WARN_LEFT));
   if (briefingWaits) waits();
 }
 
-let last = 0;
+let last = 0, reported = false;
 function frame(now) {
   requestAnimationFrame(frame);
-  if (now - last < FRAME_MIN_MS) return;
+  const resting = mode === 'idle' && !cursor;
+  if (now - last < (resting ? REST_FRAME_MS : FRAME_MS)) return;
   const dt = Math.min(0.05, last ? (now - last) / 1000 : 0.033);
   last = now;
   hearing();
+  hearingHim(now);
   if (mode === 'confused' && now >= confusedUntil) mode = 'idle';
-  tick(now, dt);
+  if (sayUntil && now >= sayUntil) unsay();
+  // Busy or saying something, she stays on the screen he is on, beside TradingView or not.
+  const busy = mode !== 'idle' || sayUntil > 0;
+  if (busy !== reported) window.doji.busy(reported = busy);
+  step(now, dt);
   draw(now);
 }
 
+/* Her square at the bottom of the room, drawn at the screen's own density —
+   which changes when the window moves to another screen. */
 function fit() {
-  canvas.width = Math.round(innerWidth * devicePixelRatio);
-  canvas.height = Math.round(innerHeight * devicePixelRatio);
+  const side = Math.round(innerHeight / ROOM.height);
+  canvas.style.width = canvas.style.height = `${side}px`;
+  canvas.width = canvas.height = Math.round(side * devicePixelRatio);
+  // Above the ring, in the room over her head.
+  said.style.bottom = `${side + 2}px`;
+  matchMedia(`(resolution: ${devicePixelRatio}dppx)`).addEventListener('change', fit, { once: true });
 }
 
 /* ─── Her voice ─────────────────────────────────────────────────────────────
@@ -267,7 +377,7 @@ function voice() {
   return audio;
 }
 
-function play(kind, bytes) {
+function answer(kind, bytes) {
   if (mode !== 'thinking' && mode !== 'speaking') return;
   const a = voice();
   if (kind === FRAME.volume) { a.gain.gain.value = bytes[0] / 100; return; }
@@ -295,49 +405,85 @@ function silence() {
   level = 0;
 }
 
+const loudness = (meter) => {
+  const wave = new Float32Array(meter.fftSize);
+  meter.getFloatTimeDomainData(wave);
+  return Math.min(1, 6 * Math.sqrt(wave.reduce((n, s) => n + s * s, 0) / wave.length));
+};
+
 // Once a frame: how loud she is now, and whether she has started or finished.
 function hearing() {
   if (!audio) { level = 0; return; }
   const { ctx, meter } = audio;
-  if (mode === 'thinking' && ctx.currentTime >= audio.voiceAt) mode = 'speaking';
-  const wave = new Float32Array(meter.fftSize);
-  meter.getFloatTimeDomainData(wave);
-  level = Math.min(1, 4 * Math.sqrt(wave.reduce((n, s) => n + s * s, 0) / wave.length));
+  if (mode === 'thinking' && ctx.currentTime >= audio.voiceAt) { mode = 'speaking'; unsay(); }
+  level = loudness(meter);
   if (audio.done && ctx.currentTime >= audio.next) { silence(); mode = 'idle'; }
 }
 
-function trouble() {
-  recorder?.stop();
+// And how loud he is, while she listens: the ring, the silence that lets go, the tick.
+function hearingHim(now) {
+  if (mode !== 'listening' || !ear) { heard = 0; return; }
+  heard = loudness(ear);
+  if (heard > VOICE) listen.spoke = true;
+  const elapsed = now - listen.began;
+  if (!listen.spoke && elapsed >= SILENT_MS) { letGo(); say('silent'); return; }
+  if (!listen.warned && elapsed >= RECORD_MS - WARN_LEFT) { listen.warned = true; tick(); }
+}
+
+function trouble(reason) {
+  letGo();
   silence();
   mode = 'confused';
   confusedUntil = performance.now() + CONFUSED_MS;
+  say(reason);
+  if (reason === 'mic') window.doji.open('mic');
 }
 
 /* ─── Him ───────────────────────────────────────────────────────────────────
    The microphone is opened at the press and closed with the recording, so
-   macOS shows it in use only while she listens. */
-async function listen() {
+   macOS shows it in use only while she listens; her two notes say when to
+   start talking. */
+async function listening(chart) {
   try {
     recording = await navigator.mediaDevices.getUserMedia({
       audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
     });
   } catch {
-    return trouble();
+    return trouble('mic');
   }
-  const chunks = [], began = performance.now();
+  const chunks = [];
+  ear = sounds().createAnalyser();
+  ear.fftSize = 1024;
+  sounds().createMediaStreamSource(recording).connect(ear);
   recorder = new MediaRecorder(recording, { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: RECORD_BPS });
   recorder.ondataavailable = (e) => chunks.push(e.data);
   recorder.onstop = async () => {
-    recording.getTracks().forEach(t => t.stop());
-    recorder = null;
-    if (mode !== 'listening') return;
-    if (performance.now() - began < RECORD_MIN_MS) { window.doji.hush(); mode = 'idle'; return; }
+    const short = performance.now() - listen.began < RECORD_MIN_MS, kept = mode === 'listening';
+    release();
+    if (!kept) return;
+    if (short) { window.doji.hush(); mode = 'idle'; unsay(); return; }
     mode = 'thinking';
+    notes(SENT);
     window.doji.ask(new Uint8Array(await new Blob(chunks).arrayBuffer()));
   };
   recorder.start();
+  listen = { began: performance.now(), spoke: false, warned: false };
   mode = 'listening';
+  notes(LISTEN);
+  if (chart) say('looking', RECORD_MS);
   setTimeout(() => { if (mode === 'listening' && recorder) recorder.stop(); }, RECORD_MS);
+}
+
+// The microphone closed and forgotten.
+function release() {
+  recording?.getTracks().forEach(t => t.stop());
+  recording = recorder = ear = null;
+}
+
+// A recording ended without asking anything: the press taken back, or nothing said.
+function letGo() {
+  if (mode === 'listening') { mode = 'idle'; window.doji.hush(); }
+  recorder?.stop();
 }
 
 /* One gesture for everything: the key, or a click on her. Idle, she listens
@@ -353,28 +499,40 @@ async function press(chart) {
   if (mode === 'listening') return recorder?.stop();
   if (mode === 'thinking' || mode === 'speaking') { window.doji.hush(); silence(); mode = 'idle'; return; }
   starting = true;
+  unsay();
   const seen = chart ? window.doji.look() : null;
-  await listen();
+  await listening(chart);
   starting = false;
   if (stopped) { stopped = false; recorder?.stop(); }
-  if (seen && !await seen) { window.doji.hush(); trouble(); }
+  const why = seen && await seen;
+  if (why) trouble(why);
 }
 
-function click() {
-  if (mode === 'idle' && briefingWaits) { mode = 'thinking'; window.doji.briefing(); return; }
-  press(false);
+function briefing() {
+  if (mode !== 'idle' || !briefingWaits) return false;
+  mode = 'thinking';
+  unsay();
+  window.doji.briefing();
+  return true;
 }
+
+const click = () => briefing() || press(false);
 
 /* ─── Her shape, for the mouse ──────────────────────────────────────────────
    The window lets clicks through but where she is drawn; the briefing's dot
    counts as her. A press that moves is a drag, and one that does not is a
-   click. */
+   click. The first time the cursor rests on her, she says how to talk. */
+function pixel(x, y) {
+  const r = canvas.getBoundingClientRect();
+  return [(x - r.left) * 466 / r.width, (y - r.top) * 466 / r.height];
+}
+
 const on = (x, y) => {
-  const u = Math.round(x * 466 / innerWidth), v = Math.round(y * 466 / innerHeight);
+  const [u, v] = pixel(x, y).map(Math.round);
   if (briefingWaits && Math.hypot(u - 404, v - 404) < 22) return true;
   return u >= 0 && v >= 0 && u < 466 && v < 466 && alpha[v * 466 + u] > 64;
 };
-let solid = false, held = null;
+let solid = false, held = null, hinted = false, hint = 0;
 addEventListener('mousemove', (e) => {
   if (held) {
     const dx = e.screenX - held.x, dy = e.screenY - held.y;
@@ -387,7 +545,11 @@ addEventListener('mousemove', (e) => {
     return;
   }
   const now = on(e.clientX, e.clientY);
-  if (now !== solid) window.doji.solid(solid = now);
+  if (now === solid) return;
+  window.doji.solid(solid = now);
+  document.body.classList.toggle('hand', solid);
+  clearTimeout(hint);
+  if (solid && !hinted) hint = setTimeout(() => { if (mode === 'idle' && !sayUntil) { hinted = true; say('hint'); } }, HINT_AFTER_MS);
 });
 addEventListener('mousedown', (e) => { if (solid) held = { x: e.screenX, y: e.screenY, moved: false }; });
 addEventListener('mouseup', () => {
@@ -395,13 +557,28 @@ addEventListener('mouseup', () => {
   held = null;
 });
 
+// The cursor anywhere on the screen, from the main process: near her, it has her eyes.
+function near(x, y) {
+  const [u, v] = pixel(x, y), dx = u - 237, dy = v - 140, far = Math.hypot(dx, dy);
+  cursor = far < NEAR && far > 1 ? [dx / far * LOOK_RANGE, dy / far * LOOK_RANGE * 0.7] : null;
+}
+
 window.doji.on('press', press);
-window.doji.on('frame', play);
+window.doji.on('frame', answer);
 window.doji.on('done', () => { if (audio) audio.done = true; else if (mode === 'thinking') mode = 'idle'; });
 window.doji.on('trouble', trouble);
 window.doji.on('briefing', (yes) => { briefingWaits = yes; });
+window.doji.on('briefing-now', briefing);
+window.doji.on('say', (reason, key) => { if (key) talkKey = key; say(reason); });
+window.doji.on('cursor', near);
 
 addEventListener('resize', fit);
 fit();
 await load();
+const start = await window.doji.ready();
+talkKey = start.talk;
+briefingWaits = start.briefing;
+if (start.fresh) say('hello', HELLO_MS);
+else if (!start.micOk) say('mic');
+else if (start.taken) say('taken');
 requestAnimationFrame(frame);
