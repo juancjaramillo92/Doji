@@ -333,17 +333,6 @@ function draw(now) {
   if (briefingWaits) waits();
 }
 
-/* What she hears and does keeps its own clock; only her drawing waits on the
-   screen. A window on a desktop he is not looking at is not drawn, and a
-   turn asked from another desktop must still listen, answer and end. */
-function live() {
-  const now = performance.now();
-  hearing();
-  hearingHim(now);
-  if (mode === 'confused' && now >= confusedUntil) mode = 'idle';
-  if (sayUntil && now >= sayUntil) unsay();
-}
-
 let last = 0;
 function frame(now) {
   requestAnimationFrame(frame);
@@ -414,22 +403,30 @@ const loudness = (meter) => {
   return Math.min(1, 6 * Math.sqrt(wave.reduce((n, s) => n + s * s, 0) / wave.length));
 };
 
-// Each tick of her clock: how loud she is now, and whether she has started or finished.
-function hearing() {
-  if (!audio) { level = 0; return; }
-  if (mode === 'thinking' && audio.voiced) { mode = 'speaking'; unsay(); }
-  level = loudness(audio.meter);
-  if (audio.drained) { silence(); mode = 'idle'; }
-}
-
-// And how loud he is, while she listens: the ring, the silence that lets go, the tick.
-function hearingHim(now) {
-  if (mode !== 'listening' || !ear) { heard = 0; return; }
-  heard = loudness(ear);
-  if (heard > VOICE) listen.spoke = true;
-  const elapsed = now - listen.began;
-  if (!listen.spoke && elapsed >= SILENT_MS) { letGo(); say('silent'); return; }
-  if (!listen.warned && elapsed >= RECORD_MS - WARN_LEFT) { listen.warned = true; tick(); }
+/* What she hears and does keeps its own clock; only her drawing waits on the
+   screen. A window on a desktop he is not looking at is not drawn, and a
+   turn asked from another desktop must still listen, answer and end. Each
+   tick: how loud she is, and whether she has started or finished; and how
+   loud he is while she listens — the ring, the silence that lets go, the
+   tick before the end. */
+function live() {
+  const now = performance.now();
+  level = 0;
+  if (audio) {
+    if (mode === 'thinking' && audio.voiced) { mode = 'speaking'; unsay(); }
+    level = loudness(audio.meter);
+    if (audio.drained) { silence(); mode = 'idle'; }
+  }
+  heard = 0;
+  if (mode === 'listening' && ear) {
+    heard = loudness(ear);
+    if (heard > VOICE) listen.spoke = true;
+    const elapsed = now - listen.began;
+    if (!listen.spoke && elapsed >= SILENT_MS) { letGo(); say('silent'); }
+    else if (!listen.warned && elapsed >= RECORD_MS - WARN_LEFT) { listen.warned = true; tick(); }
+  }
+  if (mode === 'confused' && now >= confusedUntil) mode = 'idle';
+  if (sayUntil && now >= sayUntil) unsay();
 }
 
 function trouble(reason) {
@@ -461,7 +458,8 @@ async function listening(chart) {
   recorder.ondataavailable = (e) => chunks.push(e.data);
   recorder.onstop = async () => {
     const short = performance.now() - listen.began < RECORD_MIN_MS, kept = mode === 'listening';
-    release();
+    recording?.getTracks().forEach(t => t.stop());
+    recording = recorder = ear = null;
     if (!kept) return;
     if (short) { window.doji.hush(); mode = 'idle'; unsay(); return; }
     mode = 'thinking';
@@ -474,12 +472,6 @@ async function listening(chart) {
   notes(LISTEN);
   if (chart) say('looking', RECORD_MS);
   setTimeout(() => { if (mode === 'listening' && recorder) recorder.stop(); }, RECORD_MS);
-}
-
-// The microphone closed and forgotten.
-function release() {
-  recording?.getTracks().forEach(t => t.stop());
-  recording = recorder = ear = null;
 }
 
 // A recording ended without asking anything: the press taken back, or nothing said.

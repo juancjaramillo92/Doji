@@ -1201,13 +1201,12 @@ a runner failing its own mechanism is padding.
 
 ### R-134 — the laptop watching for a desktop switch
 **Why refused:** every way it was tried — the app in front through
-`lsappinfo`, the window in front through macOS's on-screen list, the switch
-as macOS announces it to any app — slid her in or out
-only after the switch had ended, because macOS announces a switch once its
-animation is over. A window that belongs to its desktop moves with the
-animation itself, which is what `spaces.m` makes her. Nothing subscribes to
-the announcement, not even her log: a switch decides nothing she does, and
-the log holds what she decides.
+`lsappinfo`, the window in front through macOS's on-screen list, the switch as
+macOS announces it to any app — slid her in or out only after the switch had
+ended, because macOS announces a switch once its animation is over. A window
+that belongs to its desktop moves with the animation itself, which is what
+`spaces.m` makes her. Nothing subscribes to the announcement, not even her
+log: a switch decides nothing she does, and the log holds what she decides.
 **Revisit if:** he wants her on more than one desktop at once.
 
 ### R-135 — the signing secrets handed to Dependabot's runs
@@ -1234,6 +1233,17 @@ start would ask every Mac that runs the app from the repository for Xcode's
 compiler, for the one behaviour only a packaged build is checked on.
 **Revisit if:** the app is worked on from a Mac often enough that the floating
 copy misleads.
+
+### R-138 — the laptop's single-caller functions inlined
+**Why refused:** much of `main.mjs` and `face.mjs` is a function with one
+caller — `float`, `hideHer`, `settle`, `trayIcon`, `tryKey`, `step`, `draw`,
+`features`, `ring`. Each is a job named for what it does and bound to one
+event, menu item or channel, or a part of her drawing named as `face.c` names
+its own, and `agree.test.mjs` reads several by name; inlined, the entry point
+and the frame would be one long body where a reader finds nothing by its name.
+What only split a body into halves was inlined: the two hearings in `live`,
+and the microphone's release in the recorder's stop.
+**Revisit if:** one of them grows a second caller or shrinks to one line.
 
 ---
 
