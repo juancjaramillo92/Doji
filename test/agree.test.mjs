@@ -578,6 +578,24 @@ test('the laptop keeps its Dock icon, and makes the render clear by one rule', (
   }
 });
 
+/* Whether she shows beside TradingView rests on a question only a Mac can
+   run, so the workflow runs it — read out of main.mjs, never copied — and on
+   an announcement that a desktop changed, which hides her before any
+   question is answered. */
+test('the laptop asks macOS what the workflow proves it can answer, and leaves a desktop when told', () => {
+  const workflow = source('.github/workflows/laptop.yml');
+  const reader = workflow.match(/s\.match\(\/(\^const FRONT_JXA = [^/]+)\/m\)/)?.[1];
+  assert.ok(reader, 'the workflow no longer runs her question of macOS as main.mjs holds it');
+  assert.match(LAPTOP_MAIN, new RegExp(reader, 'm'), 'main.mjs no longer holds the question where the workflow reads it');
+  assert.match(workflow, /osascript -l JavaScript -e "\$question"/, 'the workflow no longer asks macOS the question');
+  assert.match(bodyOf(LAPTOP_MAIN, 'function front('), /execFile\('\/usr\/bin\/osascript', \['-l', 'JavaScript', '-e', FRONT_JXA\]/,
+    'front() no longer asks the question the workflow proves');
+  assert.match(LAPTOP_MAIN, /subscribeWorkspaceNotification\('NSWorkspaceActiveSpaceDidChangeNotification', \(\) => \{\n\s*if \(present\(\) && !busy && settings\.where !== 'everywhere'\) face\.hide\(\);\n\s*front\(\);/,
+    'a desktop switched no longer hides her at once');
+  assert.match(LAPTOP_MAIN, /subscribeWorkspaceNotification\('NSWorkspaceDidActivateApplicationNotification', front\);/,
+    'another app coming forward no longer has her ask');
+});
+
 /* Her window goes first when she quits, and anything answering late — a
    clock, the check for the app in front, a reply — met it destroyed on his
    Mac: an exception, whose dialog kept her alive. So every clock in the main
@@ -590,7 +608,7 @@ test('the laptop stops its clocks when it quits, and touches no window that is g
   assert.match(LAPTOP_MAIN, /app\.on\('before-quit', \(\) => timers\.forEach\(clearInterval\)\);/, 'quitting no longer stops her clocks');
   assert.match(LAPTOP_MAIN, /const send = \(channel, \.\.\.args\) => \{ if \(present\(\)\) face\.webContents\.send/, 'send() no longer asks whether her window is there');
   assert.match(bodyOf(LAPTOP_MAIN, 'function appear('), /^function appear\(\) \{\n  if \(!present\(\)\) return;/, 'appear() no longer asks whether her window is there');
-  assert.match(bodyOf(LAPTOP_MAIN, 'function front('), /if \(!present\(\) \|\| name === app\.getName\(\)\) return;/, 'the check for the app in front no longer asks whether her window is there');
+  assert.match(bodyOf(LAPTOP_MAIN, 'function beheld('), /if \(!present\(\) \|\| name === app\.getName\(\)\) return;/, 'the answer to which window is in front no longer asks whether her window is there');
 });
 
 /* What the laptop copies of the charm's ear and voice, and of the door's
