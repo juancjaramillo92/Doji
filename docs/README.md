@@ -2255,7 +2255,8 @@ process alone; the page that draws her has neither, asks for nothing but what
 `preload.cjs` names, opens no window and navigates nowhere.
 
 **Her menu's *Copy her log*** puts her last decisions on the clipboard, with
-their times — each desktop switch, each time she was brought or hidden — for
+their times — whether she was kept to one desktop, each time she was
+brought or hidden — for
 him to paste when something looks wrong, since nothing she does on the Mac
 is otherwise seen from here.
 
