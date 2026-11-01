@@ -587,9 +587,9 @@ test('the laptop keeps its Dock icon, and makes the render clear by one rule', (
 
 /* She is a window on one desktop, as any window is, and macOS moves her with
    it: nothing watches which app is in front or which desktop is, and nothing
-   but he shows or hides her. Each watcher that was tried slid her in after
-   the switch had ended, where a window that belongs to its desktop slides
-   with it. So the main process asks macOS nothing about other apps' windows,
+   but he shows or hides her. A window that belongs to its desktop slides
+   with the switch, where a watcher answers once it is over (REFACTOR.md
+   R-134). So the main process asks macOS nothing about other apps' windows,
    puts her on the desktop in front only when asked, and does not move her
    for a turn. Two things would put her on every desktop again, and neither
    shows off a Mac: a panel, which Electron joins to every desktop whatever it
@@ -633,8 +633,8 @@ test('the laptop lives on one desktop, moved by macOS, and watches for nothing',
 });
 
 /* Her window goes first when she quits, and anything answering late — a
-   clock, a reply — met it destroyed on his Mac: an exception, whose dialog
-   kept her alive. So every clock in the main
+   clock, a reply — would meet it destroyed: an exception, whose dialog keeps
+   her alive. So every clock in the main
    process is one the quit stops, and what touches her window asks first
    whether it is there. */
 test('the laptop stops its clocks when it quits, and touches no window that is gone', () => {

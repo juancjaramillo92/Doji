@@ -473,9 +473,9 @@ app.whenReady().then(async () => {
   settle();
 });
 
-/* Her clocks stop when she quits. Her window goes first, and on his Mac a
-   clock answering a moment later met it destroyed: an exception, whose
-   dialog kept the process and her menu-bar icon alive — and an update waits
+/* Her clocks stop when she quits. Her window goes first, and a clock
+   answering a moment later would meet it destroyed: an exception, whose
+   dialog keeps the process and her menu-bar icon alive — and an update waits
    on the process ending before it swaps. */
 app.on('before-quit', () => timers.forEach(clearInterval));
 app.on('will-quit', () => globalShortcut.unregisterAll());

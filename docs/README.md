@@ -2146,83 +2146,83 @@ curl -sN -H "x-laptop-key: $EUGENIA_LAPTOP_SECRET" \
 
 **The app is `laptop/`**, an Electron app for the Mac, built and published by
 `.github/workflows/laptop.yml` as the charm's firmware is by its own. It has a
-Dock icon, Doji's, and an icon in the menu bar, her face cropped close and
-its black made clear by the face's own rule (`laptop/art.mjs`), which also
-carries the briefing's dot; the two hold the same menu. Electron hides the
-Dock icon or shows it again each time a window's desktops are set; hers is
-told to leave it. **Her face floats over
-TradingView**: the charm's render with its black made clear, and the charm's
-drawing over it at the charm's own coordinates — eyes, highlight, smile,
-thought dots, the listening ring — which `agree.test.mjs` holds to
-`charm/main/face.c` and `palette.h`. What the laptop adds is a body: **she
-breathes** (about 1.5% over 4.6 seconds, from her base) **and floats** (a few
-pixels over 3.3 seconds, a rhythm that never falls into step with the
-breath), **looks at the cursor** when it comes near, **leans in** to listen,
-**sways** while she thinks and **gives with the loud moments** of her voice;
-eyes and mouth ride the same transform. Reduce Motion in macOS stops the
-breathing and floating and keeps the rest; at rest she is drawn at twenty
-frames a second rather than thirty, which a breath that slow does not show.
-Clicks outside her shape go through to the chart beneath, she can be dragged
-anywhere and stays where she is left. A click on her brings her app to the
-front, as a click on any app's window does; the talk key leaves TradingView
-there. She is the window's middle; the room above her head
-holds **a line she shows** when her face alone cannot say enough.
+Dock icon, Doji's, and an icon in the menu bar, her face cropped close and its
+black made clear by the face's own rule (`laptop/art.mjs`), which also carries
+the briefing's dot; the two hold the same menu. Electron hides the Dock icon
+or shows it again each time a window's desktops are set; hers is told to leave
+it. **Her face floats over TradingView**: the charm's render with its black
+made clear, and the charm's drawing over it at the charm's own coordinates —
+eyes, highlight, smile, thought dots, the listening ring — which
+`agree.test.mjs` holds to `charm/main/face.c` and `palette.h`. What the laptop
+adds is a body: **she breathes** (about 1.5% over 4.6 seconds, from her base)
+**and floats** (a few pixels over 3.3 seconds, a rhythm that never falls into
+step with the breath), **looks at the cursor** when it comes near, **leans
+in** to listen, **sways** while she thinks and **gives with the loud moments**
+of her voice; eyes and mouth ride the same transform. Reduce Motion in macOS
+stops the breathing and floating and keeps the rest; at rest she is drawn at
+twenty frames a second rather than thirty, which a breath that slow does not
+show. Clicks outside her shape go through to the chart beneath, she can be
+dragged anywhere and stays where she is left. A click on her brings her app to
+the front, as a click on any app's window does; the talk key leaves
+TradingView there. She is the window's middle; the room above her head holds
+**a line she shows** when her face alone cannot say enough.
 
-**She lives on one desktop, as any window does.** He switches desktops all
-day and wants her on TradingView's alone — not even on another while she
-talks. So she is an ordinary window that belongs to the desktop she was put
-on, and macOS moves her with it: she slides away when he switches desktops
-and back when he returns, as every window does, and nothing watches for it
-(`REFACTOR.md` R-134). Two things would put her on every desktop, and neither is allowed to. She is
-no panel: Electron's panel joins every desktop whatever it is told. And she
-is raised above the windows of her desktop, to sit on his chart, and macOS
-floats a raised window across every desktop unless the window says
-otherwise — a setting Electron does not offer, so `spaces.m`, a few lines of
-the Mac's own code built with her, says it. The workflow asks a Mac whether
+**She lives on one desktop, as any window does.** He switches desktops all day
+and wants her on TradingView's alone — not even on another while she talks. So
+she is an ordinary window that belongs to the desktop she was put on, and
+macOS moves her with it: she slides away when he switches desktops and back
+when he returns, as every window does, and nothing watches for it
+(`REFACTOR.md` R-134). Two things would put her on every desktop, and neither
+is allowed to. She is no panel: Electron's panel joins every desktop whatever
+it is told. And she is raised above the windows of her desktop, to sit on his
+chart, and macOS floats a raised window across every desktop unless the window
+says otherwise — a setting Electron does not offer, so `spaces.m`, a few lines
+of the Mac's own code built with her, says it. The workflow asks a Mac whether
 it took before it signs her, with a panel beside her as the failure it must
-see. **Another app's full-screen desktop is one no ordinary
-window joins**, so TradingView is *filled* rather than full screen —
-Window → Fill, or fn-Control-F, or its window dragged to the top of the
-screen — and with the menu bar and the Dock set to hide themselves it looks
-the same. **Bring her here**, in her menu, puts her on the
-desktop he is on — she joins every desktop for a moment, is shown, and
-leaves them all again, which leaves her on the one she is on — and so does
-her Dock icon clicked, or the app opened again; at launch she is put on the
-desktop in front. *Hide her* hides her until she is brought back. A turn
-asked from another desktop is answered where she is: the key works from any
-app, she does not move for it, and what she hears and does keeps its own
-clock while her drawing waits on a desktop out of sight.
+see. **Another app's full-screen desktop is one no ordinary window joins**, so
+TradingView is *filled* rather than full screen — Window → Fill, or
+fn-Control-F, or its window dragged to the top of the screen — and with the
+menu bar and the Dock set to hide themselves it looks the same. **Bring her
+here**, in her menu, puts her on the desktop he is on — she joins every
+desktop for a moment, is shown, and leaves them all again, which leaves her on
+the one she is on — and so does her Dock icon clicked, or the app opened
+again; at launch she is put on the desktop in front. *Hide her* hides her
+until she is brought back. A turn asked from another desktop is answered where
+she is: the key works from any app, she does not move for it, and what she
+hears and does keeps its own clock while her drawing waits on a desktop out of
+sight.
 
-**One gesture does everything**: the talk key, ⌥Space unless he chose
-⌃⌥Space in her menu, or a click on her. At rest she listens — the charm's two
-rising notes say when to start, and the ring swells with his voice, so he sees
-she hears him; again, and the two notes fall, she thinks, then speaks, the
-mouth following her voice; again while she thinks or speaks, and she stops —
-the door keeps the turn, so the copy and the memory still land. **Shift with
-the talk key** is the same with **the chart**, *Looking at your chart…* above
-her head — only when he asks, since a picture is paid for on every round of
-the turn it rides in, and it is not kept for the turn after, as a chart sent
-in Telegram is not; her answer about it is: captured at the press, beside the listening rather than before it,
-so the first words are not lost to the moment a capture takes. It is the
-window whose title names TradingView, or else the screen the cursor is on —
-TradingView's window title is his to set, and no source documents it — with
-her own window kept out of every capture it can be; a question whose chart
-could not be captured is not asked, and she says why. The microphone is opened
-at the press and closed with the recording, so macOS shows it in use only
-while she listens. As on the charm, a recording he never spoke into is let go
-at thirty seconds, and the last thirty of a five-minute recording are ticked
-and empty the ring; a press shorter than 0.4 seconds is one he took back. The
-recording's bitrate keeps it well inside `FILE_MAX`. A key another app holds
-registers as nothing, so she says so, and the menu offers the other.
+**One gesture does everything**: the talk key, ⌥Space unless he chose ⌃⌥Space
+in her menu, or a click on her. At rest she listens — the charm's two rising
+notes say when to start, and the ring swells with his voice, so he sees she
+hears him; again, and the two notes fall, she thinks, then speaks, the mouth
+following her voice; again while she thinks or speaks, and she stops — the
+door keeps the turn, so the copy and the memory still land. **Shift with the
+talk key** is the same with **the chart**, *Looking at your chart…* above her
+head — only when he asks, since a picture is paid for on every round of the
+turn it rides in, and it is not kept for the turn after, as a chart sent in
+Telegram is not; her answer about it is: captured at the press, beside the
+listening rather than before it, so the first words are not lost to the moment
+a capture takes. It is the window whose title names TradingView, or else the
+screen the cursor is on — TradingView's window title is his to set, and no
+source documents it — with her own window kept out of every capture it can be;
+a question whose chart could not be captured is not asked, and she says why.
+The microphone is opened at the press and closed with the recording, so macOS
+shows it in use only while she listens. As on the charm, a recording he never
+spoke into is let go at thirty seconds, and the last thirty of a five-minute
+recording are ticked and empty the ring; a press shorter than 0.4 seconds is
+one he took back. The recording's bitrate keeps it well inside `FILE_MAX`. A
+key another app holds registers as nothing, so she says so, and the menu
+offers the other.
 
 **Her voice plays from one queue, in the audio thread** (`voice.mjs`, its
 logic `Queue` in `frames.mjs`): it holds `LEAD`, three tenths of a second of
 her voice, before it plays, plays it sample by sample, and after running dry
-waits for `LEAD` again. Her parts used to be scheduled one after another as
-they arrived, and her first words stammered: the vendor's stream starts
-slower than she speaks, every late part was a gap, and every join could
-click. Now a late part is one pause, never a stammer, at the cost of a pause
-before her first word too short to notice.
+waits for `LEAD` again. Parts scheduled one after another as they arrive
+stammer: the vendor's stream starts slower than she speaks, every late part
+is a gap, and every join can click. From the queue a late part is one pause,
+never a stammer, at the cost of a pause before her first word too short to
+notice.
 
 **The briefing is the charm's**: asked every five minutes until it lands, then
 an emerald dot beside her and a dot by her menu-bar icon until he hears it —
@@ -2260,8 +2260,8 @@ him to paste when something looks wrong, since nothing she does on the Mac
 is otherwise seen from here.
 
 **Quitting stops her clocks first.** Her window goes before the process
-does, and a clock answering a moment later once met it destroyed — an exception whose dialog kept her, and her menu-bar icon,
-alive after Quit. Every clock in the main process is one the quit stops, and
+does, and a clock answering a moment later would meet it destroyed — an
+exception whose dialog keeps her, and her menu-bar icon, alive after Quit. Every clock in the main process is one the quit stops, and
 whatever answers late asks whether her window is still there.
 
 **The first launch** puts her in the bottom-right corner, turns on *Start
@@ -2305,16 +2305,9 @@ from `charm/art/`, the one copy of it in the repository. `spaces.node` is built
 only by `npm run package`, so a copy started this way shows on every desktop.
 
 **To check on the Mac first**, which no suite and no Linux run can: that
-*Bring her here* puts her on the desktop of a filled TradingView, above it,
-and that she then slides with that desktop, and shows on no other, when he
-switches; that her Dock icon stays and her menu-bar icon has no black around
-her; that a click on her brings her forward and a click on the chart gives
-TradingView back with her still above it; that ⌥Space reaches her from inside TradingView;
-that macOS asks once each for the microphone and Screen Recording and keeps
-both across an update; which window or screen the chart is; that her voice
-starts clean and her mouth keeps time with it, and her notes sound as the
-charm's; that her eyes follow
-the cursor; and that the update swaps and reopens her.
+macOS asks once each for the microphone and Screen Recording and keeps both
+across an update; that her mouth keeps time with her voice and her notes
+sound as the charm's; and that her eyes follow the cursor.
 
 ### Whether it landed
 
