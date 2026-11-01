@@ -142,11 +142,11 @@ const unsay = () => { said.classList.remove('shown'); sayUntil = 0; };
    the charm's formula, at the charm's loudness. */
 const sounds = () => (cues ??= new AudioContext());
 
-function notes(pair, attack = 400, decay = 22, loud = 6000 / 32768) {
+function notes(pair) {
   const ctx = sounds(), rate = ctx.sampleRate;
   const parts = pair.map(([hz, s]) => Array.from({ length: Math.round(rate * s) }, (_, i) => {
     const t = i / rate;
-    return Math.sin(2 * Math.PI * hz * t) * Math.min(1, t * attack) * Math.exp(-t * decay) * loud;
+    return Math.sin(2 * Math.PI * hz * t) * Math.min(1, t * 400) * Math.exp(-t * 22) * 6000 / 32768;
   }));
   play(Float32Array.from(parts.flat()));
 }
@@ -176,8 +176,8 @@ const ease = (v, t, rate, dt) => {
   return Math.abs(t - e) < 0.002 ? t : e;
 };
 
-function dot(cx, cy, rx, ry, color, opacity = 1) {
-  g.globalAlpha = opacity;
+function dot(cx, cy, rx, ry, color, fade = 1) {
+  g.globalAlpha = fade;
   g.fillStyle = color;
   g.beginPath();
   g.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
@@ -414,7 +414,7 @@ const loudness = (meter) => {
   return Math.min(1, 6 * Math.sqrt(wave.reduce((n, s) => n + s * s, 0) / wave.length));
 };
 
-// Once a frame: how loud she is now, and whether she has started or finished.
+// Each tick of her clock: how loud she is now, and whether she has started or finished.
 function hearing() {
   if (!audio) { level = 0; return; }
   if (mode === 'thinking' && audio.voiced) { mode = 'speaking'; unsay(); }
@@ -518,9 +518,6 @@ function briefing() {
   return true;
 }
 
-// Through the main process, as the key is, so she stays for the turn wherever he is.
-const click = () => briefing() || window.doji.talk();
-
 /* ─── Her shape, for the mouse ──────────────────────────────────────────────
    The window lets clicks through but where she is drawn; the briefing's dot
    counts as her. A press that moves is a drag, and one that does not is a
@@ -556,7 +553,7 @@ addEventListener('mousemove', (e) => {
 });
 addEventListener('mousedown', (e) => { if (solid) held = { x: e.screenX, y: e.screenY, moved: false }; });
 addEventListener('mouseup', () => {
-  if (held && !held.moved) click();
+  if (held && !held.moved && !briefing()) press(false);
   held = null;
 });
 

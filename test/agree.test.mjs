@@ -599,8 +599,10 @@ test('the laptop lives on one desktop, moved by macOS, and watches for nothing',
     'she is no longer put on the desktop in front by joining every desktop, showing, and leaving them all');
   assert.doesNotMatch(LAPTOP_MAIN.replace(bodyOf(LAPTOP_MAIN, 'function bringHere('), ''), /setVisibleOnAllWorkspaces\(true/,
     'something but bringHere() puts her on every desktop');
-  assert.match(bodyOf(LAPTOP_MAIN, 'function press('), /^function press\(chart\) \{\n  send\('press', chart\);\s*$/,
-    'a press moves or shows her: she answers where she is');
+  const presses = [...LAPTOP_MAIN.matchAll(/\(\) => send\('press', (true|false)\)/g)].map(m => m[1]);
+  assert.deepEqual(presses.sort(), ['false', 'false', 'true', 'true'], 'the keys and the menu no longer hand the page a press, and nothing else');
+  assert.doesNotMatch(LAPTOP_MAIN.replace(bodyOf(LAPTOP_MAIN, 'function bringHere('), ''), /\.show(Inactive)?\(/,
+    'something but bringHere() shows her: a press moves or shows her, and she answers where she is');
   assert.doesNotMatch(LAPTOP_MAIN, /type: 'panel'/, 'she is a panel again, which Electron joins to every desktop');
   assert.match(bodyOf(LAPTOP_MAIN, 'function float('),
     /face\.setAlwaysOnTop\(true, 'floating'\);\n\s*if \(spaces\) note\(`kept to one desktop \(\$\{spaces\.managed\(face\.getNativeWindowHandle\(\)\)\}\)`\);/,
@@ -620,8 +622,8 @@ test('the laptop lives on one desktop, moved by macOS, and watches for nothing',
 });
 
 /* Her window goes first when she quits, and anything answering late — a
-   clock, the check for the app in front, a reply — met it destroyed on his
-   Mac: an exception, whose dialog kept her alive. So every clock in the main
+   clock, a reply — met it destroyed on his Mac: an exception, whose dialog
+   kept her alive. So every clock in the main
    process is one the quit stops, and what touches her window asks first
    whether it is there. */
 test('the laptop stops its clocks when it quits, and touches no window that is gone', () => {
@@ -641,18 +643,19 @@ test('the laptop stops its clocks when it quits, and touches no window that is g
 test('the laptop hears, sounds and waits as the charm and her door do', () => {
   const sound = source('charm/main/sound.c'), talk = source('charm/main/talk.c');
   const numbers = (text) => [...text.matchAll(/-?\d+(?:\.\d+)?/g)].map(m => Number(m[0]));
+  // How a note rises, dies and how loud, in the charm's order: play_notes' attack, decay and loudness.
+  const shaped = bodyOf(LAPTOP_FACE, 'function notes(').match(/Math\.min\(1, t \* (\d+)\) \* Math\.exp\(-t \* (\d+)\) \* (\d+) \/ 32768/)
+    ?.slice(1).map(Number);
+  assert.ok(shaped, 'the laptop no longer shapes a note as this test reads it');
   for (const [cue, fn] of [['LISTEN', 'sound_listen'], ['SENT', 'sound_sent']]) {
     const charm = bodyOf(sound, `void ${fn}(void) {`, `sound.c has no ${fn}()`);
     const copy = LAPTOP_FACE.match(new RegExp(`^const ${cue} = (\\[\\[[^;]+\\]\\]);$`, 'm'));
     assert.ok(copy, `face.mjs no longer lists ${cue} as this test reads it`);
     const played = numbers(charm.match(/play_notes\(notes, ([^)]+)\)/)?.[1] ?? '');
-    assert.deepEqual([...numbers(copy[1]), 400, 22, 6000], [...numbers(charm.match(/\{ \{[^;]+\} \}/)?.[0] ?? ''), ...played],
+    assert.deepEqual([...numbers(copy[1]), ...shaped], [...numbers(charm.match(/\{ \{[^;]+\} \}/)?.[0] ?? ''), ...played],
       `the laptop's ${cue} is not the charm's ${fn}: its notes, or how they rise, die and how loud`);
   }
-  assert.match(LAPTOP_FACE, /function notes\(pair, attack = 400, decay = 22, loud = 6000 \/ 32768\)/,
-    'the laptop draws its notes with other defaults than the charm\'s play_notes is called with');
   assert.match(sound, /float env = fminf\(1\.0f, t \* attack\) \* expf\(-t \* decay\);/, 'sound.c no longer shapes a note as this test reads it');
-  assert.match(LAPTOP_FACE, /Math\.min\(1, t \* attack\) \* Math\.exp\(-t \* decay\) \* loud/, 'the laptop shapes a note otherwise than the charm');
   const tick = bodyOf(sound, 'void sound_tick(void) {', 'sound.c has no sound_tick()');
   const [span, click, decay, hz, loud] = [/SOUND_RATE \* (\d+) \/ 100/, /t < (0\.\d+)f/, /expf\(-t \* ([\d.]+)f\)/, /M_PI \* ([\d.]+)f \* t/, /env \* (\d+)\)/]
     .map(re => Number(tick.match(re)?.[1]));

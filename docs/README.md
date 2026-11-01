@@ -2171,15 +2171,15 @@ holds **a line she shows** when her face alone cannot say enough.
 day and wants her on TradingView's alone — not even on another while she
 talks. So she is an ordinary window that belongs to the desktop she was put
 on, and macOS moves her with it: she slides away when he switches desktops
-and back when he returns, as every window does, and nothing watches for it.
-Two things stood in the way, and both put her on every desktop. She was a
-panel, and Electron's panel joins every desktop whatever it is told; she is
-not one now. And she is raised above the windows of her desktop, to sit on
-his chart, and macOS floats a raised window across every desktop unless the
-window says otherwise — a setting Electron does not offer, so `spaces.m`, a
-few lines of the Mac's own code built with her, says it. The workflow asks a
-Mac whether it took before it signs her, with a panel beside her as the
-failure it must see. **Another app's full-screen desktop is one no ordinary
+and back when he returns, as every window does, and nothing watches for it
+(`REFACTOR.md` R-134). Two things would put her on every desktop, and neither is allowed to. She is
+no panel: Electron's panel joins every desktop whatever it is told. And she
+is raised above the windows of her desktop, to sit on his chart, and macOS
+floats a raised window across every desktop unless the window says
+otherwise — a setting Electron does not offer, so `spaces.m`, a few lines of
+the Mac's own code built with her, says it. The workflow asks a Mac whether
+it took before it signs her, with a panel beside her as the failure it must
+see. **Another app's full-screen desktop is one no ordinary
 window joins**, so TradingView is *filled* rather than full screen —
 Window → Fill, or fn-Control-F, or its window dragged to the top of the
 screen — and with the menu bar and the Dock set to hide themselves it looks
@@ -2192,14 +2192,8 @@ asked from another desktop is answered where she is: the key works from any
 app, she does not move for it, and what she hears and does keeps its own
 clock while her drawing waits on a desktop out of sight.
 
-Every way of watching that was tried — the app in front, the window in
-front, a desktop switch announced — slid her in only after the switch had
-ended, because macOS says a switch has happened when its animation is
-over. A window that belongs to its desktop moves with the animation itself.
-
 **One gesture does everything**: the talk key, ⌥Space unless he chose
-⌃⌥Space in her menu, or a click on her, which goes through the main process
-as the key does. At rest she listens — the charm's two
+⌃⌥Space in her menu, or a click on her. At rest she listens — the charm's two
 rising notes say when to start, and the ring swells with his voice, so he sees
 she hears him; again, and the two notes fall, she thinks, then speaks, the
 mouth following her voice; again while she thinks or speaks, and she stops —

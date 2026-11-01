@@ -6,11 +6,12 @@
    pure half — her frames read off the wire, and her voice read out of them,
    fed the door's own bytes, from `charmFrame`, cut at every place a network
    read can cut them; her voice played from its queue while it arrives late
-   and unevenly, as a real stream does; where her window goes when a screen is gone; and the
-   swap an update leaves behind, run in a scratch folder with macOS's `ditto`
-   and `open` stood in for, in every way it can fail. The copies the app holds of the
-   door and of the charm are agree.test.mjs's; whether she looks, sounds and
-   floats as she should is his to see on the Mac (README, The laptop).
+   and unevenly, as a real stream does; where her window goes when a screen
+   is gone; and the swap an update leaves behind, run in a scratch folder
+   with macOS's `ditto` and `open` stood in for, in every way it can fail.
+   The copies the app holds of the door and of the charm are
+   agree.test.mjs's; whether she looks, sounds and floats as she should is
+   his to see on the Mac (README, The laptop).
    ═══════════════════════════════════════════════════════════════════════════ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -159,16 +160,15 @@ test('an update that cannot take the old app\'s place leaves the old app, and op
 const BLOCK = 128;
 const PART = 480;  // 20 ms of her voice
 
-function playing(arrivals, { stopAt = Infinity } = {}) {
+function playing(arrivals) {
   const q = new Queue(PCM_RATE), out = [], said = [];
   const voiceSample = (j) => ((j % 997) + 1) / 2000;
   let sent = 0;
   for (let now = 0, step = 0; step < 4000; step++, now = step * BLOCK / PCM_RATE) {
     while (sent < arrivals.length && arrivals[sent] <= now) {
       q.push(Float32Array.from({ length: PART }, (_, i) => voiceSample(sent * PART + i)));
-      if (++sent === arrivals.length && stopAt === Infinity) q.end();
+      if (++sent === arrivals.length) q.end();
     }
-    if (now >= stopAt && !q.ended) q.end();
     const block = new Float32Array(BLOCK);
     const event = q.fill(block);
     if (event) said.push([event, out.length]);
@@ -186,7 +186,7 @@ const whole = (out, expected) => {
   return voiced.length === expected.length && wrong === -1 ? 'whole' : `sample ${wrong} of ${voiced.length}, ${expected.length} sent`;
 };
 
-// The positions of every run of silence inside her voice, once it has started.
+// How many runs of silence fall inside her voice, once it has started.
 const pauses = (out) => {
   const first = out.findIndex(s => s !== 0), last = out.findLastIndex(s => s !== 0);
   let runs = 0;

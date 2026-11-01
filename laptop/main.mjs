@@ -213,22 +213,18 @@ function hideHer() {
 }
 
 /* The keys, registered whole or reported: a key another app holds registers
-   as nothing, which would read as her not hearing. */
+   as nothing, which would read as her not hearing. A press is heard wherever
+   he is, and she answers where she is: she does not move for a turn. The
+   chart goes only when he asks for it, with Shift — a picture on every
+   question is a cost on every answer, and his to choose. */
 function bind() {
   globalShortcut.unregisterAll();
   const accelerator = KEYS[talkKey()];
-  const talk = globalShortcut.register(accelerator, () => press(false));
-  const chart = globalShortcut.register(`Shift+${accelerator}`, () => press(true));
+  const talk = globalShortcut.register(accelerator, () => send('press', false));
+  const chart = globalShortcut.register(`Shift+${accelerator}`, () => send('press', true));
   taken = !talk || !chart;
   if (taken) send('say', 'taken', talkKey());
   menu();
-}
-
-/* A press is heard wherever he is, and she answers where she is: she does
-   not move for a turn. The chart goes only when he asks for it, with Shift —
-   a picture on every question is a cost on every answer, and his to choose. */
-function press(chart) {
-  send('press', chart);
 }
 
 /* Her menu, in the menu bar and on her Dock icon alike: the menu bar's
@@ -238,8 +234,8 @@ function menu() {
   const name = talkKey(), accelerator = KEYS[name];
   tray.setTitle(waiting ? '•' : '');
   const items = () => [
-    { label: 'Talk to her', accelerator, registerAccelerator: false, click: () => press(false) },
-    { label: 'Show her the chart', accelerator: `Shift+${accelerator}`, registerAccelerator: false, click: () => press(true) },
+    { label: 'Talk to her', accelerator, registerAccelerator: false, click: () => send('press', false) },
+    { label: 'Show her the chart', accelerator: `Shift+${accelerator}`, registerAccelerator: false, click: () => send('press', true) },
     { label: 'Hear the briefing', enabled: Boolean(waiting), click: () => send('briefing-now') },
     { type: 'separator' },
     { label: 'Bring her here', click: bringHere },
@@ -424,7 +420,6 @@ ipcMain.handle('look', async () => {
   const seen = await (looking = look());
   return typeof seen === 'string' ? seen : null;
 });
-ipcMain.on('talk', () => press(false));
 ipcMain.on('ask', (_, voice) => ask(voice));
 ipcMain.on('hush', () => { asking?.abort(); asking = null; looking = null; });
 ipcMain.on('briefing', hearBriefing);
@@ -484,5 +479,3 @@ app.whenReady().then(async () => {
    on the process ending before it swaps. */
 app.on('before-quit', () => timers.forEach(clearInterval));
 app.on('will-quit', () => globalShortcut.unregisterAll());
-// Closing the key's window is not leaving: she floats until he quits her.
-app.on('window-all-closed', () => {});

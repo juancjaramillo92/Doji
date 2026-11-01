@@ -1199,6 +1199,42 @@ alone: the night's look reads the version out of the image itself. A check for
 a runner failing its own mechanism is padding.
 **Revisit if:** a published `charm/version` is ever found empty.
 
+### R-134 — the laptop watching for a desktop switch
+**Why refused:** every way it was tried — the app in front through
+`lsappinfo`, the window in front through macOS's on-screen list, the switch
+announced by `NSWorkspaceActiveSpaceDidChangeNotification` — slid her in or out
+only after the switch had ended, because macOS announces a switch once its
+animation is over. A window that belongs to its desktop moves with the
+animation itself, which is what `spaces.m` makes her. The announcement is
+still subscribed, for her log alone: it decides nothing, and the log is the one
+view of the Mac there is from here.
+**Revisit if:** he wants her on more than one desktop at once.
+
+### R-135 — the signing secrets handed to Dependabot's runs
+**Why refused:** GitHub gives a Dependabot run none of the repository's
+secrets, so a bump's laptop build stops short of signing. Handing them over
+would run an unreviewed dependency's install scripts beside `SB_SECRET_KEY`,
+the key to the whole database, to sign a build nobody installs. The run
+still builds and asks the Mac whether her window keeps to one desktop; `main`
+signs and publishes once the bump is merged.
+**Revisit if:** the certificate is kept behind a credential that opens nothing
+else.
+
+### R-136 — `hearLaptop` and `hearCharm` inlined into the entry point
+**Why refused:** each has one caller, the door it serves. They stay as the
+device's half under its own banner, beside the frames and the briefing it
+shares, so the entry point stays the four lines of authorisation every function
+keeps readable; `hear` is the turn they share.
+**Revisit if:** a device's half shrinks to the call to `hear` alone.
+
+### R-137 — `spaces.node` built by `npm start` as well
+**Deferred.** A copy run from the repository has no `spaces.node` and shows
+on every desktop, as it has no `build.txt` and never updates. Building it on
+start would ask every Mac that runs the app from the repository for Xcode's
+compiler, for the one behaviour only a packaged build is checked on.
+**Revisit if:** the app is worked on from a Mac often enough that the floating
+copy misleads.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED
