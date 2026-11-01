@@ -2173,6 +2173,9 @@ window is frontmost on the desktop in front** — the first ordinary window in
 macOS's list of windows on screen, `FRONT_JXA`, asked through JavaScript for
 Automation, with no permission, since owners' names need none — and she shows
 when it is TradingView's, on whichever desktop, full screen or not. She asks
+it only once the switch has settled, `SETTLE_MS` after it: asked at the
+announcement, the list still held the desktop left, answered TradingView, and
+she came back on the desktop he had moved to. She asks
 again when another app comes forward, and every two seconds as a backstop.
 "Which app is in front" was the wrong question: a switch to an empty desktop
 can leave TradingView the app in front with none of it on screen, and she
@@ -2248,6 +2251,11 @@ its vendors — and kept encrypted by the Keychain. The app's own menu holds
 the Edit menu ⌘V pastes it through. The key and the door live in the main
 process alone; the page that draws her has neither, asks for nothing but what
 `preload.cjs` names, opens no window and navigates nowhere.
+
+**Her menu's *Copy her log*** puts her last decisions on the clipboard, with
+their times — each desktop switch, each change in whose window is in front,
+each time she showed or hid — for him to paste when something looks wrong,
+since nothing she does on the Mac is otherwise seen from here.
 
 **Quitting stops her clocks first.** Her window goes before the process
 does, and the check for the app in front, answering a moment later, once met
