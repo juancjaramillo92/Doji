@@ -102,7 +102,12 @@ let beside = true;     // TradingView in front, or which app is in front not kno
 let busy = false;      // she is listening, thinking, speaking or saying something
 
 const nyDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
-const send = (channel, ...args) => face?.webContents.send(channel, ...args);
+/* Her window, while it is there: what answers late — a check, a reply, a
+   screen change — can arrive after a quit has destroyed it. */
+const present = () => Boolean(face) && !face.isDestroyed();
+const send = (channel, ...args) => { if (present()) face.webContents.send(channel, ...args); };
+const timers = [];
+const every = (fn, ms) => timers.push(setInterval(fn, ms));
 const talkKey = () => (settings.key in KEYS ? settings.key : '⌥Space');
 
 /* ─── What she keeps on the laptop ─────────────────────────────────────────
@@ -169,7 +174,7 @@ function float() {
   face.loadFile(join(here, 'face.html'));
   // A screen unplugged or rearranged can take her place with it.
   for (const change of ['display-removed', 'display-metrics-changed']) {
-    screen.on(change, () => face.setBounds(placed(face.getBounds(),
+    screen.on(change, () => present() && face.setBounds(placed(face.getBounds(),
       screen.getAllDisplays().map(d => d.workArea), screen.getPrimaryDisplay().workArea)));
   }
 }
@@ -187,6 +192,7 @@ function resize(name) {
    switch to another desktop leaves her behind at once — macOS's own doing,
    with nothing to wait for. */
 function appear() {
+  if (!present()) return;
   const everywhere = settings.where === 'everywhere';
   const wanted = !settings.hidden && (busy || everywhere || beside);
   if (wanted && !face.isVisible()) {
@@ -218,7 +224,7 @@ function show() {
 function front() {
   execFile('/bin/sh', ['-c', 'lsappinfo info -only name "$(lsappinfo front)"'], { timeout: FRONT_MS * 4 }, (err, out) => {
     const name = err ? null : out.match(/"LSDisplayName"="([^"]*)"/)?.[1] ?? null;
-    if (name === app.getName()) return;
+    if (!present() || name === app.getName()) return;
     const was = beside;
     beside = name === null || TRADINGVIEW.test(name);
     // TradingView back in front while she shows elsewhere — on a turn asked from another desktop — brings her with it.
@@ -492,19 +498,24 @@ app.whenReady().then(async () => {
   bind();
   if (!key) askForKey();
   briefing();
-  setInterval(briefing, BRIEFING_EVERY_MS);
+  every(briefing, BRIEFING_EVERY_MS);
   lookForUpdate();
-  setInterval(lookForUpdate, UPDATE_EVERY_MS);
+  every(lookForUpdate, UPDATE_EVERY_MS);
   front();
-  setInterval(front, FRONT_MS);
-  setInterval(() => {
-    if (!face.isVisible()) return;
+  every(front, FRONT_MS);
+  every(() => {
+    if (!present() || !face.isVisible()) return;
     const at = screen.getCursorScreenPoint(), { x, y } = face.getBounds();
     send('cursor', at.x - x, at.y - y);
   }, CURSOR_MS);
   settle();
 });
 
+/* Her clocks stop when she quits. Her window goes first, and on his Mac the
+   check for the app in front, answering a moment later, met it destroyed: an
+   exception, whose dialog kept the process and her menu-bar icon alive —
+   and an update waits on the process ending before it swaps. */
+app.on('before-quit', () => timers.forEach(clearInterval));
 app.on('will-quit', () => globalShortcut.unregisterAll());
 // Closing the key's window is not leaving: she floats until he quits her.
 app.on('window-all-closed', () => {});

@@ -2243,6 +2243,12 @@ the Edit menu ⌘V pastes it through. The key and the door live in the main
 process alone; the page that draws her has neither, asks for nothing but what
 `preload.cjs` names, opens no window and navigates nowhere.
 
+**Quitting stops her clocks first.** Her window goes before the process
+does, and the check for the app in front, answering a moment later, once met
+it destroyed — an exception whose dialog kept her, and her menu-bar icon,
+alive after Quit. Every clock in the main process is one the quit stops, and
+whatever answers late asks whether her window is still there.
+
 **The first launch** puts her in the bottom-right corner, turns on *Start
 with the Mac* — a companion is there when the Mac is; it is his to turn off —
 and says how to talk. Opened from anywhere but Applications, she offers to
