@@ -3,6 +3,6 @@
 <plist version="1.0">
 <dict>
   <key>NSMicrophoneUsageDescription</key>
-  <string>Eugenia listens while you hold a question for her, and only then.</string>
+  <string>Eugenia listens from the moment you ask her something until you send it, and only then.</string>
 </dict>
 </plist>
