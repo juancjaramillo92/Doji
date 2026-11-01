@@ -598,7 +598,7 @@ test('the laptop keeps its Dock icon, and makes the render clear by one rule', (
    desktop's, the package builds it and keeps it out of the archive, and the
    workflow signs it and asks a Mac whether it took. */
 test('the laptop lives on one desktop, moved by macOS, and watches for nothing', () => {
-  for (const watcher of [/osascript/, /lsappinfo/, /CGWindowList/, /subscribeWorkspaceNotification\([^)]*DidActivate/]) {
+  for (const watcher of [/osascript/, /lsappinfo/, /CGWindowList/, /subscribeWorkspaceNotification/]) {
     assert.doesNotMatch(LAPTOP_MAIN, watcher, `main.mjs watches other apps again (${watcher}) — her desktop is macOS's to move`);
   }
   assert.match(bodyOf(LAPTOP_MAIN, 'function bringHere('),

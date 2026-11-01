@@ -2255,7 +2255,8 @@ process alone; the page that draws her has neither, asks for nothing but what
 `preload.cjs` names, opens no window and navigates nowhere.
 
 **Her menu's *Copy her log*** puts her last decisions on the clipboard, with
-their times — each desktop switch, each time she was brought or hidden — for
+their times — whether she was kept to one desktop, each time she was
+brought or hidden — for
 him to paste when something looks wrong, since nothing she does on the Mac
 is otherwise seen from here.
 
@@ -2304,10 +2305,10 @@ To work on it, `npm ci` and `npm start` in `laptop/` — the render is copied in
 from `charm/art/`, the one copy of it in the repository. `spaces.node` is built
 only by `npm run package`, so a copy started this way shows on every desktop.
 
-**To check on the Mac first**, which no suite and no Linux run can: that
-macOS asks once each for the microphone and Screen Recording and keeps both
-across an update; that her mouth keeps time with her voice and her notes
-sound as the charm's; and that her eyes follow the cursor.
+**To check on the Mac first**, which no suite and no Linux run can: nothing
+is open. A change to what only the Mac shows — the window, the keys, the
+microphone, the capture, the sound, the signature or the update — adds its
+line here.
 
 ### Whether it landed
 

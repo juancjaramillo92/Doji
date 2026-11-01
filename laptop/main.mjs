@@ -463,8 +463,6 @@ app.whenReady().then(async () => {
   every(briefing, BRIEFING_EVERY_MS);
   lookForUpdate();
   every(lookForUpdate, UPDATE_EVERY_MS);
-  // Only for her log: the switch itself is macOS's to make, and she moves with her desktop.
-  systemPreferences.subscribeWorkspaceNotification('NSWorkspaceActiveSpaceDidChangeNotification', () => note('desktop switched'));
   every(() => {
     if (!present() || !face.isVisible()) return;
     const at = screen.getCursorScreenPoint(), { x, y } = face.getBounds();

@@ -1202,12 +1202,12 @@ a runner failing its own mechanism is padding.
 ### R-134 — the laptop watching for a desktop switch
 **Why refused:** every way it was tried — the app in front through
 `lsappinfo`, the window in front through macOS's on-screen list, the switch
-announced by `NSWorkspaceActiveSpaceDidChangeNotification` — slid her in or out
+as macOS announces it to any app — slid her in or out
 only after the switch had ended, because macOS announces a switch once its
 animation is over. A window that belongs to its desktop moves with the
-animation itself, which is what `spaces.m` makes her. The announcement is
-still subscribed, for her log alone: it decides nothing, and the log is the one
-view of the Mac there is from here.
+animation itself, which is what `spaces.m` makes her. Nothing subscribes to
+the announcement, not even her log: a switch decides nothing she does, and
+the log holds what she decides.
 **Revisit if:** he wants her on more than one desktop at once.
 
 ### R-135 — the signing secrets handed to Dependabot's runs
