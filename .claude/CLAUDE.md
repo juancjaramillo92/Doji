@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 870 tests, nine suites
+npm test      # 872 tests, nine suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -484,8 +484,8 @@ proof, and a change says which it rests on:
 
 - **Pure, and driven in `npm test`.** `briefing.c`, `errand.c`, `lift.c`,
   `dns.c`, `ogg.c` and `frames.c` include no ESP-IDF, so `charm.test.mjs` compiles
-  them with the host's `cc -Wall -Werror`, `RTC_DATA_ATTR` stubbed to
-  nothing, and drives them against the server's own functions and bytes. A decision that can be pure goes in one of these, or a
+  them with the host's `cc -Wall -Werror` and drives them against the
+  server's own functions and bytes. A decision that can be pure goes in one of these, or a
   new one added to that compile, so a test can drive it; one that cannot is
   read by `agree.test.mjs`, as `awake()` and `journal_ask()` are.
 - **Compiled only by the workflow.** Everything else. The build refuses a
@@ -502,15 +502,22 @@ What a change most often breaks:
 
 - **A sample, a frame or a byte changed is a behaviour change**, its own
   commit — R-33 is the tick that looks foldable and is not.
-- **Only `RTC_DATA_ATTR` survives sleep**; every waking runs `app_main` again.
-  State that must outlive a sleep is declared so, and nothing else is assumed
-  to.
+- **Standby keeps everything, and a restart keeps nothing.** Every waking after
+  the first runs on in the same program, so state that belongs to one waking
+  is reset where `life()` takes the next (`reporting`, `lit_at`, `woke_at`),
+  and a reading that belongs to one moment carries its age (`motion.c`'s
+  `kept_t`). The one thing a restart must carry is the update's mark,
+  `RTC_NOINIT_ATTR`.
+- **A waking ends in `sleep_now()`, from however deep in it**: it jumps back
+  to `life()` (`longjmp`), so nothing may hold the display lock or anything
+  else across a call that can reach it.
 - **Nothing flashes.** What shows first is decided before `light()`, and the
   journal leaves on the dark: `FACE_DARK` goes up before the questions come
   down.
-- **PWR is a notification to her task**; a question only looks at it
-  (`ulTaskNotifyValueClear`) and leaves it to be taken. `agree.test.mjs` reads
-  both.
+- **PWR is a notification to her task, and nothing else is**: a question only
+  looks at it (`ulTaskNotifyValueClear`) and leaves it to be taken, and the
+  sleeper says it has woken through a semaphore. `agree.test.mjs` reads all
+  three.
 - **LVGL is touched from her task under `bsp_display_lock`**, or from inside
   LVGL's own callbacks — the touch, the dial, the face's timer. The power task
   reaches the screen only through the `face_set_*` setters, which write plain

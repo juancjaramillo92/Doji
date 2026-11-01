@@ -16,10 +16,19 @@
    case, tilted further than any test of flatness could allow for. */
 #define RESTING   0.01f
 
+/* A reading too: how far two readings apart must part, summed over the axes,
+   for her to have been moved — 120 mg, a hand picking her up and not a table
+   or a pocket carried still. */
+#define STIRRED   0.12f
+
 static float moved(const float a[3], const float b[3]) {
     float m = 0;
     for (int i = 0; i < 3; i++) m += fabsf(a[i] - b[i]);
     return m;
+}
+
+bool lift_stirred(const float before[3], const float now[3]) {
+    return moved(before, now) > STIRRED;
 }
 
 bool lift_seen(const float first[3], const float second[3]) {

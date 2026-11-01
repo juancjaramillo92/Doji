@@ -11,7 +11,6 @@
 
 #include <string.h>
 #include "esp_app_desc.h"
-#include "esp_attr.h"
 #include "esp_crt_bundle.h"
 #include "esp_https_ota.h"
 #include "esp_log.h"
@@ -23,7 +22,7 @@ static const char *TAG = "ota";
 #define NIGHT_HOUR 3            // New York, between the nightly pass and the briefing
 #define READ_MS    30000
 
-static RTC_DATA_ATTR int looked;  // yyyymmdd of the last night's look
+static int looked;  // yyyymmdd of the last night's look
 
 bool ota_due(time_t now) {
     struct tm t;

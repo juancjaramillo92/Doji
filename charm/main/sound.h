@@ -13,8 +13,9 @@ void sound_start(void);
 #define SOUND_RATE 24000
 
 /* Both codecs closed, the speaker's amplifier with them: they are powered
-   by the board, not the chip, so deep sleep alone leaves them biased. Before
-   every sleep, started or not: a codec never opened is refused unharmed. */
+   by the board, not the chip, so the chip's sleep alone leaves them biased.
+   Before every standby, started or not: a codec never opened is refused
+   unharmed. */
 void sound_stop(void);
 
 // 0 to 100.

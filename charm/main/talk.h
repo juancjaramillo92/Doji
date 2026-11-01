@@ -22,7 +22,8 @@ bool talk_ready(void (*lit)(void));
 // stored, -1 out of reach or cut off.
 int talk_briefing(void);
 
-// When she first listened this waking, in microseconds since boot; 0 if not.
+// When she first listened since this was last asked, in microseconds since
+// boot; 0 if she has not. Asking forgets it, for the next waking's.
 int64_t talk_listened(void);
 
 /* One line about the waking for her door to file, `text` as it is: never

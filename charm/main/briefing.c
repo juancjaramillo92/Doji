@@ -1,6 +1,5 @@
 #include "briefing.h"
 
-#include "esp_attr.h"
 #include "net.h"
 
 /* The briefing's hours in New York: weekdays at BRIEF_WEEKDAY, Sunday at
@@ -15,7 +14,7 @@
 // asking runs through the hour the last retry starts.
 #define FIRST_ASK_MIN 5
 
-static RTC_DATA_ATTR int announced;  // yyyymmdd, New York
+static int announced;  // yyyymmdd, New York
 
 static int day_of(const struct tm *t) {
     return (t->tm_year + 1900) * 10000 + (t->tm_mon + 1) * 100 + t->tm_mday;
