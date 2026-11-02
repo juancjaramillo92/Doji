@@ -1277,6 +1277,19 @@ milliseconds, and depends on nothing that has not been seen to work.
 **Revisit if:** the board is on a bench with a log, to find where the
 interrupt stops.
 
+### R-140 — open interest beside the speculators' count
+**Why refused, after a trial:** added in October 2026 so he could tell new money
+arriving from one side leaving, and judged on 1 November after four Sundays. No
+Sunday briefing used it, he never asked about it, and her own verdict that
+Sunday was that it had not explained a single move. It cost a line in every
+Sunday briefing and a sentence in `SYSTEM` for nothing he used, while he was
+asking for simpler briefings. Daily open interest and COMEX vault stocks are
+CME's paid feeds, which TradingView does not serve, and stay off while he keeps
+to his budget.
+**Revisit if:** he asks about positioning in a way the managed-money count
+cannot answer; the next candidate then is the futures–spot gap, read once a day
+after the close.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

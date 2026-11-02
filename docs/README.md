@@ -1125,8 +1125,7 @@ a New York day by the quarter-hourly job (`storePositioning`), and kept only
 once it folds, so a report that will not read leaves the last one standing.
 `positioningList` gives the managed-money net, its sides, the week's change, the
 net's range over 52 weeks (crowded means something only against its own past),
-the open interest with its change from the week before (a move with it rising is
-new money, with it falling one side leaving), and the Tuesday it was taken. Only
+and the Tuesday it was taken. Only
 the Sunday briefing and `get_around` get it: a weekday briefing would repeat it
 five times, and a weekly count cannot cause a quarter-hour move.
 Background, in one sentence at most, never a reason to trade.
@@ -1166,8 +1165,8 @@ briefing and `get_around` get it. The front month moves to the next
 contract every couple of months, and on that day the count can jump or drop for
 no reason in the market, so she says a sharp change may be the switch rather
 than reading it. TradingView serves neither daily open interest nor COMEX vault
-stocks, and CME's site refuses automated reads, so the weekly CFTC count is the
-open interest she has.
+stocks, and CME's site refuses automated reads, so she has no open interest:
+the CFTC's weekly figure was tried and dropped (`REFACTOR.md` R-140).
 
 **`?alerts=1` is his active price alerts** — the levels he marks in TradingView,
 folded by `foldAlerts` to the level, the symbol, the condition, when he set it

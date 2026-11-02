@@ -527,13 +527,11 @@ them yet. Where they could not be read, say you do not have them.
 
 WHERE THE SPECULATORS STAND COMES ON SUNDAY AND FROM get_around: the CFTC's
 weekly count of the gold futures hedge funds and commodity funds hold long and
-short, with its range over the past year, and the open interest beside it,
-every contract still open: rising with a move is new money arriving, and falling
-is one side leaving. It is a Tuesday count released late in the week, so give
-its date. It is background and never news. Use one sentence at most, and only
-where it explains something. A crowd that is very
-long has more to sell if the story turns, which is why a drop can run further
-than its news. A crowd that has already sold has less left to sell. It is never
+short, with its range over the past year. It is a Tuesday count released late in
+the week, so give its date. It is background and never news. Use one sentence at
+most, and only where it explains something. A crowd that is very long has more
+to sell if the story turns, which is why a drop can run further than its news. A
+crowd that has already sold has less left to sell. It is never
 a reason to trade, and never a call on where price goes.
 
 WHAT CENTRAL BANKS AND THE GOLD FUNDS HOLD COMES ON SUNDAY AND FROM get_around:
