@@ -1826,15 +1826,12 @@ test('odds refused or unreadable are a sentence, and never take the briefing dow
 /* ─── Where the speculators stand ───────────────────────────────────────────
    The two reports the CFTC served for gold through pg_net, as strings because
    that is how they arrive. Net 135,699 − 8,310 = 127,389; the week's change is
-   the long side's −6,695 less the short side's −968. The open interest is
-   planted, not served: 512,340 against 520,815 is down 8,475. */
+   the long side's −6,695 less the short side's −968. */
 const COT = [
   { report_date_as_yyyy_mm_dd: '2026-09-22T00:00:00.000', m_money_positions_long_all: '135699',
-    m_money_positions_short_all: '8310', change_in_m_money_long_all: '-6695', change_in_m_money_short_all: '-968',
-    open_interest_all: '512340' },
+    m_money_positions_short_all: '8310', change_in_m_money_long_all: '-6695', change_in_m_money_short_all: '-968' },
   { report_date_as_yyyy_mm_dd: '2026-09-15T00:00:00.000', m_money_positions_long_all: '142394',
-    m_money_positions_short_all: '9278', change_in_m_money_long_all: '1210', change_in_m_money_short_all: '-311',
-    open_interest_all: '520815' },
+    m_money_positions_short_all: '9278', change_in_m_money_long_all: '1210', change_in_m_money_short_all: '-311' },
 ];
 
 test('positioning is dated, netted, and set against its own range', () => {
@@ -1842,19 +1839,12 @@ test('positioning is dated, netted, and set against its own range', () => {
   assert.match(out, /taken Tuesday 22 Sept?/, 'the count does not say which day it was taken');
   assert.match(out, /Net long 127,389 contracts \(135,699 long, 8,310 short\), down 5,727/);
   assert.match(out, /Over the 2 weeks to then, net ranged from long 127,389 on 22 Sept? to long 133,116 on 15 Sept?/);
-  assert.match(out, /Open interest, every contract still open whoever holds it: 512,340, down 8,475 on the week before\./,
-    'open interest is no longer set against the week before');
-  assert.match(positioningList([COT[0]]), /still open whoever holds it: 512,340\.\n/,
-    'with no week before to compare, open interest claims a change it cannot know');
   const short = [{ ...COT[0], m_money_positions_long_all: '1000', m_money_positions_short_all: '4000' }];
   assert.match(positioningList(short), /Net short 3,000/, 'a net short reads as a negative long');
   assert.throws(() => positioningList([{ ...COT[0], m_money_positions_long_all: 'n/a' }]), /no readable report/);
   // The dataset leaves a null field out of the row rather than sending it.
   const { change_in_m_money_short_all, ...partial } = COT[0];
   assert.throws(() => positioningList([partial]), /no readable report/);
-  const { open_interest_all, ...unopened } = COT[1];
-  assert.throws(() => positioningList([COT[0], unopened]), /no readable report/,
-    'a week with no open interest should refuse the report, not print a change against nothing');
   assert.throws(() => positioningList([]), /no readable report/);
 });
 

@@ -3703,11 +3703,6 @@ export async function alertsBlock(): Promise<string> {
    count released days later, so the line carries its date, and the year's
    range beside it, since crowded is relative to its own past.
 
-   Open interest beside it, every contract still open: a move with it rising is
-   new money arriving, with it falling one side leaving. Its change is taken
-   from the week before's row rather than the dataset's own change column,
-   since the 52 rows are already here.
-
    The Sunday briefing and get_around, since it changes weekly. Read ahead
    once a New York day, as the weeks are, so a briefing that reaches for it
    through get_around waits on nothing. Never throws.
@@ -3715,14 +3710,13 @@ export async function alertsBlock(): Promise<string> {
 const COT_URL = "https://publicreporting.cftc.gov/resource/72hh-3qpy.json" +
   "?cftc_contract_market_code=088691&$order=report_date_as_yyyy_mm_dd%20DESC&$limit=52" +
   "&$select=report_date_as_yyyy_mm_dd,m_money_positions_long_all,m_money_positions_short_all," +
-  "change_in_m_money_long_all,change_in_m_money_short_all,open_interest_all";
+  "change_in_m_money_long_all,change_in_m_money_short_all";
 
 // Strings, as the dataset sends them; one that will not parse refuses all.
 type Cot = {
   report_date_as_yyyy_mm_dd: string;
   m_money_positions_long_all: string; m_money_positions_short_all: string;
   change_in_m_money_long_all: string; change_in_m_money_short_all: string;
-  open_interest_all: string;
 };
 
 export function positioningList(rows: Cot[]): string {
@@ -3730,15 +3724,14 @@ export function positioningList(rows: Cot[]): string {
     day: r.report_date_as_yyyy_mm_dd.slice(0, 10),
     long: Number(r.m_money_positions_long_all), short: Number(r.m_money_positions_short_all),
     change: Number(r.change_in_m_money_long_all) - Number(r.change_in_m_money_short_all),
-    open: Number(r.open_interest_all),
   }));
-  if (!read.length || !read.every(r => [r.long, r.short, r.change, r.open].every(Number.isFinite))) {
+  if (!read.length || !read.every(r => [r.long, r.short, r.change].every(Number.isFinite))) {
     throw new Error("no readable report");
   }
   const n = (v: number) => v.toLocaleString('en-US');
   const net = (r: { long: number; short: number }) => r.long - r.short;
   const side = (v: number) => `${v >= 0 ? "long" : "short"} ${n(Math.abs(v))}`;
-  const [latest, before] = read;
+  const [latest] = read;
   const low = read.reduce((a, b) => net(b) < net(a) ? b : a);
   const high = read.reduce((a, b) => net(b) > net(a) ? b : a);
   return `\n\nWhere the speculators stand in COMEX gold futures — the CFTC's count of ` +
@@ -3746,9 +3739,6 @@ export function positioningList(rows: Cot[]): string {
     `${civilDay(latest.day)} and released later that week:\n` +
     `· Net ${side(net(latest))} contracts (${n(latest.long)} long, ${n(latest.short)} short), ` +
     `${latest.change >= 0 ? "up" : "down"} ${n(Math.abs(latest.change))} on the week before.\n` +
-    `· Open interest, every contract still open whoever holds it: ${n(latest.open)}` +
-    (before ? `, ${latest.open >= before.open ? "up" : "down"} ${n(Math.abs(latest.open - before.open))} ` +
-              `on the week before.\n` : `.\n`) +
     `· Over the ${read.length} weeks to then, net ranged from ${side(net(low))} on ` +
     `${civilDay(low.day)} to ${side(net(high))} on ${civilDay(high.day)}.`;
 }

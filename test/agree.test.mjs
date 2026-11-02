@@ -6685,8 +6685,6 @@ test('the speculators\' weekly count reaches the Sunday briefing and a conversat
   const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1];
   assert.match(system, /WHERE THE SPECULATORS STAND COMES ON SUNDAY AND FROM get_around/,
     'SYSTEM no longer says what the count is for, so it reads as news');
-  assert.match(system.replace(/\s+/g, ' '), /rising with a move is new money arriving, and falling is one side leaving/,
-    'SYSTEM no longer says what open interest tells her, so it is a number she is handed and cannot read');
   assert.match(system, /never\s+a reason to trade, and never a call on where price goes/,
     'the count lost the line that keeps it from reading as a signal');
 });
