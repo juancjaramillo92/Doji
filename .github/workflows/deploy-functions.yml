@@ -66,6 +66,9 @@ jobs:
       # --no-verify-jwt repeats config.toml on purpose: if either stopped being
       # honoured, JWT verification back on would break the webhooks and the
       # poller at once. Two statements of one setting is the cheaper mistake.
-      - run: supabase functions deploy --project-ref gujhyogvkzjgnrodyuse --no-verify-jwt
+      #
+      # --yes, because the CLI now asks before deploying and, with no terminal
+      # to ask on, deploys nothing and fails — the price of `latest` above.
+      - run: supabase functions deploy --project-ref gujhyogvkzjgnrodyuse --no-verify-jwt --yes
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
