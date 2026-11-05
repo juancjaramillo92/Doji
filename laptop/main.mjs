@@ -529,8 +529,14 @@ app.on('web-contents-created', (_, contents) => {
   contents.on('will-navigate', (e) => e.preventDefault());
 });
 
-// Her Dock icon clicked, or the app opened again, is him looking for her: she comes to the desktop he is on.
-const found = () => { bringHere(); send('say', 'here'); };
+/* Her Dock icon clicked, or the app opened again, is him looking for her: she
+   comes to the desktop he is on. Not before her window is made — at the first
+   launch it waits on macOS's question about the microphone. */
+const found = () => {
+  if (!present()) return;
+  bringHere();
+  send('say', 'here');
+};
 app.on('activate', found);
 app.on('second-instance', found);
 
