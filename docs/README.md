@@ -4372,7 +4372,10 @@ all three pass: an eval that cannot fail says nothing. It costs money, so
 it is never in `npm test`; what can be checked without the model is —
 `fold.test.mjs` holds every case well formed, the counters against planted text,
 each request against its call site, and every plant against the prompt it
-breaks. Run it before and after any prompt change, and read the cases first:
+breaks — each of a plant's patterns must find its sentence, or the plant
+throws, since a replace that misses hands the prompt back unchanged and one
+dead pattern among several leaves its rule standing. Run it before and after
+any prompt change, and read the cases first:
 
 ```sh
 ANTHROPIC_API_KEY=... node --experimental-strip-types scripts/eval.mjs --plant
