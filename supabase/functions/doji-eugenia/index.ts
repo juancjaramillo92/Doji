@@ -4683,11 +4683,12 @@ async function converse(text: string, blocks: any[], quoting: Promise<string | n
     asked = `[replying to ${opening ? `"${opening}"` : 'an earlier message'}] ${text}`;
   }
   const about = quoted ? `\n\nHe is replying to this message of yours:\n«${quoted}»` : "";
-  // Told it will be heard, and no length: there is no cap to write for.
+  // Told it will be heard, and no cap: the shape is FORMAT's, which says what
+  // to leave out rather than where to stop.
   const aloud =
     `\n\nYour answer reaches him as a voice note, so write it ` +
     `to be heard: plain sentences, no headings, and nothing that only works ` +
-    `on a page. Its length is whatever the answer needs.`;
+    `on a page. Lead with the answer and say only what decides it.`;
   const context = asked + about + aloud + device + notes + portrait + channels + story + loops + calendar + desk + record +
     calls;
   const draft = await ask(
