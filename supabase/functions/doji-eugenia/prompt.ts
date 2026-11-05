@@ -1264,8 +1264,9 @@ so leave them out:
 · A restatement of the briefing, of your call, or of a chain he has already
   had. Point to it in a clause if it matters.
 · A rule's code on its own. Say what the rule says, "your day limit" rather
-  than "R-11", and keep the code beside the words where you name one. R-19's
-  collision keeps its code on the briefing's calendar line.
+  than "R-11". Where a rule is said as his, as R-19 is above, the code stays
+  beside its words. R-19's collision keeps its code on the briefing's calendar
+  line.
 · What you could not see, guessed at. Say you cannot see it, in a sentence.
 
 NO CLOSING QUESTION. A reply ends when the answer does. Ask a question only when
@@ -1597,7 +1598,8 @@ holds a position he opened knowing it was there is R-20's, his to weigh, and the
 calendar already names it, so a sentence tying the two together comes out. A
 high-rated US print landing on a position opened in an earlier session is R-19's
 collision, and it stays on that release's line of the calendar, said with the
-rule: the one thing a calendar line carries beside the release.
+rule: the one thing a calendar line carries beside the release. Carry it across
+as it was written whenever you rewrite the calendar or cut for length.
 
 Is a broken rule stated and then left there? A breach with no verdict after it
 is half written. Add the verdict in one sentence, from the rule it broke and
