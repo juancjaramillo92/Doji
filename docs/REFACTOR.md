@@ -1297,8 +1297,8 @@ one and eight to eighteen for a 1,600-character plan check, most of them
 returned a handful of characters changed. Asked for find-and-replace pairs
 instead, it would write only what changed — but a pair that does not match
 sends the draft ungated, and the gate is what keeps a view out while he holds
-a position. The replies he asked for on 5 November are a third of that
-length, which takes most of the gate's time with them.
+a position. The replies he asked for on 5 November are meant to be a fraction
+of that length, which takes most of the gate's time with them.
 **Revisit if:** `eugenia_runs` shows `trim` still past five seconds on a
 typical reply once the shorter replies have run a week.
 
@@ -1309,6 +1309,29 @@ the slowest part of a reply and scales with its length, so the shorter reply
 is the speed-up instead.
 **Revisit if:** he asks for her to start speaking sooner and accepts more than
 one voice note.
+
+### R-153 — a sentence or word count on a reply
+**Why refused:** the shorter replies of 5 November are a shape — the answer
+first, then only what decides it — and a list of what to leave out, never a
+ceiling. A ceiling alone cuts whatever is longest, and in a reply that is the
+mechanism he asked for or a plan check with three failed steps. The one soft
+count the shape carried, "two or three short paragraphs", pulled a term built
+from the ground up into a paragraph of five in eval run 86, against WRITING's
+four, and came out.
+**Revisit if:** the timing query shows replies still past the length the
+briefing slot is held to while the eval's cases stay green.
+
+### R-154 — the rules `CRITIC` restates from the briefing slot, made shared blocks
+**Why refused:** the read's test in words he could watch happen, the call that
+stands on its levels, and R-19's collision kept when the length is cut each live
+in `SYSTEM` and in `CRITIC`, as `MECHANISM` once did before it was interpolated.
+These three are not one sentence said twice: the writer's says how to write
+it, the critic's how to repair a draft that missed it, and a block shared
+between them would say one of those badly. An interpolated block also changes
+the text of both prompts, a behaviour change owed an eval run of its own.
+`agree.test.mjs` holds each pair.
+**Revisit if:** a pair is found disagreeing in a way the test did not see, or
+a fourth briefing rule joins them.
 
 ### R-145 — the laptop's journal page as a pure module
 **Deferred.** The questions' sequence in `face.mjs` — what comes up when, a

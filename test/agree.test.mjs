@@ -6869,6 +6869,10 @@ test('the confirming candle and the correlations are the ones the writer and the
     assert.ok(text.includes(`a ${WORDS[CONFIRM_MS / 60_000]}-minute candle`),
       `${where} names a confirming candle other than CONFIRM_MS, ${CONFIRM_MS / 60_000} minutes`);
   }
+  // His document names the chart too, in §6's Entry and §12's Confirmation.
+  const closes = source('supabase/functions/doji-eugenia/strategy.ts')
+    .match(new RegExp(`a ${CONFIRM_MS / 60_000}m candle closing in the intended direction`, 'g')) ?? [];
+  assert.equal(closes.length, 2, `§6 and §12 no longer both name the ${CONFIRM_MS / 60_000}m close CONFIRM_MS scores`);
   assert.ok(system.includes('each over the sessions its line states'), 'SYSTEM no longer leaves the windows to the block');
   const spoken = { 20: 'twenty', 60: 'sixty' };
   for (const n of FITS) {
@@ -7351,6 +7355,24 @@ test('the gold-against-real-yields chain is exempt from the rung, and walked now
       `gets used bare and the one load-bearing mechanism goes unsaid`);
     assert.match(half, /a briefing has no chain, (?:and its why stops at|so here it comes out, and the why keeps only) (?:the|its) last link/,
       `the ${who} no longer keeps the chain out of the briefing, so it is walked every morning`);
+  }
+});
+
+/* THREE MORE RULES THE CRITIC RESTATES, and it runs last: a read's test in
+   words he could watch happen, a call whose stop is where it is wrong, and
+   R-19's collision kept when the length is cut. Each copy without the other
+   has the critic undo the writer. */
+test('the briefing\'s plain test, bare call and kept collision are in the writer and the critic', () => {
+  const cut = EUGENIA_PROMPT.indexOf('export const CRITIC');
+  const writer = EUGENIA_PROMPT.slice(0, cut).replace(/\s+/g, ' ');
+  const critic = EUGENIA_PROMPT.slice(cut).replace(/\s+/g, ' ');
+  for (const [who, half] of [['writer', writer], ['critic', critic]]) {
+    assert.ok(half.includes(`"I'm wrong if bets on a December hike jump today"`),
+      `the ${who} no longer gives the read's test in words he could watch happen`);
+    assert.match(half, /stop (?:is|says) where it is wrong/,
+      `the ${who} no longer lets a briefing's call stand on its levels alone`);
+    assert.match(half, /R-19's collision on its line/,
+      `the ${who} may cut R-19's collision off its calendar line for length`);
   }
 });
 
