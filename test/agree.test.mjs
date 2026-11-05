@@ -6582,7 +6582,7 @@ test('the map is hers, printed, built into her call, and kept out of the briefin
      'her call no longer takes the setup his rules name for where the level sits'],
     [/THE MAP OF HIS CHARTS IS THE HOURS ON IT, and in the briefing it is there for your call and nothing else/,
      'the briefing may turn the map into prose, against the weeks behind his chart'],
-    [/YOUR CALL, LAST, in two or three sentences, its levels off the map of his charts/,
+    [/YOUR CALL, LAST, in one or two sentences, its levels off the map of his charts/,
      'the briefing\'s call slot no longer builds on the map'],
     [/With no chart, get_structure shows you the bias and where his level sits on your map, and you say it is yours/,
      'a plan he brings without a chart is judged blind, or off a map not said to be hers'],
@@ -6952,9 +6952,9 @@ test('readsDue reads on the calendar job\'s last pass of each hour, as its cron 
 
 test('the number budget is stated to the writer and to the critic, and is one budget', () => {
   // Nothing bounded these before. Fourteen true figures is a page he skims.
-  const writer = EUGENIA_PROMPT.match(/(\w+) TO (\w+) NUMBERS IN THE WHOLE BRIEFING/);
+  const writer = EUGENIA_PROMPT.match(/(\w+) NUMBERS? AT MOST IN THE WHOLE BRIEFING/);
   assert.ok(writer, 'the writer is no longer given a number budget');
-  const critic = EUGENIA_PROMPT.match(/HOW MANY NUMBERS ARE IN IT\? (\w+) to (\w+) for a briefing/);
+  const critic = EUGENIA_PROMPT.match(/HOW MANY NUMBERS ARE IN IT\? (\w+) at most for a briefing/);
   assert.ok(critic, 'the critic no longer counts them, so the budget is advisory');
   /* ONE BUDGET IN TWO COPIES. The critic runs last and cuts to its own, so a
      writer told fewer is rewritten back up to the old count. */
@@ -6962,7 +6962,7 @@ test('the number budget is stated to the writer and to the critic, and is one bu
     'the writer and the critic hold different number budgets, and the critic runs last');
   // And the README's copy, which the facts table lists.
   assert.match(source('docs/README.md').replace(/\s+/g, ' '),
-    new RegExp(`the briefing holds ${writer[1].toLowerCase()} or ${writer[2].toLowerCase()} beside`),
+    new RegExp(`the briefing holds ${writer[1].toLowerCase()} at most beside`),
     'the README gives the briefing a number budget the prompt does not');
 });
 
@@ -7052,7 +7052,7 @@ test('a word count never stands without what to cut instead: the briefing\'s two
   }
   // One ceiling, the writer's in words and the critic's in figures, and the
   // README's copies of both, which the facts table lists.
-  const SPOKEN = { 150: 'One hundred and fifty' };
+  const SPOKEN = { 100: 'One hundred' };
   assert.ok(writer.replace(/\s+/g, ' ').includes(`${SPOKEN[most]} is the ceiling`),
     `the writer and the critic hold different ceilings, and the critic runs last`);
   const told = source('docs/README.md').replace(/\s+/g, ' ');
@@ -7091,10 +7091,11 @@ test('a word count never stands without what to cut instead: the briefing\'s two
   assert.match(review, /"keep respecting your stops" is a resolution/, 'the keep\'s rule has lost its worked example');
 });
 
-test('the gold-against-real-yields chain is exempt from the rung, in both copies', () => {
-  /* THE ONE PLACE THE LADDER IS OVERRIDDEN, in both: the critic decides whether
-     a mechanism inside one briefing is a repetition, and this chain is under
-     nearly every briefing. */
+test('the gold-against-real-yields chain is exempt from the rung, and walked nowhere in a briefing, in both copies', () => {
+  /* THE ONE PLACE THE LADDER IS OVERRIDDEN, in both, and the one place it is
+     not walked: under nearly every answer about rates, and said every morning
+     it is the chain he has heard most. The critic runs last, so its copy says
+     both halves too. */
   // WHITESPACE-COLLAPSED: the prompt is hard-wrapped and a phrase splits across
   // lines.
   const flat = at => EUGENIA_PROMPT.slice(...at).replace(/\s+/g, ' ');
@@ -7105,6 +7106,8 @@ test('the gold-against-real-yields chain is exempt from the rung, in both copies
     assert.match(half, /exempt from the map|map does not apply/,
       `the ${who} does not say the rung is overridden for it, so at \`owns\` it ` +
       `gets used bare and the one load-bearing mechanism goes unsaid`);
+    assert.match(half, /a briefing has no chain, (?:and its why stops at|so here it comes out, and the why keeps only) (?:the|its) last link/,
+      `the ${who} no longer keeps the chain out of the briefing, so it is walked every morning`);
   }
 });
 
