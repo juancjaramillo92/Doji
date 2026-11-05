@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // GLADYS — the journal bot  ·  Supabase Edge Function (Deno)
 // ───────────────────────────────────────────────────────────────────────────
-// One function, three callers, told apart by the secret they present:
+// One function, four callers, told apart by the secret they present:
 //
 //   x-doji-key                        its triggers — a position opened, post
 //                                     the message; its answers moved, redraw it.
@@ -9,6 +9,8 @@
 //                                     column and redraw the message.
 //   x-charm-key                       her charm — what waits for its journal,
 //                                     and an answer given on its screen.
+//   x-laptop-key                      Eugenia's laptop — the same, on its own
+//                                     key, so a lost laptop is cut off alone.
 //
 // One file, because the halves share the keyboard, the message and the
 // callback_data grammar. A tap names its column through COLUMNS, the same four
@@ -37,8 +39,8 @@
 //           allowed_updates = ["callback_query"] — a tap is her whole
 //           vocabulary.
 // Secrets:  GLADYS_BOT_TOKEN, TELEGRAM_CHAT_ID, GLADYS_WEBHOOK_SECRET,
-//           DOJI_CRON_SECRET, SB_SECRET_KEY; GLADYS_CHARM_SECRET, optional —
-//           unset, the charm's door is shut
+//           DOJI_CRON_SECRET, SB_SECRET_KEY; GLADYS_CHARM_SECRET and
+//           GLADYS_LAPTOP_SECRET, optional — unset, that door is shut
 // ═══════════════════════════════════════════════════════════════════════════
 
 import {
@@ -53,6 +55,7 @@ const CHAT_ID        = env("TELEGRAM_CHAT_ID");
 const WEBHOOK_SECRET = env("GLADYS_WEBHOOK_SECRET");
 const CRON_SECRET    = env("DOJI_CRON_SECRET");
 const CHARM_SECRET   = env("GLADYS_CHARM_SECRET");
+const LAPTOP_SECRET  = env("GLADYS_LAPTOP_SECRET");
 
 /* ─── The journal vocabulary ───────────────────────────────────────────────
    One of three copies — CONFIG.SETUPS and trades_setup_check are the others —
@@ -342,6 +345,7 @@ async function handleTap(req: Request): Promise<Response> {
    while anything does. An answer from it is a tap in a tap's own grammar, so
    parseCallback is the one boundary for both and no other column is reachable.
    The trigger then redraws the Telegram message, as it does for the app.
+   The laptop asks the same, as the charm does, on a key of its own.
    ───────────────────────────────────────────────────────────────────────── */
 
 /* A week back, oldest first, so trades are journalled in the order he took
@@ -391,6 +395,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   const fromTelegram = req.headers.get("x-telegram-bot-api-secret-token");
   const fromDatabase = req.headers.get("x-doji-key");
   const fromCharm    = req.headers.get("x-charm-key");
+  const fromLaptop   = req.headers.get("x-laptop-key");
 
   if (!BOT_TOKEN || !CHAT_ID || !WEBHOOK_SECRET || !CRON_SECRET || !SB_KEY) {
     console.error("doji-gladys: a required secret is not set — refusing all requests");
@@ -404,7 +409,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     if (secretMatches(fromDatabase, CRON_SECRET)) {
       return await fromTrigger(req);
     }
-    if (secretMatches(fromCharm, CHARM_SECRET)) {
+    if (secretMatches(fromCharm, CHARM_SECRET) || secretMatches(fromLaptop, LAPTOP_SECRET)) {
       return req.method === "POST" ? await charmAnswer(req) : await waiting();
     }
     return json({ ok: false, error: "unauthorized" }, 401);

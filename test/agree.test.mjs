@@ -412,6 +412,7 @@ test('the charm updates from what the workflow publishes, and the image holds th
 const LAPTOP_MAIN = source('laptop/main.mjs');
 const LAPTOP_FACE = source('laptop/face.mjs');
 const LAPTOP_DOOR = EUGENIA_TS.slice(EUGENIA_TS.indexOf('if (secretMatches(fromLaptop, LAPTOP_SECRET))'));
+const GLADYS_TS = source('supabase/functions/doji-gladys/index.ts');
 
 test('the laptop reads her frames as the door numbers them, at the rate she speaks', async () => {
   const frames = await import('../laptop/frames.mjs');
@@ -451,18 +452,25 @@ test('the laptop knocks with the key, the form and the words her door reads', ()
     'the laptop\'s door no longer answers the briefing as the charm\'s does');
 });
 
-/* A key is proved by asking the door with an empty form, and the statuses the
-   laptop takes as proof are the door's answers to a right key. */
-test('the laptop proves a key by the answers her door gives a right one', () => {
-  const kept = LAPTOP_MAIN.match(/if \(res\.status !== (\d+) && res\.status !== (\d+)\) return 'wrong';/);
+/* Each key is proved by asking its door — hers with an empty form, Gladys's
+   with what waits — and the statuses the laptop takes as proof are each
+   door's answers to a right key. */
+test('the laptop proves each key by the answers its door gives a right one', () => {
+  const kept = LAPTOP_MAIN.match(/if \(who === 'gladys' \? res\.status !== (\d+) : res\.status !== (\d+) && res\.status !== (\d+)\) return 'wrong';/);
   assert.ok(kept, 'tryKey no longer judges a key as this test reads it');
-  const [empty, short] = kept.slice(1);
+  const [gladys, empty, short] = kept.slice(1);
   assert.match(LAPTOP_DOOR, new RegExp(`a recording, up to \\$\\{FILE_MAX\\} bytes\` \\}, ${empty}\\)`),
     `the laptop takes a ${empty} as a right key, and her door refuses an empty form otherwise`);
   assert.match(LAPTOP_DOOR, new RegExp(`"the laptop needs STT_URL, STT_KEY and TTS_KEY" \\}, ${short}\\)`),
     `the laptop takes a ${short} as a right key at a door short of its vendors, and her door answers that otherwise`);
-  assert.match(LAPTOP_MAIN, /body: new FormData\(\), headers: \{ 'x-laptop-key': candidate \}/,
-    'tryKey no longer asks the door with an empty form');
+  assert.match(LAPTOP_MAIN, /fetch\(DOOR, \{ method: 'POST', body: new FormData\(\), headers: \{ 'x-laptop-key': candidate \}/,
+    'tryKey no longer asks her door with an empty form');
+  // Gladys's GET is waiting(), answered with json's own status.
+  assert.match(GLADYS_TS, /\? await charmAnswer\(req\) : await waiting\(\)/, 'Gladys\'s door no longer answers a GET with what waits');
+  assert.equal(source('supabase/functions/_shared/edge.ts').match(/export const json = \(body: unknown, status = (\d+)\)/)?.[1],
+    gladys, `the laptop takes a ${gladys} as Gladys's answer to a right key, and her door answers what waits otherwise`);
+  assert.match(LAPTOP_MAIN, /fetch\(GLADYS, \{ headers: \{ 'x-laptop-key': candidate \}, signal \}\)/,
+    'tryKey no longer asks Gladys\'s door what waits');
 });
 
 test('the laptop records no more than her door takes', () => {
@@ -515,6 +523,119 @@ test('the laptop draws the charm\'s face, at the charm\'s numbers and in its col
   const ring = face.match(/static const uint32_t RING\[\] = \{ ([A-Z, ]+) \};/)?.[1].split(', ');
   assert.ok(ring, 'face.c no longer lists RING as this test reads it');
   assert.match(LAPTOP_FACE, new RegExp(`\\[${ring.join(', ')}\\]\\.forEach`), 'the laptop\'s ring turns through other colours than the charm\'s');
+});
+
+/* Gladys's journal on the laptop asks her door as the charm does: the header
+   her door reads, the four answers by key and column and the setups by name,
+   the keys of her answer it reads and the one it posts. The laptop's door is
+   the charm's half, on a key of its own. */
+test('the laptop journals through the door, the keys and the answers Gladys reads', async () => {
+  const { ANSWERS, SETUPS: setups } = await import('../laptop/journal.mjs');
+  assert.deepEqual(ANSWERS, Object.entries(COLUMNS),
+    'the laptop answers a key, or reads a column, her door does not have — or in another order than the screens ask them');
+  assert.deepEqual(setups, [...SETUPS], 'the laptop offers a setup her door would refuse');
+
+  const knocked = bodyOf(LAPTOP_MAIN, 'async function gladys(');
+  assert.match(knocked, /fetch\(GLADYS, \{/, 'gladys() no longer knocks at Gladys\'s door');
+  const sent = [...knocked.matchAll(/'(x-[\w-]+)'/g)].map(m => m[1]);
+  assert.deepEqual(sent, ['x-laptop-key'], 'the laptop knocks at Gladys\'s door with another header');
+  assert.match(GLADYS_TS, /const fromLaptop\s+= req\.headers\.get\("x-laptop-key"\);/, 'Gladys\'s door no longer reads the laptop\'s header');
+  assert.match(GLADYS_TS, /if \(secretMatches\(fromCharm, CHARM_SECRET\) \|\| secretMatches\(fromLaptop, LAPTOP_SECRET\)\) \{\s*return req\.method === "POST" \? await charmAnswer\(req\) : await waiting\(\);/,
+    'the laptop\'s key no longer opens the charm\'s half of Gladys\'s door');
+  assert.match(GLADYS_TS, /^const LAPTOP_SECRET\s+= env\("GLADYS_LAPTOP_SECRET"\);$/m, 'Gladys\'s laptop key is no longer her own');
+
+  const answered = bodyOf(GLADYS_TS, 'async function waiting(').match(/return json\(\{ ([^}]+) \}\);/);
+  assert.ok(answered, 'waiting() no longer answers as this test reads it');
+  const keys = answered[1].split(',').map(k => k.split(':')[0].trim());
+  const read = knocked.match(/const \{ (\w+), (\w+) \} = await res\.json\(\)/)?.slice(1);
+  assert.ok(read, 'gladys() no longer reads her answer as this test reads it');
+  for (const k of read) assert.ok(keys.includes(k), `the laptop reads "${k}" and her door answers ${keys.join(', ')}`);
+  const select = GLADYS_TS.match(/const SELECT = "([^"]+)"/)?.[1].split(',');
+  assert.ok(select, 'doji-gladys no longer names the columns it selects as this test reads them');
+  for (const f of ['id', ...ANSWERS.map(([, column]) => column)]) {
+    assert.ok(select.includes(f), `the laptop reads the trade's ${f} and her door does not select it`);
+  }
+  assert.match(LAPTOP_FACE, /window\.doji\.answer\(j\.trade\.id, /, 'the page no longer answers a trade by its id');
+  const posted = bodyOf(LAPTOP_MAIN, 'async function answer(').match(/JSON\.stringify\(\{ (\w+): tap\(/)?.[1];
+  assert.ok(posted, 'answer() no longer posts its answer as this test reads it');
+  assert.match(bodyOf(GLADYS_TS, 'async function charmAnswer('), new RegExp(`\\?\\.${posted}\\b`),
+    `the laptop posts its answer as "${posted}" and her door reads it under another key`);
+});
+
+/* The journal's screens are the charm's, drawn by a second hand: the words,
+   the halves' gradients, the tag, the pill, the dots, the tick, the ring and
+   the times, each read out of journal.c, with its colours by palette.h's
+   names; the first question as gladys.c picks it; and the mark for a trade
+   waiting, face.c's sleep screen's ring. */
+test('the laptop draws the charm\'s journal, at its numbers, times and colours', () => {
+  const journal = source('charm/main/journal.c'), face = source('charm/main/face.c');
+  const palette = Object.fromEntries([...source('charm/main/palette.h').matchAll(/^#define (\w+)\s+0x([0-9a-f]{6})/gim)]
+    .map(m => [m[1], `#${m[2].toLowerCase()}`]));
+  const words = (text, name) => {
+    const m = text.match(new RegExp(`${name}(?:\\[\\d\\])? = [{\\[]([^}\\]]+)[}\\]]`));
+    assert.ok(m, `${name} is no longer listed as this test reads it`);
+    return [...m[1].matchAll(/["']([^"']+)["']/g)].map(w => w[1]);
+  };
+  for (const name of ['WORDS', 'SHORT']) {
+    assert.deepEqual(words(LAPTOP_FACE, name), words(journal, name), `the laptop's ${name} are not the charm's`);
+  }
+
+  const inC = journal.match(/HALVES\[3\]\[2\]\[2\] = \{([^;]+)\};/)?.[1]
+    .replace(/\/\*[^*]*\*\/|\/\/.*$/gm, '').match(/0x[0-9a-f]{6}|[A-Z]{3,}/gi)
+    .map(c => c.startsWith('0x') ? `#${c.slice(2).toLowerCase()}` : palette[c]);
+  const inJs = LAPTOP_FACE.match(/^const HALVES = \[([^;]+)\];$/m)?.[1]
+    .replace(/\/\*[^*]*\*\/|\/\/.*$/gm, '').match(/'#[0-9a-f]{6}'|\b[A-Z]{3,}\b/g)
+    .map(c => c.startsWith("'") ? c.slice(1, -1) : palette[c]);
+  assert.ok(inC?.length === 12 && inC.every(Boolean), 'journal.c no longer lists HALVES as this test reads them');
+  assert.deepEqual(inJs, inC, 'the laptop paints the journal\'s halves in other colours than the charm');
+
+  const ms = (text, name) => {
+    const m = text.match(new RegExp(`^(?:#define ${name}\\s+(\\d+)|const ${name} = ([\\d_]+);)`, 'm'));
+    assert.ok(m, `${name} is no longer defined as this test reads it`);
+    return Number((m[1] ?? m[2]).replace(/_/g, ''));
+  };
+  for (const name of ['ASK_MS', 'FLASH_MS', 'TICK_MS', 'SWEEP_MS', 'DONE_MS']) {
+    assert.equal(ms(LAPTOP_FACE, name), ms(journal, name), `the laptop's ${name} is not the charm's`);
+  }
+  assert.match(journal, new RegExp(`lv_obj_fade_in\\(pill, ${ms(LAPTOP_FACE, 'FADE_MS')}, 0\\)`), 'the laptop fades the pill in over another time than the charm');
+
+  // Where everything sits, as the lines that place it in each.
+  const held = [
+    [/half\[i\] = box\(root, i \? 235 : 0, 0, 231, 466,/, /x = i \? 235 : 0;[^]*?g\.fillRect\(x, 0, 231, 466\)/, 'the halves'],
+    [/tag = box\(root, 183, 70, 100, 34,[^]*?lv_obj_set_style_radius\(tag, 17, 0\)/, /g\.roundRect\(183, 70, 100, 34, 17\)/, 'the setup\'s tag'],
+    [/pill = box\(root, 0, 190, 150, 88, GROUND\);[^]*?radius\(pill, 44, 0\)[^]*?border_width\(pill, 2, 0\)/,
+      /g\.roundRect\(233 - w \/ 2 \+ 1, 191, w - 2, 86, 43\)/, 'the pill'],
+    [/int32_t w = lv_obj_get_width\(word\) \+ 64;\s*lv_obj_set_width\(pill, w > 150 \? w : 150\);/, /Math\.max\(150, g\.measureText\(WORDS\[j\.q\]\)\.width - 2 \+ 64\)/, 'the pill\'s width'],
+    [/int r = i == q \? 5 : 4;[^]*?233 \+ \(i - 1\.5f\) \* 22 - r, 34 - r\);[^]*?!missing\[i\] \? ACCENT : INK[^]*?LV_OPA_COVER : 56, 0\)/,
+      /const r = i === q \? 5 : 4;\s*dot\(233 \+ \(i - 1\.5\) \* 22, 34, r, r, missing\[i\] \? INK : ACCENT, !missing\[i\] \|\| i === q \? 1 : 56 \/ 255\);/, 'the dots'],
+    [/at\[3\]\[2\] = \{ \{ 203, 237 \}, \{ 223, 257 \}, \{ 263, 209 \} \};[^]*?hypotf\(20, 20\), second = hypotf\(40, 48\)[^]*?l\.width = 9;/,
+      /^const TICK = \[\[203, 237\], \[223, 257\], \[263, 209\]\];[^]*?Math\.hypot\(20, 20\), second = Math\.hypot\(40, 48\)[^]*?g\.lineWidth = 9;/m, 'the tick'],
+    [/face_ring\(layer, 231, 8, fminf\(1, t \/ \(float\)SWEEP_MS\), all_yes \? 1 : 0\.55f\);/, /ring\(231, 8, Math\.min\(1, t \/ SWEEP_MS\), allYes \? 1 : 0\.55\);/, 'the ring'],
+    [/l\.color = lv_color_hex\(all_yes \? GLOW : INK\);/, /g\.strokeStyle = allYes \? GLOW : INK;/, 'the tick\'s colour'],
+    [/text\(tag, &hanken_16, MUTED, 2\), WORDS\[0\]\)/, /word\(WORDS\[0\], 233, 87, 16, 700, MUTED, 2\);/, 'the tag\'s word'],
+    [/word = text\(pill, &hanken_64, INK, 2\);/, /word\(WORDS\[j\.q\], 233, 234, 64, 800, INK, 2\);/, 'the pill\'s word'],
+    [/half_word\[i\] = text\(half\[i\], &hanken_64, INK, 1\);[^]*?lv_obj_set_style_text_color\(half_word\[side\], lv_color_white\(\), 0\)/,
+      /word\(SHORT\[i\], x \+ 231 \/ 2, 233, 64, 800, j\.lit === i \? '#ffffff' : INK, 1\);/, 'the setups\' words'],
+    [/int side = p\.x >= 233;/, /const side = pixel\(x, 0\)\[0\] >= 233 \? 1 : 0;/, 'which half a tap is on'],
+  ];
+  for (const [c, js, what] of held) {
+    assert.match(journal, c, `journal.c no longer draws ${what} as this test reads it`);
+    assert.match(LAPTOP_FACE, js, `the laptop draws ${what} otherwise than the charm`);
+  }
+  // The weights the words are drawn in, fonts.sh's for the 64 and the 16.
+  const fonts = source('charm/tools/fonts.sh');
+  for (const [size, weight] of [[64, 800], [16, 700]]) {
+    assert.match(fonts, new RegExp(`--font ${weight}\\.ttf --size ${size} `), `the charm no longer draws ${size} px at ${weight}`);
+  }
+  assert.ok(LAPTOP_FACE.includes("64, 800, INK") && LAPTOP_FACE.includes("16, 700, MUTED"), 'the laptop draws the journal\'s words at other weights');
+
+  assert.match(source('charm/main/gladys.c'), /int q = 0;\s*while \(q < 3 && !t\.missing\[q\]\) q\+\+;/,
+    'gladys.c no longer asks the first question a trade lacks of the first three, else the last');
+  const night = bodyOf(face, 'static void draw_night(', 'face.c has no draw_night()');
+  const mark = night.match(/a\.radius = \d+; a\.width = (\d+);[^}]*a\.color = lv_color_hex\(0x([0-9a-f]{6})\);/);
+  assert.ok(mark, 'face.c no longer marks a trade waiting as this test reads it');
+  assert.equal(LAPTOP_FACE.match(/^const WAITS = '(#[0-9a-f]{6})';$/m)?.[1], `#${mark[2]}`, 'the laptop marks a trade waiting in another colour');
+  assert.match(bodyOf(LAPTOP_FACE, 'function waits('), new RegExp(`g\\.lineWidth = ${mark[1]};`), 'the laptop\'s ring for a trade is another width');
 });
 
 /* Where the laptop's update lives: the objects the workflow writes, the ones
@@ -2304,7 +2425,7 @@ test('an optional secret is guarded where it is used', () => {
   for (const { name, text } of FUNCTIONS) {
     for (const { name: secret } of bound(text)) {
       if (!OPTIONAL.has(secret)) continue;
-      assert.match(text, new RegExp(`if \\(![A-Z_ |!]*\\b${secret}\\b|if \\(secretMatches\\(\\w+, ${secret}\\)\\)`),
+      assert.match(text, new RegExp(`if \\(![A-Z_ |!]*\\b${secret}\\b|(?:if \\(|\\|\\| )secretMatches\\(\\w+, ${secret}\\)`),
         `${name} treats ${secret} as optional but never checks it before use — ` +
         `unset, it would reach a request as an empty string rather than taking ` +
         `the branch that says she cannot do that yet`);

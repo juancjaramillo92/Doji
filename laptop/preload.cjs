@@ -3,7 +3,7 @@
    CommonJS, because a sandboxed preload cannot be a module. */
 const { contextBridge, ipcRenderer } = require('electron');
 
-const TOLD = ['press', 'frame', 'done', 'trouble', 'briefing', 'briefing-now', 'say', 'cursor'];
+const TOLD = ['press', 'frame', 'done', 'trouble', 'briefing', 'briefing-now', 'journal', 'journal-now', 'say', 'cursor'];
 
 contextBridge.exposeInMainWorld('doji', {
   on: (channel, fn) => {
@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('doji', {
   ask: (voice) => ipcRenderer.send('ask', voice),
   hush: () => ipcRenderer.send('hush'),
   briefing: () => ipcRenderer.send('briefing'),
+  answer: (id, q, half) => ipcRenderer.invoke('answer', id, q, half),
   open: (pane) => ipcRenderer.send('open', pane),
   solid: (yes) => ipcRenderer.send('solid', yes),
   drag: (dx, dy) => ipcRenderer.send('drag', dx, dy),

@@ -15,6 +15,7 @@ on:
     paths:
       - 'laptop/**'
       - 'charm/art/eugenia.png'
+      - 'charm/art/HankenGrotesk.ttf'
       - 'icon-512.png'
       - '.github/workflows/laptop.yml'
   workflow_dispatch:
