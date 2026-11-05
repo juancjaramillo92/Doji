@@ -65,7 +65,7 @@ const BRIEFING_EVERY_MS = 5 * 60_000;
    questions belong to the minute it opened. */
 const JOURNAL_EVERY_MS = 60_000;
 const UPDATE_EVERY_MS = 24 * 60 * 60_000;
-// How often she looks for the cursor, to look at it when it comes near.
+// How often she looks for the cursor, to look at it when it comes near; the page is told only when it has moved.
 const CURSOR_MS = 100;
 // Her last decisions, kept for him to copy when something looks wrong.
 const LOG_LINES = 80;
@@ -104,6 +104,7 @@ let offered = null;    // a newer build than this one
 let pending = { waiting: 0, trade: null };  // what waits for its journal, as Gladys's door last said
 let answering = false; // an answer on its way to Gladys's door
 let knocks = 0;        // asks of Gladys's door, so a look an answer overtook is dropped
+let pointed = '';      // where the page was last told the cursor is
 let updating = false;
 const log = [];
 
@@ -560,6 +561,8 @@ app.whenReady().then(async () => {
   every(() => {
     if (!present() || !face.isVisible()) return;
     const at = screen.getCursorScreenPoint(), { x, y } = face.getBounds();
+    if (`${at.x - x},${at.y - y}` === pointed) return;
+    pointed = `${at.x - x},${at.y - y}`;
     send('cursor', at.x - x, at.y - y);
   }, CURSOR_MS);
   settle();
