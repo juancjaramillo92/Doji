@@ -2325,7 +2325,8 @@ asks for whichever is missing, as the charm's setup asks for both; *Her key…*
 and *Gladys's key…* in her menu change either. The app's own menu holds
 the Edit menu ⌘V pastes them through. The keys and the doors live in the main
 process alone; the page that draws her has neither, asks for nothing but what
-`preload.cjs` names, opens no window and navigates nowhere.
+`preload.cjs` names, opens no window and navigates nowhere. Each page is
+handed only its own names: the key window its key alone, her face the rest.
 
 **Her menu's *Copy her log*** puts her last decisions on the clipboard, with
 their times — whether she was kept to one desktop, each time she was brought
