@@ -345,7 +345,7 @@ async function handleTap(req: Request): Promise<Response> {
    while anything does. An answer from it is a tap in a tap's own grammar, so
    parseCallback is the one boundary for both and no other column is reachable.
    The trigger then redraws the Telegram message, as it does for the app.
-   The laptop asks the same, as the charm does, on a key of its own.
+   The laptop asks the same, on a key of its own.
    ───────────────────────────────────────────────────────────────────────── */
 
 /* A week back, oldest first, so trades are journalled in the order he took

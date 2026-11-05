@@ -542,26 +542,29 @@ what it does. Three levels of proof, as on the charm:
 
 - **Pure, and driven in `npm test`.** `frames.mjs`, fed `charmFrame`'s bytes,
   and its `Queue`, played against a stream that arrives late and unevenly;
-  `art.mjs`; `place.mjs`; and `update.mjs`, whose swap `laptop.test.mjs` runs in a scratch
-  folder with `ditto` and `open` stood in for. A decision that can be pure goes
+  `art.mjs`; `place.mjs`; `journal.mjs`, read by Gladys's own `parseCallback`;
+  and `update.mjs`, whose swap `laptop.test.mjs` runs in a scratch folder with
+  `ditto`, `open` and `codesign` stood in for. A decision that can be pure goes
   in one of these.
-- **Read.** Every copy it holds of the door or the charm — the header, the
-  form, the frames, the face's numbers and colours, the sounds and the ear,
-  the wait, the update's path — and the level the workflow's check raises
-  its window to, is read out of both by `agree.test.mjs`; `types.test.mjs`
-  asks it the two scope questions as its own program.
+- **Read.** Every copy it holds of the doors or the charm — the header, the
+  form, the frames, the face's numbers and colours, the journal's screens,
+  the sounds and the ear, the wait, the update's path and signer — and the
+  level the workflow's check raises its window to, is read out of both by
+  `agree.test.mjs`; `types.test.mjs` asks it the two scope questions as its
+  own program.
 - **Only the Mac.** The window, the keys, the microphone, the capture, the
   sound, the signature and the update. The README's *To check on the Mac
   first* is what of it he has not yet seen hold, and only he takes a line
-  off it. `spaces.m` is the one part a Mac answers in CI: the workflow asks
-  the runner whether a raised window took it, beside a panel as the defect
-  it must see. A Linux run under Xvfb drives the page and the main process
+  off it. Three things a Mac answers in CI, each beside the defect it must
+  see: whether a raised window took `spaces.m` (a panel beside it), whether
+  the fuses are off (read on first), and whether the update's reading of her
+  signer holds her own build and refuses a stranger's. A Linux run under Xvfb drives the page and the main process
   against a stand-in door, which proves the sequence and the drawing and
   nothing about macOS; it is built for the change at hand and not kept
   (`REFACTOR.md` R-139).
 
-The key and the door stay in the main process; the page asks for nothing
-`preload.cjs` does not name. A face change is a change to the charm's numbers
+The keys and the doors stay in the main process; each page can ask for only
+what `preload.cjs` hands it. A face change is a change to the charm's numbers
 or to the body's, never to both in one place without the other — the charm's
 are held.
 

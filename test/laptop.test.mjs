@@ -9,9 +9,9 @@
    and unevenly, as a real stream does; where her window goes when a screen
    is gone; the journal's answers, read by Gladys's own boundary, and the
    question a trade is asked first; and the swap an update leaves behind,
-   run in a scratch folder with macOS's `ditto` and `open` stood in for, in
-   every way it can fail.
-   The copies the app holds of the door and of the charm are
+   run in a scratch folder with macOS's `ditto`, `open` and `codesign` stood
+   in for, in every way it can fail.
+   The copies the app holds of the doors and of the charm are
    agree.test.mjs's; whether she looks, sounds and floats as she should is
    his to see on the Mac (README, The laptop).
    ═══════════════════════════════════════════════════════════════════════════ */
