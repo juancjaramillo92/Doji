@@ -504,13 +504,17 @@ function frame(now) {
 }
 
 /* Her square at the bottom of the room, drawn at the screen's own density —
-   which changes when the window moves to another screen. */
+   which changes when the window moves to another screen, watched for once
+   per density rather than once per resize. */
+let density = 0;
 function fit() {
   const side = Math.round(innerHeight / ROOM.height);
   canvas.style.width = canvas.style.height = `${side}px`;
   canvas.width = canvas.height = Math.round(side * devicePixelRatio);
   // Above the ring, in the room over her head.
   said.style.bottom = `${side + 2}px`;
+  if (devicePixelRatio === density) return;
+  density = devicePixelRatio;
   matchMedia(`(resolution: ${devicePixelRatio}dppx)`).addEventListener('change', fit, { once: true });
 }
 
@@ -618,12 +622,15 @@ async function listening(chart) {
   const chunks = [];
   ear = sounds().createAnalyser();
   ear.fftSize = 1024;
-  sounds().createMediaStreamSource(recording).connect(ear);
+  // Let go with the recording: the context outlives every question, and a source left connected to it stays.
+  const source = sounds().createMediaStreamSource(recording);
+  source.connect(ear);
   recorder = new MediaRecorder(recording, { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: RECORD_BPS });
   recorder.ondataavailable = (e) => chunks.push(e.data);
   recorder.onstop = async () => {
     const short = performance.now() - listen.began < RECORD_MIN_MS, kept = mode === 'listening';
     recording?.getTracks().forEach(t => t.stop());
+    source.disconnect();
     recording = recorder = ear = null;
     if (!kept) return;
     if (short) { window.doji.hush(); mode = 'idle'; unsay(); return; }
