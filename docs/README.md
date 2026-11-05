@@ -2255,8 +2255,9 @@ notice.
 **The briefing is the charm's**: an emerald dot beside her and a dot by her
 menu-bar icon while one waits — a click on the dot or *Hear the briefing*
 plays it, and the dot goes once it has come to its end, so one that fails —
-the line gone, her door's error — waits to be heard again. Whether one waits is her door's to say (`?briefing=waits`, every
-five minutes), so the dot goes when he hears it on the charm, at midnight in
+the line gone, her door's error — waits to be heard again. Whether one waits
+is her door's to say (`?briefing=waits`, every five minutes, and at once when
+the Mac wakes), so the dot goes when he hears it on the charm, at midnight in
 New York, and stays gone after a restart. Clicked in the minutes before the
 laptop next asks, a briefing that is no longer there is nothing to play, not a
 failure: her door's `204`, as the charm takes it. The ready line is not
@@ -2265,7 +2266,7 @@ played; the dot is the news.
 **Gladys's journal is the charm's**, asked of Gladys's door rather than
 hers (*Gladys — the Telegram journal*): what waits every minute — oftener
 than the charm can afford, since the laptop is awake and online whenever he
-trades on it — and a trade that came in ticks, as on the charm, and its
+trades on it — and at once when the Mac wakes. A trade that came in ticks, as on the charm, and its
 questions take her place once she is idle; a conversation is never
 interrupted. **The screens are the charm's**, drawn at `journal.c`'s own
 coordinates and colours on its round screen, in Doji's typeface, Hanken

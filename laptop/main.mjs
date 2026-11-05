@@ -15,8 +15,8 @@
    the page at all.
    ═══════════════════════════════════════════════════════════════════════════ */
 import {
-  app, BrowserWindow, Menu, Tray, clipboard, desktopCapturer, dialog, globalShortcut, ipcMain, nativeImage, safeStorage,
-  screen, shell, systemPreferences,
+  app, BrowserWindow, Menu, Tray, clipboard, desktopCapturer, dialog, globalShortcut, ipcMain, nativeImage, powerMonitor,
+  safeStorage, screen, shell, systemPreferences,
 } from 'electron';
 import { Buffer } from 'node:buffer';
 import { spawn } from 'node:child_process';
@@ -562,6 +562,8 @@ app.whenReady().then(async () => {
   every(briefing, BRIEFING_EVERY_MS);
   journal();
   every(journal, JOURNAL_EVERY_MS);
+  // A Mac that slept missed both: asked at once rather than at their next turn.
+  powerMonitor.on('resume', () => { briefing(); journal(); });
   lookForUpdate();
   every(lookForUpdate, UPDATE_EVERY_MS);
   every(() => {
