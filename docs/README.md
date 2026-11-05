@@ -2253,7 +2253,8 @@ notice.
 
 **The briefing is the charm's**: an emerald dot beside her and a dot by her
 menu-bar icon while one waits — a click on the dot or *Hear the briefing*
-plays it. Whether one waits is her door's to say (`?briefing=waits`, every
+plays it, and the dot goes once it has come to its end, so one that fails —
+the line gone, her door's error — waits to be heard again. Whether one waits is her door's to say (`?briefing=waits`, every
 five minutes), so the dot goes when he hears it on the charm, at midnight in
 New York, and stays gone after a restart. Clicked in the minutes before the
 laptop next asks, a briefing that is no longer there is nothing to play, not a

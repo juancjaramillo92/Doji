@@ -99,6 +99,7 @@ let taken = false;     // the talk key is held by another app
 let asking = null;     // the request in flight, so a press can hush her
 let looking = null;    // the chart being captured since he asked her to look
 let waiting = false;   // a briefing waits for him, as her door last said
+let hearings = 0;      // briefings heard here, so an ask one overtook is dropped
 let offered = null;    // a newer build than this one
 let pending = { waiting: 0, trade: null };  // what waits for its journal, as Gladys's door last said
 let answering = false; // an answer on its way to Gladys's door
@@ -296,7 +297,8 @@ function menu() {
    the page as it arrives, so she starts speaking before the rest has come.
    Nothing on the wire for READ_MS is a dead line, said as one rather than
    thought about for ever. A press while she thinks or speaks hushes her; the
-   door keeps the turn going, so the copy and the memory still land. */
+   door keeps the turn going, so the copy and the memory still land. True
+   when the answer came to its end. */
 async function talk(path, body) {
   asking?.abort();
   const abort = asking = new AbortController();
@@ -310,11 +312,12 @@ async function talk(path, body) {
     if (res.status === 401) { askForKey('eugenia'); return send('trouble', 'key'); }
     if (res.status === 503) return send('trouble', 'voice');
     // Nothing to say: the briefing asked for as midnight passed, or heard on the charm since its dot was drawn.
-    if (res.status === 204) return send('done');
+    if (res.status === 204) { send('done'); return true; }
     if (!res.ok || !res.body) return send('trouble', 'door');
     const feed = framer((kind, bytes) => send('frame', kind, bytes));
     for await (const chunk of res.body) { alive(); feed(chunk); }
     send('done');
+    return true;
   } catch {
     if (abort.signal.reason === 'silent') send('trouble', 'lost');
     else if (asking === abort) send('trouble', 'offline');
@@ -370,24 +373,31 @@ async function look() {
    he hears it on the charm, at midnight in New York, and stays gone after a
    restart. Asked as ?briefing=waits, whose answer has no voice in it; the
    charm's ready line is spoken, and the dot is the news. An answer that is
-   neither leaves the dot as it was. */
+   neither leaves the dot as it was, and so does one asked before a briefing
+   heard here ended, since it read the door before the door knew.
+
+   The dot goes once the briefing has come to its end, as on the charm: a
+   briefing that failed — the line gone, her door's error — leaves it up, to
+   be heard again. */
 async function briefing() {
   if (!keys.eugenia) return;
+  const mine = hearings;
   const res = await fetch(`${DOOR}?briefing=waits`, { headers: { 'x-laptop-key': keys.eugenia }, signal: AbortSignal.timeout(ASK_MS) })
     .catch(() => null);
   if (res?.status !== 200 && res?.status !== 204) return;
   res.body?.cancel();
-  if (waiting === (res.status === 200)) return;
+  if (mine !== hearings || waiting === (res.status === 200)) return;
   waiting = !waiting;
   send('briefing', waiting);
   menu();
 }
 
-function hearBriefing() {
+async function hearBriefing() {
+  if (!await talk('?briefing=today')) return;
+  hearings++;
   waiting = false;
   send('briefing', false);
   menu();
-  talk('?briefing=today');
 }
 
 /* ─── Gladys's journal ──────────────────────────────────────────────────────
