@@ -49,7 +49,7 @@ const CHART_PX = 1568;
 /* Her door beats every BEAT_MS while she thinks, so two beats missed is a
    line that is dead, not a turn that is long; agree.test.mjs holds the two. */
 const READ_MS = 40_000;
-// A question with a short answer — the key, the briefing, the version.
+// A question with a short answer — the key, whether a briefing waits, the version.
 const ASK_MS = 20_000;
 // The app is a hundred megabytes and more.
 const DOWNLOAD_MS = 10 * 60_000;
@@ -58,7 +58,7 @@ const DOWNLOAD_MS = 10 * 60_000;
    and open the pane. */
 const LOOK_MS = 8_000;
 const PROMPT_MS = 1_500;
-// The briefing is asked after the way the charm asks it: every few minutes until it lands.
+// Whether a briefing waits, asked every few minutes: the charm's wakings, more often.
 const BRIEFING_EVERY_MS = 5 * 60_000;
 /* What waits for its journal, asked oftener than the charm can afford to:
    the laptop is awake and online whenever he trades on it, and a trade's
@@ -98,8 +98,7 @@ let micOk = true;
 let taken = false;     // the talk key is held by another app
 let asking = null;     // the request in flight, so a press can hush her
 let looking = null;    // the chart being captured since he asked her to look
-let waiting = null;    // the New York date a landed briefing waits for him on
-let heard = null;      // the New York date he heard it
+let waiting = false;   // a briefing waits for him, as her door last said
 let offered = null;    // a newer build than this one
 let pending = { waiting: 0, trade: null };  // what waits for its journal, as Gladys's door last said
 let answering = false; // an answer on its way to Gladys's door
@@ -107,7 +106,6 @@ let knocks = 0;        // asks of Gladys's door, so a look an answer overtook is
 let updating = false;
 const log = [];
 
-const nyDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
 /* Her window, while it is there: what answers late — a check, a reply, a
    screen change — can arrive after a quit has destroyed it. */
 const present = () => Boolean(face) && !face.isDestroyed();
@@ -267,7 +265,7 @@ function menu() {
   const items = () => [
     { label: 'Talk to her', accelerator, registerAccelerator: false, click: () => send('press', false) },
     { label: 'Show her the chart', accelerator: `Shift+${accelerator}`, registerAccelerator: false, click: () => send('press', true) },
-    { label: 'Hear the briefing', enabled: Boolean(waiting), click: () => send('briefing-now') },
+    { label: 'Hear the briefing', enabled: waiting, click: () => send('briefing-now') },
     { label: 'Journal the trade', enabled: pending.waiting > 0, click: () => send('journal-now') },
     { type: 'separator' },
     { label: 'Bring her here', click: bringHere },
@@ -364,26 +362,27 @@ async function look() {
   return chart.thumbnail.toJPEG(85);
 }
 
-/* The briefing, as the charm has it: asked until it lands, then a dot beside
-   her and in the menu bar until he hears it, gone at midnight in New York, as
-   the door's today is. The ready answer is her line spoken; the dot is the
-   news, so it is not played. */
+/* The briefing, as the charm has it: a dot beside her and in the menu bar
+   while one waits for him. Her door says whether one does — today's, landed,
+   and heard whole on neither the charm nor the laptop — so the dot goes when
+   he hears it on the charm, at midnight in New York, and stays gone after a
+   restart. Asked as ?briefing=waits, whose answer has no voice in it; the
+   charm's ready line is spoken, and the dot is the news. An answer that is
+   neither leaves the dot as it was. */
 async function briefing() {
-  const today = nyDate();
-  if (waiting && waiting !== today) { waiting = null; send('briefing', false); menu(); }
-  if (!keys.eugenia || waiting || heard === today) return;
-  const res = await fetch(`${DOOR}?briefing=ready`, { headers: { 'x-laptop-key': keys.eugenia }, signal: AbortSignal.timeout(ASK_MS) })
+  if (!keys.eugenia) return;
+  const res = await fetch(`${DOOR}?briefing=waits`, { headers: { 'x-laptop-key': keys.eugenia }, signal: AbortSignal.timeout(ASK_MS) })
     .catch(() => null);
-  if (res?.status !== 200) return;
+  if (res?.status !== 200 && res?.status !== 204) return;
   res.body?.cancel();
-  waiting = today;
-  send('briefing', true);
+  if (waiting === (res.status === 200)) return;
+  waiting = !waiting;
+  send('briefing', waiting);
   menu();
 }
 
 function hearBriefing() {
-  heard = nyDate();
-  waiting = null;
+  waiting = false;
   send('briefing', false);
   menu();
   talk('?briefing=today');
@@ -491,7 +490,7 @@ function trayIcon() {
 }
 
 /* ─── What the pages ask of this half ──────────────────────────────────── */
-ipcMain.handle('ready', () => ({ fresh, micOk, taken, talk: talkKey(), briefing: Boolean(waiting), ...pending }));
+ipcMain.handle('ready', () => ({ fresh, micOk, taken, talk: talkKey(), briefing: waiting, ...pending }));
 ipcMain.handle('look', async () => {
   const seen = await (looking = look());
   return typeof seen === 'string' ? seen : null;

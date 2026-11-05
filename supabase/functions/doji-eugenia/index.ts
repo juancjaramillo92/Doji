@@ -4954,7 +4954,7 @@ const CHARM_LOW = "Jefe, I'm running out of battery. Charge me when you can.";
    the whole stream runs at the pace of speech, and cut a long briefing off
    mid-sentence. Once she speaks, the charm's own hanging up and the worker's
    wall clock are the bounds. */
-async function* charmAudio(words: Promise<Spoken>): AsyncGenerator<Uint8Array> {
+async function* charmAudio(words: Promise<Spoken>): AsyncGenerator<Uint8Array, boolean> {
   let said: Spoken | null = null;
   while (said === null) {
     yield BEAT;
@@ -4971,8 +4971,10 @@ async function* charmAudio(words: Promise<Spoken>): AsyncGenerator<Uint8Array> {
       if (!spoken.ok || !spoken.body) throw new Error(`speech HTTP ${spoken.status}`);
       for await (const bytes of spoken.body) yield charmFrame(FRAME.voice, bytes);
     }
+    return true;
   } catch (err) {
     console.error("doji-eugenia: the charm could not speak —", why(err));
+    return false;
   }
 }
 
@@ -4982,18 +4984,33 @@ async function* charmAudio(words: Promise<Spoken>): AsyncGenerator<Uint8Array> {
    dot until he presses and asks `?briefing=today` for the briefing itself. The
    text is the one postBriefing stored, read back as the speaking worker reads
    it, so the charm says exactly what Telegram received. The laptop asks the
-   same two questions and is answered the same way. */
+   same two questions and is answered the same way.
+
+   Heard is the briefing spoken whole to either device: a run row, written once
+   the last of it has gone, so a line that drops halfway leaves it waiting.
+   From then on both doors answer as though none were stored, and the other
+   device's dot goes — the charm finds it at its next waking, and the laptop
+   asks `?briefing=waits`, whose answer has no voice in it, so asking every few
+   minutes costs no speech. Telegram's copy is sent regardless. */
 const CHARM_READY = "Your briefing is ready, jefe.";
 
 async function charmBriefing(which: string): Promise<Response> {
-  if (which !== 'ready' && which !== 'today') {
-    return json({ ok: false, error: "briefing is ready or today" }, 400);
+  if (which !== 'ready' && which !== 'today' && which !== 'waits') {
+    return json({ ok: false, error: "briefing is ready, today or waits" }, 400);
   }
-  const now = new Date();
-  const turn = await storedBriefing(nyClock(now).wd === 0 ? 'sunday' : 'weekday', nyDate(now));
-  if (!turn) return new Response(null, { status: 204 });
-  return new Response(ReadableStream.from(charmAudio(Promise.resolve({ answer: which === 'ready' ? CHARM_READY : turn.content, volume: null }))),
-                      { headers: { "Content-Type": "application/octet-stream" } });
+  const now = new Date(), today = nyDate(now);
+  const due: Brief = nyClock(now).wd === 0 ? 'sunday' : 'weekday', heard = `${due} briefing heard`;
+  const [turn, [run]] = await Promise.all([
+    storedBriefing(due, today),
+    readRows<{ at: string }>('Briefing heard',
+      `eugenia_runs?select=at&caller=eq.${encodeURIComponent(heard)}&order=id.desc&limit=1`),
+  ]);
+  if (!turn || (run && nyDate(new Date(run.at)) === today)) return new Response(null, { status: 204 });
+  if (which === 'waits') return new Response(null, { status: 200 });
+  const said = charmAudio(Promise.resolve({ answer: which === 'ready' ? CHARM_READY : turn.content, volume: null }));
+  return new Response(ReadableStream.from(which === 'ready' ? said : (async function* () {
+    if (yield* said) await recordRun({ caller: heard, ok: true });
+  })()), { headers: { "Content-Type": "application/octet-stream" } });
 }
 
 /* ─── The laptop half: he spoke to her face on his laptop ──────────────────

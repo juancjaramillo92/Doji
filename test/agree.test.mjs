@@ -77,6 +77,12 @@ const CRON_SQL = subject('Everything that runs on a timer');
 const SEMANTIC_SQL = subject('Searching her memory');
 const SCHEMA_008 = subject('Whether the silent writers are writing');
 const EUGENIA_TS = source('supabase/functions/doji-eugenia/index.ts');
+// The words ?briefing= is answered for, as charmBriefing refuses every other.
+const BRIEFING_WORDS = () => {
+  const refused = EUGENIA_TS.match(/if \(((?:which !== '\w+'(?: && )?)+)\) \{\s*return json\(\{ ok: false, error: "briefing is/)?.[1];
+  assert.ok(refused, 'charmBriefing no longer refuses the words it does not answer as this test reads it');
+  return [...refused.matchAll(/'(\w+)'/g)].map(m => m[1]).sort();
+};
 const EUGENIA_PROMPT = source('supabase/functions/doji-eugenia/prompt.ts');
 
 // The functions as the DIRECTORY holds them, not a list typed here.
@@ -294,9 +300,9 @@ test('the charm waits out her silence, records what her door takes, and asks the
   assert.ok(room <= max, `the charm records up to ${room} bytes and her door refuses past ${max}`);
 
   const asked = [...talk.matchAll(/EUGENIA_DOOR "\?briefing=(\w+)"/g)].map(m => m[1]).sort();
-  const door = EUGENIA_TS.match(/if \(which !== '(\w+)' && which !== '(\w+)'\) \{/);
-  assert.ok(asked.length && door, 'talk.c or charmBriefing no longer names the briefing as this test reads it');
-  assert.deepEqual(asked, door.slice(1).sort(), 'the charm asks ?briefing= for a word her door does not answer, or misses one');
+  const door = BRIEFING_WORDS();
+  assert.ok(asked.length, 'talk.c no longer names the briefing as this test reads it');
+  for (const word of asked) assert.ok(door.includes(word), `the charm asks ?briefing=${word} and her door answers ${door.join(', ')}`);
   // The waking's report: the flag the charm sends is the one her door reads.
   const sent = talk.match(/EUGENIA_DOOR "\?(\w+)=1", HTTP_METHOD_POST/)?.[1];
   assert.ok(sent && EUGENIA_TS.includes(`searchParams.has("${sent}")`),
@@ -444,10 +450,13 @@ test('the laptop knocks with the key, the form and the words her door reads', ()
   const chart = appended.find(m => m[1] === 'chart');
   assert.ok(chart && images.includes(chart[2]), `the laptop sends its chart as ${chart?.[2]}, which her door refuses`);
 
-  const asked = [...LAPTOP_MAIN.matchAll(/\?briefing=(\w+)/g)].map(m => m[1]).sort();
-  const door = EUGENIA_TS.match(/if \(which !== '(\w+)' && which !== '(\w+)'\) \{/);
-  assert.ok(asked.length && door, 'the laptop or charmBriefing no longer names the briefing as this test reads it');
-  assert.deepEqual([...new Set(asked)], door.slice(1).sort(), 'the laptop asks ?briefing= for a word her door does not answer, or misses one');
+  // Every word the laptop asks is one her door answers, and every word her door answers is asked by the charm or the laptop.
+  const asked = [...new Set([...LAPTOP_MAIN.matchAll(/\?briefing=(\w+)/g)].map(m => m[1]))].sort();
+  const charm = [...source('charm/main/talk.c').matchAll(/EUGENIA_DOOR "\?briefing=(\w+)"/g)].map(m => m[1]);
+  const door = BRIEFING_WORDS();
+  assert.ok(asked.length, 'the laptop no longer names the briefing as this test reads it');
+  for (const word of asked) assert.ok(door.includes(word), `the laptop asks ?briefing=${word} and her door answers ${door.join(', ')}`);
+  assert.deepEqual([...new Set([...asked, ...charm])].sort(), door, 'her door answers a ?briefing= word neither device asks');
   assert.match(LAPTOP_DOOR, /if \(briefing !== null\) return await charmBriefing\(briefing\);/,
     'the laptop\'s door no longer answers the briefing as the charm\'s does');
 });
