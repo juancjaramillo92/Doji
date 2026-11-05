@@ -489,10 +489,13 @@ function draw(now) {
   if (V.journal > 0) questions(journal, now);
 }
 
+/* At rest she is drawn at REST_FRAME_MS, and so are the questions while
+   nothing on them moves — up, settled, and not drawing their tick. */
 let last = 0;
 function frame(now) {
   requestAnimationFrame(frame);
-  const resting = mode === 'idle' && !cursor;
+  const settled = mode === 'journal' && V.journal === 1 && !journal.done && now - journal.faded >= FADE_MS;
+  const resting = mode === 'idle' && !cursor || settled;
   if (now - last < (resting ? REST_FRAME_MS : FRAME_MS)) return;
   const dt = Math.min(0.05, last ? (now - last) / 1000 : 0.033);
   last = now;

@@ -2188,7 +2188,7 @@ in** to listen, **sways** while she thinks and **gives with the loud moments**
 of her voice; eyes and mouth ride the same transform. Reduce Motion in macOS
 stops the breathing and floating and keeps the rest; at rest she is drawn at
 twenty frames a second rather than thirty, which a breath that slow does not
-show. Clicks outside her shape go through to the chart beneath, she can be
+show, and so are the journal's questions while nothing on them moves. Clicks outside her shape go through to the chart beneath, she can be
 dragged anywhere and stays where she is left. A click on her brings her app to
 the front, as a click on any app's window does; the talk key leaves
 TradingView there. She is the window's middle; the room above her head holds
