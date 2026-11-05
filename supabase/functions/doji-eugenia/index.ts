@@ -1689,7 +1689,7 @@ async function makeCall(direction: unknown, entry: unknown, stop: unknown, targe
    at +$20 as R-04 moves his, reached on a bar after the fill and effective from
    the bar after that, since a bar's high and low cannot say which came first.
    A call that waits for a close goes live only once a 5m candle opened after
-   it — built from the minute bars on the five minutes, as his chart draws it —
+   it — built from the minute bars five minutes at a time, as his chart draws it —
    has reached the level and closed beyond it, and fills on the first touch of
    the entry after that candle closed: a touch before it is the trade R-07
    forbids. A call filed before `confirm` existed is scored on the touch alone.
@@ -1738,16 +1738,16 @@ export function scoreCall(c: Call, candles: Candle[], from: number): Score {
    the level and closed beyond it the call's way, or null. Five minutes with
    no minute in the bars is no candle, never a guess at one. */
 function confirmedAt(bars: Candle[], buy: boolean, level: number, from: number): number | null {
-  const quarters = new Map<number, Candle>();
+  const candles = new Map<number, Candle>();
   for (const b of bars) {
     const t = Math.floor(b.t / CONFIRM_MS) * CONFIRM_MS;
     if (t < from) continue;
-    const q = quarters.get(t);
-    quarters.set(t, q ? { ...q, high: Math.max(q.high, b.high), low: Math.min(q.low, b.low), close: b.close }
+    const c = candles.get(t);
+    candles.set(t, c ? { ...c, high: Math.max(c.high, b.high), low: Math.min(c.low, b.low), close: b.close }
                       : { ...b, t });
   }
-  for (const q of quarters.values()) {
-    if (buy ? q.low <= level && q.close > level : q.high >= level && q.close < level) return q.t + CONFIRM_MS;
+  for (const c of candles.values()) {
+    if (buy ? c.low <= level && c.close > level : c.high >= level && c.close < level) return c.t + CONFIRM_MS;
   }
   return null;
 }
