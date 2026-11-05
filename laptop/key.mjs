@@ -3,7 +3,7 @@
    in the window's address, and the page says whose. */
 const WHOSE = {
   eugenia: ['Her key', 'EUGENIA_LAPTOP_SECRET'],
-  gladys: ['Gladys’s key', 'GLADYS_LAPTOP_SECRET'],
+  gladys: ["Gladys's key", 'GLADYS_LAPTOP_SECRET'],
 };
 const SAID = {
   wrong: "The door doesn't know that key. Check it was copied whole.",

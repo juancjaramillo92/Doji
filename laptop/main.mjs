@@ -551,7 +551,7 @@ app.whenReady().then(async () => {
      anything else: Electron grants any permission a page asks for unless
      told otherwise, the camera and notifications among them. */
   session.defaultSession.setPermissionRequestHandler((contents, permission, grant, details) =>
-    grant(contents === face?.webContents && permission === 'media' && (details.mediaTypes ?? []).every(t => t === 'audio')));
+    grant(contents === face?.webContents && permission === 'media' && details.mediaTypes?.every(t => t === 'audio') === true));
   micOk = await systemPreferences.askForMediaAccess('microphone');
   if (!micOk) shell.openExternal(PANES.mic);
   // The app's own menu, for its name, Quit, and the Edit menu ⌘V pastes her key through.

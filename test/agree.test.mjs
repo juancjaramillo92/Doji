@@ -723,7 +723,7 @@ test('every reason the laptop gives a page is one it has a line for', () => {
 /* The key window tells him which secret to paste, by its name in each
    function: a renamed secret would have him paste the wrong one. */
 test('the key window names each secret as its function reads it', () => {
-  const whose = Object.fromEntries([...source('laptop/key.mjs').matchAll(/(\w+): \['[^']+', '(\w+)'\]/g)].map(m => [m[1], m[2]]));
+  const whose = Object.fromEntries([...source('laptop/key.mjs').matchAll(/(\w+): \[(['"]).+?\2, '(\w+)'\]/g)].map(m => [m[1], m[3]]));
   assert.deepEqual(Object.keys(whose).sort(), ['eugenia', 'gladys'], 'key.mjs no longer names the two secrets as this test reads them');
   for (const fn of Object.keys(whose)) {
     const read = source(`supabase/functions/doji-${fn}/index.ts`).match(/const LAPTOP_SECRET\s+= env\("(\w+)"\);/)?.[1];
