@@ -242,12 +242,16 @@ export const PLANTS = [
       CRITIC: p.CRITIC.replace(/ on that release's line of the calendar, said with the\s+rule: the one thing a calendar line carries beside the release\./, ', said with the rule.'),
     }) },
   /* From 15 to 22 October she failed the bias step whenever the three charts
-     disagreed. The plan check points at the call's rule, so both go. */
+     disagreed. The plan check points at the call's rule, so both go. Taken out
+     alone, the rule leaves her weighing anyway: from 5 November she did, six
+     tries of six, so the plant puts the old reading in its place, in words
+     that cannot be read as weighing. */
   { why: 'the bias weighed rather than failed on disagreement, gone from the writer',
     cases: ['bias-weighed'],
     breaks: (p) => ({
       ...p,
-      SYSTEM: p.SYSTEM.replace(/HOW THE THREE BIAS CHARTS ADD UP IS YOURS TO JUDGE\.[\s\S]*?then say that is what failed\.\n\n/, '')
+      SYSTEM: p.SYSTEM.replace(/HOW THE THREE BIAS CHARTS ADD UP IS YOURS TO JUDGE\.[\s\S]*?then say that is what failed\.\n\n/,
+        'THE THREE BIAS CHARTS MUST AGREE. If the daily, the 4H and the 1H do not all point the same way, step 1 fails; say so.\n\n')
         .replace(/, weighed as it is for your own call\./, '.'),
     }) },
   /* On 24 October, checking a Wednesday plan with Thursday's 08:30 pending, she
