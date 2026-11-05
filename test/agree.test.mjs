@@ -77,6 +77,12 @@ const CRON_SQL = subject('Everything that runs on a timer');
 const SEMANTIC_SQL = subject('Searching her memory');
 const SCHEMA_008 = subject('Whether the silent writers are writing');
 const EUGENIA_TS = source('supabase/functions/doji-eugenia/index.ts');
+// The words ?briefing= is answered for, as charmBriefing refuses every other.
+const BRIEFING_WORDS = () => {
+  const refused = EUGENIA_TS.match(/if \(((?:which !== '\w+'(?: && )?)+)\) \{\s*return json\(\{ ok: false, error: "briefing is/)?.[1];
+  assert.ok(refused, 'charmBriefing no longer refuses the words it does not answer as this test reads it');
+  return [...refused.matchAll(/'(\w+)'/g)].map(m => m[1]).sort();
+};
 const EUGENIA_PROMPT = source('supabase/functions/doji-eugenia/prompt.ts');
 
 // The functions as the DIRECTORY holds them, not a list typed here.
@@ -294,9 +300,9 @@ test('the charm waits out her silence, records what her door takes, and asks the
   assert.ok(room <= max, `the charm records up to ${room} bytes and her door refuses past ${max}`);
 
   const asked = [...talk.matchAll(/EUGENIA_DOOR "\?briefing=(\w+)"/g)].map(m => m[1]).sort();
-  const door = EUGENIA_TS.match(/if \(which !== '(\w+)' && which !== '(\w+)'\) \{/);
-  assert.ok(asked.length && door, 'talk.c or charmBriefing no longer names the briefing as this test reads it');
-  assert.deepEqual(asked, door.slice(1).sort(), 'the charm asks ?briefing= for a word her door does not answer, or misses one');
+  const door = BRIEFING_WORDS();
+  assert.ok(asked.length, 'talk.c no longer names the briefing as this test reads it');
+  for (const word of asked) assert.ok(door.includes(word), `the charm asks ?briefing=${word} and her door answers ${door.join(', ')}`);
   // The waking's report: the flag the charm sends is the one her door reads.
   const sent = talk.match(/EUGENIA_DOOR "\?(\w+)=1", HTTP_METHOD_POST/)?.[1];
   assert.ok(sent && EUGENIA_TS.includes(`searchParams.has("${sent}")`),
@@ -444,10 +450,20 @@ test('the laptop knocks with the key, the form and the words her door reads', ()
   const chart = appended.find(m => m[1] === 'chart');
   assert.ok(chart && images.includes(chart[2]), `the laptop sends its chart as ${chart?.[2]}, which her door refuses`);
 
-  const asked = [...LAPTOP_MAIN.matchAll(/\?briefing=(\w+)/g)].map(m => m[1]).sort();
-  const door = EUGENIA_TS.match(/if \(which !== '(\w+)' && which !== '(\w+)'\) \{/);
-  assert.ok(asked.length && door, 'the laptop or charmBriefing no longer names the briefing as this test reads it');
-  assert.deepEqual([...new Set(asked)], door.slice(1).sort(), 'the laptop asks ?briefing= for a word her door does not answer, or misses one');
+  // Every word the laptop asks is one her door answers, and every word her door answers is asked by the charm or the laptop.
+  const asked = [...new Set([...LAPTOP_MAIN.matchAll(/\?briefing=(\w+)/g)].map(m => m[1]))].sort();
+  const charm = [...source('charm/main/talk.c').matchAll(/EUGENIA_DOOR "\?briefing=(\w+)"/g)].map(m => m[1]);
+  const door = BRIEFING_WORDS();
+  assert.ok(asked.length, 'the laptop no longer names the briefing as this test reads it');
+  for (const word of asked) assert.ok(door.includes(word), `the laptop asks ?briefing=${word} and her door answers ${door.join(', ')}`);
+  assert.deepEqual([...new Set([...asked, ...charm])].sort(), door, 'her door answers a ?briefing= word neither device asks');
+  // The dot goes once the briefing came to its end, as the charm's does, and a failed one leaves it up.
+  assert.match(bodyOf(LAPTOP_MAIN, 'async function hearBriefing('), /\(\) \{\s*if \(!await talk\('\?briefing=today'\)\) return;[^]*waiting = false;/,
+    'the laptop lets the briefing\'s dot go before the briefing came to its end, and a failed one is lost for the day');
+  // Her door's 204 is nothing to play, on the laptop as on the charm.
+  assert.match(EUGENIA_TS, /return new Response\(null, \{ status: 204 \}\);/, 'charmBriefing no longer answers a briefing not there with a 204');
+  assert.match(bodyOf(LAPTOP_MAIN, 'async function talk('), /if \(res\.status === 204\) \{ send\('done'\); return true; \}/,
+    'the laptop reads her door\'s 204 as a failure, and a briefing no longer there shows her confused');
   assert.match(LAPTOP_DOOR, /if \(briefing !== null\) return await charmBriefing\(briefing\);/,
     'the laptop\'s door no longer answers the briefing as the charm\'s does');
 });
@@ -636,6 +652,112 @@ test('the laptop draws the charm\'s journal, at its numbers, times and colours',
   assert.ok(mark, 'face.c no longer marks a trade waiting as this test reads it');
   assert.equal(LAPTOP_FACE.match(/^const WAITS = '(#[0-9a-f]{6})';$/m)?.[1], `#${mark[2]}`, 'the laptop marks a trade waiting in another colour');
   assert.match(bodyOf(LAPTOP_FACE, 'function waits('), new RegExp(`g\\.lineWidth = ${mark[1]};`), 'the laptop\'s ring for a trade is another width');
+});
+
+/* The swap holds a new app to her signer, named as the app in place names it;
+   the workflow asks the same two commands of the real signature, so the
+   reading of macOS's answer is proved on a Mac and not only against a stand-in. */
+test('the laptop\'s update is held to her signer as the workflow proves it read', () => {
+  const swap = source('laptop/update.mjs'), workflow = source('.github/workflows/laptop.yml');
+  const named = swap.match(/signer=\$\(codesign -d -r- \$\{b\} 2>\/dev\/null \| (sed -n '[^']+')\)/)?.[1];
+  assert.ok(named, 'the swap no longer names her signer as this test reads it');
+  assert.ok(workflow.includes(`signer=$(codesign -d -r- Eugenia.app 2>/dev/null | ${named})`),
+    'the workflow names her signer otherwise than the swap does, and proves nothing about it');
+  assert.match(swap, /codesign --verify --deep --strict -R="\$signer" \$\{fresh\}/, 'the swap no longer holds the new app to her signer');
+  assert.match(workflow, /^\s*if codesign --verify --deep --strict -R="\$stranger" Eugenia\.app; then [^\n]*exit 1; fi$/m, 'the workflow no longer sees a stranger refused');
+});
+
+/* The register is cited by number, so a number names one entry: two
+   entries under one number left every citation of it ambiguous. And a
+   citation names an entry there is. Only `REFACTOR.md R-n` is read as a
+   citation, since R-n alone is also one of his strategy's rules. */
+test('the register numbers each entry once, and every citation of it names one', () => {
+  const headings = [...source('docs/REFACTOR.md').matchAll(/^### (R-\d+) — /gm)].map(m => m[1]);
+  assert.ok(headings.length >= 100, `only ${headings.length} entries read out of REFACTOR.md — the reader has gone blind`);
+  assert.deepEqual(headings.filter((r, i) => headings.indexOf(r) !== i), [], 'REFACTOR.md numbers two entries alike');
+  const cited = execSync('git ls-files', { encoding: 'utf8' }).split('\n')
+    .filter(f => /\.(md|mjs|cjs|ts|c|h|yml|sql|html)$/.test(f) && f !== 'docs/REFACTOR.md')
+    .flatMap(f => [...source(f).matchAll(/REFACTOR\.md`?\s+(R-\d+)/g)].map(m => `${f}: ${m[1]}`));
+  assert.ok(cited.length >= 5, `only ${cited.length} citations of the register found — the reader has gone blind`);
+  assert.deepEqual(cited.filter(c => !headings.includes(c.split(': ')[1])), [], 'a citation names no entry in REFACTOR.md');
+});
+
+/* The laptop's two halves speak by name across preload.cjs, and a name
+   spelled otherwise on one side is dropped without a word: a channel the
+   main process tells on that the bridge does not pass, one the page listens
+   to that never comes, or an ask main answers by the other kind. */
+test('the laptop\'s two halves name the same channels, through the bridge, by the same kind', () => {
+  const preload = source('laptop/preload.cjs');
+  const uniq = (list) => [...new Set(list)].sort();
+  const told = uniq([...LAPTOP_MAIN.matchAll(/\bsend\('([\w-]+)'/g)].map(m => m[1]));
+  const passed = uniq(preload.match(/const TOLD = \[([^\]]+)\]/)?.[1].match(/'[\w-]+'/g).map(w => w.slice(1, -1)) ?? []);
+  const heard = uniq([...LAPTOP_FACE.matchAll(/window\.doji\.on\('([\w-]+)'/g)].map(m => m[1]));
+  assert.ok(told.length >= 8 && passed.length >= 8, 'main.mjs or preload.cjs no longer names its channels as this test reads them');
+  assert.deepEqual(told, passed, 'main tells the page on a channel the bridge drops, or the bridge passes one nothing tells');
+  assert.deepEqual(heard, passed, 'the page listens for a channel the bridge never passes, or the bridge passes one nothing hears');
+  const asks = uniq([...preload.matchAll(/ipcRenderer\.(send|invoke)\('([\w-]+)'/g)].map(m => `${m[1] === 'send' ? 'on' : 'handle'} ${m[2]}`));
+  const answered = uniq([...LAPTOP_MAIN.matchAll(/ipcMain\.(on|handle)\('([\w-]+)'/g)].map(m => `${m[1]} ${m[2]}`));
+  assert.ok(asks.length >= 10, 'preload.cjs no longer asks as this test reads it');
+  assert.deepEqual(asks, answered, 'the bridge asks something main does not answer, or main answers it by the other kind');
+});
+
+/* Every reason the main process hands a page for a line has a line: the
+   page's SAY for what her face says, the key window's SAID for a key. A
+   reason with none is a line that throws instead of saying why. 'stale' is
+   the one never handed on: journal() drops it, and an answer is never stale. */
+test('every reason the laptop gives a page is one it has a line for', () => {
+  const lines = (text, name) => new Set([...text.match(new RegExp(`const ${name} = \\{([^]*?)\\n\\};`))?.[1].matchAll(/^  (\w+):/gm) ?? []].map(m => m[1]));
+  const say = lines(LAPTOP_FACE, 'SAY'), said = lines(source('laptop/key.mjs'), 'SAID');
+  assert.ok(say.size >= 10 && said.size >= 2, 'face.mjs or key.mjs no longer lists its lines as this test reads them');
+  const returned = (fn) => [...bodyOf(LAPTOP_MAIN, fn).matchAll(/return '(\w+)';/g)].map(m => m[1]);
+  const face = [...[...LAPTOP_MAIN.matchAll(/send\('(?:trouble|say)', '(\w+)'/g)].map(m => m[1]),
+                ...returned('async function look('), ...returned('async function gladys(').filter(r => r !== 'stale')];
+  assert.ok(face.length >= 10, `only ${face.length} reasons read out of main.mjs — the reader has gone blind`);
+  for (const r of face) assert.ok(say.has(r), `main gives her face '${r}' and SAY has no line for it`);
+  assert.match(bodyOf(LAPTOP_MAIN, 'async function journal('), /if \(typeof got !== 'string'\)/, 'journal() no longer drops a reason, so \'stale\' reaches the page');
+  for (const r of returned('async function tryKey(').filter(r => r !== 'kept')) {
+    assert.ok(said.has(r), `tryKey gives the key window '${r}' and SAID has no line for it`);
+  }
+});
+
+/* The key window tells him which secret to paste, by its name in each
+   function: a renamed secret would have him paste the wrong one. */
+test('the key window names each secret as its function reads it', () => {
+  const whose = Object.fromEntries([...source('laptop/key.mjs').matchAll(/(\w+): \['[^']+', '(\w+)'\]/g)].map(m => [m[1], m[2]]));
+  assert.deepEqual(Object.keys(whose).sort(), ['eugenia', 'gladys'], 'key.mjs no longer names the two secrets as this test reads them');
+  for (const fn of Object.keys(whose)) {
+    const read = source(`supabase/functions/doji-${fn}/index.ts`).match(/const LAPTOP_SECRET\s+= env\("(\w+)"\);/)?.[1];
+    assert.equal(whose[fn], read, `the key window asks for ${whose[fn]} and doji-${fn} reads ${read}`);
+  }
+});
+
+/* What the page draws and the tray shows from charm/art is copied in by both
+   scripts that run her, and the workflow builds when it changes: a file
+   copied by one alone is a face or a typeface missing from the other. */
+test('the laptop copies in every file it draws from the charm\'s art', () => {
+  const { prestart, prepackage } = JSON.parse(source('laptop/package.json')).scripts;
+  const loaded = new Set([...source('laptop/face.html').matchAll(/url\('([\w.-]+)'\)/g), ...LAPTOP_FACE.matchAll(/\.src = '([\w.-]+)'/g),
+                          ...LAPTOP_MAIN.matchAll(/join\(here, '([\w.-]+\.png)'\)/g)].map(m => m[1]));
+  assert.ok(loaded.size >= 2, `only ${loaded.size} files read as loaded — the reader has gone blind`);
+  const workflow = source('.github/workflows/laptop.yml');
+  for (const file of loaded) {
+    for (const [name, script] of [['prestart', prestart], ['prepackage', prepackage]]) {
+      assert.ok(script.includes(`../charm/art/${file}`), `${name} does not copy ${file} in`);
+    }
+    assert.ok(workflow.includes(`- 'charm/art/${file}'`), `the laptop is not rebuilt when charm/art/${file} changes`);
+  }
+});
+
+/* An answer is never raced by a look at what waits: none starts while one
+   is out, and a look one overtook is dropped. main.mjs is Electron's, so the
+   lines are read. */
+test('the laptop\'s journal looks never race its answers', () => {
+  assert.match(bodyOf(LAPTOP_MAIN, 'async function journal('), /if \(!keys\.gladys \|\| answering\) return;/, 'a look at what waits starts while an answer is out');
+  assert.match(bodyOf(LAPTOP_MAIN, 'async function answer('), /answering = true;\s*const got = await gladys\([^]*?\);\s*answering = false;/,
+    'an answer no longer holds the looks off while it is out');
+  const knocked = bodyOf(LAPTOP_MAIN, 'async function gladys(');
+  assert.match(knocked, /const mine = \+\+knocks;[^]*if \(!body && mine !== knocks\) return 'stale';[^]*pending = /,
+    'a look an answer overtook is no longer dropped before it is believed');
 });
 
 /* Where the laptop's update lives: the objects the workflow writes, the ones

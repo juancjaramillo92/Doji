@@ -76,6 +76,10 @@ const FADE_MS = 180;
 const TICK_MS = 420;
 const SWEEP_MS = 700;
 const DONE_MS = 2600;
+/* The laptop's own: the questions come up on their own over his chart, at
+   the moment he is likeliest to be working it, so a click in their first
+   SETTLE_MS was meant for the chart beneath them. */
+const SETTLE_MS = 500;
 // The ring near white: grey on black reads as a smudge.
 const WAITS = '#ecf4ef';
 const TYPE = '"Hanken Grotesk"';
@@ -485,10 +489,13 @@ function draw(now) {
   if (V.journal > 0) questions(journal, now);
 }
 
+/* At rest she is drawn at REST_FRAME_MS, and so are the questions while
+   nothing on them moves — up, settled, and not drawing their tick. */
 let last = 0;
 function frame(now) {
   requestAnimationFrame(frame);
-  const resting = mode === 'idle' && !cursor;
+  const settled = mode === 'journal' && V.journal === 1 && !journal.done && now - journal.faded >= FADE_MS;
+  const resting = mode === 'idle' && !cursor || settled;
   if (now - last < (resting ? REST_FRAME_MS : FRAME_MS)) return;
   const dt = Math.min(0.05, last ? (now - last) / 1000 : 0.033);
   last = now;
@@ -497,13 +504,17 @@ function frame(now) {
 }
 
 /* Her square at the bottom of the room, drawn at the screen's own density —
-   which changes when the window moves to another screen. */
+   which changes when the window moves to another screen, watched for once
+   per density rather than once per resize. */
+let density = 0;
 function fit() {
   const side = Math.round(innerHeight / ROOM.height);
   canvas.style.width = canvas.style.height = `${side}px`;
   canvas.width = canvas.height = Math.round(side * devicePixelRatio);
   // Above the ring, in the room over her head.
   said.style.bottom = `${side + 2}px`;
+  if (devicePixelRatio === density) return;
+  density = devicePixelRatio;
   matchMedia(`(resolution: ${devicePixelRatio}dppx)`).addEventListener('change', fit, { once: true });
 }
 
@@ -583,6 +594,7 @@ function live() {
     if (j.done ? now - j.done >= DONE_MS : j.lit === null && now - j.since >= ASK_MS) mode = 'idle';
   }
   if (mode === 'idle' && due) journalNow();
+  if (!held) feel();
   if (sayUntil && now >= sayUntil) unsay();
 }
 
@@ -610,12 +622,15 @@ async function listening(chart) {
   const chunks = [];
   ear = sounds().createAnalyser();
   ear.fftSize = 1024;
-  sounds().createMediaStreamSource(recording).connect(ear);
+  // Let go with the recording: the context outlives every question, and a source left connected to it stays.
+  const source = sounds().createMediaStreamSource(recording);
+  source.connect(ear);
   recorder = new MediaRecorder(recording, { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: RECORD_BPS });
   recorder.ondataavailable = (e) => chunks.push(e.data);
   recorder.onstop = async () => {
     const short = performance.now() - listen.began < RECORD_MIN_MS, kept = mode === 'listening';
     recording?.getTracks().forEach(t => t.stop());
+    source.disconnect();
     recording = recorder = ear = null;
     if (!kept) return;
     if (short) { window.doji.hush(); mode = 'idle'; unsay(); return; }
@@ -682,7 +697,7 @@ function journalNow() {
   due = false;
   unsay();
   mode = 'journal';
-  journal = { q: -1, allYes: true, done: 0 };
+  journal = { q: -1, allYes: true, done: 0, opened: performance.now() };
   ask(trade);
   return true;
 }
@@ -696,7 +711,7 @@ function ask(next) {
 // A click on a half: lit at once, held FLASH_MS at least, and sent.
 async function choose(x) {
   const j = journal;
-  if (j.lit !== null || j.done) return;
+  if (j.lit !== null || j.done || performance.now() - j.opened < SETTLE_MS) return;
   const side = pixel(x, 0)[0] >= 233 ? 1 : 0;
   j.lit = side;
   const [got] = await Promise.all([window.doji.answer(j.trade.id, j.q, side), new Promise(r => setTimeout(r, FLASH_MS))]);
@@ -727,8 +742,11 @@ function waitsNow(next, count) {
    waits count as her, and the journal's round screen is all hers. A press
    that moves is a drag, and one that does not is a click: on the journal, an
    answer; on her, what waits goes first — the journal, then the briefing —
-   and otherwise she listens. The first time the cursor rests on her, she
-   says how to talk. */
+   and otherwise she listens. Whether the pointer is on her is asked as it
+   moves and as she changes under it — the questions coming up or going, a
+   mark appearing — so a window that takes clicks where she no longer is
+   never catches one meant for the chart. The first time the cursor rests on
+   her, she says how to talk. */
 function pixel(x, y) {
   const r = canvas.getBoundingClientRect();
   return [(x - r.left) * 466 / r.width, (y - r.top) * 466 / r.height];
@@ -741,6 +759,15 @@ const on = (x, y) => {
   return u >= 0 && v >= 0 && u < 466 && v < 466 && alpha[v * 466 + u] > 64;
 };
 let solid = false, held = null, hinted = false, hint = 0;
+let pointer = null;          // where the cursor last was, in the window's pixels
+function feel() {
+  const now = pointer !== null && on(...pointer);
+  if (now === solid) return;
+  window.doji.solid(solid = now);
+  document.body.classList.toggle('hand', solid);
+  clearTimeout(hint);
+  if (solid && !hinted) hint = setTimeout(() => { if (mode === 'idle' && !sayUntil) { hinted = true; say('hint'); } }, HINT_AFTER_MS);
+}
 addEventListener('mousemove', (e) => {
   if (held) {
     const dx = e.screenX - held.x, dy = e.screenY - held.y;
@@ -752,15 +779,12 @@ addEventListener('mousemove', (e) => {
     }
     return;
   }
-  const now = on(e.clientX, e.clientY);
-  if (now === solid) return;
-  window.doji.solid(solid = now);
-  document.body.classList.toggle('hand', solid);
-  clearTimeout(hint);
-  if (solid && !hinted) hint = setTimeout(() => { if (mode === 'idle' && !sayUntil) { hinted = true; say('hint'); } }, HINT_AFTER_MS);
+  pointer = [e.clientX, e.clientY];
+  feel();
 });
 addEventListener('mousedown', (e) => { if (solid) held = { x: e.screenX, y: e.screenY, moved: false }; });
 addEventListener('mouseup', (e) => {
+  if (held?.moved) window.doji.dropped();
   if (held && !held.moved) {
     if (mode === 'journal') choose(e.clientX);
     else if (!journalNow() && !briefing()) press(false);
@@ -770,6 +794,7 @@ addEventListener('mouseup', (e) => {
 
 // The cursor anywhere on the screen, from the main process: near her, it has her eyes.
 function near(x, y) {
+  pointer = [x, y];
   const [u, v] = pixel(x, y), dx = u - 237, dy = v - 140, far = Math.hypot(dx, dy);
   cursor = far < NEAR && far > 1 ? [dx / far * LOOK_RANGE, dy / far * LOOK_RANGE * 0.7] : null;
 }

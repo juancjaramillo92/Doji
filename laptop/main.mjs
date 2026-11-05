@@ -15,8 +15,8 @@
    the page at all.
    ═══════════════════════════════════════════════════════════════════════════ */
 import {
-  app, BrowserWindow, Menu, Tray, clipboard, desktopCapturer, dialog, globalShortcut, ipcMain, nativeImage, safeStorage,
-  screen, shell, systemPreferences,
+  app, BrowserWindow, Menu, Tray, clipboard, desktopCapturer, dialog, globalShortcut, ipcMain, nativeImage, powerMonitor,
+  safeStorage, screen, session, shell, systemPreferences,
 } from 'electron';
 import { Buffer } from 'node:buffer';
 import { spawn } from 'node:child_process';
@@ -49,7 +49,7 @@ const CHART_PX = 1568;
 /* Her door beats every BEAT_MS while she thinks, so two beats missed is a
    line that is dead, not a turn that is long; agree.test.mjs holds the two. */
 const READ_MS = 40_000;
-// A question with a short answer — the key, the briefing, the version.
+// A question with a short answer — the key, whether a briefing waits, the version.
 const ASK_MS = 20_000;
 // The app is a hundred megabytes and more.
 const DOWNLOAD_MS = 10 * 60_000;
@@ -58,14 +58,14 @@ const DOWNLOAD_MS = 10 * 60_000;
    and open the pane. */
 const LOOK_MS = 8_000;
 const PROMPT_MS = 1_500;
-// The briefing is asked after the way the charm asks it: every few minutes until it lands.
+// Whether a briefing waits, asked every few minutes: the charm's wakings, more often.
 const BRIEFING_EVERY_MS = 5 * 60_000;
 /* What waits for its journal, asked oftener than the charm can afford to:
    the laptop is awake and online whenever he trades on it, and a trade's
    questions belong to the minute it opened. */
 const JOURNAL_EVERY_MS = 60_000;
 const UPDATE_EVERY_MS = 24 * 60 * 60_000;
-// How often she looks for the cursor, to look at it when it comes near.
+// How often she looks for the cursor, to look at it when it comes near; the page is told only when it has moved.
 const CURSOR_MS = 100;
 // Her last decisions, kept for him to copy when something looks wrong.
 const LOG_LINES = 80;
@@ -98,16 +98,16 @@ let micOk = true;
 let taken = false;     // the talk key is held by another app
 let asking = null;     // the request in flight, so a press can hush her
 let looking = null;    // the chart being captured since he asked her to look
-let waiting = null;    // the New York date a landed briefing waits for him on
-let heard = null;      // the New York date he heard it
+let waiting = false;   // a briefing waits for him, as her door last said
+let hearings = 0;      // briefings heard here, so an ask one overtook is dropped
 let offered = null;    // a newer build than this one
 let pending = { waiting: 0, trade: null };  // what waits for its journal, as Gladys's door last said
 let answering = false; // an answer on its way to Gladys's door
 let knocks = 0;        // asks of Gladys's door, so a look an answer overtook is dropped
+let pointed = '';      // where the page was last told the cursor is
 let updating = false;
 const log = [];
 
-const nyDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
 /* Her window, while it is there: what answers late — a check, a reply, a
    screen change — can arrive after a quit has destroyed it. */
 const present = () => Boolean(face) && !face.isDestroyed();
@@ -199,7 +199,6 @@ function float() {
   if (spaces) note(`kept to one desktop (${spaces.managed(face.getNativeWindowHandle())})`);
   face.setContentProtection(true);
   face.setIgnoreMouseEvents(true, { forward: true });
-  face.on('moved', () => { [settings.x, settings.y] = face.getPosition(); save(); });
   face.loadFile(join(here, 'face.html'));
   face.once('ready-to-show', () => { if (!settings.hidden) bringHere(); });
   // A screen unplugged or rearranged can take her place with it.
@@ -267,7 +266,7 @@ function menu() {
   const items = () => [
     { label: 'Talk to her', accelerator, registerAccelerator: false, click: () => send('press', false) },
     { label: 'Show her the chart', accelerator: `Shift+${accelerator}`, registerAccelerator: false, click: () => send('press', true) },
-    { label: 'Hear the briefing', enabled: Boolean(waiting), click: () => send('briefing-now') },
+    { label: 'Hear the briefing', enabled: waiting, click: () => send('briefing-now') },
     { label: 'Journal the trade', enabled: pending.waiting > 0, click: () => send('journal-now') },
     { type: 'separator' },
     { label: 'Bring her here', click: bringHere },
@@ -298,7 +297,8 @@ function menu() {
    the page as it arrives, so she starts speaking before the rest has come.
    Nothing on the wire for READ_MS is a dead line, said as one rather than
    thought about for ever. A press while she thinks or speaks hushes her; the
-   door keeps the turn going, so the copy and the memory still land. */
+   door keeps the turn going, so the copy and the memory still land. True
+   when the answer came to its end. */
 async function talk(path, body) {
   asking?.abort();
   const abort = asking = new AbortController();
@@ -311,10 +311,13 @@ async function talk(path, body) {
     });
     if (res.status === 401) { askForKey('eugenia'); return send('trouble', 'key'); }
     if (res.status === 503) return send('trouble', 'voice');
+    // Nothing to say: the briefing asked for as midnight passed, or heard on the charm since its dot was drawn.
+    if (res.status === 204) { send('done'); return true; }
     if (!res.ok || !res.body) return send('trouble', 'door');
     const feed = framer((kind, bytes) => send('frame', kind, bytes));
     for await (const chunk of res.body) { alive(); feed(chunk); }
     send('done');
+    return true;
   } catch {
     if (abort.signal.reason === 'silent') send('trouble', 'lost');
     else if (asking === abort) send('trouble', 'offline');
@@ -364,29 +367,37 @@ async function look() {
   return chart.thumbnail.toJPEG(85);
 }
 
-/* The briefing, as the charm has it: asked until it lands, then a dot beside
-   her and in the menu bar until he hears it, gone at midnight in New York, as
-   the door's today is. The ready answer is her line spoken; the dot is the
-   news, so it is not played. */
+/* The briefing, as the charm has it: a dot beside her and in the menu bar
+   while one waits for him. Her door says whether one does — today's, landed,
+   and heard whole on neither the charm nor the laptop — so the dot goes when
+   he hears it on the charm, at midnight in New York, and stays gone after a
+   restart. Asked as ?briefing=waits, whose answer has no voice in it; the
+   charm's ready line is spoken, and the dot is the news. An answer that is
+   neither leaves the dot as it was, and so does one asked before a briefing
+   heard here ended, since it read the door before the door knew.
+
+   The dot goes once the briefing has come to its end, as on the charm: a
+   briefing that failed — the line gone, her door's error — leaves it up, to
+   be heard again. */
 async function briefing() {
-  const today = nyDate();
-  if (waiting && waiting !== today) { waiting = null; send('briefing', false); menu(); }
-  if (!keys.eugenia || waiting || heard === today) return;
-  const res = await fetch(`${DOOR}?briefing=ready`, { headers: { 'x-laptop-key': keys.eugenia }, signal: AbortSignal.timeout(ASK_MS) })
+  if (!keys.eugenia) return;
+  const mine = hearings;
+  const res = await fetch(`${DOOR}?briefing=waits`, { headers: { 'x-laptop-key': keys.eugenia }, signal: AbortSignal.timeout(ASK_MS) })
     .catch(() => null);
-  if (res?.status !== 200) return;
+  if (res?.status !== 200 && res?.status !== 204) return;
   res.body?.cancel();
-  waiting = today;
-  send('briefing', true);
+  if (mine !== hearings || waiting === (res.status === 200)) return;
+  waiting = !waiting;
+  send('briefing', waiting);
   menu();
 }
 
-function hearBriefing() {
-  heard = nyDate();
-  waiting = null;
+async function hearBriefing() {
+  if (!await talk('?briefing=today')) return;
+  hearings++;
+  waiting = false;
   send('briefing', false);
   menu();
-  talk('?briefing=today');
 }
 
 /* ─── Gladys's journal ──────────────────────────────────────────────────────
@@ -491,7 +502,7 @@ function trayIcon() {
 }
 
 /* ─── What the pages ask of this half ──────────────────────────────────── */
-ipcMain.handle('ready', () => ({ fresh, micOk, taken, talk: talkKey(), briefing: Boolean(waiting), ...pending }));
+ipcMain.handle('ready', () => ({ fresh, micOk, taken, talk: talkKey(), briefing: waiting, ...pending }));
 ipcMain.handle('look', async () => {
   const seen = await (looking = look());
   return typeof seen === 'string' ? seen : null;
@@ -502,10 +513,14 @@ ipcMain.on('briefing', hearBriefing);
 ipcMain.handle('answer', (_, id, q, half) => answer(id, q, half));
 ipcMain.on('open', (_, pane) => { if (pane in PANES) shell.openExternal(PANES[pane]); });
 ipcMain.on('solid', (_, yes) => face.setIgnoreMouseEvents(!yes, { forward: true }));
+/* Where he leaves her is written once, when he lets go: a drag moves her a
+   step at every movement of the mouse, and a write to the disk at each was
+   dozens a second. */
 ipcMain.on('drag', (_, dx, dy) => {
   const [x, y] = face.getPosition();
   face.setPosition(x + dx, y + dy);
 });
+ipcMain.on('dropped', () => { [settings.x, settings.y] = face.getPosition(); save(); });
 ipcMain.handle('key', (_, candidate) => tryKey(keyFor, String(candidate).trim()));
 
 // Her pages are files and stay files: no window opens from them, and none navigates away.
@@ -514,8 +529,14 @@ app.on('web-contents-created', (_, contents) => {
   contents.on('will-navigate', (e) => e.preventDefault());
 });
 
-// Her Dock icon clicked, or the app opened again, is him looking for her: she comes to the desktop he is on.
-const found = () => { bringHere(); send('say', 'here'); };
+/* Her Dock icon clicked, or the app opened again, is him looking for her: she
+   comes to the desktop he is on. Not before her window is made — at the first
+   launch it waits on macOS's question about the microphone. */
+const found = () => {
+  if (!present()) return;
+  bringHere();
+  send('say', 'here');
+};
 app.on('activate', found);
 app.on('second-instance', found);
 
@@ -527,6 +548,11 @@ app.whenReady().then(async () => {
     app.setLoginItemSettings({ openAtLogin: true });
     save();
   }
+  /* Her face asks for the microphone, and nothing on her pages asks for
+     anything else: Electron grants any permission a page asks for unless
+     told otherwise, the camera and notifications among them. */
+  session.defaultSession.setPermissionRequestHandler((contents, permission, grant, details) =>
+    grant(contents === face?.webContents && permission === 'media' && (details.mediaTypes ?? []).every(t => t === 'audio')));
   micOk = await systemPreferences.askForMediaAccess('microphone');
   if (!micOk) shell.openExternal(PANES.mic);
   // The app's own menu, for its name, Quit, and the Edit menu ⌘V pastes her key through.
@@ -541,11 +567,15 @@ app.whenReady().then(async () => {
   every(briefing, BRIEFING_EVERY_MS);
   journal();
   every(journal, JOURNAL_EVERY_MS);
+  // A Mac that slept missed both: asked at once rather than at their next turn.
+  powerMonitor.on('resume', () => { briefing(); journal(); });
   lookForUpdate();
   every(lookForUpdate, UPDATE_EVERY_MS);
   every(() => {
     if (!present() || !face.isVisible()) return;
     const at = screen.getCursorScreenPoint(), { x, y } = face.getBounds();
+    if (`${at.x - x},${at.y - y}` === pointed) return;
+    pointed = `${at.x - x},${at.y - y}`;
     send('cursor', at.x - x, at.y - y);
   }, CURSOR_MS);
   settle();

@@ -432,16 +432,22 @@ test('doji-eugenia: the charm files a report of its waking, vendors or not', asy
 /* ─── The briefing on the charm ───────────────────────────────────────────
    The charm wakes after the briefing's hour and asks whether it has landed,
    then asks for the briefing itself when he presses. Both read today's stored
-   briefing by its marker, as the speaking worker does. */
+   briefing by its marker, as the speaking worker does, and whether either
+   device has heard it: `heard` is when that was, if ever. */
 
-const briefingStored = (content) => (url) => {
+const briefingStored = (content, heard = null) => (url, init) => {
   if (url.includes('/rest/v1/eugenia_turns?select=created_at')) {
     return ok(content === null ? [] : [{ created_at: new Date().toISOString() }]);
   }
   if (url.includes('/rest/v1/eugenia_turns?select=content')) return ok([{ content }]);
+  if (url.includes('/rest/v1/eugenia_runs?select=at')) return ok(heard ? [{ at: heard }] : []);
+  if (url.endsWith('/rest/v1/eugenia_runs') && init?.method === 'POST') return ok([]);
   if (url.includes('/audio/speech')) return Promise.resolve(new Response(new Uint8Array(PCM)));
   return Promise.reject(new Error(`the briefing door asked something unexpected: ${url}`));
 };
+// The runs filed, by caller — a heard briefing is one.
+const filed = () => calls.filter(c => c.method === 'POST' && c.url.endsWith('/rest/v1/eugenia_runs'))
+  .map(c => JSON.parse(c.body)[0].caller);
 const briefingDoor = (which) => new Request(`https://fn.test/functions/v1/doji-eugenia?briefing=${which}`,
   { method: 'GET', headers: { 'x-charm-key': 'charm' } });
 
@@ -461,7 +467,38 @@ test('doji-eugenia: the charm hears that the briefing landed, then the briefing 
     const marker = calls.find(c => c.url.includes('select=created_at')).url;
     assert.ok(marker.includes(encodeURIComponent(`[${sunday ? 'sunday' : 'weekday'} briefing]`)),
       `the charm looked for the wrong briefing today: ${marker}`);
+    // The briefing spoken to its end is heard, and her line that it landed is not.
+    assert.deepEqual(filed(),
+      which === 'today' ? [`${sunday ? 'sunday' : 'weekday'} briefing heard`] : [],
+      `?briefing=${which} marked the briefing heard wrongly`);
   }
+});
+
+/* Heard on one device is heard on both: today's heard answers every question
+   as though none were stored, and speaks nothing; yesterday's does not. The
+   laptop's question that has no voice answers 200 while one waits. A
+   briefing whose speech broke off is not heard. */
+test('doji-eugenia: a briefing heard on either device is gone from both, and only one heard whole', async () => {
+  const serve = await serving('doji-eugenia');
+  respond = briefingStored('Gold opened quiet.', new Date().toISOString());
+  for (const which of ['ready', 'today', 'waits']) {
+    calls.length = 0;
+    assert.equal((await serve(briefingDoor(which))).status, 204, `?briefing=${which} answered a briefing already heard`);
+    assert.ok(!calls.some(c => c.url.includes('/audio/speech')), `?briefing=${which} spoke a briefing already heard`);
+  }
+
+  respond = briefingStored('Gold opened quiet.', new Date(Date.now() - 86_400_000).toISOString());
+  calls.length = 0;
+  const waits = await serve(briefingDoor('waits'));
+  assert.equal(waits.status, 200, 'a briefing heard yesterday kept today\'s from waiting');
+  assert.equal((await waits.arrayBuffer()).byteLength, 0, '?briefing=waits answered with something to play');
+  assert.ok(!calls.some(c => c.url.includes('/audio/speech')), '?briefing=waits spoke');
+
+  const stored = briefingStored('Gold opened quiet.');
+  respond = (url, init) => url.includes('/audio/speech') ? Promise.resolve(new Response('busy', { status: 503 })) : stored(url, init);
+  calls.length = 0;
+  await framesOf(await serve(briefingDoor('today')));
+  assert.deepEqual(filed(), [], 'a briefing whose speech broke off was marked heard');
 });
 
 test('doji-eugenia: a briefing not stored yet is a 204, and nothing is spoken', async () => {

@@ -12,7 +12,8 @@
     "package": "electron-packager . Eugenia --platform=darwin --arch=arm64 --overwrite --out=out --app-bundle-id=app.doji.eugenia --extend-info=Info.plist --icon=Eugenia.icns --ignore=^/out --ignore=^/Info\\.plist --ignore=^/Eugenia\\.icns --ignore=^/Eugenia\\.iconset --ignore=^/spaces\\.m '--asar.unpack=*.node'"
   },
   "devDependencies": {
+    "@electron/fuses": "2.1.3",
     "@electron/packager": "20.3.0",
-    "electron": "45.1.0"
+    "electron": "45.2.3"
   }
 }
