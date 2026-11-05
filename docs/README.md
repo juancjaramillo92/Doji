@@ -2273,7 +2273,12 @@ at: the setup split down the middle, **B&R** left and **S&R** right; then
 **RULES**, **SL** and **TP**, no on the left and yes on the right, each half
 brightening when clicked; four dots at the top; done, the dots fill, the tick
 draws in and the ring sweeps round, brighter when every answer was a yes.
-**A click on a half sends that one answer at once**, in a tap's own grammar
+Their first half second takes no click: they come up on their own over his
+chart, when he is likeliest to be working it, and a click then was meant for
+the chart. Whether a click is hers is asked again whenever she changes under
+a still cursor — the questions coming or going, a mark appearing — not only
+when the cursor moves, so the window never keeps catching clicks where she no
+longer is. **A click on a half sends that one answer at once**, in a tap's own grammar
 (`laptop/journal.mjs`, read by Gladys's own `parseCallback` in
 `laptop.test.mjs`), and her door answers with what waits next, so the next
 question or the next trade follows without a pause. An answer her door did
@@ -2377,7 +2382,9 @@ capture, the sound, the signature or the update — adds its line here.
 - **The journal**: a trade opened comes up as its questions with the tick,
   in Hanken Grotesk rather than a fallback face; a click on either half
   answers on her window without TradingView losing its place; the ring and
-  `○` show while one waits, on his own chart's colours.
+  `○` show while one waits, on his own chart's colours; a click on the chart
+  in the instant the questions come up goes to the chart, and once they are
+  gone the chart takes clicks where they were.
 
 ### Whether it landed
 

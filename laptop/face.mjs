@@ -76,6 +76,10 @@ const FADE_MS = 180;
 const TICK_MS = 420;
 const SWEEP_MS = 700;
 const DONE_MS = 2600;
+/* The laptop's own: the questions come up on their own over his chart, at
+   the moment he is likeliest to be working it, so a click in their first
+   SETTLE_MS was meant for the chart beneath them. */
+const SETTLE_MS = 500;
 // The ring near white: grey on black reads as a smudge.
 const WAITS = '#ecf4ef';
 const TYPE = '"Hanken Grotesk"';
@@ -583,6 +587,7 @@ function live() {
     if (j.done ? now - j.done >= DONE_MS : j.lit === null && now - j.since >= ASK_MS) mode = 'idle';
   }
   if (mode === 'idle' && due) journalNow();
+  if (!held) feel();
   if (sayUntil && now >= sayUntil) unsay();
 }
 
@@ -682,7 +687,7 @@ function journalNow() {
   due = false;
   unsay();
   mode = 'journal';
-  journal = { q: -1, allYes: true, done: 0 };
+  journal = { q: -1, allYes: true, done: 0, opened: performance.now() };
   ask(trade);
   return true;
 }
@@ -696,7 +701,7 @@ function ask(next) {
 // A click on a half: lit at once, held FLASH_MS at least, and sent.
 async function choose(x) {
   const j = journal;
-  if (j.lit !== null || j.done) return;
+  if (j.lit !== null || j.done || performance.now() - j.opened < SETTLE_MS) return;
   const side = pixel(x, 0)[0] >= 233 ? 1 : 0;
   j.lit = side;
   const [got] = await Promise.all([window.doji.answer(j.trade.id, j.q, side), new Promise(r => setTimeout(r, FLASH_MS))]);
@@ -727,8 +732,11 @@ function waitsNow(next, count) {
    waits count as her, and the journal's round screen is all hers. A press
    that moves is a drag, and one that does not is a click: on the journal, an
    answer; on her, what waits goes first — the journal, then the briefing —
-   and otherwise she listens. The first time the cursor rests on her, she
-   says how to talk. */
+   and otherwise she listens. Whether the pointer is on her is asked as it
+   moves and as she changes under it — the questions coming up or going, a
+   mark appearing — so a window that takes clicks where she no longer is
+   never catches one meant for the chart. The first time the cursor rests on
+   her, she says how to talk. */
 function pixel(x, y) {
   const r = canvas.getBoundingClientRect();
   return [(x - r.left) * 466 / r.width, (y - r.top) * 466 / r.height];
@@ -741,6 +749,15 @@ const on = (x, y) => {
   return u >= 0 && v >= 0 && u < 466 && v < 466 && alpha[v * 466 + u] > 64;
 };
 let solid = false, held = null, hinted = false, hint = 0;
+let pointer = null;          // where the cursor last was, in the window's pixels
+function feel() {
+  const now = pointer !== null && on(...pointer);
+  if (now === solid) return;
+  window.doji.solid(solid = now);
+  document.body.classList.toggle('hand', solid);
+  clearTimeout(hint);
+  if (solid && !hinted) hint = setTimeout(() => { if (mode === 'idle' && !sayUntil) { hinted = true; say('hint'); } }, HINT_AFTER_MS);
+}
 addEventListener('mousemove', (e) => {
   if (held) {
     const dx = e.screenX - held.x, dy = e.screenY - held.y;
@@ -752,12 +769,8 @@ addEventListener('mousemove', (e) => {
     }
     return;
   }
-  const now = on(e.clientX, e.clientY);
-  if (now === solid) return;
-  window.doji.solid(solid = now);
-  document.body.classList.toggle('hand', solid);
-  clearTimeout(hint);
-  if (solid && !hinted) hint = setTimeout(() => { if (mode === 'idle' && !sayUntil) { hinted = true; say('hint'); } }, HINT_AFTER_MS);
+  pointer = [e.clientX, e.clientY];
+  feel();
 });
 addEventListener('mousedown', (e) => { if (solid) held = { x: e.screenX, y: e.screenY, moved: false }; });
 addEventListener('mouseup', (e) => {
@@ -770,6 +783,7 @@ addEventListener('mouseup', (e) => {
 
 // The cursor anywhere on the screen, from the main process: near her, it has her eyes.
 function near(x, y) {
+  pointer = [x, y];
   const [u, v] = pixel(x, y), dx = u - 237, dy = v - 140, far = Math.hypot(dx, dy);
   cursor = far < NEAR && far > 1 ? [dx / far * LOOK_RANGE, dy / far * LOOK_RANGE * 0.7] : null;
 }
