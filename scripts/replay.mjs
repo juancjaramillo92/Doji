@@ -100,7 +100,7 @@ export function tally(rows) {
 
 const line = (day, r) => `${day}  ${r.outcome.padEnd(11)}` +
   (r.call ? ` ${r.call.direction} ${r.call.entry}, stop ${r.call.stop}, target ${r.call.target}` +
-            (r.call.confirm === 'close' ? `, on a 15m close beyond ${r.call.level}` : ', at the market') : '') +
+            (r.call.confirm === 'close' ? `, on a 5m close beyond ${r.call.level}` : ', at the market') : '') +
   (r.result !== null && r.result !== undefined ? `  ${r.result >= 0 ? '+' : ''}${r.result}` : '') + `  — ${r.why}`;
 
 async function main(argv) {

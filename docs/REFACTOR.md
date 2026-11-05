@@ -870,12 +870,12 @@ nothing to read. Apart, each job's row says what happened to that job.
 needs the same window.
 
 ### R-91 — the confirming candle out of the prompt
-**Why refused:** `SYSTEM` says "a fifteen-minute candle", a copy of
-`CONFIRM_MS` in words. It is also R-07's 15m, his rule, which she is told in his
+**Why refused:** `SYSTEM` says "a five-minute candle", a copy of
+`CONFIRM_MS` in words. It is also R-07's 5m, his rule, which she is told in his
 words everywhere a call waits, so the words stay and a test holds them to the
 constant. The correlation windows are not copied at all: each line of the block
 states its own sessions, and the prompt points her to it.
-**Revisit if:** his rules move the confirming candle off the 15m.
+**Revisit if:** his rules move the confirming candle off the 5m.
 
 ### R-92 — a cap on what each briefing was handed
 **Why refused:** `eugenia_inputs` keeps the whole message a briefing was asked,
@@ -1289,6 +1289,26 @@ to his budget.
 **Revisit if:** he asks about positioning in a way the managed-money count
 cannot answer; the next candidate then is the futures–spot gap, read once a day
 after the close.
+
+### R-141 — `TRIM` answering with its edits rather than the whole reply
+**Why refused, for now:** `TRIM` re-types every reply, so its time is the
+reply's length: in the fortnight to 4 November about two seconds for a short
+one and eight to eighteen for a 1,600-character plan check, most of them
+returned a handful of characters changed. Asked for find-and-replace pairs
+instead, it would write only what changed — but a pair that does not match
+sends the draft ungated, and the gate is what keeps a view out while he holds
+a position. The replies he asked for on 5 November are a third of that
+length, which takes most of the gate's time with them.
+**Revisit if:** `eugenia_runs` shows `trim` still past five seconds on a
+typical reply once the shorter replies have run a week.
+
+### R-142 — her first paragraph spoken and sent while the rest is voiced
+**Why refused:** he would hear her start at about twenty seconds rather than
+forty, but as two voice notes for one reply, and he wants one. The voice is
+the slowest part of a reply and scales with its length, so the shorter reply
+is the speed-up instead.
+**Revisit if:** he asks for her to start speaking sooner and accepts more than
+one voice note.
 
 ---
 

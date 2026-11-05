@@ -4944,32 +4944,32 @@ test('a call is scored on price, every doubt against her', () => {
   assert.equal(score([minute(1, { high: 4021 }), minute(2, { low: 3989 })], sell).outcome, 'won');
 });
 
-/* R-07: the signal is not an entry. A call that waits for a 15m close beyond
+/* R-07: the signal is not an entry. A call that waits for a 5m close beyond
    its level is live only after that candle closes, so a touch of the entry
    before it is the trade his rules forbid, and is never scored as filled. */
-test('a call waiting on a close fills only after a 15m candle closes beyond its level', () => {
+test('a call waiting on a close fills only after a 5m candle closes beyond its level', () => {
   const waits = { ...CALL, entry: 4002, stop: 3985, target: 4032, confirm: 'close', level: 4000 };
   const score = (bars) => scoreCall(waits, bars, FROM);
-  // 13:00–13:14 is one quarter, its last minute at 13:14.
-  const reach = minute(3, { low: 3999, high: 4003, close: 4001 });
-  const closes = minute(14, { low: 4001, high: 4006, close: 4005 });
-  assert.equal(score([reach, closes, minute(16, { low: 4010 })]).outcome, 'untriggered',
+  // 13:00–13:04 is one candle, its last minute at 13:04.
+  const reach = minute(2, { low: 3999, high: 4003, close: 4001 });
+  const closes = minute(4, { low: 4001, high: 4006, close: 4005 });
+  assert.equal(score([reach, closes, minute(6, { low: 4010 })]).outcome, 'untriggered',
     'price never came back to the entry after the candle closed');
-  const won = score([reach, closes, minute(16, { low: 4001.5, high: 4004 }), minute(17, { high: 4033 })]);
-  assert.deepEqual([won.outcome, won.triggered_at], ['won', '2026-10-14T13:16:00.000Z']);
-  assert.equal(score([minute(3, { low: 3999, high: 4003, close: 4001 }), minute(14, { low: 3990, close: 3995 }),
-                      minute(16, { low: 4001 }), minute(17, { high: 4033 })]).outcome, 'untriggered',
+  const won = score([reach, closes, minute(6, { low: 4001.5, high: 4004 }), minute(7, { high: 4033 })]);
+  assert.deepEqual([won.outcome, won.triggered_at], ['won', '2026-10-14T13:06:00.000Z']);
+  assert.equal(score([minute(2, { low: 3999, high: 4003, close: 4001 }), minute(4, { low: 3990, close: 3995 }),
+                      minute(6, { low: 4001 }), minute(7, { high: 4033 })]).outcome, 'untriggered',
     'a candle that reached the level and closed back below it was read as the confirmation');
-  assert.equal(score([minute(16, { low: 4003, close: 4005 }), minute(17, { low: 4001, high: 4033 })]).outcome,
+  assert.equal(score([minute(6, { low: 4003, close: 4005 }), minute(7, { low: 4001, high: 4033 })]).outcome,
     'untriggered', 'a candle that never reached the level was read as the confirmation');
-  const early = score([reach, minute(4, { low: 4001, high: 4002 }), closes, minute(16, { high: 4033, low: 4004 })]);
+  const early = score([reach, minute(3, { low: 4001, high: 4002 }), closes, minute(6, { high: 4033, low: 4004 })]);
   assert.equal(early.outcome, 'untriggered', 'a touch of the entry inside the confirming candle was filled');
-  assert.equal(scoreCall({ ...waits, made_at: '2026-10-14T13:05:00Z' }, [reach, closes, minute(16, { low: 4001 }),
-               minute(17, { high: 4033 })], FROM).outcome, 'untriggered',
-    'a quarter that opened before the call was read as its confirmation');
+  assert.equal(scoreCall({ ...waits, made_at: '2026-10-14T13:01:00Z' }, [reach, closes, minute(6, { low: 4001 }),
+               minute(7, { high: 4033 })], FROM).outcome, 'untriggered',
+    'a candle that opened before the call was read as its confirmation');
   const sell = { ...waits, direction: 'sell', entry: 3998, stop: 4015, target: 3968 };
-  assert.equal(scoreCall(sell, [minute(3, { high: 4001, low: 3997, close: 3999 }), minute(14, { high: 3999, low: 3994, close: 3995 }),
-               minute(16, { high: 3998.5, low: 3996 }), minute(17, { low: 3967 })], FROM).outcome, 'won');
+  assert.equal(scoreCall(sell, [minute(2, { high: 4001, low: 3997, close: 3999 }), minute(4, { high: 3999, low: 3994, close: 3995 }),
+               minute(6, { high: 3998.5, low: 3996 }), minute(7, { low: 3967 })], FROM).outcome, 'won');
 });
 
 test('a call the bars do not reach is unread, and a weekend is not a gap', () => {
