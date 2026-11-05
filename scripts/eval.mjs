@@ -233,13 +233,17 @@ export const PLANTS = [
   /* Issue #270: a collision with a position from an earlier session had no
      place in the briefing's shape. The writer never named it, 2 of 2, and the
      critic cut it off the release's calendar line, 3 of 3, before the slot
-     said where it goes. */
+     said where it goes. The length rules and the reply's rule on codes each
+     name it too, so those go with it. */
   { why: 'R-19\'s collision on its calendar line, gone from the writer and the critic',
     cases: ['brief-names-r19-collision', 'critic-keeps-r19-collision'],
     breaks: (p) => ({
       ...p,
-      SYSTEM: p.SYSTEM.replace(/ Read\s+what he has on before you write it\.[\s\S]*?never\s+which way it goes\./, ''),
-      CRITIC: p.CRITIC.replace(/ on that release's line of the calendar, said with the\s+rule: the one thing a calendar line carries beside the release\./, ', said with the rule.'),
+      SYSTEM: p.SYSTEM.replace(/ Read\s+what he has on before you write it\.[\s\S]*?never\s+which way it goes\./, '')
+        .replace(/, R-19's collision on its\s+line included,/, ',')
+        .replace(/ R-19's collision keeps its code on the briefing's calendar\s+line\./, ''),
+      CRITIC: p.CRITIC.replace(/ on that release's line of the calendar, said with the\s+rule: the one thing a calendar line carries beside the release\. Carry it across\s+as it was written whenever you rewrite the calendar or cut for length\./, ', said with the rule.')
+        .replace(/ or R-19's collision on its line,/, ','),
     }) },
   /* From 15 to 22 October she failed the bias step whenever the three charts
      disagreed. The plan check points at the call's rule, so both go. Taken out
@@ -258,13 +262,15 @@ export const PLANTS = [
      wrote that the stop has to move before it lands: R-19 rightly cited, said
      as an order about a trade he was weighing. MECHANISM's R-19 sentence says
      the same of a position held, and in run 54, with only the plan's copy
-     gone, she said it as his rule all three times; so both go. */
+     gone, she said it as his rule all three times; so both go, and the
+     reply's rule on codes, which points at the plan's. */
   { why: 'R-19 said as his rule on a plan he would hold into a later session, gone from the writer and MECHANISM',
     cases: ['plan-r19-said-as-rule'],
     breaks: (p) => ({
       ...p,
-      SYSTEM: p.SYSTEM.replace(/ One that lands in a later\s+session, were he to hold it, is R-19's,[\s\S]*?those\s+are\s+orders\./, '')
-        .replace(R19_KEPT, ''),
+      SYSTEM: p.SYSTEM.replace(/ One that lands in a later\s+session,\s+were\s+he\s+to\s+hold\s+it,\s+is\s+R-19's,[\s\S]*?those\s+are\s+orders\./, '')
+        .replace(R19_KEPT, '')
+        .replace(/ Where a rule is said as his, as R-19 is above, the code stays\s+beside its words\./, ''),
     }) },
 ];
 

@@ -7072,6 +7072,24 @@ test('every planted defect breaks a prompt and names a case that exists', () => 
     assert.match(banned[k].replace(/\s+/g, ' '), /it is the mechanism, and the part he learns from/,
       `the position-ban plant takes MECHANISM's chain rule from ${k} as well as its ban`);
   }
+  /* A plant of several replacements passes the check above when only one of
+     them matches: a re-wrap that split "were he" left the plan's R-19
+     sentence standing for a whole run. So the plants this holds are read for
+     every copy of their rule. */
+  const after = (id) => {
+    const b = EVAL.PLANTS.find(p => p.cases.includes(id)).breaks(EVAL.PROMPTS);
+    return { SYSTEM: b.SYSTEM.replace(/\s+/g, ' '), CRITIC: b.CRITIC.replace(/\s+/g, ' ') };
+  };
+  const plan = after('plan-r19-said-as-rule');
+  assert.doesNotMatch(plan.SYSTEM, /R-19 puts the stop at break-even|His own rule landing on it is not a view|Where a rule is said as his/,
+    'the R-19 plant leaves the writer a statement of R-19 said as his rule');
+  const collision = after('critic-keeps-r19-collision');
+  assert.doesNotMatch(collision.SYSTEM, /lands on your buy from yesterday evening, R-19|R-19's collision on its line included|R-19's collision keeps its code/,
+    'the collision plant leaves the writer a statement of the collision on its line');
+  assert.doesNotMatch(collision.CRITIC, /the one thing a calendar line carries beside the release|Carry it across as it was written|or R-19's collision on its line/,
+    'the collision plant leaves the critic, which runs last, its statement of the collision');
+  assert.doesNotMatch(after('bias-weighed').SYSTEM, /HOW THE THREE BIAS CHARTS ADD UP|weighed as it is for your own call/,
+    'the bias plant leaves the writer its rule for weighing the charts');
   // And the case's read is one CRITIC keeps with the ban gone: labelled, with
   // its falsifier, and no level.
   const read = EVAL.CASES.find(c => c.id === 'critic-strips-read-in-position').draft.split('\n\n')
