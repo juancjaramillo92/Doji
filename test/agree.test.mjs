@@ -682,6 +682,84 @@ test('the register numbers each entry once, and every citation of it names one',
   assert.deepEqual(cited.filter(c => !headings.includes(c.split(': ')[1])), [], 'a citation names no entry in REFACTOR.md');
 });
 
+/* The laptop's two halves speak by name across preload.cjs, and a name
+   spelled otherwise on one side is dropped without a word: a channel the
+   main process tells on that the bridge does not pass, one the page listens
+   to that never comes, or an ask main answers by the other kind. */
+test('the laptop\'s two halves name the same channels, through the bridge, by the same kind', () => {
+  const preload = source('laptop/preload.cjs');
+  const uniq = (list) => [...new Set(list)].sort();
+  const told = uniq([...LAPTOP_MAIN.matchAll(/\bsend\('([\w-]+)'/g)].map(m => m[1]));
+  const passed = uniq(preload.match(/const TOLD = \[([^\]]+)\]/)?.[1].match(/'[\w-]+'/g).map(w => w.slice(1, -1)) ?? []);
+  const heard = uniq([...LAPTOP_FACE.matchAll(/window\.doji\.on\('([\w-]+)'/g)].map(m => m[1]));
+  assert.ok(told.length >= 8 && passed.length >= 8, 'main.mjs or preload.cjs no longer names its channels as this test reads them');
+  assert.deepEqual(told, passed, 'main tells the page on a channel the bridge drops, or the bridge passes one nothing tells');
+  assert.deepEqual(heard, passed, 'the page listens for a channel the bridge never passes, or the bridge passes one nothing hears');
+  const asks = uniq([...preload.matchAll(/ipcRenderer\.(send|invoke)\('([\w-]+)'/g)].map(m => `${m[1] === 'send' ? 'on' : 'handle'} ${m[2]}`));
+  const answered = uniq([...LAPTOP_MAIN.matchAll(/ipcMain\.(on|handle)\('([\w-]+)'/g)].map(m => `${m[1]} ${m[2]}`));
+  assert.ok(asks.length >= 10, 'preload.cjs no longer asks as this test reads it');
+  assert.deepEqual(asks, answered, 'the bridge asks something main does not answer, or main answers it by the other kind');
+});
+
+/* Every reason the main process hands a page for a line has a line: the
+   page's SAY for what her face says, the key window's SAID for a key. A
+   reason with none is a line that throws instead of saying why. 'stale' is
+   the one never handed on: journal() drops it, and an answer is never stale. */
+test('every reason the laptop gives a page is one it has a line for', () => {
+  const lines = (text, name) => new Set([...text.match(new RegExp(`const ${name} = \\{([^]*?)\\n\\};`))?.[1].matchAll(/^  (\w+):/gm) ?? []].map(m => m[1]));
+  const say = lines(LAPTOP_FACE, 'SAY'), said = lines(source('laptop/key.mjs'), 'SAID');
+  assert.ok(say.size >= 10 && said.size >= 2, 'face.mjs or key.mjs no longer lists its lines as this test reads them');
+  const returned = (fn) => [...bodyOf(LAPTOP_MAIN, fn).matchAll(/return '(\w+)';/g)].map(m => m[1]);
+  const face = [...[...LAPTOP_MAIN.matchAll(/send\('(?:trouble|say)', '(\w+)'/g)].map(m => m[1]),
+                ...returned('async function look('), ...returned('async function gladys(').filter(r => r !== 'stale')];
+  assert.ok(face.length >= 10, `only ${face.length} reasons read out of main.mjs — the reader has gone blind`);
+  for (const r of face) assert.ok(say.has(r), `main gives her face '${r}' and SAY has no line for it`);
+  assert.match(bodyOf(LAPTOP_MAIN, 'async function journal('), /if \(typeof got !== 'string'\)/, 'journal() no longer drops a reason, so \'stale\' reaches the page');
+  for (const r of returned('async function tryKey(').filter(r => r !== 'kept')) {
+    assert.ok(said.has(r), `tryKey gives the key window '${r}' and SAID has no line for it`);
+  }
+});
+
+/* The key window tells him which secret to paste, by its name in each
+   function: a renamed secret would have him paste the wrong one. */
+test('the key window names each secret as its function reads it', () => {
+  const whose = Object.fromEntries([...source('laptop/key.mjs').matchAll(/(\w+): \['[^']+', '(\w+)'\]/g)].map(m => [m[1], m[2]]));
+  assert.deepEqual(Object.keys(whose).sort(), ['eugenia', 'gladys'], 'key.mjs no longer names the two secrets as this test reads them');
+  for (const fn of Object.keys(whose)) {
+    const read = source(`supabase/functions/doji-${fn}/index.ts`).match(/const LAPTOP_SECRET\s+= env\("(\w+)"\);/)?.[1];
+    assert.equal(whose[fn], read, `the key window asks for ${whose[fn]} and doji-${fn} reads ${read}`);
+  }
+});
+
+/* What the page draws and the tray shows from charm/art is copied in by both
+   scripts that run her, and the workflow builds when it changes: a file
+   copied by one alone is a face or a typeface missing from the other. */
+test('the laptop copies in every file it draws from the charm\'s art', () => {
+  const { prestart, prepackage } = JSON.parse(source('laptop/package.json')).scripts;
+  const loaded = new Set([...source('laptop/face.html').matchAll(/url\('([\w.-]+)'\)/g), ...LAPTOP_FACE.matchAll(/\.src = '([\w.-]+)'/g),
+                          ...LAPTOP_MAIN.matchAll(/join\(here, '([\w.-]+\.png)'\)/g)].map(m => m[1]));
+  assert.ok(loaded.size >= 2, `only ${loaded.size} files read as loaded — the reader has gone blind`);
+  const workflow = source('.github/workflows/laptop.yml');
+  for (const file of loaded) {
+    for (const [name, script] of [['prestart', prestart], ['prepackage', prepackage]]) {
+      assert.ok(script.includes(`../charm/art/${file}`), `${name} does not copy ${file} in`);
+    }
+    assert.ok(workflow.includes(`- 'charm/art/${file}'`), `the laptop is not rebuilt when charm/art/${file} changes`);
+  }
+});
+
+/* An answer is never raced by a look at what waits: none starts while one
+   is out, and a look one overtook is dropped. main.mjs is Electron's, so the
+   lines are read. */
+test('the laptop\'s journal looks never race its answers', () => {
+  assert.match(bodyOf(LAPTOP_MAIN, 'async function journal('), /if \(!keys\.gladys \|\| answering\) return;/, 'a look at what waits starts while an answer is out');
+  assert.match(bodyOf(LAPTOP_MAIN, 'async function answer('), /answering = true;\s*const got = await gladys\([^]*?\);\s*answering = false;/,
+    'an answer no longer holds the looks off while it is out');
+  const knocked = bodyOf(LAPTOP_MAIN, 'async function gladys(');
+  assert.match(knocked, /const mine = \+\+knocks;[^]*if \(!body && mine !== knocks\) return 'stale';[^]*pending = /,
+    'a look an answer overtook is no longer dropped before it is believed');
+});
+
 /* Where the laptop's update lives: the objects the workflow writes, the ones
    the app reads, and the version the build stamped, written beside it. */
 test('the laptop looks for its update where the workflow publishes it', () => {
