@@ -2951,9 +2951,18 @@ const byChannel = (rows: Read[]) => {
     : "";
 };
 
+/* What she filed, set inside a sentence of ours. She writes a test as she says
+   it, "I'm wrong if the two-year falls", and a condition as a sentence of its
+   own, "Price comes back to 4,110."; set after our "wrong if" and "if" as filed,
+   they read "wrong if I'm wrong if" and "if Price … above it..", to him in
+   /notes and to her on every turn. */
+const clause = (said: string) => said.trim()
+  .replace(/^(?:I(?:'m| am| would be|'d be) )?wrong if /i, '').replace(/^if /i, '')
+  .replace(/\.+$/, '').replace(/^[A-Z](?=[a-z])/, first => first.toLowerCase());
+
 const misses = (rows: Read[]) => rows.filter(r => r.verdict === 'wrong').slice(0, RECORD_MISSES)
-  .map(r => `· ${civilDay(r.given_on)}: ${r.reading} (wrong if ${r.test}) — ${r.evidence ?? 'its test fired'}` +
-            (r.lesson ? `. Misread: ${r.lesson}` : ""))
+  .map(r => `· ${civilDay(r.given_on)}: ${r.reading} (wrong if ${clause(r.test)}) — ` +
+            (r.evidence ?? 'its test fired').replace(/\.+$/, '') + (r.lesson ? `. Misread: ${r.lesson}` : ""))
   .join("\n");
 
 export function recordList(rows: Read[]): string {
@@ -2982,7 +2991,7 @@ export function callsQuery(now = Date.now()): string {
 }
 
 const callLine = (c: Call) =>
-  `${c.direction} ${c.entry}, stop ${c.stop}, target ${c.target}, if ${c.condition}`;
+  `${c.direction} ${c.entry}, stop ${c.stop}, target ${c.target}, if ${clause(c.condition)}`;
 
 export function callsList(rows: Call[], now = Date.now(), to = "Your"): string {
   if (!rows.length) return "";

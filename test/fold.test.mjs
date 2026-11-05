@@ -4869,6 +4869,10 @@ test('her record counts every verdict and names the newest misses, three at most
   assert.match(out, /Misread: I took the dollar as leading when the two-year was/,
     'a miss no longer says which link she misread');
   assert.match(out, /30 Jul: a hot print is bad for gold \(wrong if the two-year falls on it\) — the two-year fell/);
+  // As she files them, a test said as a sentence and evidence with its full stop.
+  const said = recordList([{ ...READS[0], test: "I'm wrong if the two-year falls on it.", evidence: 'The two-year fell.' }]);
+  assert.match(said, /\(wrong if the two-year falls on it\) — The two-year fell\. Misread:/,
+    'a test filed as she says it reads "wrong if I\'m wrong if", or evidence ends ".."');
   assert.ok(out.includes('miss 0') && out.includes('miss 1') && !out.includes('miss 2'),
     'more than three misses are listed, or not the newest');
   assert.ok(!out.includes('claims do not move'), 'a read that held is listed as a miss');
@@ -4997,6 +5001,12 @@ test('her calls say how they ended, what they made, and which still stands', () 
   assert.match(out, /Standing until the 17:00 roll: buy 4000, stop 3985, target 4030, if a retest of 4,000/,
     'the call still standing is not named, so she would make a second');
   assert.match(out, /The latest lost:\n· 13 Oct: buy 4000/);
+  // A condition filed as a sentence of its own sits inside ours after "if".
+  const filed = callsList([{ ...CALL, condition: 'Price comes back to 4,000 and a five-minute candle closes back above it.' }], now);
+  assert.match(filed, /, if price comes back to 4,000 and a five-minute candle closes back above it\.$/m,
+    'a condition filed as a sentence reads "if Price … above it.."');
+  assert.match(callsList([{ ...CALL, condition: 'If FOMC holds, a retest of 4,000' }], now), /, if FOMC holds, a retest of 4,000\./,
+    'a condition opening on "If" or an acronym is mangled');
   assert.doesNotMatch(out, /Of the \d+ lost/, 'a count of steps when no loss has been explained');
   const why = callsList([
     { ...CALL, id: 2, expires_at: '2026-10-13T21:00:00Z', outcome: 'lost', result: -15, misread: 'level', lesson: 'the quarter had broken' },
