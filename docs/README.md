@@ -113,8 +113,9 @@ package-lock.json                       committed — see Tests
 .gitignore                              node_modules, and nothing else
 charm/.gitignore                        ESP-IDF's build output and fetched components
 laptop/                                 Eugenia on the Mac — see The laptop
-  main.mjs                              the window, the keys, the menu, her door, the chart, the update
-  face.mjs                              her face and body, the line over her head, his microphone, her voice
+  main.mjs                              the window, the keys, the menu, her door and Gladys's, the chart, the update
+  face.mjs                              her face and body, the line over her head, his microphone, her voice, the journal's screens
+  journal.mjs                           Gladys's journal: the four answers, the question asked first, a tap's grammar
   frames.mjs                            her answer, read out of its frames, and the queue her voice plays from
   voice.mjs                             that queue's player, in the audio thread
   place.mjs                             where her window goes, and the room around her
@@ -122,9 +123,9 @@ laptop/                                 Eugenia on the Mac — see The laptop
   update.mjs                            the swap an update leaves behind
   spaces.m                              her window kept to one desktop, in the Mac's own code
   preload.cjs                           what the pages may ask the main process
-  key.html                              her key, asked once; key.mjs tries it
+  key.html                              her key and Gladys's, each asked once; key.mjs tries it
   Info.plist                            why she asks for the microphone
-  .gitignore                            the copied render, the stamp and the build
+  .gitignore                            the copied render and typeface, the stamp and the build
 ```
 
 ---
@@ -2147,10 +2148,11 @@ as a chart sent in Telegram does — one of the four image types the API reads,
 up to `FILE_MAX` — and is not stored; the Telegram copy says it was there,
 `«what she heard» — with your chart`. The answer is the charm's: the same
 frames, the same silence while she thinks, kept past a laptop that hangs up.
-`?briefing=ready` and `?briefing=today` answer the laptop as they answer the
-charm, and the laptop alone asks **`?briefing=waits`**: `200` with no body
-while a briefing waits, `204` otherwise — whether it waits without her line
-spoken, so it can be asked every few minutes at no cost in speech.
+`?briefing=today` answers the laptop as it answers the charm. In place of
+the charm's `?briefing=ready` the laptop asks **`?briefing=waits`**: `200`
+with no body while a briefing waits, `204` otherwise — whether it waits
+without her line spoken, so it can be asked every few minutes at no cost in
+speech.
 
 **The recording keeps the name and type the laptop gave it.** A laptop's
 browser engine records WebM, not the charm's Ogg, and the transcriber reads
@@ -2193,10 +2195,10 @@ in** to listen, **sways** while she thinks and **gives with the loud moments**
 of her voice; eyes and mouth ride the same transform. Reduce Motion in macOS
 stops the breathing and floating and keeps the rest; at rest she is drawn at
 twenty frames a second rather than thirty, which a breath that slow does not
-show, and so are the journal's questions while nothing on them moves. Clicks outside her shape go through to the chart beneath, she can be
-dragged anywhere and stays where she is left — written once, when he lets go,
-rather than at every step of the drag. A click on her brings her app to
-the front, as a click on any app's window does; the talk key leaves
+show, and so are the journal's questions while nothing on them moves. Clicks
+outside her shape go through to the chart beneath, she can be dragged
+anywhere and stays where she is left — written once, when he lets go, rather
+than at every step of the drag. A click on her brings her app to the front, as a click on any app's window does; the talk key leaves
 TradingView there. She is the window's middle; the room above her head holds
 **a line she shows** when her face alone cannot say enough.
 
@@ -2271,9 +2273,9 @@ played; the dot is the news.
 **Gladys's journal is the charm's**, asked of Gladys's door rather than
 hers (*Gladys — the Telegram journal*): what waits every minute — oftener
 than the charm can afford, since the laptop is awake and online whenever he
-trades on it — and at once when the Mac wakes. A trade that came in ticks, as on the charm, and its
-questions take her place once she is idle; a conversation is never
-interrupted. **The screens are the charm's**, drawn at `journal.c`'s own
+trades on it — and at once when the Mac wakes. A trade that came in ticks, as
+on the charm, and its questions take her place once she is idle; a
+conversation is never interrupted. **The screens are the charm's**, drawn at `journal.c`'s own
 coordinates and colours on its round screen, in Doji's typeface, Hanken
 Grotesk, copied in from `charm/art/` at the weights the charm's fonts are cut
 at: the setup split down the middle, **B&R** left and **S&R** right; then
@@ -2285,8 +2287,8 @@ chart, when he is likeliest to be working it, and a click then was meant for
 the chart. Whether a click is hers is asked again whenever she changes under
 a still cursor — the questions coming or going, a mark appearing — not only
 when the cursor moves, so the window never keeps catching clicks where she no
-longer is. **A click on a half sends that one answer at once**, in a tap's own grammar
-(`laptop/journal.mjs`, read by Gladys's own `parseCallback` in
+longer is. **A click on a half sends that one answer at once**, in a tap's
+own grammar (`laptop/journal.mjs`, read by Gladys's own `parseCallback` in
 `laptop.test.mjs`), and her door answers with what waits next, so the next
 question or the next trade follows without a pause. An answer her door did
 not take leaves the question to be clicked again, and the line above her head
@@ -2368,7 +2370,8 @@ private bucket, `laptop-signing`, read only with the secret key; every build
 after signs with that one. Only the bucket's answer that there is none makes
 a new one — any other failure to read it stops the build rather than signing
 with a stranger — and a new one never overwrites the kept one. Lost, the next
-build makes another, and macOS asks for her permissions once more. A
+build makes another, which he installs by hand, since her update refuses a
+signer it does not know, and macOS asks for her permissions once more. A
 Dependabot run is handed none of the secrets, so a bump's build is checked
 and not signed: it builds, and asks a Mac whether her window keeps to one
 desktop (`REFACTOR.md` R-135). Unsigned
@@ -2388,15 +2391,16 @@ nothing else on the Mac would then check who made it, the swap does: the new
 app takes the old one's place only signed by the signer the old one names
 (`codesign -d -r-`), and the workflow proves that reading on the real
 signature, a stranger's beside it refused. A build signed by another
-certificate — the kept one lost — is refused, and installed by hand once. A copy run from
-the repository has no `build.txt` and never offers one.
+certificate — the kept one lost — is refused, and installed by hand once. A
+copy run from the repository has no `build.txt` and never offers one.
 
 **Her app wears Doji's icon**, the phone's `icon-512.png`, made into the sizes
 macOS asks for at build time. Nothing is drawn larger than the icon is, so the
 largest Retina size, which would be 1024, is left to macOS to scale.
 
-To work on it, `npm ci` and `npm start` in `laptop/` — the render is copied in
-from `charm/art/`, the one copy of it in the repository. `spaces.node` is built
+To work on it, `npm ci` and `npm start` in `laptop/` — the render and the
+typeface are copied in from `charm/art/`, the one copy of each in the
+repository. `spaces.node` is built
 only by `npm run package`, so a copy started this way shows on every desktop.
 
 **To check on the Mac first**, which no suite and no Linux run can. A change
@@ -4293,7 +4297,8 @@ the jobs, and `agree.test.mjs` holds that count against `schema.sql`.
    - Run Actions → laptop on `main`, download
      `https://<project>.supabase.co/storage/v1/object/public/laptop/Eugenia.zip`,
      put Eugenia in Applications, open it, *Open Anyway* once, paste the two
-     keys, and allow the microphone; Screen Recording is asked at the first ⇧⌥Space.
+     keys, and allow the microphone; Screen Recording is asked at the first
+     ⇧⌥Space.
 
 ---
 
@@ -4412,7 +4417,7 @@ home-screen shortcut and every bookmark open `/`.
 | `test/charm.test.mjs` | the charm's pure C — `charm/main/briefing.c`, `charm/main/errand.c`, `charm/main/lift.c`, `charm/main/dns.c`, `charm/main/ogg.c` and `charm/main/frames.c` — compiled on the machine running the suite and driven in the zone the charm reads its clock in, out of `charm/main/net.c`: the briefing watch against `briefDue` and `retryDue` every five minutes of both weeks the clocks change in, an announced briefing not asked for again until the next day, and waiting until New York's midnight and no longer, on the server's own day, never before the clock is set, the wait between errands longer for each that found no network and never an hour, and over the weekend, every five minutes of both weeks the clocks change in against `marketOpen`, half-hourly with the open woken for unless a trade waits, a movement in standby and a lift judged on readings, held and put down told apart, the setup's answer to a name, with and without the EDNS record a phone may add, a recording's Ogg file page by page against the specification's CRC, and her answer read out of `charmFrame`'s own bytes however the reads fall; and the firmware's names, the other of the two scope questions in C — every static, macro and enum constant a file declares used in it, every function a header declares called from another file, every non-static function in a header — since the ESP-IDF build refuses a name declared nowhere and only warns of one used nowhere |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions, the app and the laptop as three programs — with one planted defect per question proving the check can fail |
-| `test/laptop.test.mjs` | the laptop's pure half: her frames read back whole off `charmFrame`'s own bytes however the reads cut them — inside a header, at every frame's edges, a few bytes at a time — and her voice read as 16-bit samples across a frame that ends mid-sample, silence as exact zeros; her voice played from its queue by a simulated speaker while it arrives slower than she speaks and then faster, and through a stall followed by uneven parts — no silence inside her voice but the stall's one, every sample once and in order, begun after the lead, and an answer shorter than the lead played whole; her window kept where he left it while a screen shows her, on a second screen too, and brought home when none does; every half of every journal question read by Gladys's own `parseCallback` as the answer it means, and the question a trade is asked first over every way it can lack them, a no never asked again; and the update's swap run in a scratch folder under a path with a space and an apostrophe, `ditto` and `open` stood in for: the new app put in place and opened, and the old one kept and reopened when the download will not unpack, holds no app, is signed by a stranger, or will not move into place |
+| `test/laptop.test.mjs` | the laptop's pure half: her frames read back whole off `charmFrame`'s own bytes however the reads cut them — inside a header, at every frame's edges, a few bytes at a time — and her voice read as 16-bit samples across a frame that ends mid-sample, silence as exact zeros; her voice played from its queue by a simulated speaker while it arrives slower than she speaks and then faster, and through a stall followed by uneven parts — no silence inside her voice but the stall's one, every sample once and in order, begun after the lead, and an answer shorter than the lead played whole; her window kept where he left it while a screen shows her, on a second screen too, and brought home when none does; every half of every journal question read by Gladys's own `parseCallback` as the answer it means, and the question a trade is asked first over every way it can lack them, a no never asked again; and the update's swap run in a scratch folder under a path with a space and an apostrophe, `ditto`, `open` and `codesign` stood in for: the new app put in place and opened, and the old one kept and reopened when the download will not unpack, holds no app, is signed by a stranger, or will not move into place |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, `syncPepperstone`'s three outcomes, and a run that finds nothing reaching for no label |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |

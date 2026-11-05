@@ -1310,6 +1310,71 @@ is the speed-up instead.
 **Revisit if:** he asks for her to start speaking sooner and accepts more than
 one voice note.
 
+### R-145 — the laptop's journal page as a pure module
+**Deferred.** The questions' sequence in `face.mjs` — what comes up when, a
+click's answer, the minute that lets them go, a trade answered in Telegram
+while they are up — is driven by no suite; it was driven in Chromium against a
+stand-in bridge for each change and not kept (R-139). Its decisions could move
+into `journal.mjs` with the clock passed in, as the queue's did into
+`frames.mjs`, and `laptop.test.mjs` would drive them. That is a refactor of a
+page no suite reads, so nothing would prove it changed nothing but the same
+throwaway run.
+**Revisit if:** the journal's page half changes again, so the move and its
+first test land together.
+
+### R-146 — the charm asking quietly whether its briefing was heard
+**Deferred.** A briefing heard on the laptop leaves the charm's dot on its
+sleep screen until its next waking, where `?briefing=today` answers 204 and the
+dot goes without a word. Clearing it sooner means the errand asking a question
+with no voice in it while the dot is up — a firmware change only the board can
+prove, for a dot nobody reads while the charm sleeps.
+**Revisit if:** he notices the charm's dot after hearing the briefing on the
+laptop.
+
+### R-147 — the laptop asking `?briefing=ready` every few minutes
+**Why refused:** the laptop needs whether a briefing still waits, asked often
+enough to follow the other device, and `ready` answers 200 with her line
+spoken: speech paid for on every ask while the dot is up, and never played.
+`?briefing=waits` answers the same question with no voice in it.
+**Revisit if:** never; the charm keeps `ready` because it plays the line.
+
+### R-148 — a column or table for the heard briefing
+**Why refused:** `eugenia_runs.caller` is free text, a delivered briefing is
+already a run row there, and a heard one is the same kind of fact: a row,
+`<weekday|sunday> briefing heard`, needs no migration, no `verify.sql` line
+and no second writer's grant. The read takes the newest under a limit, as every
+read of a growing table does.
+**Revisit if:** heard ever needs to say on which device, or to be undone.
+
+### R-149 — the laptop's other three fuses
+**Deferred.** The fuses that check her archive's integrity, load her only
+from it, and take the file protocol's extra privileges away would harden her
+further, but her pages are files loaded as modules, and whether she still loads, draws and records
+with them set only a Mac launch shows. The three that let another program
+borrow her permissions are off.
+**Revisit if:** he can run a build on the Mac before it is published.
+
+### R-150 — Gladys's door not reading the charm's version for the laptop
+**Why refused:** `waiting()` reads the charm's newest version beside what waits,
+in parallel and bounded at `APP_MS`, and the laptop ignores it. Leaving it out
+for the laptop is an argument to `waiting()` for one caller, to save a public
+read that costs nothing while Storage answers.
+**Revisit if:** the laptop's answers are slow and the version read is why.
+
+### R-151 — the main process refusing IPC from the wrong window
+**Why refused:** the pages are sandboxed with context isolation, so their
+script reaches the main process only through what `preload.cjs` hands it, and
+it hands the key window its key alone. A check of the sender in every handler
+would repeat that boundary in a dozen places.
+**Revisit if:** a page ever loads something that is not one of her own files.
+
+### R-152 — `npm audit fix` in `laptop/`
+**Why refused:** its five moderate reports are `minimatch` inside
+`@electron/packager`, which builds her and does not ship, and the fix offered
+is a downgrade of the packager.
+**Revisit if:** a report reaches what ships, or a packager release carries the
+fix.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

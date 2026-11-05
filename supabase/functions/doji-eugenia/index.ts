@@ -4983,15 +4983,16 @@ async function* charmAudio(words: Promise<Spoken>): AsyncGenerator<Uint8Array, b
    line that it has landed, or 204 while it has not; then the charm shows its
    dot until he presses and asks `?briefing=today` for the briefing itself. The
    text is the one postBriefing stored, read back as the speaking worker reads
-   it, so the charm says exactly what Telegram received. The laptop asks the
-   same two questions and is answered the same way.
+   it, so the charm says exactly what Telegram received. The laptop asks for
+   the briefing the same way, and whether one waits as `?briefing=waits`,
+   whose answer has no voice in it, so asking every few minutes costs no
+   speech.
 
    Heard is the briefing spoken whole to either device: a run row, written once
    the last of it has gone, so a line that drops halfway leaves it waiting.
-   From then on both doors answer as though none were stored, and the other
-   device's dot goes — the charm finds it at its next waking, and the laptop
-   asks `?briefing=waits`, whose answer has no voice in it, so asking every few
-   minutes costs no speech. Telegram's copy is sent regardless. */
+   From then on every question is answered as though none were stored, and
+   the other device's dot goes — the charm's at its next waking, the laptop's
+   at its next ask. Telegram's copy is sent regardless. */
 const CHARM_READY = "Your briefing is ready, jefe.";
 
 async function charmBriefing(which: string): Promise<Response> {
