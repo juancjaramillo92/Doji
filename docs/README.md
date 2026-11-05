@@ -1292,11 +1292,14 @@ grammar.
 minutes to ask what waits — every half hour while the market is shut and
 nothing waits already — and shows a still near-white ring on its sleep screen
 while anything does. A `GET` with `x-charm-key: <GLADYS_CHARM_SECRET>` answers
-`{ waiting, trade }`: his trades from the last week (`WAITING_DAYS`) with any of
-the four answers missing, not deleted, oldest first so they are journalled in
-the order he took them — read newest first under `WAITING_MAX` and reversed. The
-week is the bound: a trade left unjournalled would otherwise keep the dot lit
-for ever. **An answer is a tap in a tap's own grammar** — a `POST` of
+`{ waiting, trade, app }`: his trades from the last week (`WAITING_DAYS`) with
+any of the four answers missing, not deleted, oldest first so they are
+journalled in the order he took them — read newest first under `WAITING_MAX`
+and reversed. The week is the bound: a trade left unjournalled would otherwise
+keep the dot lit for ever. `app` is the newest charm build the workflow
+published, read beside the trades from `APP_VERSION_URL` so an update reaches
+the charm that day; `null` when it cannot be read within `APP_MS`, which costs
+the early update and never the answer. **An answer is a tap in a tap's own grammar** — a `POST` of
 `{ "data": "PID562780708|sl|1" }` — so `parseCallback` is the one boundary for
 both, and no column but the four is reachable; `[Edit]` and `[Done]` are refused
 with a 400, being the Telegram form's. It answers with what waits next, so the
