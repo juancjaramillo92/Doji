@@ -1259,7 +1259,7 @@ and compares main with the change.
 **Revisit if:** the page's sequence moves into a pure module a suite can
 drive without a clock, as the queue's did.
 
-### R-134 — the panel asleep under an empty sleep screen in standby
+### R-143 — the panel asleep under an empty sleep screen in standby
 **Deferred.** Before standby, a sleep screen with no marks held the panel in
 reset, the same black without the panel running. Standby keeps the screen
 started, and a panel held in reset needs the board package's whole start
@@ -1269,7 +1269,7 @@ board has not been measured for.
 **Revisit if:** the report's `battery` falls faster in standby than the
 checks and the radio account for.
 
-### R-135 — the motion sensor's interrupt instead of checks five times a second
+### R-144 — the motion sensor's interrupt instead of checks five times a second
 **Why refused:** waiting on wake-on-motion would cost nothing between
 movements, but on the board its wake never reached the chip, through every
 change made to its setting blind. A check is one I2C read in a waking of a few

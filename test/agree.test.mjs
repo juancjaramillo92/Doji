@@ -667,6 +667,21 @@ test('the laptop\'s update is held to her signer as the workflow proves it read'
   assert.match(workflow, /^\s*if codesign --verify --deep --strict -R="\$stranger" Eugenia\.app; then [^\n]*exit 1; fi$/m, 'the workflow no longer sees a stranger refused');
 });
 
+/* The register is cited by number, so a number names one entry: two
+   entries under one number left every citation of it ambiguous. And a
+   citation names an entry there is. Only `REFACTOR.md R-n` is read as a
+   citation, since R-n alone is also one of his strategy's rules. */
+test('the register numbers each entry once, and every citation of it names one', () => {
+  const headings = [...source('docs/REFACTOR.md').matchAll(/^### (R-\d+) — /gm)].map(m => m[1]);
+  assert.ok(headings.length >= 100, `only ${headings.length} entries read out of REFACTOR.md — the reader has gone blind`);
+  assert.deepEqual(headings.filter((r, i) => headings.indexOf(r) !== i), [], 'REFACTOR.md numbers two entries alike');
+  const cited = execSync('git ls-files', { encoding: 'utf8' }).split('\n')
+    .filter(f => /\.(md|mjs|cjs|ts|c|h|yml|sql|html)$/.test(f) && f !== 'docs/REFACTOR.md')
+    .flatMap(f => [...source(f).matchAll(/REFACTOR\.md`?\s+(R-\d+)/g)].map(m => `${f}: ${m[1]}`));
+  assert.ok(cited.length >= 5, `only ${cited.length} citations of the register found — the reader has gone blind`);
+  assert.deepEqual(cited.filter(c => !headings.includes(c.split(': ')[1])), [], 'a citation names no entry in REFACTOR.md');
+});
+
 /* Where the laptop's update lives: the objects the workflow writes, the ones
    the app reads, and the version the build stamped, written beside it. */
 test('the laptop looks for its update where the workflow publishes it', () => {
