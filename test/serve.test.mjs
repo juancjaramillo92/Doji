@@ -24,7 +24,7 @@ const ENV = {
   EUGENIA_BOT_TOKEN: 'eugenia', EUGENIA_WEBHOOK_SECRET: 'eugenia-hook',
   ANTHROPIC_API_KEY: 'sk-ant-test', CTRADER_MCP_TOKEN: 'ctrader',
   EUGENIA_CHARM_SECRET: 'charm', EUGENIA_LAPTOP_SECRET: 'laptop', STT_URL: 'https://stt.test/v1/audio/transcriptions',
-  STT_KEY: 'stt', TTS_KEY: 'tts', GLADYS_CHARM_SECRET: 'gladys-charm',
+  STT_KEY: 'stt', TTS_KEY: 'tts', GLADYS_CHARM_SECRET: 'gladys-charm', GLADYS_LAPTOP_SECRET: 'gladys-laptop',
 };
 
 let env = ENV;
@@ -644,6 +644,42 @@ test('doji-gladys: the charm cannot write anything but an answer, and is shut wi
   calls.length = 0;
   assert.equal((await shut(gladysCharm())).status, 401, 'the charm door opened with its secret unset');
   assert.deepEqual(calls, [], 'a shut charm door made a request');
+});
+
+/* The laptop asks the charm's half on a key of its own, so a lost laptop is
+   cut off without touching the charm: neither key opens the other's header,
+   and with its secret unset the laptop's door is shut. */
+const gladysLaptop = (key, init = {}) => new Request('https://fn.test/functions/v1/doji-gladys',
+  { method: 'GET', ...init, headers: { 'x-laptop-key': key } });
+
+test('doji-gladys: the laptop journals as the charm does, on a key of its own', async () => {
+  const serve = await serving('doji-gladys');
+  respond = (url, init) => {
+    if (init.method === 'PATCH') return ok([trade('PID1', 2, JSON.parse(init.body))]);
+    if (url.includes('/rest/v1/trades?')) return ok([trade('PID1', 2, { setup: 'Break & Retest' })]);
+    if (url.includes('/storage/')) return Promise.resolve(new Response('', { status: 404 }));
+    return pending();
+  };
+  const told = await answer(await serve(gladysLaptop('gladys-laptop')));
+  assert.equal(told.status, 200);
+  assert.equal(told.body.waiting, 1);
+  assert.equal(told.body.trade.id, 'PID1', 'the laptop is not told what waits');
+
+  calls.length = 0;
+  const after = await answer(await serve(gladysLaptop('gladys-laptop', { method: 'POST', body: JSON.stringify({ data: 'PID1|rules|0' }) })));
+  assert.equal(after.status, 200);
+  const writes = calls.filter(c => c.method === 'PATCH');
+  assert.equal(writes.length, 1);
+  assert.deepEqual(JSON.parse(writes[0].body), { followed_rules: false }, 'the laptop wrote more than its one answer');
+  assert.equal(after.body.trade.id, 'PID1', 'the laptop\'s answer is not answered with what waits after it');
+
+  calls.length = 0;
+  assert.equal((await serve(gladysLaptop('gladys-charm'))).status, 401, 'the charm\'s key opens the laptop\'s door');
+  assert.equal((await serve(gladysCharm({ headers: { 'x-charm-key': 'gladys-laptop' } }))).status, 401,
+    'the laptop\'s key opens the charm\'s door');
+  const shut = await serving('doji-gladys', ['GLADYS_LAPTOP_SECRET']);
+  assert.equal((await shut(gladysLaptop(''))).status, 401, 'the laptop door opened with its secret unset');
+  assert.deepEqual(calls, [], 'a refused laptop made a request');
 });
 
 /* ─── Between the functions, read as served ───────────────────────────────

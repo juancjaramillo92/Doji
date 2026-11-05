@@ -9,12 +9,16 @@
    thinks and gives with the loud moments of her voice. Eyes and mouth ride
    the same transform, so they stay on her. And a line above her head, for
    what her face alone cannot say: why something failed, and how to talk.
+   When a trade waits for its journal, the charm's journal screens take her
+   place, and his clicks answer them.
 
    This page records him and plays her; the main process carries both to her
-   door and back, and owns the key, the chart and the window.
+   door and back, and his answers to Gladys's, and owns the keys, the chart
+   and the window.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { opacity } from './art.mjs';
 import { FRAME, PCM_RATE, sampler } from './frames.mjs';
+import { asked } from './journal.mjs';
 import { ROOM } from './place.mjs';
 
 /* ─── The charm's face, copied ─────────────────────────────────────────────
@@ -30,7 +34,7 @@ const DOTS = [[208, 38, 3.2], [233, 30, 3.8], [258, 38, 3.2]];
 const FEATURES = '#0d0c0b', SHINE = '#f2f0ec', THROAT = '#1d0e0b', THOUGHT = '#ead3b6';
 // Doji's colours as the charm has them, copies of charm/main/palette.h.
 const DEEP = '#0e6f5c', ACCENT = '#0c8650', GLOW = '#3cc488', TEAL = '#1f9e93';
-const INK = '#e6ece9', GROUND = '#070c0a', LINE = '#1c2922';
+const INK = '#e6ece9', GROUND = '#070c0a', LINE = '#1c2922', MUTED = '#96a89e';
 const BLINK_EVERY_MS = 4000;
 const LOOK_RANGE = 6;
 const CONFUSED_MS = 4000;
@@ -46,6 +50,36 @@ const WARN_LEFT = 30_000;
 const LISTEN = [[660.0, 0.07], [990.0, 0.11]];
 const SENT = [[990.0, 0.07], [660.0, 0.11]];
 
+/* ─── Gladys's journal, copied ─────────────────────────────────────────────
+   The charm's journal screens, at journal.c's own coordinates on its round
+   screen: each question owns the whole of it, split down the middle, with
+   one word in Doji's typeface. Left is no and right is yes — the setup's
+   halves its two setups — in Doji's emeralds rather than a win's teal and a
+   loss's red, each a gradient from top to bottom that brightens when
+   clicked. Four dots at the top say what is answered; done, they fill, a
+   tick draws itself in and the ring sweeps round once, brighter when every
+   answer was a yes. Unclicked for ASK_MS, the questions give way to her, the
+   trade still waiting. agree.test.mjs holds all of it to journal.c, and the
+   mark for a trade waiting to face.c's sleep screen. */
+const WORDS = ['SETUP', 'RULES', 'SL', 'TP'];
+const SHORT = ['B&R', 'S&R'];
+const HALVES = [
+  //         resting                    lit
+  /* setup */ [['#0b2a22', '#113a2f'], [DEEP, GLOW]],
+  /* no    */ [['#0a2430', '#0f3340'], ['#1f6f8a', TEAL]],
+  /* yes   */ [['#0d2a17', '#153d22'], [ACCENT, '#5fe08a']],
+];
+const TICK = [[203, 237], [223, 257], [263, 209]];
+const ASK_MS = 60_000;
+const FLASH_MS = 260;
+const FADE_MS = 180;
+const TICK_MS = 420;
+const SWEEP_MS = 700;
+const DONE_MS = 2600;
+// The ring near white: grey on black reads as a smudge.
+const WAITS = '#ecf4ef';
+const TYPE = '"Hanken Grotesk"';
+
 /* ─── What the laptop adds ─────────────────────────────────────────────────
    Tuned by eye and kept small: she is alive, not busy. The two rhythms differ
    so they never fall into step and repeat like a metronome. She gives from
@@ -56,6 +90,8 @@ const BREATH_S = 4.6, BREATH = 0.015;
 const BOB_S = 3.3, BOB = 2.5;
 const SWAY_S = 2.6, SWAY = 0.026;
 const LEAN = 0.02, SQUASH = 0.035, LIFT = 4;
+// The journal crosses over her rather than cutting in: nothing flashes, as on the charm.
+const CROSS = 12;
 const FRAME_MS = 33, REST_FRAME_MS = 50;
 // The cursor within this many of her pixels has her eyes.
 const NEAR = 700;
@@ -98,8 +134,11 @@ const still = matchMedia('(prefers-reduced-motion: reduce)');
 Object.assign(said.style, { color: INK, background: `${GROUND}e0`, border: `1px solid ${LINE}` });
 
 let art, alpha;              // the render with its black made clear, and her shape for clicks
-let mode = 'idle';           // idle · listening · thinking · speaking · confused
+let mode = 'idle';           // idle · listening · thinking · speaking · confused · journal
 let briefingWaits = false;
+let trade = null, waiting = 0;   // the oldest trade waiting for its journal, and how many do
+let due = false;                 // a trade came in: its questions come up once she is idle
+let journal = null;              // the questions, up while the mode is: the trade, the question, the half lit, done
 let talkKey = '⌥Space';
 let recorder = null, recording = null, ear = null;
 let listen = null;           // the recording under way: when it began, whether he spoke, the tick
@@ -177,12 +216,13 @@ const ease = (v, t, rate, dt) => {
 };
 
 function dot(cx, cy, rx, ry, color, fade = 1) {
-  g.globalAlpha = fade;
+  g.save();
+  g.globalAlpha *= fade;
   g.fillStyle = color;
   g.beginPath();
   g.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
   g.fill();
-  g.globalAlpha = 1;
+  g.restore();
 }
 
 /* A smile through its two ends and its lowest point, turned through F.tilt
@@ -203,7 +243,7 @@ function curve(cx, y, half, sag, width, color) {
 }
 
 const V = {
-  open: 0, gx: 0, gy: 0, mouth: 0, smile: 1, dots: 0, confused: 0, lid: 1, lean: 0, sway: 0, squash: 0, heard: 0,
+  open: 0, gx: 0, gy: 0, mouth: 0, smile: 1, dots: 0, confused: 0, lid: 1, lean: 0, sway: 0, squash: 0, heard: 0, journal: 0,
 };
 const gaze = [0, 0];
 let nextGlance = 0, nextBlink = 0, blinkAt = 0, blinking = false, level = 0, heard = 0;
@@ -245,28 +285,133 @@ function features(now) {
   }
 }
 
-/* The listening ring round the rim, Doji's emeralds turning through it. It
-   swells with his voice, so he sees she hears him, and in a recording's last
-   WARN_LEFT it empties toward the end. */
-function ring(part) {
+/* The charm's ring round the rim, Doji's emeralds turning through it, `part`
+   of the way round from the top. */
+function ring(radius, width, part, fade = 1) {
   const conic = g.createConicGradient(-Math.PI / 2, 233, 233);
   [DEEP, ACCENT, GLOW, TEAL, DEEP].forEach((c, i) => conic.addColorStop(i / 4, c));
+  g.save();
+  g.globalAlpha *= fade;
   g.strokeStyle = conic;
-  g.lineWidth = 5 + 9 * V.heard;
+  g.lineWidth = width;
   g.lineCap = 'round';
   g.beginPath();
-  // Inside her square at its widest, or the window's edge cuts it.
-  g.arc(233, 233, 222, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * part);
+  g.arc(233, 233, radius, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * part);
   g.stroke();
+  g.restore();
 }
 
-// The briefing waits: an emerald dot with a glow, low beside her.
+/* What waits, low beside her, marked as the charm's sleep screen marks it:
+   a near-white ring for a trade, an emerald dot with a glow for the briefing,
+   the dot inside the ring for both — shape tells them apart. The charm's
+   ring is on black and his chart may be light, so it has a dark edge. */
 function waits() {
+  if (trade) {
+    g.save();
+    g.shadowColor = GROUND;
+    g.shadowBlur = 4;
+    g.strokeStyle = WAITS;
+    g.lineWidth = 3;
+    g.beginPath();
+    g.arc(404, 404, 25, 0, 2 * Math.PI);
+    g.stroke();
+    g.restore();
+  }
+  if (!briefingWaits) return;
   g.save();
   g.shadowColor = ACCENT;
   g.shadowBlur = 22;
   dot(404, 404, 16, 16, GLOW);
   g.restore();
+}
+
+/* ─── The journal's screens ─────────────────────────────────────────────────
+   Drawn in the charm's 466 square, on its round screen. */
+function word(text, x, y, size, weight, color, spacing) {
+  g.font = `${weight} ${size}px ${TYPE}`;
+  g.letterSpacing = `${spacing}px`;
+  g.fillStyle = color;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  // The spacing follows the last letter as well, so the word is centred without it.
+  g.fillText(text, x + spacing / 2, y);
+}
+
+// Answered emerald, this one larger, the rest to come faint.
+function progress(q, missing) {
+  for (let i = 0; i < 4; i++) {
+    const r = i === q ? 5 : 4;
+    dot(233 + (i - 1.5) * 22, 34, r, r, missing[i] ? INK : ACCENT, !missing[i] || i === q ? 1 : 56 / 255);
+  }
+}
+
+function questions(j, now) {
+  g.save();
+  g.globalAlpha = V.journal;
+  g.beginPath();
+  g.arc(233, 233, 233, 0, 2 * Math.PI);
+  g.clip();
+  g.fillStyle = '#000000';
+  g.fillRect(0, 0, 466, 466);
+  if (j.done) finished(now - j.done, j.allYes);
+  else {
+    const setup = j.q === 0;
+    for (const i of [0, 1]) {
+      const [top, bottom] = HALVES[setup ? 0 : 1 + i][j.lit === i ? 1 : 0], x = i ? 235 : 0;
+      const fill = g.createLinearGradient(0, 0, 0, 466);
+      fill.addColorStop(0, top);
+      fill.addColorStop(1, bottom);
+      g.fillStyle = fill;
+      g.fillRect(x, 0, 231, 466);
+      if (setup) word(SHORT[i], x + 231 / 2, 233, 64, 800, j.lit === i ? '#ffffff' : INK, 1);
+    }
+    if (setup) {
+      g.fillStyle = '#000000';
+      g.beginPath();
+      g.roundRect(183, 70, 100, 34, 17);
+      g.fill();
+      word(WORDS[0], 233, 87, 16, 700, MUTED, 2);
+    } else {
+      // The word with room either side, never narrower than the pill's own curve.
+      g.font = `800 64px ${TYPE}`;
+      g.letterSpacing = '2px';
+      const w = Math.max(150, g.measureText(WORDS[j.q]).width - 2 + 64);
+      g.save();
+      g.globalAlpha *= Math.min(1, (now - j.faded) / FADE_MS);
+      g.fillStyle = GROUND;
+      g.strokeStyle = LINE;
+      g.lineWidth = 2;
+      g.beginPath();
+      g.roundRect(233 - w / 2 + 1, 191, w - 2, 86, 43);
+      g.fill();
+      g.stroke();
+      word(WORDS[j.q], 233, 234, 64, 800, INK, 2);
+      g.restore();
+    }
+    progress(j.q, j.missing);
+  }
+  g.restore();
+}
+
+/* The four dots filled, the tick drawn in over TICK_MS in its two strokes,
+   and the ring swept round over SWEEP_MS — the tick light emerald and the
+   ring at full strength when every answer was a yes. */
+function finished(t, allYes) {
+  progress(-1, [false, false, false, false]);
+  const first = Math.hypot(20, 20), second = Math.hypot(40, 48);
+  let drawn = Math.min(1, t / TICK_MS) * (first + second);
+  g.strokeStyle = allYes ? GLOW : INK;
+  g.lineWidth = 9;
+  g.lineCap = 'round';
+  for (let s = 0; s < 2 && drawn > 0; s++) {
+    const len = s ? second : first, k = Math.min(1, drawn / len), [x, y] = TICK[s], [x2, y2] = TICK[s + 1];
+    g.beginPath();
+    g.moveTo(x, y);
+    g.lineTo(x + (x2 - x) * k, y + (y2 - y) * k);
+    g.stroke();
+    drawn -= len;
+  }
+  ring(231, 8, Math.min(1, t / SWEEP_MS), allYes ? 1 : 0.55);
 }
 
 /* The charm's tick, then the body. Each value eases toward what the mode asks
@@ -309,6 +454,7 @@ function step(now, dt) {
   V.sway = ease(V.sway, m === 'thinking' ? Math.sin(2 * Math.PI * now / 1000 / SWAY_S) : 0, 4, dt);
   V.squash = ease(V.squash, m === 'speaking' ? level : 0, 14, dt);
   V.heard = ease(V.heard, m === 'listening' ? heard : 0, 18, dt);
+  V.journal = ease(V.journal, m === 'journal' ? 1 : 0, CROSS, dt);
 }
 
 function draw(now) {
@@ -321,16 +467,22 @@ function draw(now) {
   const k = canvas.width / 466;
   g.setTransform(k, 0, 0, k, 0, 0);
   g.clearRect(0, 0, 466, 466);
-  g.save();
-  g.translate(233, BASE - BOB * bob - LIFT * V.squash);
-  g.rotate(SWAY * V.sway);
-  g.scale(sx, sy);
-  g.translate(-233, -BASE);
-  g.drawImage(art, 0, 0);
-  features(now);
-  g.restore();
-  if (mode === 'listening') ring(Math.min(1, (RECORD_MS - (now - listen.began)) / WARN_LEFT));
-  if (briefingWaits) waits();
+  if (V.journal < 1) {
+    g.save();
+    g.translate(233, BASE - BOB * bob - LIFT * V.squash);
+    g.rotate(SWAY * V.sway);
+    g.scale(sx, sy);
+    g.translate(-233, -BASE);
+    g.drawImage(art, 0, 0);
+    features(now);
+    g.restore();
+    /* The ring swells with his voice, so he sees she hears him, and in a
+       recording's last WARN_LEFT it empties toward the end — inside her
+       square at its widest, or the window's edge cuts it. */
+    if (mode === 'listening') ring(222, 5 + 9 * V.heard, Math.min(1, (RECORD_MS - (now - listen.began)) / WARN_LEFT));
+    waits();
+  }
+  if (V.journal > 0) questions(journal, now);
 }
 
 let last = 0;
@@ -426,6 +578,11 @@ function live() {
     else if (!listen.warned && elapsed >= RECORD_MS - WARN_LEFT) { listen.warned = true; tick(); }
   }
   if (mode === 'confused' && now >= confusedUntil) mode = 'idle';
+  if (mode === 'journal') {
+    const j = journal;
+    if (j.done ? now - j.done >= DONE_MS : j.lit === null && now - j.since >= ASK_MS) mode = 'idle';
+  }
+  if (mode === 'idle' && due) journalNow();
   if (sayUntil && now >= sayUntil) unsay();
 }
 
@@ -492,6 +649,7 @@ async function press(chart) {
   if (starting) { stopped = true; return; }
   if (mode === 'listening') return recorder?.stop();
   if (mode === 'thinking' || mode === 'speaking') { window.doji.hush(); silence(); mode = 'idle'; return; }
+  if (mode === 'journal') mode = 'idle';
   starting = true;
   unsay();
   const seen = chart ? window.doji.look() : null;
@@ -510,10 +668,67 @@ function briefing() {
   return true;
 }
 
+/* ─── His journal ───────────────────────────────────────────────────────────
+   What waits comes from the main process, asked of Gladys's door every
+   minute; a trade that came in ticks, as on the charm, and its questions come
+   up once she is idle — the conversation first, as on the charm. Each answer
+   is sent as he gives it and answered with what waits after it, so the next
+   question, or the next trade, follows at once; one her door did not take
+   leaves the question where it was, to be clicked again, and the line says
+   why. The talk key on them closes them and she listens, as PWR does on the
+   charm. Answered elsewhere while they are up, they follow what is left. */
+function journalNow() {
+  if (mode !== 'idle' || !trade) return false;
+  due = false;
+  unsay();
+  mode = 'journal';
+  journal = { q: -1, allYes: true, done: 0 };
+  ask(trade);
+  return true;
+}
+
+function ask(next) {
+  const { q, missing } = asked(next), now = performance.now();
+  if (q !== journal.q) journal.faded = now;
+  Object.assign(journal, { trade: next, q, missing, since: now, lit: null });
+}
+
+// A click on a half: lit at once, held FLASH_MS at least, and sent.
+async function choose(x) {
+  const j = journal;
+  if (j.lit !== null || j.done) return;
+  const side = pixel(x, 0)[0] >= 233 ? 1 : 0;
+  j.lit = side;
+  const [got] = await Promise.all([window.doji.answer(j.trade.id, j.q, side), new Promise(r => setTimeout(r, FLASH_MS))]);
+  if (typeof got !== 'string') ({ trade, waiting } = got);
+  if (mode !== 'journal' || journal !== j) return;
+  if (typeof got === 'string') {
+    j.lit = null;
+    j.since = performance.now();
+    return say(got);
+  }
+  j.allYes &&= j.q === 0 || side === 1;
+  if (trade) ask(trade);
+  else j.done = performance.now();
+}
+
+function waitsNow(next, count) {
+  if (count > waiting) tick();
+  due = count > waiting || (due && count > 0);
+  trade = next;
+  waiting = count;
+  if (mode !== 'journal' || journal.lit !== null || journal.done) return;
+  if (!next) mode = 'idle';
+  else if (next.id !== journal.trade.id || asked(next).q !== journal.q) ask(next);
+}
+
 /* ─── Her shape, for the mouse ──────────────────────────────────────────────
-   The window lets clicks through but where she is drawn; the briefing's dot
-   counts as her. A press that moves is a drag, and one that does not is a
-   click. The first time the cursor rests on her, she says how to talk. */
+   The window lets clicks through but where she is drawn; the marks of what
+   waits count as her, and the journal's round screen is all hers. A press
+   that moves is a drag, and one that does not is a click: on the journal, an
+   answer; on her, what waits goes first — the journal, then the briefing —
+   and otherwise she listens. The first time the cursor rests on her, she
+   says how to talk. */
 function pixel(x, y) {
   const r = canvas.getBoundingClientRect();
   return [(x - r.left) * 466 / r.width, (y - r.top) * 466 / r.height];
@@ -521,7 +736,8 @@ function pixel(x, y) {
 
 const on = (x, y) => {
   const [u, v] = pixel(x, y).map(Math.round);
-  if (briefingWaits && Math.hypot(u - 404, v - 404) < 22) return true;
+  if (mode === 'journal') return Math.hypot(u - 233, v - 233) < 233;
+  if ((trade || briefingWaits) && Math.hypot(u - 404, v - 404) < (trade ? 29 : 22)) return true;
   return u >= 0 && v >= 0 && u < 466 && v < 466 && alpha[v * 466 + u] > 64;
 };
 let solid = false, held = null, hinted = false, hint = 0;
@@ -544,8 +760,11 @@ addEventListener('mousemove', (e) => {
   if (solid && !hinted) hint = setTimeout(() => { if (mode === 'idle' && !sayUntil) { hinted = true; say('hint'); } }, HINT_AFTER_MS);
 });
 addEventListener('mousedown', (e) => { if (solid) held = { x: e.screenX, y: e.screenY, moved: false }; });
-addEventListener('mouseup', () => {
-  if (held && !held.moved && !briefing()) press(false);
+addEventListener('mouseup', (e) => {
+  if (held && !held.moved) {
+    if (mode === 'journal') choose(e.clientX);
+    else if (!journalNow() && !briefing()) press(false);
+  }
   held = null;
 });
 
@@ -561,15 +780,18 @@ window.doji.on('done', () => { if (audio) tell(audio, 'end'); else if (mode === 
 window.doji.on('trouble', trouble);
 window.doji.on('briefing', (yes) => { briefingWaits = yes; });
 window.doji.on('briefing-now', briefing);
+window.doji.on('journal', waitsNow);
+window.doji.on('journal-now', journalNow);
 window.doji.on('say', (reason, key) => { if (key) talkKey = key; say(reason); });
 window.doji.on('cursor', near);
 
 addEventListener('resize', fit);
 fit();
-await load();
+await Promise.all([load(), document.fonts.load(`800 64px ${TYPE}`), document.fonts.load(`700 16px ${TYPE}`)]);
 const start = await window.doji.ready();
 talkKey = start.talk;
 briefingWaits = start.briefing;
+waitsNow(start.trade, start.waiting);
 if (start.fresh) say('hello', HELLO_MS);
 else if (!start.micOk) say('mic');
 else if (start.taken) say('taken');

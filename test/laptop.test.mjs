@@ -7,8 +7,10 @@
    fed the door's own bytes, from `charmFrame`, cut at every place a network
    read can cut them; her voice played from its queue while it arrives late
    and unevenly, as a real stream does; where her window goes when a screen
-   is gone; and the swap an update leaves behind, run in a scratch folder
-   with macOS's `ditto` and `open` stood in for, in every way it can fail.
+   is gone; the journal's answers, read by Gladys's own boundary, and the
+   question a trade is asked first; and the swap an update leaves behind,
+   run in a scratch folder with macOS's `ditto` and `open` stood in for, in
+   every way it can fail.
    The copies the app holds of the door and of the charm are
    agree.test.mjs's; whether she looks, sounds and floats as she should is
    his to see on the Mac (README, The laptop).
@@ -20,7 +22,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { charmFrame } from '../supabase/functions/doji-eugenia/index.ts';
+import { parseCallback } from '../supabase/functions/doji-gladys/index.ts';
 import { FRAME, LEAD, PCM_RATE, Queue, framer, sampler } from '../laptop/frames.mjs';
+import { ANSWERS, SETUPS, asked, tap } from '../laptop/journal.mjs';
 import { placed, room, ROOM } from '../laptop/place.mjs';
 import { BUNDLE, swapScript } from '../laptop/update.mjs';
 
@@ -225,4 +229,29 @@ test('an answer shorter than the lead is played whole when it ends, and silence 
   const events = [];
   for (let i = 0; i < 40; i++) { const e = q.fill(new Float32Array(BLOCK)); if (e) events.push(e); if (e === 'drained') break; }
   assert.deepEqual(events, ['drained'], 'her silence was taken for her voice');
+});
+
+/* Every half of every question, read by Gladys's own boundary: the column the
+   question names, the left half the first setup or a no, the right the
+   second or a yes. */
+test('every half of every journal question is the answer Gladys writes for it', () => {
+  for (const [q, [, column]] of ANSWERS.entries()) {
+    for (const half of [0, 1]) {
+      const data = tap('PID562780708', q, half);
+      assert.deepEqual(parseCallback(data),
+        { id: 'PID562780708', column, value: q === 0 ? SETUPS[half] : half === 1, action: 'answer' }, data);
+    }
+  }
+});
+
+/* Asked first what it lacks of the setup, rules and stop loss, else the take
+   profit — over every way a trade can lack them; and a no is an answer, so
+   it is never asked again. */
+test('a trade is asked first the first of its questions it lacks', () => {
+  for (let lacks = 1; lacks < 16; lacks++) {
+    const trade = Object.fromEntries(ANSWERS.map(([, column], i) => [column, lacks & 1 << i ? null : i ? false : SETUPS[1]]));
+    const { q, missing } = asked(trade);
+    assert.deepEqual(missing, ANSWERS.map((_, i) => Boolean(lacks & 1 << i)), `lacking ${lacks.toString(2)}`);
+    assert.equal(q, [0, 1, 2].find(i => missing[i]) ?? 3, `lacking ${lacks.toString(2)}, the trade is asked ${ANSWERS[q]?.[0]}`);
+  }
 });

@@ -5,12 +5,13 @@
    talks, again and she answers, with Shift and she looks at the chart as
    well. Nothing about her is here: the door is doji-eugenia's, the turn is
    hers, and this file only carries his words and his chart to it and her
-   voice back.
+   voice back. Gladys's journal comes with her, as it does on the charm: what
+   waits is asked of Gladys's door, and his answers carried to it.
 
-   This half owns everything the page may not: the key, the door, the window
-   it floats in, the keys, the chart it captures, the permissions and the
-   update. The door is asked from here rather than from the page because the
-   page is a file and the door allows no browser origin; the key never reaches
+   This half owns everything the page may not: the keys, the doors, the window
+   it floats in, the talk keys, the chart it captures, the permissions and the
+   update. The doors are asked from here rather than from the page because the
+   page is a file and the doors allow no browser origin; the keys never reach
    the page at all.
    ═══════════════════════════════════════════════════════════════════════════ */
 import {
@@ -25,10 +26,14 @@ import { join, resolve } from 'node:path';
 import process from 'node:process';
 import { BLOB, opacity } from './art.mjs';
 import { framer } from './frames.mjs';
+import { tap } from './journal.mjs';
 import { placed, room } from './place.mjs';
 import { swapScript } from './update.mjs';
 
 const DOOR = 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-eugenia';
+const GLADYS = 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-gladys';
+// Each key in its own file, encrypted by the Keychain.
+const KEPT = { eugenia: 'key', gladys: 'gladys-key' };
 // Published by laptop.yml from main: the zipped app, and its version after it.
 const UPDATES = 'https://gujhyogvkzjgnrodyuse.supabase.co/storage/v1/object/public/laptop';
 
@@ -55,6 +60,10 @@ const LOOK_MS = 8_000;
 const PROMPT_MS = 1_500;
 // The briefing is asked after the way the charm asks it: every few minutes until it lands.
 const BRIEFING_EVERY_MS = 5 * 60_000;
+/* What waits for its journal, asked oftener than the charm can afford to:
+   the laptop is awake and online whenever he trades on it, and a trade's
+   questions belong to the minute it opened. */
+const JOURNAL_EVERY_MS = 60_000;
 const UPDATE_EVERY_MS = 24 * 60 * 60_000;
 // How often she looks for the cursor, to look at it when it comes near.
 const CURSOR_MS = 100;
@@ -83,7 +92,8 @@ if (!first) app.quit();
 let face, tray, keyWindow;
 let settings = {};
 let fresh = false;     // no settings yet: the first launch
-let key = null;
+const keys = { eugenia: null, gladys: null };
+let keyFor = null;     // whose key the key window asks for
 let micOk = true;
 let taken = false;     // the talk key is held by another app
 let asking = null;     // the request in flight, so a press can hush her
@@ -91,6 +101,9 @@ let looking = null;    // the chart being captured since he asked her to look
 let waiting = null;    // the New York date a landed briefing waits for him on
 let heard = null;      // the New York date he heard it
 let offered = null;    // a newer build than this one
+let pending = { waiting: 0, trade: null };  // what waits for its journal, as Gladys's door last said
+let answering = false; // an answer on its way to Gladys's door
+let knocks = 0;        // asks of Gladys's door, so a look an answer overtook is dropped
 let updating = false;
 const log = [];
 
@@ -108,41 +121,57 @@ const every = (fn, ms) => timers.push(setInterval(fn, ms));
 const talkKey = () => (settings.key in KEYS ? settings.key : '⌥Space');
 
 /* ─── What she keeps on the laptop ─────────────────────────────────────────
-   The window's size and place, the talk key, and her key, encrypted by the
-   Keychain. */
+   The window's size and place, the talk key, and the two keys, hers and
+   Gladys's, encrypted by the Keychain. */
 function load() {
   fresh = !existsSync(kept('settings.json'));
   try { settings = JSON.parse(readFileSync(kept('settings.json'), 'utf8')); } catch { settings = {}; }
-  try { key = safeStorage.decryptString(readFileSync(kept('key'))); } catch { key = null; }
+  for (const who of Object.keys(KEPT)) {
+    try { keys[who] = safeStorage.decryptString(readFileSync(kept(KEPT[who]))); } catch { keys[who] = null; }
+  }
 }
 const save = () => writeFileSync(kept('settings.json'), JSON.stringify(settings));
 
-/* A key is tried before it is kept, as the charm's setup tries one: an empty
-   form, which her door refuses with a 400 for a right key — a 503 when the
-   right key finds the door without its vendors — and a 401 for a wrong one. */
-async function tryKey(candidate) {
-  const res = await fetch(DOOR, {
-    method: 'POST', body: new FormData(), headers: { 'x-laptop-key': candidate }, signal: AbortSignal.timeout(ASK_MS),
-  }).catch(() => null);
+/* A key is tried at its door before it is kept, as the charm's setup tries
+   one. Hers is asked with an empty form, which her door refuses with a 400
+   for a right key — a 503 when the right key finds the door without its
+   vendors — and a 401 for a wrong one; Gladys's is asked what waits, which
+   her door answers with a 200 for a right key alone. Hers kept and Gladys's
+   never given, the window asks for Gladys's next, as the charm's setup asks
+   for both. */
+async function tryKey(who, candidate) {
+  const signal = AbortSignal.timeout(ASK_MS);
+  const res = await (who === 'gladys'
+    ? fetch(GLADYS, { headers: { 'x-laptop-key': candidate }, signal })
+    : fetch(DOOR, { method: 'POST', body: new FormData(), headers: { 'x-laptop-key': candidate }, signal })
+  ).catch(() => null);
   if (!res) return 'offline';
-  if (res.status !== 400 && res.status !== 503) return 'wrong';
-  key = candidate;
-  writeFileSync(kept('key'), safeStorage.encryptString(key));
-  keyWindow?.close();
-  briefing();
+  res.body?.cancel();
+  if (who === 'gladys' ? res.status !== 200 : res.status !== 400 && res.status !== 503) return 'wrong';
+  keys[who] = candidate;
+  writeFileSync(kept(KEPT[who]), safeStorage.encryptString(candidate));
+  if (who === 'gladys') journal();
+  else briefing();
+  if (keys.gladys) keyWindow?.close();
+  else askForKey('gladys');
   return 'kept';
 }
 
-// A menu-bar app's window opens behind the app he is in unless it takes the front.
-function askForKey() {
+/* One window asks for either key, saying whose. A menu-bar app's window
+   opens behind the app he is in unless it takes the front. */
+function askForKey(who) {
   app.focus({ steal: true });
-  if (keyWindow) return keyWindow.focus();
-  keyWindow = new BrowserWindow({
-    width: 420, height: 250, resizable: false, minimizable: false, maximizable: false, title: 'Eugenia',
-    webPreferences: { preload: join(here, 'preload.cjs') },
-  });
-  keyWindow.on('closed', () => { keyWindow = null; });
-  keyWindow.loadFile(join(here, 'key.html'));
+  if (keyWindow && keyFor === who) return keyWindow.focus();
+  keyFor = who;
+  if (!keyWindow) {
+    keyWindow = new BrowserWindow({
+      width: 420, height: 250, resizable: false, minimizable: false, maximizable: false, title: 'Eugenia',
+      webPreferences: { preload: join(here, 'preload.cjs') },
+    });
+    keyWindow.on('closed', () => { keyWindow = null; });
+  }
+  keyWindow.loadFile(join(here, 'key.html'), { query: { who } });
+  keyWindow.focus();
 }
 
 /* ─── The window she floats in ──────────────────────────────────────────────
@@ -228,15 +257,18 @@ function bind() {
 }
 
 /* Her menu, in the menu bar and on her Dock icon alike: the menu bar's
-   icon carries the briefing's dot, the Dock's is where an app is looked for. */
+   icon carries the marks of what waits, the Dock's is where an app is looked
+   for. The marks are the charm's sleep screen's — a dot for the briefing, a
+   ring for a trade, the dot inside the ring for both. */
 function menu() {
   if (!tray) return;
   const name = talkKey(), accelerator = KEYS[name];
-  tray.setTitle(waiting ? '•' : '');
+  tray.setTitle(pending.waiting ? (waiting ? '◉' : '○') : waiting ? '•' : '');
   const items = () => [
     { label: 'Talk to her', accelerator, registerAccelerator: false, click: () => send('press', false) },
     { label: 'Show her the chart', accelerator: `Shift+${accelerator}`, registerAccelerator: false, click: () => send('press', true) },
     { label: 'Hear the briefing', enabled: Boolean(waiting), click: () => send('briefing-now') },
+    { label: 'Journal the trade', enabled: pending.waiting > 0, click: () => send('journal-now') },
     { type: 'separator' },
     { label: 'Bring her here', click: bringHere },
     ...(settings.hidden ? [] : [{ label: 'Hide her', click: hideHer }]),
@@ -249,7 +281,8 @@ function menu() {
     ...(taken ? [{ label: `${name} is taken by another app`, enabled: false }] : []),
     { label: 'Start with the Mac', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin,
       click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }) },
-    { label: 'Her key…', click: askForKey },
+    { label: 'Her key…', click: () => askForKey('eugenia') },
+    { label: 'Gladys\'s key…', click: () => askForKey('gladys') },
     { label: 'Restart her', click: () => { app.relaunch(); app.exit(0); } },
     { label: 'Copy her log', click: () => clipboard.writeText([`Eugenia ${BUILD ?? 'from the repository'}`, ...log].join('\n')) },
     { type: 'separator' },
@@ -274,9 +307,9 @@ async function talk(path, body) {
   alive();
   try {
     const res = await fetch(`${DOOR}${path}`, {
-      method: body ? 'POST' : 'GET', body, headers: { 'x-laptop-key': key ?? '' }, signal: abort.signal,
+      method: body ? 'POST' : 'GET', body, headers: { 'x-laptop-key': keys.eugenia ?? '' }, signal: abort.signal,
     });
-    if (res.status === 401) { askForKey(); return send('trouble', 'key'); }
+    if (res.status === 401) { askForKey('eugenia'); return send('trouble', 'key'); }
     if (res.status === 503) return send('trouble', 'voice');
     if (!res.ok || !res.body) return send('trouble', 'door');
     const feed = framer((kind, bytes) => send('frame', kind, bytes));
@@ -338,8 +371,8 @@ async function look() {
 async function briefing() {
   const today = nyDate();
   if (waiting && waiting !== today) { waiting = null; send('briefing', false); menu(); }
-  if (!key || waiting || heard === today) return;
-  const res = await fetch(`${DOOR}?briefing=ready`, { headers: { 'x-laptop-key': key }, signal: AbortSignal.timeout(ASK_MS) })
+  if (!keys.eugenia || waiting || heard === today) return;
+  const res = await fetch(`${DOOR}?briefing=ready`, { headers: { 'x-laptop-key': keys.eugenia }, signal: AbortSignal.timeout(ASK_MS) })
     .catch(() => null);
   if (res?.status !== 200) return;
   res.body?.cancel();
@@ -354,6 +387,49 @@ function hearBriefing() {
   send('briefing', false);
   menu();
   talk('?briefing=today');
+}
+
+/* ─── Gladys's journal ──────────────────────────────────────────────────────
+   Asked of her door as the charm asks it, on the laptop's own key: a GET
+   answers what waits, { waiting, trade }, and an answer is a POST in a tap's
+   own grammar, answered with what waits after it, so the page moves on
+   without a second request. The page draws the questions and says which
+   half he clicked; the grammar is journal.mjs's. An answer is never raced:
+   no look starts while one is out, and a look one overtook is dropped, since
+   it read the row before the answer was written. Answers the trade, or why
+   there is none — 'offline', 'key', 'door', or 'stale' for a look dropped. */
+async function gladys(body) {
+  const mine = ++knocks;
+  const res = await fetch(GLADYS, {
+    method: body ? 'POST' : 'GET', body, headers: { 'x-laptop-key': keys.gladys ?? '' }, signal: AbortSignal.timeout(ASK_MS),
+  }).catch(() => null);
+  if (!res) return 'offline';
+  if (!res.ok) {
+    res.body?.cancel();
+    if (res.status !== 401) return 'door';
+    keys.gladys = null;
+    askForKey('gladys');
+    return 'key';
+  }
+  const { waiting, trade } = await res.json().catch(() => ({}));
+  if (!Number.isInteger(waiting)) return 'door';
+  if (!body && mine !== knocks) return 'stale';
+  pending = { waiting, trade };
+  menu();
+  return pending;
+}
+
+async function journal() {
+  if (!keys.gladys || answering) return;
+  const got = await gladys();
+  if (typeof got !== 'string') send('journal', got.trade, got.waiting);
+}
+
+async function answer(id, q, half) {
+  answering = true;
+  const got = await gladys(JSON.stringify({ data: tap(id, q, half) }));
+  answering = false;
+  return got;
 }
 
 /* ─── Her updates ───────────────────────────────────────────────────────────
@@ -415,7 +491,7 @@ function trayIcon() {
 }
 
 /* ─── What the pages ask of this half ──────────────────────────────────── */
-ipcMain.handle('ready', () => ({ fresh, micOk, taken, talk: talkKey(), briefing: Boolean(waiting) }));
+ipcMain.handle('ready', () => ({ fresh, micOk, taken, talk: talkKey(), briefing: Boolean(waiting), ...pending }));
 ipcMain.handle('look', async () => {
   const seen = await (looking = look());
   return typeof seen === 'string' ? seen : null;
@@ -423,13 +499,14 @@ ipcMain.handle('look', async () => {
 ipcMain.on('ask', (_, voice) => ask(voice));
 ipcMain.on('hush', () => { asking?.abort(); asking = null; looking = null; });
 ipcMain.on('briefing', hearBriefing);
+ipcMain.handle('answer', (_, id, q, half) => answer(id, q, half));
 ipcMain.on('open', (_, pane) => { if (pane in PANES) shell.openExternal(PANES[pane]); });
 ipcMain.on('solid', (_, yes) => face.setIgnoreMouseEvents(!yes, { forward: true }));
 ipcMain.on('drag', (_, dx, dy) => {
   const [x, y] = face.getPosition();
   face.setPosition(x + dx, y + dy);
 });
-ipcMain.handle('key', (_, candidate) => tryKey(String(candidate).trim()));
+ipcMain.handle('key', (_, candidate) => tryKey(keyFor, String(candidate).trim()));
 
 // Her pages are files and stay files: no window opens from them, and none navigates away.
 app.on('web-contents-created', (_, contents) => {
@@ -458,9 +535,12 @@ app.whenReady().then(async () => {
   tray = new Tray(trayIcon());
   tray.setToolTip('Eugenia');
   bind();
-  if (!key) askForKey();
+  if (!keys.eugenia) askForKey('eugenia');
+  else if (!keys.gladys) askForKey('gladys');
   briefing();
   every(briefing, BRIEFING_EVERY_MS);
+  journal();
+  every(journal, JOURNAL_EVERY_MS);
   lookForUpdate();
   every(lookForUpdate, UPDATE_EVERY_MS);
   every(() => {
