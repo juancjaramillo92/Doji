@@ -1472,9 +1472,11 @@ test('a commitment is recorded, audited, held against his trades and retired', (
    A plan that names its trigger is kept far more often than one that does not,
    and §9 says his failure has one trigger: the touch. Two sentences carry it,
    and nothing structural does, so this reads for both. R-07's probe is quoted
-   as the rules table words it, so a reworded rule fails the copy here.
+   as the rules table words it, so a reworded rule fails the copy here — and
+   it is said as his rule, never asked: the same question closing every reply
+   is a line he stops hearing.
    ─────────────────────────────────────────────────────────────────────────── */
-test('she asks for the moment a commitment applies, and asks his probe for the touch before the fact', () => {
+test('she asks for the moment a commitment applies, and says the touch as his rule without asking it', () => {
   const system = SYSTEM.replace(/\s+/g, ' ');
   assert.match(system, /A COMMITMENT WITH A WHEN IN IT IS THE ONE THAT GETS KEPT/,
     'SYSTEM no longer asks him when a commitment applies, so "be more patient" is ' +
@@ -1482,8 +1484,10 @@ test('she asks for the moment a commitment applies, and asks his probe for the t
   assert.match(system, /The moment is his to name, never yours to supply/,
     'SYSTEM asks for the moment but no longer says it is his — she would write ' +
     'a commitment he never made');
-  assert.match(system, /YOUR ONE QUESTION IS HIS OWN PROBE FOR THE TOUCH, ASKED BEFORE THE FACT/,
-    'a plan check no longer asks what he will wait for at the level');
+  assert.match(system, /THE TOUCH IS WHERE HE FAILS, AND IT IS SAID AS HIS RULE, NEVER ASKED/,
+    'a plan check no longer says the touch is his rule, or asks it again');
+  assert.doesNotMatch(system, /What will you wait for at the level before you click\?/,
+    'SYSTEM hands her the closing question again, word for word');
 
   const probe = ALWAYS.match(/\| R-07 \|[^\n]*?\*"([^"]+)"\*/)?.[1];
   assert.ok(probe, 'the rules table no longer words R-07 as a probe');
@@ -4597,7 +4601,7 @@ test('TRIM counts too, last, because replies broke the rule the critic fixed', (
     'TRIM\'s count no longer bounds a paragraph at four sentences');
   assert.match(step, /every em-dash; each one becomes a full stop/,
     'TRIM\'s count no longer removes the em-dash aside');
-  for (const earlier of ['${WRITING}', 'DO NOT CUT THE MECHANISM']) {
+  for (const earlier of ['${WRITING}', 'NEVER CUT THE ANSWER']) {
     assert.ok(trim.indexOf(earlier) > -1 && trim.indexOf(earlier) < count,
       `TRIM counts before "${earlier}", which can change a paragraph after it`);
   }
@@ -4705,8 +4709,8 @@ test('a plan he gives her is checked against his rules and his sequence, and the
   const section = system.slice(at, system.indexOf('WHEN HE SENDS A CHART', at));
   assert.match(section, /THE LEVELS STAY HIS\. Never suggest a different entry, stop or target/,
     'the plan check no longer forbids her offering levels of her own in place of his');
-  assert.match(section, /THEN SAY WHETHER YOU WOULD TAKE IT/,
-    'the plan check no longer ends in whether she would take it, which is what he asked');
+  assert.match(section, /He asked whether it holds up, so the first sentence says whether you would take it/,
+    'the plan check no longer opens with whether she would take it, which is what he asked');
   assert.match(section, /Read §4 and §6 with get_strategy before you judge a step/,
     'she judges his setup against her idea of one rather than the sequence he wrote');
 
@@ -4733,7 +4737,7 @@ test('a plan he gives her is checked against his rules and his sequence, and the
     assert.ok(journal.has(r) || r === 'R-08',
       `the row half cites ${r}, which §7 does not mark journal — a row cannot answer it`);
   }
-  const bySequence = [...new Set(half('AGAINST HIS PRE-TRADE SEQUENCE', 'THEN SAY WHETHER').match(/R-\d+/g))];
+  const bySequence = [...new Set(half('AGAINST HIS PRE-TRADE SEQUENCE', 'BOTH CHECKS ARE YOUR WORK').match(/R-\d+/g))];
   assert.deepEqual(bySequence.sort(), ['R-05', 'R-06', 'R-07', 'R-08'],
     'the sequence half no longer names the steps R-08 runs through');
   for (const r of bySequence) assert.ok(judgment.has(r), `${r} is not a judgment rule in §7`);
@@ -6699,7 +6703,7 @@ test('the map is hers, printed, built into her call, and kept out of the briefin
      'her call no longer takes the setup his rules name for where the level sits'],
     [/THE MAP OF HIS CHARTS IS THE HOURS ON IT, and in the briefing it is there for your call and nothing else/,
      'the briefing may turn the map into prose, against the weeks behind his chart'],
-    [/YOUR CALL, LAST, in two or three sentences, its levels off the map of his charts/,
+    [/YOUR CALL, LAST, in one or two sentences, its levels off the map of his charts/,
      'the briefing\'s call slot no longer builds on the map'],
     [/With no chart, get_structure shows you the bias and where his level sits on your map, and you say it is yours/,
      'a plan he brings without a chart is judged blind, or off a map not said to be hers'],
@@ -6731,11 +6735,11 @@ test('the map\'s grid and candle count are the ones the tool, the writer and §4
 });
 
 /* Said in words where nothing interpolates them: the confirming candle her
-   calls wait for, which is R-07's 15m, in the writer and the tool, and the two
+   calls wait for, which is R-07's 5m, in the writer and the tool, and the two
    series gold's correlations are taken over, in the writer. The windows are
    the block's to state, so the writer names none. */
 test('the confirming candle and the correlations are the ones the writer and the tool say', () => {
-  const WORDS = { 15: 'fifteen' };
+  const WORDS = { 5: 'five' };
   const tool = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const CALL_TOOL = {'));
   const said = tool.slice(0, tool.indexOf('} as const;')).replace(/" \+\s*"/g, '');
   const system = SYSTEM.replace(/\s+/g, ' ');
@@ -7031,11 +7035,11 @@ test('the writing rules are stated once and read by all three', () => {
 
 /* HIS FOUR STEPS IN HIS ORDER. In run 53 she could not see the 1H, took the
    level, the candle and the ratio, and judged the bias last. A step she cannot
-   see is said where it falls. */
-test('a step she cannot see is said in its place, so his sequence keeps its order', () => {
+   see does not pass, and is judged where it falls. */
+test('a step she cannot see does not pass, so his sequence keeps its order', () => {
   const system = EUGENIA_PROMPT.match(/export const SYSTEM = `([\s\S]*?)`;/)[1].replace(/\s+/g, ' ');
-  assert.match(system, /Where you cannot see a step, say so in its place, rather than passing it or moving it to the end\./,
-    'a step she cannot see can be moved to the end of his sequence');
+  assert.match(system, /Where you cannot see a step, it does not pass and it is not moved to the end: you judge in his order/,
+    'a step she cannot see can be passed, or moved to the end of his sequence');
 });
 
 /* HIS RULE, NOT HER ORDER. A plan he would hold into a later session's print is
@@ -7069,9 +7073,9 @@ test('readsDue reads on the calendar job\'s last pass of each hour, as its cron 
 
 test('the number budget is stated to the writer and to the critic, and is one budget', () => {
   // Nothing bounded these before. Fourteen true figures is a page he skims.
-  const writer = EUGENIA_PROMPT.match(/(\w+) TO (\w+) NUMBERS IN THE WHOLE BRIEFING/);
+  const writer = EUGENIA_PROMPT.match(/(\w+) NUMBERS? AT MOST IN THE WHOLE BRIEFING/);
   assert.ok(writer, 'the writer is no longer given a number budget');
-  const critic = EUGENIA_PROMPT.match(/HOW MANY NUMBERS ARE IN IT\? (\w+) to (\w+) for a briefing/);
+  const critic = EUGENIA_PROMPT.match(/HOW MANY NUMBERS ARE IN IT\? (\w+) at most for a briefing/);
   assert.ok(critic, 'the critic no longer counts them, so the budget is advisory');
   /* ONE BUDGET IN TWO COPIES. The critic runs last and cuts to its own, so a
      writer told fewer is rewritten back up to the old count. */
@@ -7079,7 +7083,7 @@ test('the number budget is stated to the writer and to the critic, and is one bu
     'the writer and the critic hold different number budgets, and the critic runs last');
   // And the README's copy, which the facts table lists.
   assert.match(source('docs/README.md').replace(/\s+/g, ' '),
-    new RegExp(`the briefing holds ${writer[1].toLowerCase()} or ${writer[2].toLowerCase()} beside`),
+    new RegExp(`the briefing holds ${writer[1].toLowerCase()} at most beside`),
     'the README gives the briefing a number budget the prompt does not');
 });
 
@@ -7169,7 +7173,7 @@ test('a word count never stands without what to cut instead: the briefing\'s two
   }
   // One ceiling, the writer's in words and the critic's in figures, and the
   // README's copies of both, which the facts table lists.
-  const SPOKEN = { 150: 'One hundred and fifty' };
+  const SPOKEN = { 100: 'One hundred' };
   assert.ok(writer.replace(/\s+/g, ' ').includes(`${SPOKEN[most]} is the ceiling`),
     `the writer and the critic hold different ceilings, and the critic runs last`);
   const told = source('docs/README.md').replace(/\s+/g, ' ');
@@ -7208,10 +7212,11 @@ test('a word count never stands without what to cut instead: the briefing\'s two
   assert.match(review, /"keep respecting your stops" is a resolution/, 'the keep\'s rule has lost its worked example');
 });
 
-test('the gold-against-real-yields chain is exempt from the rung, in both copies', () => {
-  /* THE ONE PLACE THE LADDER IS OVERRIDDEN, in both: the critic decides whether
-     a mechanism inside one briefing is a repetition, and this chain is under
-     nearly every briefing. */
+test('the gold-against-real-yields chain is exempt from the rung, and walked nowhere in a briefing, in both copies', () => {
+  /* THE ONE PLACE THE LADDER IS OVERRIDDEN, in both, and the one place it is
+     not walked: under nearly every answer about rates, and said every morning
+     it is the chain he has heard most. The critic runs last, so its copy says
+     both halves too. */
   // WHITESPACE-COLLAPSED: the prompt is hard-wrapped and a phrase splits across
   // lines.
   const flat = at => EUGENIA_PROMPT.slice(...at).replace(/\s+/g, ' ');
@@ -7222,6 +7227,8 @@ test('the gold-against-real-yields chain is exempt from the rung, in both copies
     assert.match(half, /exempt from the map|map does not apply/,
       `the ${who} does not say the rung is overridden for it, so at \`owns\` it ` +
       `gets used bare and the one load-bearing mechanism goes unsaid`);
+    assert.match(half, /a briefing has no chain, (?:and its why stops at|so here it comes out, and the why keeps only) (?:the|its) last link/,
+      `the ${who} no longer keeps the chain out of the briefing, so it is walked every morning`);
   }
 });
 
@@ -7674,18 +7681,28 @@ test('a swipe-reply looks forward first and back for the briefing only after', (
     'briefing is the one message stored before it is sent — so it is never found');
 });
 
-/* ─── The reply gate holds no length ─────────────────────────────────────────
-   A reply's length is whatever the answer needs, and `keepDraft` only refuses
-   a revision under a third of the draft — so a sentence count in TRIM cuts a
-   nine-finding plan check to that count. */
+/* ─── The reply gate cuts by what, never to a length ─────────────────────────
+   A reply says only what decides it, and the gate is told what to cut, in
+   order, beside what it may never cut: a ceiling alone cuts whatever is
+   longest, and `keepDraft` only refuses a revision under a third of the
+   draft — so a sentence count in TRIM cuts a three-finding plan check to it.
+   The writer's copy of the shape is FORMAT's, read here as the pair. */
 
-test('the reply gate does not hold a reply to a fixed length', () => {
+test('the reply gate cuts what is on its list, beside what it never cuts, and holds no length', () => {
   const trim = EUGENIA_PROMPT.match(/export const TRIM = `([\s\S]*?)`;/)?.[1].replace(/\s+/g, ' ');
   assert.ok(trim, 'prompt.ts no longer exports TRIM');
-  assert.match(trim, /A REPLY IS AS LONG AS WHAT HE ASKED NEEDS/,
-    'TRIM no longer says a reply is as long as it needs, and it gates every reply');
+  assert.match(trim, /IS EVERY SENTENCE PART OF THE ANSWER\? A reply says only what decides it, so cut in this order/,
+    'TRIM no longer says what a reply loses, and in what order');
+  assert.match(trim, /NEVER CUT THE ANSWER, THE STEP OR RULE THAT DECIDES IT, OR THE MECHANISM HE ASKED FOR/,
+    'TRIM is told what to cut with nothing it may not, so it cuts whatever is longest');
+  assert.match(trim, /DOES IT LEAD WITH THE ANSWER\?/, 'TRIM no longer moves the answer to the front');
   assert.doesNotMatch(trim, /two or three sentences/,
     'TRIM holds a reply to two or three sentences, which cuts a plan check short');
+  const system = SYSTEM.replace(/\s+/g, ' ');
+  assert.match(system, /A REPLY LEADS WITH THE ANSWER AND SAYS ONLY WHAT DECIDES IT/,
+    'the writer no longer has the shape the gate cuts towards');
+  assert.match(system, /NO CLOSING QUESTION\. A reply ends when the answer does/,
+    'a reply may close on a question again');
 });
 
 /* ─── The trade look is told what happened, not a state that may be false ────

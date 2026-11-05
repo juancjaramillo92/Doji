@@ -19,7 +19,7 @@
    interpolates it — the copy here was the unreachable one. */
 import { PITCH } from "./prompt.ts";
 
-export const VERSION = "v1.29";
+export const VERSION = "v1.30";
 
 /* The whole strategy said once, interpolated into ALWAYS and §0. */
 const SUMMARY = `XAUUSD only, intraday to multi-session, positions held for the move they were
@@ -110,7 +110,7 @@ export const SECTIONS: Record<string, string> = {
 
   "0": `## 0 · Header
 
-**Version** ${VERSION} · **Supersedes** v1.28
+**Version** ${VERSION} · **Supersedes** v1.29
 
 ### Summary
 
@@ -917,7 +917,7 @@ Six charts with three jobs, and the hourly does two of them.
 |---|---|
 | **Bias** — step 1 | daily, 4H, 1H |
 | **Levels** — where the map is marked | 1H, 30m |
-| **Entry** — the signal, the confirmation, the fill | 15m, 5m |
+| **Entry** — the signal, the confirmation, the fill | 15m, 5m; the confirming close on the 5m |
 
 The 1H is the hinge: last of the bias charts and first of the level charts, which
 is where a top-down read meets the map.
@@ -1219,7 +1219,7 @@ setups:**
    psychological, 25 and 75 quarters, plus the reaction points where price has
    actually turned. Marked on the 1H and 30m (§4)
 3. **Candle or chart pattern** — signal first, then confirmation. Read on the 15m
-   and 5m
+   and 5m, and the confirming close is a 5m candle
 4. **Reward-to-risk of at least 1:1.5**
 
 The order is the rule. A failed step ends the sequence rather than being traded off
@@ -1304,7 +1304,7 @@ only a row carrying the plan as first seen can tell which produced it.
 ### Entry
 
 A signal is price reaching a level and rejecting, and it is not an entry.
-Confirmation is required and is either a candle closing in the intended direction,
+Confirmation is required and is either a 5m candle closing in the intended direction,
 or the reaction around the level resolving clearly enough to enter before a close.
 Entering on the signal with neither is the violation R-07 names, and §9 is why it
 has its own section.
@@ -2129,7 +2129,7 @@ traded.
 
 **Signal.** Price reaches a level and rejects. Not an entry on its own.
 
-**Confirmation.** Either a candle closing in the intended direction (*close*), or the
+**Confirmation.** Either a 5m candle closing in the intended direction (*close*), or the
 reaction around the level resolving clearly enough to enter before a close (*read*).
 Both valid. Entering on the signal with neither is not — and per §9 it is his most
 common failure.
@@ -2184,6 +2184,7 @@ it stays as written, because correcting the record would falsify it.
 
 | Version | Change | From lesson |
 |---|---|---|
+| v1.30 | **The confirming close is a 5m candle.** §6 and §12 said "a candle closing in the intended direction" without naming the chart, and her calls and her checks of his plans read it as the 15m. The 5m confirms sooner, nearer the level, so the stop behind it stays tight. Her calls wait for, and are scored on, a 5m close beyond their level. | His instruction, 5 November |
 | v1.29 | **R-02's cap read where the stop was set.** The cap was checked on the exit of a loss alone, so a stop set past $20 that won its target passed: on 27 October a $22 stop, first seen by the poller, took its $30. R-02 now also fails a closed trade, win or loss, whose recorded stop sat more than $20 from entry. No rule's wording changed — §5 already called a $22 stop non-compliant — only what the check can see. | Eugenia's morning verdict of 28 October, and his go-ahead |
 | v1.28 | **R-02's respect half made checkable.** §7 kept it open because an exit past the stop is a widened stop or slippage and the row cannot tell which; \`trade_stops\` can, and since v1.19 had been read for R-19 alone. R-02 now also fails a closed trade, win or loss, whose recorded stop moved away from entry — each sighting held against the last stop that rested — and passes an exit past a stop that never moved as slippage. A stop pulled and never put back is \`unknown\`. It reaches only the trades the poller recorded, so a clean run is never stops respected on the rest. | Eugenia's suggestion, after an $8 stop closed $18 out, and his go-ahead |
 | v1.27 | **The two flows are handed to her.** The central banks' gold reserves — China, Poland, India, Turkey, the Czech Republic — in tonnes, and GLD's and IAU's assets and money in or out, read from TradingView and handed to the Sunday briefing and a conversation. Each channel's *Where to read it* says so, and the central banks' gives the year to June 2026 as it read on 15 October. Reference material only; no rule changed. | A probe of what TradingView serves |

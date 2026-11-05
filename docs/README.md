@@ -1461,8 +1461,11 @@ were not helping: they reached him when he was not trading, and he asked for
 something much simpler with the working done behind it. So: **where the big
 picture stands and which way it leans** — the Fed's path, the dollar's trend,
 inflation, central-bank buying, her read on them and what would prove it wrong —
-in one or two sentences; **why, in one line**, the one force and the one fact
-that shows it, with no chain; the calendar; her call. Nothing beside them but a
+in one or two sentences, the test in words he could watch happen (*I'm wrong if
+bets on a December hike jump today*); **why, in one line**, the one force and
+the one fact that shows it, with no chain; the calendar; her call, as what it
+waits for and its three levels, since the stop says where it is wrong. Nothing
+beside them but a
 verdict on a closed trade that broke a rule. The teaching moved to where he is
 listening — a conversation, above all one before a trade — and what she worked
 out and left out is what she answers from when he asks. His note alone did not
@@ -1497,8 +1500,8 @@ runs last.
 
 **Length is a rule, and what makes it safe is what sits beside it.** A ceiling
 with nothing saying what to lose cuts whatever is longest on the page, which was
-once the teaching, every morning. So the budget is 80–120 words, less on a day
-the picture did not move, 150 at the outside, and beside it a fixed order of what
+once the teaching, every morning. So the budget is 50–80 words, less on a day
+the picture did not move, 100 at the outside, and beside it a fixed order of what
 comes out: numbers he cannot act on, then levels he can read off his own screen,
 then any sentence that is not one of the four lines. **Never the read or its
 test, never an event, never the call, never a verdict.** Still over means the
@@ -1528,7 +1531,7 @@ read as hard when one sentence carries three ideas. The rules, in `WRITING`:
   of them. `CRITIC` and `TRIM` each COUNT this, and every em-dash, as
   their last step rather than reading for it among the rest.
 - **A number earns its place** by meaning something he can use; the briefing
-  holds one or two beside the call's levels and the calendar's times, one budget
+  holds one at most beside the call's levels and the calendar's times, one budget
   the writer and `CRITIC` both state and a test holds equal.
 
 **The judgement rules carry worked examples.** The countable rules landed at once
@@ -1563,8 +1566,9 @@ since it is the only thing that says what **not** to explain.
 no interest, so it competes with what a bond pays once inflation is taken out.
 `PITCH` says a channel at `owns` gets its term bare — right for every term but
 this, which sits under nearly every read. Writer and critic are both told, and
-in the briefing's one line of why it is said in plain words whenever it carries
-the argument.
+both are told the one place it is not walked: the briefing, which has no chain,
+so its why keeps the last link alone — *higher rates make gold a harder sell*.
+Said every morning, it was the chain he had heard most.
 
 **She remembers yesterday.** The briefing reads the last twelve turns, so it
 opens with how yesterday's print landed rather than from nothing. What is stored
@@ -1713,12 +1717,18 @@ outcomes are a `caller: 'reactions'` row.
 
 **Every reply is read once more before it is sent**, as the briefing is.
 `CRITIC` reads the briefing; `TRIM` reads every reply. The reply is gated inside
-the typing indicator, so she never reads as having finished and said nothing,
-and `TRIM` holds the reply to no short length: a plan checked against his rules
-can be nine findings long.
+the typing indicator, so she never reads as having finished and said nothing.
+**A reply leads with the answer and says only what decides it** (`SYSTEM`'s
+FORMAT): the reason that decides it and nothing already said in the
+conversation, no rule codes, no closing question unless the answer needs
+something from you. `TRIM` moves a buried answer to the front and cuts from a
+list, in order — what passed, a level that decides nothing, restatements, a
+closing question — beside what it never cuts: the answer, what decides it, a
+mechanism you asked for. It holds the reply to no length, because a ceiling
+alone cuts whatever is longest.
 
 `TRIM` is **not `CRITIC` with a shorter prompt**. The briefing's checks — a first
-sentence true only today, four lines, one line of why, 80–120 words —
+sentence true only today, four lines, one line of why, 50–80 words —
 would ruin three sentences. `TRIM` asks the writing questions alone, off the same
 `WRITING` the writer was given; it gets no notes and no channel map, since it is
 not judging whether a term was built, but **is** handed what you have on now,
@@ -1951,7 +1961,7 @@ few seconds and stopped before the text can go, as typing is shown while she
 writes: on 27 October the voice took two and a half minutes with nothing on his
 screen, and he asked whether she had answered.
 
-**There is no length cap.** A briefing is 80–150 words by its own rule, and a
+**There is no length cap.** A briefing is 50–100 words by its own rule, and a
 cap decides that past some length a message is not worth hearing. A long message
 becomes *several* voice notes, split by `chunk()` with its paragraph preference
 so each part is a whole thought; the only number is what the vendor accepts per
@@ -2537,7 +2547,7 @@ you.
   the same way.
 - **A call can wait for its setup.** In the morning the setup is usually not
   there yet, so the call says what it waits for — *if price comes back to 4,000
-  and a fifteen-minute candle closes above it, buy at 4,002*. The condition is
+  and a five-minute candle closes above it, buy at 4,002*. The condition is
   hers to state in his words, and `confirm` is the part of it that is scored:
   `close` with the level it waits on, or `market` for a confirmation that has
   already printed. `make_call` refuses a wait whose level is not between the
@@ -2553,8 +2563,8 @@ you.
   whether price reached the entry, then whether the target or the stop came
   first, the stop moved to break-even at +$20 as your R-04 moves yours. **A
   call that waits for a close is scored as waiting** (R-07: the signal is not
-  an entry): its entry counts only once a 15m candle — built from the minute
-  bars on the quarter hour, and opened after the call — has reached the level
+  an entry): its entry counts only once a 5m candle — built from the minute
+  bars on the five minutes, and opened after the call — has reached the level
   and closed beyond it, so a touch of the entry before that candle closes is
   never a fill. Calls filed before `confirm` existed are scored on the touch. On the
   bar that filled her only the stop counts; a bar touching both is a loss; the
@@ -3595,10 +3605,13 @@ pre-trade sequence, which no row can see and which you decided in October 2026
 she should judge: R-08's four steps in order — the bias, the level (R-05's
 interior for Break & Retest, R-06's outer extreme for Support & Resistance), the
 confirmation rather than the touch (R-07), the ratio — reading §4 and §6 first
-so she holds you to what you wrote, and naming any step she cannot see in its
-place, never moved to the end. **Then she says whether she would take it**, as
-hers, and you decide. Her one question is your own probe for the touch, asked
-before the fact: what you will wait for at the level before you click. **The
+so she holds you to what you wrote; a step she cannot see does not pass. **The
+reply opens with whether she would take it**, as hers, and you decide, and then
+says only what decided it — the step that failed, a rule that keeps you out, a
+release due, a step she could not see — with what passed in a clause at most.
+The touch is said as your rule where the confirmation decides it, never asked:
+a reply ends when the answer does, and a question closing every one is a line
+you stop hearing. **The
 levels stay yours**: she never suggests a different entry, stop or target and
 never turns "the ratio is 1:1.1" into the target that would fix it; `TRIM`
 removes a level she offers in place of yours. **A release you would carry into a
