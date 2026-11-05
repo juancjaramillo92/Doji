@@ -2375,7 +2375,12 @@ click downloads it, saying so, quits, and a shell left behind,
 `swapScript`, puts it in place and opens it: the old app is set aside first
 and put back if the new one cannot take its place, so a failed update leaves
 the app it found, never none. Downloaded by the app rather than a browser, it
-carries no quarantine, so *Open Anyway* is never asked again. A copy run from
+carries no quarantine, so *Open Anyway* is never asked again — and since
+nothing else on the Mac would then check who made it, the swap does: the new
+app takes the old one's place only signed by the signer the old one names
+(`codesign -d -r-`), and the workflow proves that reading on the real
+signature, a stranger's beside it refused. A build signed by another
+certificate — the kept one lost — is refused, and installed by hand once. A copy run from
 the repository has no `build.txt` and never offers one.
 
 **Her app wears Doji's icon**, the phone's `icon-512.png`, made into the sizes
@@ -2392,6 +2397,8 @@ capture, the sound, the signature or the update — adds its line here.
 
 - **Her binary kept to her own code**: she starts, listens, captures the
   chart and updates as before, the switches off.
+- **An update held to her signer**: *Update her* still puts the new version
+  in place and opens it.
 - **The journal**: a trade opened comes up as its questions with the tick,
   in Hanken Grotesk rather than a fallback face; a click on either half
   answers on her window without TradingView losing its place; the ring and

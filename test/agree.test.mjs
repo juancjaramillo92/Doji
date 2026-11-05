@@ -654,6 +654,19 @@ test('the laptop draws the charm\'s journal, at its numbers, times and colours',
   assert.match(bodyOf(LAPTOP_FACE, 'function waits('), new RegExp(`g\\.lineWidth = ${mark[1]};`), 'the laptop\'s ring for a trade is another width');
 });
 
+/* The swap holds a new app to her signer, named as the app in place names it;
+   the workflow asks the same two commands of the real signature, so the
+   reading of macOS's answer is proved on a Mac and not only against a stand-in. */
+test('the laptop\'s update is held to her signer as the workflow proves it read', () => {
+  const swap = source('laptop/update.mjs'), workflow = source('.github/workflows/laptop.yml');
+  const named = swap.match(/signer=\$\(codesign -d -r- \$\{b\} 2>\/dev\/null \| (sed -n '[^']+')\)/)?.[1];
+  assert.ok(named, 'the swap no longer names her signer as this test reads it');
+  assert.ok(workflow.includes(`signer=$(codesign -d -r- Eugenia.app 2>/dev/null | ${named})`),
+    'the workflow names her signer otherwise than the swap does, and proves nothing about it');
+  assert.match(swap, /codesign --verify --deep --strict -R="\$signer" \$\{fresh\}/, 'the swap no longer holds the new app to her signer');
+  assert.match(workflow, /^\s*if codesign --verify --deep --strict -R="\$stranger" Eugenia\.app; then [^\n]*exit 1; fi$/m, 'the workflow no longer sees a stranger refused');
+});
+
 /* Where the laptop's update lives: the objects the workflow writes, the ones
    the app reads, and the version the build stamped, written beside it. */
 test('the laptop looks for its update where the workflow publishes it', () => {

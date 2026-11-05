@@ -115,15 +115,25 @@ function swapping({ unpack = 'whole', mvFails = false } = {}) {
   const unpacked = join(root, 'eugenia-update'), zip = join(root, 'Eugenia.zip'), opened = join(root, 'opened');
   mkdirSync(bundle, { recursive: true });
   writeFileSync(join(bundle, 'version'), 'old');
+  writeFileSync(join(bundle, 'signer'), 'certificate leaf = H"kept"');
   writeFileSync(zip, 'zip');
   mkdirSync(stubs);
   const stub = (name, body) => { writeFileSync(join(stubs, name), `#!/bin/sh\n${body}\n`); chmodSync(join(stubs, name), 0o755); };
-  // ditto -x -k <zip> <dest>: the new app unpacked, or not.
+  // ditto -x -k <zip> <dest>: the new app unpacked, signed by her kept certificate or a stranger's, or not.
+  const signed = (by) => `mkdir -p "$4/${BUNDLE}" && echo new > "$4/${BUNDLE}/version" && echo '${by}' > "$4/${BUNDLE}/signer"`;
   stub('ditto', {
-    whole: `mkdir -p "$4/${BUNDLE}" && echo new > "$4/${BUNDLE}/version"`,
+    whole: signed('certificate leaf = H"kept"'),
+    stranger: signed('certificate leaf = H"other"'),
     broken: 'exit 1',
     empty: 'mkdir -p "$4"',
   }[unpack]);
+  // codesign -d -r- <app> names its signer as macOS does; --verify -R=<signer> <app> holds an app to it.
+  stub('codesign', [
+    'case "$1" in',
+    '  -d) echo "Executable=$3" >&2; echo "designated => $(cat "$3/signer")";;',
+    '  --verify) [ -f "$5/signer" ] && [ "${4#-R=}" = "$(cat "$5/signer")" ];;',
+    'esac',
+  ].join('\n'));
   stub('open', `echo "$1" >> '${opened}'`);
   if (mvFails) stub('mv', `case "$1" in *eugenia-update/${BUNDLE}) exit 1;; esac\nexec /bin/mv "$@"`);
   const gone = spawnSync('true').pid;
@@ -148,6 +158,7 @@ test('an update puts the new app in place of the old, and opens it', () => {
 test('an update that cannot take the old app\'s place leaves the old app, and opens it', () => {
   for (const [why, how] of [['a download that will not unpack', { unpack: 'broken' }],
                             ['a download with no app in it', { unpack: 'empty' }],
+                            ['a new app signed by a stranger', { unpack: 'stranger' }],
                             ['a new app that will not move into place', { mvFails: true }]]) {
     const r = swapping(how);
     assert.equal(r.version, 'old', `${why} left no app, or the wrong one`);

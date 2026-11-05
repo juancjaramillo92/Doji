@@ -153,6 +153,17 @@ jobs:
         run: |
           codesign --verify --deep --strict Eugenia.app
           codesign --verify --strict Eugenia.app/Contents/Resources/app.asar.unpacked/spaces.node
+          # The update's swap names her signer as the app in place says it and
+          # holds the new one to it (update.mjs): asked here of the real
+          # signature, with another leaf beside it as the stranger it must refuse.
+          signer=$(codesign -d -r- Eugenia.app 2>/dev/null | sed -n 's/^designated => //p')
+          echo "her signer: $signer"
+          test -n "$signer"
+          codesign --verify --deep --strict -R="$signer" Eugenia.app
+          stranger=$(echo "$signer" | sed -E 's/H"[0-9a-f]+"/H"0000000000000000000000000000000000000000"/')
+          test "$stranger" != "$signer"
+          # An if, not a !: bash's -e never stops on a command negated with !.
+          if codesign --verify --deep --strict -R="$stranger" Eugenia.app; then echo "a stranger's signer was taken for hers"; exit 1; fi
           # The packager skips an icon it cannot find with only a warning.
           cmp ../../Eugenia.icns "Eugenia.app/Contents/Resources/$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' Eugenia.app/Contents/Info.plist)"
           ditto -c -k --keepParent Eugenia.app Eugenia.zip
