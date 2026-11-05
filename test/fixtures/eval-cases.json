@@ -205,7 +205,7 @@
     "context": "\n\nWhat he has on, and where his day stands:\n· open since 09:41 ET — buy 2oz from 4012.40, stop 3995.00 and target 4042.00 as first seen\n· his day so far: 0.00 against an account of 1000 implied by his size — inside the 4% R-11 sets",
     "draft": "Buenos días. The big picture moved this morning: retail sales came in far above forecast, and the market now prices fewer Fed cuts. My read is this print is bad news for gold. I would be wrong if the two-year falls back under 3.86% by the close.\n\nWhy: gold pays no interest, so it competes with what a bond pays once inflation is taken out, and fewer cuts keep that high, so gold is a harder sell.\n\nToday:\n- Nothing rated high today.",
     "mustNot": ["\\bmy read\\b", "I would be wrong if"],
-    "judge": ["The briefing carries no read of hers on which way the news leans for gold, since he holds a position and did not ask for one", "The why from the print to gold is kept, its last link included: gold being a harder sell is mechanism, not a view"]
+    "judge": ["The briefing carries no read of hers on which way the news leans for gold, since he holds a position and did not ask for one", "The why from the print to gold keeps its last link: gold being a harder sell is mechanism, not a view. The chain before that link may be cut, since a briefing carries no chain"]
   },
   {
     "id": "bias-weighed",
