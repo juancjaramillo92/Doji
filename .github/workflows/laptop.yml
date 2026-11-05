@@ -61,6 +61,27 @@ jobs:
           done
           iconutil -c icns Eugenia.iconset
           npm run package
+      # Her binary runs her code and nothing else. As Electron ships it, any
+      # program on the Mac could start it as plain Node, or under a debugger,
+      # and borrow the microphone and Screen Recording macOS granted her —
+      # macOS grants the app, not the code it runs. The three switches that
+      # allow it are turned off before she is signed, and read back; the first
+      # read must see them on, as the defect the check must see.
+      - name: Keep her binary to her own code
+        working-directory: laptop
+        run: |
+          node --input-type=module -e '
+          import { flipFuses, getCurrentFuseWire, FuseState, FuseVersion, FuseV1Options } from "@electron/fuses";
+          const app = "out/Eugenia-darwin-arm64/Eugenia.app";
+          const closed = ["RunAsNode", "EnableNodeOptionsEnvironmentVariable", "EnableNodeCliInspectArguments"];
+          const read = async () => { const wire = await getCurrentFuseWire(app); return closed.map(f => wire[FuseV1Options[f]]); };
+          if (!(await read()).every(s => s === FuseState.ENABLE)) throw new Error("the switches read as off before they were turned off: the reader has gone blind");
+          await flipFuses(app, { version: FuseVersion.V1, resetAdHocDarwinSignature: true,
+            ...Object.fromEntries(closed.map(f => [FuseV1Options[f], false])) });
+          const after = await read();
+          console.log(closed.map((f, i) => `${f} ${after[i] === FuseState.DISABLE ? "off" : "STILL ON"}`).join(", "));
+          if (!after.every(s => s === FuseState.DISABLE)) process.exit(1);
+          '
       # The one decision in her that only macOS answers, asked of it here: a
       # window raised as hers is, given spaces.node, belongs to one desktop and
       # floats across none. A panel given the same call rides along as the

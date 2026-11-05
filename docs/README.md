@@ -2343,6 +2343,15 @@ and says how to talk. Opened from anywhere but Applications, she offers to
 move herself there, where she updates and macOS keeps her permissions. A
 place left on a screen since unplugged brings her back to the main one.
 
+**Her binary runs her code and nothing else.** As Electron ships it, any
+program on the Mac could start it as plain Node or under a debugger and
+borrow the microphone and Screen Recording macOS granted her, since macOS
+grants the app rather than the code it runs. The workflow turns those three
+switches off — Electron's fuses `RunAsNode`,
+`EnableNodeOptionsEnvironmentVariable` and `EnableNodeCliInspectArguments` —
+before she is signed, and reads them back, the first read seeing them on as
+the defect it must see.
+
 **It is signed with a certificate of its own, never Apple's**, which costs
 nothing and is why macOS keeps her microphone and screen permissions from one
 version to the next: they belong to a signer, and an ad-hoc signature is a new
@@ -2381,6 +2390,8 @@ only by `npm run package`, so a copy started this way shows on every desktop.
 to what only the Mac shows — the window, the keys, the microphone, the
 capture, the sound, the signature or the update — adds its line here.
 
+- **Her binary kept to her own code**: she starts, listens, captures the
+  chart and updates as before, the switches off.
 - **The journal**: a trade opened comes up as its questions with the tick,
   in Hanken Grotesk rather than a fallback face; a click on either half
   answers on her window without TradingView losing its place; the ring and
