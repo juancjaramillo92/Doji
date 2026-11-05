@@ -16,7 +16,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 import {
   app, BrowserWindow, Menu, Tray, clipboard, desktopCapturer, dialog, globalShortcut, ipcMain, nativeImage, powerMonitor,
-  safeStorage, screen, shell, systemPreferences,
+  safeStorage, screen, session, shell, systemPreferences,
 } from 'electron';
 import { Buffer } from 'node:buffer';
 import { spawn } from 'node:child_process';
@@ -548,6 +548,11 @@ app.whenReady().then(async () => {
     app.setLoginItemSettings({ openAtLogin: true });
     save();
   }
+  /* Her face asks for the microphone, and nothing on her pages asks for
+     anything else: Electron grants any permission a page asks for unless
+     told otherwise, the camera and notifications among them. */
+  session.defaultSession.setPermissionRequestHandler((contents, permission, grant, details) =>
+    grant(contents === face?.webContents && permission === 'media' && (details.mediaTypes ?? []).every(t => t === 'audio')));
   micOk = await systemPreferences.askForMediaAccess('microphone');
   if (!micOk) shell.openExternal(PANES.mic);
   // The app's own menu, for its name, Quit, and the Edit menu ⌘V pastes her key through.

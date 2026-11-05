@@ -2326,7 +2326,9 @@ and *Gladys's key…* in her menu change either. The app's own menu holds
 the Edit menu ⌘V pastes them through. The keys and the doors live in the main
 process alone; the page that draws her has neither, asks for nothing but what
 `preload.cjs` names, opens no window and navigates nowhere. Each page is
-handed only its own names: the key window its key alone, her face the rest.
+handed only its own names: the key window its key alone, her face the rest. And
+her face is granted the microphone and nothing else: Electron grants any
+permission a page asks for unless told otherwise.
 
 **Her menu's *Copy her log*** puts her last decisions on the clipboard, with
 their times — whether she was kept to one desktop, each time she was brought
