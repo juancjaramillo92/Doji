@@ -102,7 +102,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 885 tests, nine suites
+npm test      # 886 tests, nine suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -257,7 +257,7 @@ his to do and yours — so nothing open goes unsaid.
   `positionsBlock()` to judge the last. A printed level is a fact, never in the
   paragraph with her read. A plan he has not taken is checked when he asks, in
   two halves — the rules §7 marks `journal`, and R-08's sequence, judgment rules
-  she now judges — and ends in whether she would take it; the levels stay his.
+  she now judges — and opens with whether she would take it; the levels stay his.
   `agree.test.mjs` reads each half's citations against the table.
 - **Her read record is judged by the test she stated, never by where price
   went**, and it is hers: never on the trade look, never cited to him as a
@@ -290,7 +290,8 @@ his to do and yours — so nothing open goes unsaid.
   need judgement carry a worked example, because a model matches an example where
   it ignores an adjective — check a new example against the rule it sits beside.
   The countable rules are asked for as a count, last, in both gates.
-- **The real-rate chain is exempt from the rung**, stated in both copies.
+- **The real-rate chain is exempt from the rung, and walked nowhere in a
+  briefing**, stated in both copies.
 - **`CRITIC` restates several prompt rules**; changing one without the other has
   the critic undo it. `agree.test.mjs` holds each pair.
 

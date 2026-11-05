@@ -485,6 +485,7 @@ single-sourced at run time:
 | the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow, the Apps Script, the charm's `charm/main/net.h` and the laptop's `laptop/main.mjs` |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
 | each function's **gateway setting** | `config.toml`'s stanza and the deploy command's flag |
+| the **confirming candle** | `CONFIRM_MS` in `doji-eugenia`, which `scoreCall` builds candles at, said in words by `make_call`'s description and by `SYSTEM`, and named in §6's Entry and §12's Confirmation in `strategy.ts` |
 | her **map's grid and candle count** | `GRID` and `CANDLES` in `structure.ts`, said in words by `get_structure`'s description and by `SYSTEM`; the grid is §4's, in `strategy.ts` |
 | the **review's length** | `REVIEW`'s ceiling and the count it cuts past, in words, the figures the README gives, and the ceiling `review-process-over-pnl` counts against |
 | **what the eval reads** | `scripts/eval.mjs`'s imports and `file()` reads, and the paths `test.yml`'s test job compares with main |
@@ -1815,9 +1816,10 @@ about an odd reaction.
 
 **The briefing asks him nothing.** A slot whose only output is an open thread
 measures nothing; he engages by *instruction*, a channel that works. The reply
-path keeps its questions — in the trade conversation one question and then
-silence is the method, and he answers there because he started it.
-`agree.test.mjs` reads both halves.
+path keeps the questions an answer needs — his stop and target for a check, the
+moment a commitment applies, what was going on when he tells her how a trade
+felt — and asks each once, never as a closing line; he answers there because he
+started it. `agree.test.mjs` reads both halves.
 
 ### Checking his rules
 
@@ -1915,7 +1917,8 @@ draft goes.
 
 **A voice note** reaches her as text marked `[voice note]`, and she reads it as
 him talking rather than writing — it will ramble, and it is likely to be about
-how a trade felt, which is when she slows down and asks one thing. The Messages
+how a trade felt. She answers the one thing he is asking, and slows down where
+it is about how a trade felt. The Messages
 API takes no audio and Telegram does not transcribe for bots, so `STT_URL` and
 `STT_KEY` are optional secrets written against the `/audio/transcriptions`
 shape. **Unset is a first-class state**: she says she cannot hear it and nothing
@@ -2622,7 +2625,7 @@ you.
   first, the stop moved to break-even at +$20 as your R-04 moves yours. **A
   call that waits for a close is scored as waiting** (R-07: the signal is not
   an entry): its entry counts only once a 5m candle — built from the minute
-  bars on the five minutes, and opened after the call — has reached the level
+  bars five minutes at a time, and opened after the call — has reached the level
   and closed beyond it, so a touch of the entry before that candle closes is
   never a fill. Calls filed before `confirm` existed are scored on the touch. On the
   bar that filled her only the stop counts; a bar touching both is a loss; the
