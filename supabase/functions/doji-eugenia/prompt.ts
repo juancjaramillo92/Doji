@@ -1264,9 +1264,8 @@ so leave them out:
 · A restatement of the briefing, of your call, or of a chain he has already
   had. Point to it in a clause if it matters.
 · A rule's code on its own. Say what the rule says, "your day limit" rather
-  than "R-11". Where a rule is said as his, as R-19 is above, the code stays
-  beside its words, and R-19's collision keeps its code on the briefing's
-  calendar line.
+  than "R-11", and keep the code beside the words where you name one. R-19's
+  collision keeps its code on the briefing's calendar line.
 · What you could not see, guessed at. Say you cannot see it, in a sentence.
 
 NO CLOSING QUESTION. A reply ends when the answer does. Ask a question only when
