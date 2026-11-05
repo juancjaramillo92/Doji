@@ -2411,6 +2411,31 @@ test('standby sleeps from its own task, and every press of PWR is one press', ()
     'the press that wakes her from standby is taken as a tap too, and ends the turn it began');
 });
 
+/* An earlier app's deep sleep held the panel's reset and select and the
+   touch controller's reset, and left the buttons with their sleep circuit;
+   both outlive a restart and a flash while the battery keeps the chip
+   powered, and the first standby build, which let go of nothing, came up
+   black. So letting go is the first thing every start does. And standby
+   sleeps with LVGL held between frames, so no touch read is stopped halfway
+   on the bus the motion sensor and the power chip share. main.c and sleep.c
+   are the board's, so they are read. */
+test('every start lets go of what an earlier sleep held, and standby sleeps between frames', () => {
+  const main = source('charm/main/main.c');
+  assert.match(bodyOf(main, 'void app_main(void) {', 'main.c has no app_main()'), /^void app_main\(void\) \{\s*sleep_let_go\(\);/,
+    'app_main() does something before letting go of the pins an earlier sleep held, the screen\'s among them');
+  const sleep = source('charm/main/sleep.c');
+  const held = sleep.match(/static const gpio_num_t HELD\[\] = \{([^}]*)\};/);
+  assert.ok(held && ['BSP_LCD_RST', 'BSP_LCD_CS', 'BSP_LCD_TOUCH_RST'].every(p => held[1].includes(p)),
+    'sleep.c no longer lets go of the panel\'s reset and select and the touch controller\'s reset');
+  const go = bodyOf(sleep, 'void sleep_let_go(void) {', 'sleep.c has no sleep_let_go()');
+  for (const step of ['gpio_hold_dis(HELD[i]);', 'gpio_deep_sleep_hold_dis();', 'give_back();']) {
+    assert.ok(go.includes(step), `sleep_let_go() no longer does ${step}`);
+  }
+  assert.match(bodyOf(main, 'static wake_t standby(void) {'),
+    /bsp_display_lock\(-1\);\s*slept_t slept = sleep_light\([^;]*\);\s*bsp_display_unlock\(\);/,
+    'standby sleeps with LVGL free to be halfway through a touch read on the shared bus');
+});
+
 /* The charm reads her voice as fast as it plays it, so a budget over the
    whole speech stream runs at the pace of speech: SPEAK_MS on the stream cut a
    briefing past two and a half minutes off mid-sentence. It bounds the

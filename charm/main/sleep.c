@@ -1,6 +1,7 @@
 #include "sleep.h"
 
 #include "bsp/esp-bsp.h"
+#include "driver/gpio.h"
 #include "driver/rtc_io.h"
 #include "esp_sleep.h"
 #include "freertos/FreeRTOS.h"
@@ -11,8 +12,24 @@
 // The BOOT button and the touch controller's interrupt pull low.
 static const gpio_num_t WAKE[] = { BOOT_PIN, BSP_LCD_TOUCH_INT };
 
+// What an earlier app held through its deep sleep.
+static const gpio_num_t HELD[] = { BSP_LCD_RST, BSP_LCD_CS, BSP_LCD_TOUCH_RST };
+
 #define COUNT(a) (sizeof a / sizeof *a)
 #define STACK    3072
+
+// A pin that can wake her stays with its sleep circuit, reading nothing,
+// until it is given back.
+static void give_back(void) {
+    rtc_gpio_deinit(PWR_PIN);
+    for (size_t i = 0; i < COUNT(WAKE); i++) rtc_gpio_deinit(WAKE[i]);
+}
+
+void sleep_let_go(void) {
+    for (size_t i = 0; i < COUNT(HELD); i++) gpio_hold_dis(HELD[i]);
+    gpio_deep_sleep_hold_dis();
+    give_back();
+}
 
 static TaskHandle_t sleeper;
 static SemaphoreHandle_t woken;
@@ -58,10 +75,7 @@ slept_t sleep_light(int64_t ms) {
     xTaskNotifyGive(sleeper);
     xSemaphoreTake(woken, portMAX_DELAY);
 
-    // A pin that can wake her stays with its sleep circuit, reading nothing,
-    // until it is given back.
-    rtc_gpio_deinit(PWR_PIN);
-    for (size_t i = 0; i < COUNT(WAKE); i++) rtc_gpio_deinit(WAKE[i]);
+    give_back();
     esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
     return cause == ESP_SLEEP_WAKEUP_EXT0 ? SLEPT_PRESS : cause == ESP_SLEEP_WAKEUP_EXT1 ? SLEPT_TOUCH : SLEPT;
 }

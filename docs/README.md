@@ -3715,7 +3715,11 @@ RAM, sent as they are (`light` in `charm/main/main.c`). Her task's stack, the
 Opus encoder's, is in PSRAM, since in internal RAM it leaves the codecs too
 little and the board package aborts as her speaker starts; light sleep, which
 suspends the cache PSRAM is read through, is entered from a small task of its
-own (`charm/main/sleep.c`). The versions every build uses are the ones
+own (`charm/main/sleep.c`). Every start first lets go of what an earlier app's deep sleep
+left on the pins (`sleep_let_go`): the panel's reset and select and the touch
+controller's reset held at a level, and the buttons in their sleep circuit,
+which outlive a restart and a flash while the battery keeps the chip powered
+and keep the screen from ever starting. The versions every build uses are the ones
 `charm/dependencies.lock` names, and the workflow fails a build that resolved
 any other, so a new release reaches the firmware only by a commit that changes
 the lock.

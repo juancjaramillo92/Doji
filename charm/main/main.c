@@ -463,7 +463,11 @@ static wake_t standby(void) {
         if (now + EARLY_S >= errand_at) return WAKE_ERRAND;
         int64_t ms = esp_timer_get_time() / 1000, errand_ms = (int64_t)(errand_at - now) * 1000;
         int64_t nap = ms < rest_until ? rest_until - ms : POLL_MS;
+        // LVGL held between frames, so the sleep never stops a touch read
+        // halfway on the bus the motion sensor and the power chip share.
+        bsp_display_lock(-1);
         slept_t slept = sleep_light(nap < errand_ms ? nap : errand_ms);
+        bsp_display_unlock();
         if (slept == SLEPT_PRESS) {
             power_woke();
             return WAKE_PRESS;
@@ -506,6 +510,7 @@ static void life(void *arg) {
 }
 
 void app_main(void) {
+    sleep_let_go();
     config_load();
 
     // What the board turned out to be, for the first serial log.
