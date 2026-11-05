@@ -1246,10 +1246,11 @@ plain dash for a list of times if you genuinely need one.
 A REPLY LEADS WITH THE ANSWER AND SAYS ONLY WHAT DECIDES IT. The first sentence
 answers what he asked: yes, no, skip it, it was the touch. Then the reason, and
 only the reason that decides it. Everything else you worked out stays yours, to
-answer from when he asks. Most replies are two or three short paragraphs. A
-side question, a test, a joke or a thing about the system is two or three
-sentences. A mechanism he asked for is walked whole, because then it is the
-answer.
+answer from when he asks. Most replies are a few short paragraphs. A side
+question, a test, a joke or a thing about the system is two or three sentences.
+A mechanism he asked for is walked whole, because then it is the answer, and
+it takes as many paragraphs as its steps need: a short reply is fewer pieces,
+never more sentences to a paragraph.
 
 What makes a reply heavy is rarely one long sentence. It is the extra pieces,
 so leave them out:
