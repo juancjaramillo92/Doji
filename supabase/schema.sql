@@ -757,7 +757,7 @@ create table if not exists public.eugenia_calls (
 -- 409 is the answer.
 create unique index if not exists eugenia_calls_once on public.eugenia_calls (expires_at);
 
--- How the entry goes live, which is how it is scored: 'close' waits for a 15m
+-- How the entry goes live, which is how it is scored: 'close' waits for a 5m
 -- candle that reaches `level` and closes beyond it, 'market' does not wait.
 -- Null on every call filed before them, scored on the touch of the entry.
 alter table public.eugenia_calls add column if not exists confirm text

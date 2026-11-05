@@ -870,12 +870,12 @@ nothing to read. Apart, each job's row says what happened to that job.
 needs the same window.
 
 ### R-91 — the confirming candle out of the prompt
-**Why refused:** `SYSTEM` says "a fifteen-minute candle", a copy of
-`CONFIRM_MS` in words. It is also R-07's 15m, his rule, which she is told in his
+**Why refused:** `SYSTEM` says "a five-minute candle", a copy of
+`CONFIRM_MS` in words. It is also R-07's 5m, his rule, which she is told in his
 words everywhere a call waits, so the words stay and a test holds them to the
 constant. The correlation windows are not copied at all: each line of the block
 states its own sessions, and the prompt points her to it.
-**Revisit if:** his rules move the confirming candle off the 15m.
+**Revisit if:** his rules move the confirming candle off the 5m.
 
 ### R-92 — a cap on what each briefing was handed
 **Why refused:** `eugenia_inputs` keeps the whole message a briefing was asked,

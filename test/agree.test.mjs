@@ -6610,11 +6610,11 @@ test('the map\'s grid and candle count are the ones the tool, the writer and §4
 });
 
 /* Said in words where nothing interpolates them: the confirming candle her
-   calls wait for, which is R-07's 15m, in the writer and the tool, and the two
+   calls wait for, which is R-07's 5m, in the writer and the tool, and the two
    series gold's correlations are taken over, in the writer. The windows are
    the block's to state, so the writer names none. */
 test('the confirming candle and the correlations are the ones the writer and the tool say', () => {
-  const WORDS = { 15: 'fifteen' };
+  const WORDS = { 5: 'five' };
   const tool = EUGENIA_TS.slice(EUGENIA_TS.indexOf('const CALL_TOOL = {'));
   const said = tool.slice(0, tool.indexOf('} as const;')).replace(/" \+\s*"/g, '');
   const system = SYSTEM.replace(/\s+/g, ' ');

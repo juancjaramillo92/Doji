@@ -2492,7 +2492,7 @@ you.
   the same way.
 - **A call can wait for its setup.** In the morning the setup is usually not
   there yet, so the call says what it waits for — *if price comes back to 4,000
-  and a fifteen-minute candle closes above it, buy at 4,002*. The condition is
+  and a five-minute candle closes above it, buy at 4,002*. The condition is
   hers to state in his words, and `confirm` is the part of it that is scored:
   `close` with the level it waits on, or `market` for a confirmation that has
   already printed. `make_call` refuses a wait whose level is not between the
@@ -2508,8 +2508,8 @@ you.
   whether price reached the entry, then whether the target or the stop came
   first, the stop moved to break-even at +$20 as your R-04 moves yours. **A
   call that waits for a close is scored as waiting** (R-07: the signal is not
-  an entry): its entry counts only once a 15m candle — built from the minute
-  bars on the quarter hour, and opened after the call — has reached the level
+  an entry): its entry counts only once a 5m candle — built from the minute
+  bars on the five minutes, and opened after the call — has reached the level
   and closed beyond it, so a touch of the entry before that candle closes is
   never a fill. Calls filed before `confirm` existed are scored on the touch. On the
   bar that filled her only the stop counts; a bar touching both is a loss; the

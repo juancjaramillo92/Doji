@@ -1572,12 +1572,12 @@ async function recordRead(reading: unknown, test: unknown, verdict: unknown,
    ───────────────────────────────────────────────────────────────────────── */
 export const CALL_SIDES = ['buy', 'sell'] as const;
 /* How the entry goes live. R-07 enters on a confirmation, never on the signal,
-   so a call that waits for one is scored as waiting: 'close' is a 15m candle
+   so a call that waits for one is scored as waiting: 'close' is a 5m candle
    reaching the level and closing beyond it the call's way, 'market' is a call
    whose confirmation has already printed. */
 export const CALL_CONFIRMS = ['close', 'market'] as const;
 // The chart his rules read the confirming candle on.
-export const CONFIRM_MS = 900_000;
+export const CONFIRM_MS = 300_000;
 // R-08's fourth step, at entry.
 export const RR_MIN = 1.5;
 export const CALL_MAX = 300;
@@ -1592,7 +1592,7 @@ const CALL_TOOL = {
     "session, living until the next 17:00 New York roll. The condition is what price has " +
     "to do before the entry is live, in his words for it — a retest, a candle closing " +
     "back above a level — or 'at the market' for now. `confirm` is how it is scored: " +
-    "'close' waits for a fifteen-minute candle that reaches `level` and closes beyond it " +
+    "'close' waits for a five-minute candle that reaches `level` and closes beyond it " +
     "your way, and only then is the entry live; 'market' is live at once. The entry is " +
     "the price you would be filled at, and it is what is scored.",
   input_schema: {
@@ -1604,7 +1604,7 @@ const CALL_TOOL = {
       target:    { type: "number", description: "Where you take it." },
       condition: { type: "string", description: `What price has to do first, at most ${CALL_MAX} characters.` },
       confirm:   { type: "string", enum: CALL_CONFIRMS,
-                   description: "'close' when the entry waits for a 15m close beyond the level, 'market' when it does not." },
+                   description: "'close' when the entry waits for a 5m close beyond the level, 'market' when it does not." },
       level:     { type: "number", description: "With 'close': the level the candle reaches and closes beyond." },
     },
     required: ["direction", "entry", "stop", "target", "condition", "confirm"],
@@ -1623,7 +1623,7 @@ export function callProblem(direction: unknown, entry: number, stop: number, tar
     return `A ${direction} has its stop ${buy ? "below" : "above"} the entry and its target ${buy ? "above" : "below"} it.`;
   }
   if (!(CALL_CONFIRMS as readonly unknown[]).includes(confirm)) {
-    return "Say whether the entry waits for a 15m close beyond a level ('close') or is live now ('market').";
+    return "Say whether the entry waits for a 5m close beyond a level ('close') or is live now ('market').";
   }
   // The stop is where the idea is wrong, which is back on the far side of the
   // level the candle closed beyond.
@@ -1688,8 +1688,8 @@ async function makeCall(direction: unknown, entry: unknown, stop: unknown, targe
    a bar touching both stop and target is a loss; the stop moves to break-even
    at +$20 as R-04 moves his, reached on a bar after the fill and effective from
    the bar after that, since a bar's high and low cannot say which came first.
-   A call that waits for a close goes live only once a 15m candle opened after
-   it — built from the minute bars on the quarter hour, as his chart draws it —
+   A call that waits for a close goes live only once a 5m candle opened after
+   it — built from the minute bars on the five minutes, as his chart draws it —
    has reached the level and closed beyond it, and fills on the first touch of
    the entry after that candle closed: a touch before it is the trade R-07
    forbids. A call filed before `confirm` existed is scored on the touch alone.
@@ -1734,8 +1734,8 @@ export function scoreCall(c: Call, candles: Candle[], from: number): Score {
   return close(last, last.close, 'open');
 }
 
-/* When the first 15m candle opened at or after `from` closed, having reached
-   the level and closed beyond it the call's way, or null. A quarter hour with
+/* When the first 5m candle opened at or after `from` closed, having reached
+   the level and closed beyond it the call's way, or null. Five minutes with
    no minute in the bars is no candle, never a guess at one. */
 function confirmedAt(bars: Candle[], buy: boolean, level: number, from: number): number | null {
   const quarters = new Map<number, Candle>();
