@@ -198,7 +198,6 @@ function float() {
   if (spaces) note(`kept to one desktop (${spaces.managed(face.getNativeWindowHandle())})`);
   face.setContentProtection(true);
   face.setIgnoreMouseEvents(true, { forward: true });
-  face.on('moved', () => { [settings.x, settings.y] = face.getPosition(); save(); });
   face.loadFile(join(here, 'face.html'));
   face.once('ready-to-show', () => { if (!settings.hidden) bringHere(); });
   // A screen unplugged or rearranged can take her place with it.
@@ -513,10 +512,14 @@ ipcMain.on('briefing', hearBriefing);
 ipcMain.handle('answer', (_, id, q, half) => answer(id, q, half));
 ipcMain.on('open', (_, pane) => { if (pane in PANES) shell.openExternal(PANES[pane]); });
 ipcMain.on('solid', (_, yes) => face.setIgnoreMouseEvents(!yes, { forward: true }));
+/* Where he leaves her is written once, when he lets go: a drag moves her a
+   step at every movement of the mouse, and a write to the disk at each was
+   dozens a second. */
 ipcMain.on('drag', (_, dx, dy) => {
   const [x, y] = face.getPosition();
   face.setPosition(x + dx, y + dy);
 });
+ipcMain.on('dropped', () => { [settings.x, settings.y] = face.getPosition(); save(); });
 ipcMain.handle('key', (_, candidate) => tryKey(keyFor, String(candidate).trim()));
 
 // Her pages are files and stay files: no window opens from them, and none navigates away.

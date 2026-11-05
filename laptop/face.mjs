@@ -777,6 +777,7 @@ addEventListener('mousemove', (e) => {
 });
 addEventListener('mousedown', (e) => { if (solid) held = { x: e.screenX, y: e.screenY, moved: false }; });
 addEventListener('mouseup', (e) => {
+  if (held?.moved) window.doji.dropped();
   if (held && !held.moved) {
     if (mode === 'journal') choose(e.clientX);
     else if (!journalNow() && !briefing()) press(false);

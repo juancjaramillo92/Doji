@@ -18,5 +18,6 @@ contextBridge.exposeInMainWorld('doji', {
   open: (pane) => ipcRenderer.send('open', pane),
   solid: (yes) => ipcRenderer.send('solid', yes),
   drag: (dx, dy) => ipcRenderer.send('drag', dx, dy),
+  dropped: () => ipcRenderer.send('dropped'),
   key: (candidate) => ipcRenderer.invoke('key', candidate),
 });
