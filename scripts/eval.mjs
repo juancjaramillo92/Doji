@@ -198,6 +198,16 @@ const MECHANISM_BAN = / A\s+view says which way you think gold goes from here,[\
 // And the one thing about his trade the ban keeps: R-19's collision.
 const R19_KEPT = / His own rule landing on it is not a view:[\s\S]*?said with the rule\./;
 
+/* Every replacement must find its sentence. A replace that misses hands the
+   prompt back unchanged, so a plant of several replacements went on changing
+   the prompt with one of them dead: a re-wrap split "were he" and the plan's
+   R-19 sentence stood through a whole run. A pattern that misses throws here,
+   so the plant test sees it on every npm test. */
+const cut = (text, ...pairs) => pairs.reduce((t, [pattern, by = '']) => {
+  if (!pattern.test(t)) throw new Error(`a plant no longer finds ${pattern} in the prompt it breaks`);
+  return t.replace(pattern, by);
+}, text);
+
 export const PLANTS = [
   /* A reply case cannot see this plant: without the ban she walks the chain to
      gold, which MECHANISM allows, and volunteers no read. So the critic is
@@ -207,17 +217,18 @@ export const PLANTS = [
     cases: ['critic-strips-read-in-position'],
     breaks: (p) => ({
       ...p,
-      CRITIC: p.CRITIC.replace(/, and any view\s+at all if what he has on shows an open position/, '')
-        .replace(MECHANISM_BAN, ''),
-      SYSTEM: p.SYSTEM
-        .replace(MECHANISM_BAN, '')
-        .replace(/· No view on where price goes and no call while he has a position open,[\s\S]*?shows a position\.\n/, '')
-        .replace(/ While he holds a position, where it stands\s+and no read\./, '')
-        .replace(/, or a view while he is in a position,/, ',')
-        .replace(/ If he asks where you think price goes, you may[\s\S]*?and you say so\./, '')
-        .replace(/ Read these rules before using it: this is the one thing you are given\s+where what you may SAY is narrower than what you can SEE\./, '')
-        .replace(/UNPROMPTED IT DOES TWO THINGS AND NO MORE\. It stops you writing anything[\s\S]*?as being about his trade\. And it lets you/,
-                 'It lets you'),
+      CRITIC: cut(p.CRITIC,
+        [/, and any view\s+at all if what he has on shows an open position/],
+        [MECHANISM_BAN]),
+      SYSTEM: cut(p.SYSTEM,
+        [MECHANISM_BAN],
+        [/· No view on where price goes and no call while he has a position open,[\s\S]*?shows a position\.\n/],
+        [/ While he holds a position, where it stands\s+and no read\./],
+        [/, or a view while he is in a position,/, ','],
+        [/ If he asks where you think price goes, you may[\s\S]*?and you say so\./],
+        [/ Read these rules before using it: this is the one thing you are given\s+where what you may SAY is narrower than what you can SEE\./],
+        [/UNPROMPTED IT DOES TWO THINGS AND NO MORE\. It stops you writing anything[\s\S]*?as being about his trade\. And it lets you/,
+         'It lets you']),
     }) },
   /* Taken out alone, the exception leaves a call TRIM keeps anyway: it is
      labelled and says what would prove it wrong, which is what the fence
@@ -227,8 +238,8 @@ export const PLANTS = [
     cases: ['trim-keeps-filed-call'],
     breaks: (p) => ({
       ...p,
-      TRIM: p.TRIM.replace(/YOUR CALL IS THE ONE\s+EXCEPTION:[\s\S]*?never changed\./,
-        'YOUR CALL COMES OUT TOO: delete every sentence that gives an entry, a stop or a target.'),
+      TRIM: cut(p.TRIM, [/YOUR CALL IS THE ONE\s+EXCEPTION:[\s\S]*?never changed\./,
+        'YOUR CALL COMES OUT TOO: delete every sentence that gives an entry, a stop or a target.']),
     }) },
   /* Issue #270: a collision with a position from an earlier session had no
      place in the briefing's shape. The writer never named it, 2 of 2, and the
@@ -239,11 +250,13 @@ export const PLANTS = [
     cases: ['brief-names-r19-collision', 'critic-keeps-r19-collision'],
     breaks: (p) => ({
       ...p,
-      SYSTEM: p.SYSTEM.replace(/ Read\s+what he has on before you write it\.[\s\S]*?never\s+which way it goes\./, '')
-        .replace(/, R-19's collision on its\s+line included,/, ',')
-        .replace(/ R-19's collision keeps its code on the briefing's calendar\s+line\./, ''),
-      CRITIC: p.CRITIC.replace(/ on that release's line of the calendar, said with the\s+rule: the one thing a calendar line carries beside the release\. Carry it across\s+as it was written whenever you rewrite the calendar or cut for length\./, ', said with the rule.')
-        .replace(/ or R-19's collision on its line,/, ','),
+      SYSTEM: cut(p.SYSTEM,
+        [/ Read\s+what he has on before you write it\.[\s\S]*?never\s+which way it goes\./],
+        [/, R-19's collision on its\s+line included,/, ','],
+        [/ R-19's collision keeps its code on the briefing's calendar\s+line\./]),
+      CRITIC: cut(p.CRITIC,
+        [/ on that release's line of the calendar, said with the\s+rule: the one thing a calendar line carries beside the release\. Carry it across\s+as it was written whenever you rewrite the calendar or cut for length\./, ', said with the rule.'],
+        [/ or R-19's collision on its line,/, ',']),
     }) },
   /* From 15 to 22 October she failed the bias step whenever the three charts
      disagreed. The plan check points at the call's rule, so both go. Taken out
@@ -254,9 +267,10 @@ export const PLANTS = [
     cases: ['bias-weighed'],
     breaks: (p) => ({
       ...p,
-      SYSTEM: p.SYSTEM.replace(/HOW THE THREE BIAS CHARTS ADD UP IS YOURS TO JUDGE\.[\s\S]*?then say that is what failed\.\n\n/,
-        'THE THREE BIAS CHARTS MUST AGREE. If the daily, the 4H and the 1H do not all point the same way, step 1 fails; say so.\n\n')
-        .replace(/, weighed as it is for your own call\./, '.'),
+      SYSTEM: cut(p.SYSTEM,
+        [/HOW THE THREE BIAS CHARTS ADD UP IS YOURS TO JUDGE\.[\s\S]*?then say that is what failed\.\n\n/,
+         'THE THREE BIAS CHARTS MUST AGREE. If the daily, the 4H and the 1H do not all point the same way, step 1 fails; say so.\n\n'],
+        [/, weighed as it is for your own call\./, '.']),
     }) },
   /* On 24 October, checking a Wednesday plan with Thursday's 08:30 pending, she
      wrote that the stop has to move before it lands: R-19 rightly cited, said
@@ -268,9 +282,10 @@ export const PLANTS = [
     cases: ['plan-r19-said-as-rule'],
     breaks: (p) => ({
       ...p,
-      SYSTEM: p.SYSTEM.replace(/ One that lands in a later\s+session,\s+were\s+he\s+to\s+hold\s+it,\s+is\s+R-19's,[\s\S]*?those\s+are\s+orders\./, '')
-        .replace(R19_KEPT, '')
-        .replace(/ Where a rule is said as his, as R-19 is above, the code stays\s+beside its words\./, ''),
+      SYSTEM: cut(p.SYSTEM,
+        [/ One that lands in a later\s+session,\s+were\s+he\s+to\s+hold\s+it,\s+is\s+R-19's,[\s\S]*?those\s+are\s+orders\./],
+        [R19_KEPT],
+        [/ Where a rule is said as his, as R-19 is above, the code stays\s+beside its words\./]),
     }) },
 ];
 
