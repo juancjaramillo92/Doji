@@ -98,7 +98,7 @@ let micOk = true;
 let taken = false;     // the talk key is held by another app
 let asking = null;     // the request in flight, so a press can hush her
 let looking = null;    // the chart being captured since he asked her to look
-let waiting = false;   // a briefing waits for him, as her door last said
+let briefingWaits = false;  // as her door last said
 let hearings = 0;      // briefings heard here, so an ask one overtook is dropped
 let offered = null;    // a newer build than this one
 let pending = { waiting: 0, trade: null };  // what waits for its journal, as Gladys's door last said
@@ -262,11 +262,11 @@ function bind() {
 function menu() {
   if (!tray) return;
   const name = talkKey(), accelerator = KEYS[name];
-  tray.setTitle(pending.waiting ? (waiting ? '◉' : '○') : waiting ? '•' : '');
+  tray.setTitle(pending.waiting ? (briefingWaits ? '◉' : '○') : briefingWaits ? '•' : '');
   const items = () => [
     { label: 'Talk to her', accelerator, registerAccelerator: false, click: () => send('press', false) },
     { label: 'Show her the chart', accelerator: `Shift+${accelerator}`, registerAccelerator: false, click: () => send('press', true) },
-    { label: 'Hear the briefing', enabled: waiting, click: () => send('briefing-now') },
+    { label: 'Hear the briefing', enabled: briefingWaits, click: () => send('briefing-now') },
     { label: 'Journal the trade', enabled: pending.waiting > 0, click: () => send('journal-now') },
     { type: 'separator' },
     { label: 'Bring her here', click: bringHere },
@@ -386,16 +386,16 @@ async function briefing() {
     .catch(() => null);
   if (res?.status !== 200 && res?.status !== 204) return;
   res.body?.cancel();
-  if (mine !== hearings || waiting === (res.status === 200)) return;
-  waiting = !waiting;
-  send('briefing', waiting);
+  if (mine !== hearings || briefingWaits === (res.status === 200)) return;
+  briefingWaits = !briefingWaits;
+  send('briefing', briefingWaits);
   menu();
 }
 
 async function hearBriefing() {
   if (!await talk('?briefing=today')) return;
   hearings++;
-  waiting = false;
+  briefingWaits = false;
   send('briefing', false);
   menu();
 }
@@ -502,7 +502,7 @@ function trayIcon() {
 }
 
 /* ─── What the pages ask of this half ──────────────────────────────────── */
-ipcMain.handle('ready', () => ({ fresh, micOk, taken, talk: talkKey(), briefing: waiting, ...pending }));
+ipcMain.handle('ready', () => ({ fresh, micOk, taken, talk: talkKey(), briefing: briefingWaits, ...pending }));
 ipcMain.handle('look', async () => {
   const seen = await (looking = look());
   return typeof seen === 'string' ? seen : null;
@@ -513,9 +513,8 @@ ipcMain.on('briefing', hearBriefing);
 ipcMain.handle('answer', (_, id, q, half) => answer(id, q, half));
 ipcMain.on('open', (_, pane) => { if (pane in PANES) shell.openExternal(PANES[pane]); });
 ipcMain.on('solid', (_, yes) => face.setIgnoreMouseEvents(!yes, { forward: true }));
-/* Where he leaves her is written once, when he lets go: a drag moves her a
-   step at every movement of the mouse, and a write to the disk at each was
-   dozens a second. */
+/* Where he leaves her is written once, when he lets go, not at every step
+   of the drag: a drag moves her at every movement of the mouse. */
 ipcMain.on('drag', (_, dx, dy) => {
   const [x, y] = face.getPosition();
   face.setPosition(x + dx, y + dy);
@@ -573,9 +572,9 @@ app.whenReady().then(async () => {
   every(lookForUpdate, UPDATE_EVERY_MS);
   every(() => {
     if (!present() || !face.isVisible()) return;
-    const at = screen.getCursorScreenPoint(), { x, y } = face.getBounds();
-    if (`${at.x - x},${at.y - y}` === pointed) return;
-    pointed = `${at.x - x},${at.y - y}`;
+    const at = screen.getCursorScreenPoint(), { x, y } = face.getBounds(), where = `${at.x - x},${at.y - y}`;
+    if (where === pointed) return;
+    pointed = where;
     send('cursor', at.x - x, at.y - y);
   }, CURSOR_MS);
   settle();

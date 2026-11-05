@@ -458,7 +458,7 @@ test('the laptop knocks with the key, the form and the words her door reads', ()
   for (const word of asked) assert.ok(door.includes(word), `the laptop asks ?briefing=${word} and her door answers ${door.join(', ')}`);
   assert.deepEqual([...new Set([...asked, ...charm])].sort(), door, 'her door answers a ?briefing= word neither device asks');
   // The dot goes once the briefing came to its end, as the charm's does, and a failed one leaves it up.
-  assert.match(bodyOf(LAPTOP_MAIN, 'async function hearBriefing('), /\(\) \{\s*if \(!await talk\('\?briefing=today'\)\) return;[^]*waiting = false;/,
+  assert.match(bodyOf(LAPTOP_MAIN, 'async function hearBriefing('), /\(\) \{\s*if \(!await talk\('\?briefing=today'\)\) return;[^]*briefingWaits = false;/,
     'the laptop lets the briefing\'s dot go before the briefing came to its end, and a failed one is lost for the day');
   // Her door's 204 is nothing to play, on the laptop as on the charm.
   assert.match(EUGENIA_TS, /return new Response\(null, \{ status: 204 \}\);/, 'charmBriefing no longer answers a briefing not there with a 204');
