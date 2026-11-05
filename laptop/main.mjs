@@ -309,6 +309,8 @@ async function talk(path, body) {
     });
     if (res.status === 401) { askForKey('eugenia'); return send('trouble', 'key'); }
     if (res.status === 503) return send('trouble', 'voice');
+    // Nothing to say: the briefing asked for as midnight passed, or heard on the charm since its dot was drawn.
+    if (res.status === 204) return send('done');
     if (!res.ok || !res.body) return send('trouble', 'door');
     const feed = framer((kind, bytes) => send('frame', kind, bytes));
     for await (const chunk of res.body) { alive(); feed(chunk); }

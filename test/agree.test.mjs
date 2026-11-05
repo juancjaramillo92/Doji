@@ -457,6 +457,10 @@ test('the laptop knocks with the key, the form and the words her door reads', ()
   assert.ok(asked.length, 'the laptop no longer names the briefing as this test reads it');
   for (const word of asked) assert.ok(door.includes(word), `the laptop asks ?briefing=${word} and her door answers ${door.join(', ')}`);
   assert.deepEqual([...new Set([...asked, ...charm])].sort(), door, 'her door answers a ?briefing= word neither device asks');
+  // Her door's 204 is nothing to play, on the laptop as on the charm.
+  assert.match(EUGENIA_TS, /return new Response\(null, \{ status: 204 \}\);/, 'charmBriefing no longer answers a briefing not there with a 204');
+  assert.match(bodyOf(LAPTOP_MAIN, 'async function talk('), /if \(res\.status === 204\) return send\('done'\);/,
+    'the laptop reads her door\'s 204 as a failure, and a briefing no longer there shows her confused');
   assert.match(LAPTOP_DOOR, /if \(briefing !== null\) return await charmBriefing\(briefing\);/,
     'the laptop\'s door no longer answers the briefing as the charm\'s does');
 });

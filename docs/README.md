@@ -2255,8 +2255,10 @@ notice.
 menu-bar icon while one waits — a click on the dot or *Hear the briefing*
 plays it. Whether one waits is her door's to say (`?briefing=waits`, every
 five minutes), so the dot goes when he hears it on the charm, at midnight in
-New York, and stays gone after a restart. The ready line is not played; the
-dot is the news.
+New York, and stays gone after a restart. Clicked in the minutes before the
+laptop next asks, a briefing that is no longer there is nothing to play, not a
+failure: her door's `204`, as the charm takes it. The ready line is not
+played; the dot is the news.
 
 **Gladys's journal is the charm's**, asked of Gladys's door rather than
 hers (*Gladys — the Telegram journal*): what waits every minute — oftener
