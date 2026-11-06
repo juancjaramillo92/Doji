@@ -3751,7 +3751,8 @@ network), so a broken build is tried once, not every five minutes.
 **Each waking he uses reports itself** (`report` in `charm/main/main.c`), as
 she goes back to sleep, and so does a new app's proof: one line posted to her
 door's `?report=1`, filed in `eugenia_runs` under the caller `charm` with the
-line as its `detail` — the app, what woke her and why the chip last reset, the
+line as its `detail` — the app, what woke her and which pins did (`pins`, the
+motion sensor's GPIO21 among them) and why the chip last reset, the
 lifts seen and not seen since the last report (counted through sleep, so a
 lift that lit nothing is still told), when she was lit and first listened in ms
 from boot, internal RAM when lit and at its lowest, the Wi-Fi signal, and how
@@ -3803,11 +3804,13 @@ and otherwise sleeps again with the mark still up.
 flashing — or after BOOT is held for five seconds, she becomes her own Wi-Fi
 network, named for her address like *Charm-4F2A* and **locked with a password
 made up for that setup**, and shows a **QR code** carrying both, centred on her
-screen with the name under it. A phone's camera joins it in one tap, and the
-page opens by itself: her DHCP tells the phone to ask her for every name and
-where her page is (option 114, which newer phones open at once), every name the
-phone asks for resolves to the charm, and every page but its own redirects
-there. The page (`charm/main/setup.html`) is
+screen with the name under it and her page's address under that (*Open
+192.168.4.1*). A phone's camera joins it in one tap, and the page opens by
+itself: her DHCP tells the phone to ask her for every name and where her page
+is (option 114, which newer phones open at once), every name the phone asks
+for resolves to the charm, and every page but its own redirects there. A phone
+that joins and does not open it is sent to it by that address in its browser,
+no rescanning. The page (`charm/main/setup.html`) is
 set in Doji's typeface, which the charm serves herself
 (`charm/main/setup.woff2`, made by `charm/tools/fonts.sh`) since the phone has
 no internet while it is on her network, and it is built for a phone: thumb-sized
@@ -3862,7 +3865,10 @@ armed before every sleep, on GPIO21 (Waveshare's schematic for the 1.75C), it
 wakes the chip on a movement, which then watches it settle for up to a second
 and a half, a pair of readings 150 ms apart at a time, and lights her the moment
 a pair has the screen tilted up toward him and held still (`charm/main/lift.c`),
-so a lift still moving when it woke her is not mistaken for a swing; a swing on the keyring or a bump in a pocket sends her
+so a lift still moving when it woke her is not mistaken for a swing — and only
+once she has left where she lay as she was armed (`lift_moved`), since lying
+face up and still on a table is that same pair, and on the board the sensor
+woke her there with nobody near; a swing on the keyring or a bump in a pocket sends her
 straight back to sleep without lighting the screen, and rests the sensor for
 twenty seconds, so a keyring swinging all day cannot keep waking her. What shows
 first is decided before the screen lights: **a trade waiting puts its questions

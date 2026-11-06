@@ -1038,7 +1038,10 @@ test('every word on the charm\'s screens is in the font that draws it', () => {
   const say = setup.match(/SAY\[\] = \{([^}]+)\}/);
   assert.ok(say, 'setup.c no longer lists what its screen says');
   assert.match(setup, /"Charm-%02X%02X"/, 'setup.c no longer names her network as this test reads it');
-  for (const words of [...[...say[1].matchAll(/"([^"]+)"/g)].map(w => w[1]), 'Charm-0123456789ABCDEF']) {
+  // And her page's address under the code, an IPv4 address after its word.
+  const open = setup.match(/snprintf\(address, sizeof address, "([^"]+) " IPSTR/);
+  assert.ok(open, 'setup.c no longer writes her page\'s address as this test reads it');
+  for (const words of [...[...say[1].matchAll(/"([^"]+)"/g)].map(w => w[1]), 'Charm-0123456789ABCDEF', `${open[1]} 0123456789.`]) {
     for (const letter of words) assert.ok(held('hanken_18').includes(letter), `hanken_18 cannot draw the ${JSON.stringify(letter)} of ${words}`);
   }
 });

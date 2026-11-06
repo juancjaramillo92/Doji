@@ -59,6 +59,8 @@ extern const uint8_t font_end[]   asm("_binary_setup_woff2_end");
 static const char *const SAY[] = { "Phone connected", "Carry on there", "Trying the Wi-Fi", "Checking the keys" };
 
 static char ap_name[16], ap_pass[12];
+// Under the code, her page's address, for a phone that does not open it alone.
+static char address[24];
 static EventGroupHandle_t events;
 static volatile bool online;
 
@@ -119,6 +121,7 @@ static void build_screen(void) {
     lv_qrcode_update(qr, wifi, strlen(wifi));
     lv_obj_center(qr);
     text(screens[SHOW_CODE], ap_name, MUTED, 340);
+    text(screens[SHOW_CODE], address, MUTED, 368);
 
     screens[SHOW_JOINED] = group();
     text(screens[SHOW_JOINED], SAY[0], INK, 204);
@@ -219,6 +222,7 @@ static void start_network(void) {
     uint8_t offer = 1;
     static char page[24];
     snprintf(page, sizeof page, "http://" IPSTR, IP2STR(&at.ip));
+    snprintf(address, sizeof address, "Open " IPSTR, IP2STR(&at.ip));
     esp_netif_dhcps_stop(own);
     esp_netif_set_dns_info(own, ESP_NETIF_DNS_MAIN, &dns);
     esp_netif_dhcps_option(own, ESP_NETIF_OP_SET, ESP_NETIF_DOMAIN_NAME_SERVER, &offer, sizeof offer);
