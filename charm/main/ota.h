@@ -7,8 +7,8 @@
    spends it: a yes marks the night looked. */
 bool ota_due(time_t now);
 
-/* Looks at the newest app from main and, when its version is not hers,
-   writes it into her other app slot to start from next; true when it did.
+/* Looks at the newest app from main and, when ota_offered says it is worth
+   fetching, writes it into her other app slot to start from next; true when it did.
    Reading the version costs only the image's first bytes. */
 bool ota_update(void);
 

@@ -209,7 +209,7 @@ function parseAlert_(subject, htmlBody) {
 // ───────────────────────────────────────────────────────────────────────────
 // Three outcomes rather than a boolean, because the caller has three things to
 // do with them. The column whitelist, the shape checks and the merge live in
-// the function now, where they are covered by test/fold.test.mjs — this end
+// the function, where they are covered by test/fold.test.mjs — this end
 // parses and forwards, and nothing here can name a column at all.
 // ═══════════════════════════════════════════════════════════════════════════
 function sendFill_(fill) {

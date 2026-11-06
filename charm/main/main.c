@@ -21,7 +21,7 @@
    from the dark her eyes close to; put down, she sleeps with the trade under
    its ring. PWR closes the questions for her, the trade waiting again. Lifting her to look wakes her
    (motion.c), and so do a tap on the screen, PWR and BOOT. With no
-   internet when she last looked she stays on her lock screen, its mark saying
+   internet when she last looked she stays on her sleep screen, its mark saying
    why, unless the network answers within OFFLINE_TRY_MS; and losing it while
    they talk sends her back there. A lift that was not him looking — a swing, a
    bump — sends her straight back to sleep without lighting the screen, and
@@ -33,8 +33,9 @@
    tick when something new does, and in the briefing's hours (briefing.c)
    Eugenia's whether it has landed; when it has, her face lights and she says
    so. The screen is started only when its marks must change: the panel keeps
-   its picture while the chip sleeps, so most errands never touch it. Once a
-   night an errand also looks for a new app from main (ota.c).
+   its picture while the chip sleeps, so most errands never touch it. The day
+   Gladys's door names a new app from main, or at the night's look, an errand
+   also takes it (ota.c).
 
    PWR is also the power chip's (power.c): off, a press switches her on, and
    held three seconds she says goodnight and switches off. */
@@ -185,7 +186,8 @@ static void light(face_mode_t mode) {
 }
 
 /* One line for her door to file beside her runs, so a waking on the board is
-   read without a cable: the app, what woke her and why the chip last reset,
+   read without a cable: the app, what woke her and which pins did, why the
+   chip last reset,
    the lifts since the last report, when she was lit and first listened in ms
    from boot, the internal RAM at lit and at its lowest, the signal, and how
    long she was up. Sent only online and never retried. */
@@ -295,7 +297,7 @@ static bool journal(void) {
     return ulTaskNotifyTake(pdTRUE, 0);
 }
 
-// Her door out of reach because the network is: back to the lock screen,
+// Her door out of reach because the network is: back to the sleep screen,
 // where the no-internet mark says why.
 static void sleep_if_offline(int status) {
     if (status < 0 && !net_wait(0)) {

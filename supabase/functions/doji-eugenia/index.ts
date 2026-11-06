@@ -491,7 +491,8 @@ const UNSAVED = "That did not save. Carry on and do not mention it.";
 
 /* Truncated rather than refused, and never throws: the reply she is writing
    matters more than the note, and a throw would cost the whole of it. That is
-   also how she survives running without 003: no memory, every answer lands.
+   also how she survives running without her tables: no memory, every answer
+   lands.
 
    Failures say which kind failed. A lost fact she need not mention; a lost
    INSTRUCTION she is about to acknowledge, and an acknowledgement of something
@@ -1234,7 +1235,7 @@ export function quoteWindow(now: Date): string {
       "previous close is the overnight move.";
 }
 
-/* One rendering of a quote, with the window inside it, for all three callers —
+/* One rendering of a quote, with the window inside it, for both callers —
    prose, because a bare `change` reads as whatever it sounds like. */
 export function quoteLine(q: Quote, now: Date): string {
   // No previous close, no move — and she is told not to reconstruct one. The
@@ -1793,8 +1794,8 @@ export async function scoreCalls(): Promise<void> {
 }
 
 /* ─── What gold did on each print ──────────────────────────────────────────
-   get_releases said how a release ran against its consensus and nothing of
-   what gold did on it, so how gold usually takes one was hers to guess. Filed
+   get_releases says how a release ran against its consensus and nothing of
+   what gold did on it, which left how gold usually takes one hers to guess. Filed
    each night off the window of minute bars her calls are scored on: gold at
    the open of the print's minute and at the close fifteen and sixty minutes
    on, for every high-rated home print with an actual inside the bars' window
@@ -1970,7 +1971,7 @@ const CRITIC_TOOLS: unknown[] = [];
 
 /* The model per caller. A week of eugenia_runs put fourteen release looks
    above five briefings in cost, so the bounded callers moved to Sonnet — and
-   the release look then died at MAX_ROUNDS twice the next morning. That pair
+   the release look, since retired, then died at MAX_ROUNDS twice the next morning. That pair
    is confounded: record_actual had joined its tools eighty minutes before the
    model changed, and its rounds stayed high after the revert. So it proves
    neither half; the policy stands anyway — a cheaper caller that does not
@@ -1994,7 +1995,8 @@ export const modelFor = (label: string): string => MODELS[label] ?? OPUS;
 
 /* Fast mode, keyed on the caller's label as MODELS is: the same model writing
    up to 2.5× faster, at twice the rate. The replies are the caller he waits
-   on — one reply, whether it came through Telegram or the charm — and at about
+   on — one reply, whether it came through Telegram, the charm or the laptop —
+   and at about
    $12 a month on Opus he chose speed over the price, 30 October. Opus alone
    serves it. A research preview with its own rate limit, so a fast request
    refused for any reason is sent once more at the ordinary speed: the turn
@@ -2223,7 +2225,7 @@ export async function ask(messages: Turn[], effort: Effort, label: string,
       const calls = (body.content ?? []).filter((b: any) => b.type === "tool_use");
       for (const c of calls) called[c.name] = (called[c.name] ?? 0) + 1;
       // Only what this caller was offered, so a tool set is a guarantee: only
-      // the pass moves a rung or closes a thread, only a look files a print.
+      // the pass moves a rung or closes a thread, and only the chat array files a call.
       const results = await Promise.all(calls.map(async (b: any) => ({
         type: "tool_result", tool_use_id: b.id,
         content: offered.has(b.name) ? await serve(b.name, b.input ?? {}) : unserved(b.name),
@@ -2563,8 +2565,9 @@ async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Pr
    vendor or an unset key into a missing message, so the text is sent, in full,
    whenever any part did not land. What is stored is unaffected.
 
-   Not `say` itself, which keeps three things silent: the /notes audit, the
-   apologies, and short operational lines. Exported so the fallback is driven —
+   Not `say` itself, which keeps four things silent: the /notes audit, the
+   apologies, short operational lines, and the copy of a turn the charm or the
+   laptop has already spoken. Exported so the fallback is driven —
    with no TTS key every speak answers why not, a refusing vendor's shape — with
    the budget a parameter so a stall needs no waiting out.
 
@@ -4132,7 +4135,7 @@ async function critique(draft: string, notes: string, channels: string, desk: st
    direction is checked against the second.
 
    What it returns is what is remembered: storing the draft files words he
-   never read as hers, resent as history. The three callers bind it. */
+   never read as hers, resent as history. Both callers bind it. */
 async function trim(draft: string, desk: string, story: string): Promise<string> {
   return await gate(draft, `${TRIM}${desk}${story}\n\nTHE MESSAGE:\n\n${draft}`, 'trim', TRIM_MOST);
 }

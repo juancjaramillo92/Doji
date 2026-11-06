@@ -16,8 +16,9 @@
 // callback_data grammar. A tap names its column through COLUMNS, the same four
 // names as Data.OWNED, so no broker column is reachable from a button. A tap
 // carries its whole state in callback_data, so the tap path holds no session.
-// An answer written in the app has none of that, so the message id is kept on
-// the row, in tg_message_id — on neither list, so nothing else can name it.
+// An answer written in the app, or on the charm or the laptop, has none of
+// that, so the message id is kept on the row, in tg_message_id — on neither
+// list, so nothing else can name it.
 //
 // Whether a redraw settles the form is decided from the row as it stood BEFORE
 // the write (staysOpen), so the tap and the trigger it fires draw the same
@@ -26,7 +27,7 @@
 // SECURITY CONTRACT
 //   1. verify_jwt = false: Telegram cannot present a JWT, so authorisation is
 //      here, before any work.
-//   2. Each half checks its own secret; an unset secret refuses. The trigger's
+//   2. Each caller checks its own secret; an unset secret refuses. The trigger's
 //      DOJI_CRON_SECRET can put text into his thread — postOpen renders the
 //      body — but never names a column.
 //   3. The chat is checked as well: the header proves Telegram, the chat id
@@ -58,8 +59,8 @@ const CHARM_SECRET   = env("GLADYS_CHARM_SECRET");
 const LAPTOP_SECRET  = env("GLADYS_LAPTOP_SECRET");
 
 /* ─── The journal vocabulary ───────────────────────────────────────────────
-   One of three copies — CONFIG.SETUPS and trades_setup_check are the others —
-   and agree.test.mjs reads all three.
+   One of five copies — CONFIG.SETUPS, trades_setup_check, the charm's and the
+   laptop's are the others — and agree.test.mjs reads all five.
    ───────────────────────────────────────────────────────────────────────── */
 export const SETUPS: readonly string[] = ['Break & Retest', 'Support & Resistance'];
 
@@ -142,7 +143,7 @@ const mark = (v: boolean | null) => v === null ? '—' : v ? '✓' : '✗';
 
 // The New York clock, the day the trade is filed under, labelled ET since "NY"
 // is a session name here. h23, or midnight can read "24:05". Named for carrying
-// the day, unlike the bare-HH:MM nyTimes elsewhere: a card can be about an
+// the day, unlike doji-eugenia's bare-HH:MM nyTime: a card can be about an
 // earlier fill, and must not lose its date.
 const nyDayTime = (iso: string) => new Intl.DateTimeFormat('en-GB', {
   timeZone: 'America/New_York',
@@ -273,13 +274,14 @@ async function postOpen(row: Row): Promise<Response> {
   const body = await tg("sendMessage", { chat_id: CHAT_ID, text, reply_markup });
   if (!body.ok) throw new Error(`sendMessage failed: ${body.description ?? "unknown"}`);
 
-  // Recorded at once, or an answer from the app has no message to redraw.
+  // Recorded at once, or an answer from anywhere else has no message to redraw.
   await patchRow(row.id, { tg_message_id: body.result.message_id });
 
   return json({ ok: true, id: row.id });
 }
 
-/* An answer written outside Telegram — the app, or the SQL editor. Decided off
+/* An answer written outside Telegram — the app, the charm, the laptop or the
+   SQL editor. Decided off
    the before-state, as a tap is, so the redraw a tap's own trigger sets off
    agrees with the tap's and comes back `message is not modified`. Decided any
    other way, a reopened form shuts under the correction being made in it. */
@@ -350,7 +352,7 @@ async function handleTap(req: Request): Promise<Response> {
 
 /* A week back, oldest first, so trades are journalled in the order he took
    them. The week is the bound: a trade left unjournalled would otherwise keep
-   her dot lit for ever. Newest first under the limit, then reversed. */
+   her ring lit for ever. Newest first under the limit, then reversed. */
 const WAITING_DAYS = 7;
 const WAITING_MAX = 20;
 
@@ -378,7 +380,7 @@ async function waiting(): Promise<Response> {
 }
 
 // Answers only: [Edit] and [Done] belong to the Telegram form. Answered with
-// what waits after it, so the charm moves on without a second request.
+// what waits after it, so the device moves on without a second request.
 async function charmAnswer(req: Request): Promise<Response> {
   const tap = parseCallback(String((await req.json().catch(() => null))?.data ?? ""));
   if (!tap || tap.action !== 'answer' || !tap.column) {

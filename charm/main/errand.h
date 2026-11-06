@@ -8,7 +8,7 @@
    until one answers there is nothing to ask. Over the weekend, from an hour
    after the Friday close to the Sunday open, nothing new can come in for
    Gladys, so unless a `trade` already waits — whose ring a journal in
-   Telegram may clear — she asks as seldom as she ever does, and wakes for
+   Telegram, on the laptop or in the app may clear — she asks as seldom as she ever does, and wakes for
    the open. Never so long that an hour passes without an errand, so the
    night's look for an update always has one; a lift or a press tries the
    network whenever it comes. Pure, so a test compiles it on its own. */

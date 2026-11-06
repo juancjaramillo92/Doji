@@ -2465,7 +2465,7 @@ test('PWR cuts her off while she thinks, not at the next beat', () => {
 /* Nothing joins again once the join is done, so a network lost while she
    talks must say so: kept online, every door she knocks at fails with no
    sign and she records turns that go nowhere, where losing it is meant to
-   send her to the lock screen. net.c's handler is the board's, so it is read. */
+   send her to the sleep screen. net.c's handler is the board's, so it is read. */
 test('the charm hears a network it has joined go', () => {
   const net = source('charm/main/net.c');
   const handler = bodyOf(net, 'static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {',
@@ -6108,8 +6108,9 @@ test('every message she writes goes out through sayAloud', () => {
   /* THE HALF THE FUNCTION CANNOT GUARANTEE: a path calling `say` directly works
      and is silent. Four sites — the briefing's two (the speaking worker and
      postBriefing's fallback), then the trade event and the reply; the week's
-     review rides the Sunday briefing. `/notes`, the apologies, the short operational lines and the
-     charm's copy keep `say` deliberately — the charm's voice is on the charm. */
+     review rides the Sunday briefing. `/notes`, the apologies, the short
+     operational lines and the copy of a charm's or a laptop's turn keep `say`
+     deliberately — that voice was on the device. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
   assert.equal(spoken, 4,
