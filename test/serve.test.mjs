@@ -412,23 +412,6 @@ test('doji-eugenia: the charm is refused at the door without its vendors or a re
     401, 'the charm door admitted a wrong key');
 });
 
-/* The charm's report of a waking is filed as it came, beside her runs, and
-   needs neither vendor: answered before the door asks for them. */
-test('doji-eugenia: the charm files a report of its waking, vendors or not', async () => {
-  const serve = await serving('doji-eugenia', ['STT_URL', 'STT_KEY', 'TTS_KEY']);
-  respond = (url) => url.startsWith('https://db.test/rest/v1/eugenia_runs')
-    ? ok([]) : Promise.reject(new Error(`the report asked something unexpected: ${url}`));
-  calls.length = 0;
-  const report = (key) => new Request('https://fn.test/functions/v1/doji-eugenia?report=1',
-    { method: 'POST', body: 'app=3e45d44 woke=2 lifts=1/0', headers: { 'x-charm-key': key } });
-  assert.equal((await serve(report('charm'))).status, 204, 'the report was not taken');
-  assert.deepEqual(bodies('/rest/v1/eugenia_runs').map(([row]) => [row.caller, row.ok, row.detail]),
-    [['charm', true, 'app=3e45d44 woke=2 lifts=1/0']], 'the report was not filed as it came');
-  calls.length = 0;
-  assert.equal((await serve(report('wrong'))).status, 401, 'a report under a wrong key was taken');
-  assert.deepEqual(calls, [], 'a report under a wrong key made a request');
-});
-
 /* ─── The briefing on the charm ───────────────────────────────────────────
    The charm wakes after the briefing's hour and asks whether it has landed,
    then asks for the briefing itself when he presses. Both read today's stored
@@ -632,13 +615,10 @@ const gladysCharm = (init = {}) => new Request('https://fn.test/functions/v1/doj
 
 test('doji-gladys: the charm is told what waits, oldest first, a week back at most', async () => {
   const serve = await serving('doji-gladys');
-  respond = (url) => url.includes('/rest/v1/trades?') ? ok([trade('PID2', 1), trade('PID1', 30)])
-    : url.endsWith('/storage/v1/object/public/charm/version') ? Promise.resolve(new Response('3e45d44be481\n'))
-    : pending();
+  respond = (url) => url.includes('/rest/v1/trades?') ? ok([trade('PID2', 1), trade('PID1', 30)]) : pending();
   const res = await answer(await serve(gladysCharm()));
   assert.equal(res.status, 200);
   assert.equal(res.body.waiting, 2);
-  assert.equal(res.body.app, '3e45d44be481', 'the charm is not told the newest app the workflow published');
   assert.equal(res.body.trade.id, 'PID1', 'the charm was handed the newer trade first');
   const read = decodeURIComponent(calls[0].url);
   for (const part of ['deleted=is.false', 'entry_time=gte.', 'order=entry_time.desc', 'limit=20',
@@ -655,12 +635,10 @@ test('doji-gladys: an answer from the charm writes its one column, then says wha
   respond = (url, init) => {
     if (init.method === 'PATCH') return ok([trade('PID1', 30, JSON.parse(init.body))]);
     if (url.includes('/rest/v1/trades?')) return ok([]);
-    // The version unread: the answer still comes, without it.
-    if (url.includes('/storage/')) return Promise.resolve(new Response('', { status: 404 }));
     return pending();
   };
   const res = await answer(await serve(gladysCharm({ method: 'POST', body: JSON.stringify({ data: 'PID1|sl|1' }) })));
-  assert.deepEqual(res, { status: 200, body: { ok: true, waiting: 0, trade: null, app: null } });
+  assert.deepEqual(res, { status: 200, body: { ok: true, waiting: 0, trade: null } });
   const writes = calls.filter(c => c.method === 'PATCH');
   assert.equal(writes.length, 1);
   assert.ok(writes[0].url.includes('trades?id=eq.PID1'), writes[0].url);

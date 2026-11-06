@@ -11,13 +11,6 @@
 
 #define CHUNK 512  // frames per read or write
 
-/* Readings, not facts, from the board: at 24 dB the microphones gave her his
-   voice faintly, and at the speaker's top volume hers was still quiet. The
-   ES7210 takes up to 37.5 dB; her voice is doubled and rounded off as it nears
-   full scale, so a loud moment softens rather than cracks. */
-#define MIC_GAIN_DB 33.0f
-#define VOICE_GAIN  2.0f
-
 static esp_codec_dev_handle_t speaker, mics;
 static int16_t wire[CHUNK * 2];
 static uint32_t rate_now;
@@ -32,7 +25,7 @@ static void open_at(uint32_t rate) {
     esp_codec_dev_sample_info_t fs = { .sample_rate = rate, .channel = 2, .bits_per_sample = 16 };
     esp_codec_dev_open(speaker, &fs);
     esp_codec_dev_open(mics, &fs);
-    esp_codec_dev_set_in_gain(mics, MIC_GAIN_DB);
+    esp_codec_dev_set_in_gain(mics, 24.0f);
 }
 
 void sound_start(void) {
@@ -124,9 +117,7 @@ bool sound_play(const int16_t *in, size_t samples, uint32_t rate, bool (*more)(f
     for (size_t at = 0; at < samples; at += CHUNK) {
         size_t k = samples - at < CHUNK ? samples - at : CHUNK;
         if (!more(loudness_of(in + at, k))) return false;
-        for (size_t i = 0; i < k; i++) {
-            wire[2 * i] = wire[2 * i + 1] = (int16_t)(32767 * tanhf(VOICE_GAIN * in[at + i] / 32768.0f));
-        }
+        for (size_t i = 0; i < k; i++) wire[2 * i] = wire[2 * i + 1] = in[at + i];
         esp_codec_dev_write(speaker, wire, (int)(k * 4));
     }
     return true;

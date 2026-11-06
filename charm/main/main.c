@@ -40,7 +40,6 @@
    held three seconds she says goodnight and switches off. */
 #include "bsp/esp-bsp.h"
 #include "bsp/touch.h"
-#include "esp_app_desc.h"
 #include "esp_attr.h"
 #include "esp_flash.h"
 #include "esp_heap_caps.h"
@@ -48,9 +47,6 @@
 #include "esp_psram.h"
 #include "esp_sleep.h"
 #include "esp_system.h"
-#include "esp_task_wdt.h"
-#include "esp_timer.h"
-#include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lvgl.h"
@@ -76,7 +72,6 @@ static const char *TAG = "charm";
 #define LIFE_STACK    40960  // bytes
 #define DRAW_ROWS     12     // drawn at a time, twice over: 22 KB of internal RAM
 #define AWAKE_MS      30000
-#define PROVE_MS      60000  // a new app's whole proof, the network's wait included
 #define LAST_FRAME_MS 200    // the sleep screen's last rows reaching the panel, once rendered
 #define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
 #define EARLY_S       5      // how early a timer may wake her and still be the errand's
@@ -94,16 +89,6 @@ static RTC_DATA_ATTR time_t errand_at;
 
 static esp_sleep_wakeup_cause_t woke;
 static bool lit;
-
-/* The waking's report (report()): when the screen was lit and what internal
-   RAM it left, and whether this waking is one worth a report — he woke her,
-   or a new app proved itself. The lifts are counted through sleep, so the
-   ones that were not him, which light nothing and send nothing, are in the
-   next report. */
-static int64_t lit_at;
-static unsigned lit_free, lit_largest;
-static bool reporting;
-static RTC_DATA_ATTR int lifts_seen, lifts_not;
 static volatile uint32_t touches;  // every press and slide on the screen, counted
 
 // A slide round the rim is the volume; a tap on a question is the journal's.
@@ -133,10 +118,7 @@ static void even_area(lv_event_t *e) {
    seldom has free. DRAW_ROWS rows at a time in internal RAM are sent as they
    are. */
 static void light(face_mode_t mode) {
-    if (lit) {
-        face_set_mode(mode);
-        return;
-    }
+    if (lit) return;
     lit = true;
     sleep_release();
     bsp_display_cfg_t cfg = {
@@ -178,28 +160,9 @@ static void light(face_mode_t mode) {
     // Timestamped from boot, beside talk.c's "listening": how much of a press's
     // wait is the panel starting. And what internal RAM the screen and Wi-Fi
     // leave the codecs and TLS, the board's scarcest memory.
-    lit_at = esp_timer_get_time();
-    lit_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-    lit_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-    ESP_LOGI(TAG, "lit, %u bytes of internal RAM free, %u in one piece", lit_free, lit_largest);
-}
-
-/* One line for her door to file beside her runs, so a waking on the board is
-   read without a cable: the app, what woke her and why the chip last reset,
-   the lifts since the last report, when she was lit and first listened in ms
-   from boot, the internal RAM at lit and at its lowest, the signal, and how
-   long she was up. Sent only online and never retried. */
-static void report(void) {
-    wifi_ap_record_t ap;
-    int rssi = esp_wifi_sta_get_ap_info(&ap) == ESP_OK ? ap.rssi : 0;
-    char text[256];
-    snprintf(text, sizeof text,
-             "app=%.8s woke=%d reset=%d lifts=%d/%d lit=%lld listen=%lld free=%u largest=%u lowest=%u rssi=%d up=%lld",
-             esp_app_get_description()->version, (int)woke, (int)esp_reset_reason(), lifts_seen, lifts_not,
-             lit_at / 1000, talk_listened() / 1000, lit_free, lit_largest,
-             (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL), rssi, esp_timer_get_time() / 1000);
-    talk_report(text);
-    lifts_seen = lifts_not = 0;
+    ESP_LOGI(TAG, "lit, %u bytes of internal RAM free, %u in one piece",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
 }
 
 // Her briefing has landed: lit for Eugenia to say so.
@@ -239,7 +202,6 @@ static void sleep_now(void) {
         drawn = marks;
     }
     errand_at = time(NULL) + errand_wait(time(NULL), charge >= 0, trade_waits, away);
-    if (reporting && net_wait(0)) report();
     sound_stop();
     motion_arm();
     sleep_until(errand_at, true);
@@ -269,13 +231,11 @@ static void errand(void) {
             briefing_waits = true;
             briefing_announced(time(NULL));
         }
-        // A new app from main — the day Gladys's door names one she has not
-        // run or seen fail, or at the night's look in the small hours: she
-        // wakes into it at once, quietly, for this errand's place. The battery
-        // is asked first, since asking ota_due spends the night's look: one a
-        // low battery skips waits for a later errand in the hour, on the cable
-        // perhaps.
-        if (!power_low() && (ota_offered(gladys_app()) || ota_due(time(NULL))) && ota_update()) {
+        // A new app from main, in the small hours: she wakes into it at once,
+        // quietly, for this errand's place. The battery is asked first, since
+        // asking ota_due spends the night's look: one a low battery skips
+        // waits for a later errand in the hour, on the cable perhaps.
+        if (!power_low() && ota_due(time(NULL)) && ota_update()) {
             errand_at = time(NULL);
             sound_stop();
             sleep_until(errand_at, false);
@@ -333,7 +293,6 @@ static between_t between_turns(bool trade) {
 }
 
 static void awake(void) {
-    reporting = true;
     // Joining runs beside everything else: she listens while it does, and
     // waits for it only to send. Offline when she last looked, nothing lights
     // unless it answers now.
@@ -395,33 +354,6 @@ static void awake(void) {
     }
 }
 
-/* A new app from main is kept only once it has done what a broken one could
-   not: started her screen and drawn the sleep screen whole, and reached her
-   Wi-Fi. A hang on the way — a screen that never finishes a frame — is caught
-   by the task watchdog, armed for this alone to reset her, and any reset
-   before ota_confirm has the bootloader start the app that was. Without a
-   network it is not kept yet: the next waking rolls it back, as it always
-   has. Every waking of an unproven app does this first, whichever it is, so
-   no path sleeps on an app nothing has judged. */
-static void prove(void) {
-    const esp_task_wdt_config_t strict = { .timeout_ms = PROVE_MS, .idle_core_mask = 0, .trigger_panic = true };
-    esp_task_wdt_reconfigure(&strict);
-    esp_task_wdt_add(NULL);
-    net_start();
-    bool joined = net_wait(NET_ALL_MS);
-    light(FACE_DARK);
-    bsp_display_lock(-1);
-    face_draw_dark();
-    bsp_display_unlock();
-    esp_task_wdt_delete(NULL);
-    const esp_task_wdt_config_t usual = { .timeout_ms = CONFIG_ESP_TASK_WDT_TIMEOUT_S * 1000,
-                                          .idle_core_mask = (1 << portNUM_PROCESSORS) - 1 };
-    esp_task_wdt_reconfigure(&usual);
-    if (joined) ota_confirm();
-    reporting = true;
-    ESP_LOGI(TAG, "a new app %s", joined ? "proved and kept" : "drawn, but no network to keep it on");
-}
-
 static void life(void *arg) {
     (void)arg;
     power_start(xTaskGetCurrentTaskHandle());
@@ -432,15 +364,11 @@ static void life(void *arg) {
     // cannot be read reads as no cable and no battery alike, so it is a
     // battery seen that makes this off the cable.
     if (esp_reset_reason() == ESP_RST_BROWNOUT && power_battery() >= 0 && power_charge() < 0) power_off();
-    if (ota_unproven()) prove();
     // A lift that was not him: back to sleep at once, the sensor resting.
-    bool lifted = woke == ESP_SLEEP_WAKEUP_EXT1 && (esp_sleep_get_ext1_wakeup_status() & (1ULL << MOTION_PIN));
-    if (lifted && !motion_looked()) {
-        lifts_not++;
+    if (woke == ESP_SLEEP_WAKEUP_EXT1 && (esp_sleep_get_ext1_wakeup_status() & (1ULL << MOTION_PIN)) && !motion_looked()) {
         time_t rest = time(NULL) + LIFT_REST_S;
         sleep_until(rest < errand_at ? rest : errand_at, false);
     }
-    if (lifted) lifts_seen++;
     if (woke == ESP_SLEEP_WAKEUP_TIMER && time(NULL) + EARLY_S < errand_at) {
         // The rest is over before the errand is due: armed again, nothing else.
         // A timer a moment early is the errand's own.
