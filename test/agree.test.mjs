@@ -2393,6 +2393,21 @@ test('a charm already set up gives the setup up when no phone comes', () => {
     'the setup no longer gives up on its own, or gives up on a board never set up');
 });
 
+/* A wake by the motion sensor is a lift only once she has left where she
+   lay: lying face up and still is what lift_seen looks for, so a table
+   jolted, or a sensor firing at nothing, woke her again and again. Where she
+   lay is read as she is armed, before the sensor is set to wake her, and
+   kept through sleep. motion.c is the board's, so it is read. */
+test('a wake by the motion sensor is a lift only once she has moved from where she slept', () => {
+  const motion = source('charm/main/motion.c');
+  assert.match(motion, /static RTC_DATA_ATTR float rest\[3\];/, 'where she lay is not kept through sleep');
+  const arm = bodyOf(motion, 'void motion_arm(void) {', 'motion.c has no motion_arm()');
+  assert.ok(arm.indexOf('read_g(rest);') > -1 && arm.indexOf('read_g(rest);') < arm.indexOf('command(WOM_SETTING);'),
+    'where she lay is not read before the sensor is armed to wake her');
+  assert.match(bodyOf(motion, 'bool motion_looked(void) {', 'motion.c has no motion_looked()'),
+    /if \(lift_seen\(before, now\) && lift_moved\(rest, now\)\)/, 'a lift is taken without asking whether she left where she lay');
+});
+
 /* At the end of a charge her radio sags the battery and the chip resets as
    a brownout, which is no sleep wake, so it woke her — screen and radio —
    into the next reset. Off the cable that reset switches the board off, before

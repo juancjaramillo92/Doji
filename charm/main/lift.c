@@ -26,6 +26,10 @@ bool lift_seen(const float first[3], const float second[3]) {
     return SCREEN_Z * first[2] >= FACING && SCREEN_Z * second[2] >= FACING && moved(first, second) <= STILL;
 }
 
+bool lift_moved(const float rest[3], const float now[3]) {
+    return moved(rest, now) > STILL;
+}
+
 lift_hold_t lift_hold(const float before[3], const float now[3]) {
     float z = SCREEN_Z * now[2];
     bool lying = moved(before, now) <= RESTING;

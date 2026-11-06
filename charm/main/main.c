@@ -194,8 +194,10 @@ static void report(void) {
     int rssi = esp_wifi_sta_get_ap_info(&ap) == ESP_OK ? ap.rssi : 0;
     char text[256];
     snprintf(text, sizeof text,
-             "app=%.8s woke=%d reset=%d lifts=%d/%d lit=%lld listen=%lld free=%u largest=%u lowest=%u rssi=%d up=%lld",
-             esp_app_get_description()->version, (int)woke, (int)esp_reset_reason(), lifts_seen, lifts_not,
+             "app=%.8s woke=%d pins=%llx reset=%d lifts=%d/%d lit=%lld listen=%lld free=%u largest=%u lowest=%u "
+             "rssi=%d up=%lld",
+             esp_app_get_description()->version, (int)woke, esp_sleep_get_ext1_wakeup_status(),
+             (int)esp_reset_reason(), lifts_seen, lifts_not,
              lit_at / 1000, talk_listened() / 1000, lit_free, lit_largest,
              (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL), rssi, esp_timer_get_time() / 1000);
     talk_report(text);

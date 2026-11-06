@@ -13,6 +13,7 @@
 #include <string.h>
 #include "bsp/esp-bsp.h"
 #include "driver/i2c_master.h"
+#include "esp_attr.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -52,6 +53,7 @@ static const char *TAG = "motion";
 
 static i2c_master_dev_handle_t chip;
 static bool reading;
+static RTC_DATA_ATTR float rest[3];  // how she lay as she was armed, kept through sleep
 
 static void set(uint8_t reg, uint8_t v) {
     uint8_t out[2] = { reg, v };
@@ -75,8 +77,15 @@ static void command(uint8_t c) {
     set(CTRL9, ACK);
 }
 
+static void read_g(float g[3]) {
+    uint8_t reg = AX_L, raw[6] = { 0 };
+    i2c_master_transmit_receive(chip, &reg, 1, raw, 6, 100);
+    for (int i = 0; i < 3; i++) g[i] = (int16_t)(raw[2 * i] | raw[2 * i + 1] << 8) / 16384.0f;
+}
+
 void motion_arm(void) {
     attach();
+    read_g(rest);
     reading = false;
     set(CTRL7, 0);
     set(CTRL1, INTERFACE);
@@ -85,12 +94,6 @@ void motion_arm(void) {
     set(CAL1_H, ON_INT1_HIGH | BLANK);
     command(WOM_SETTING);
     set(CTRL7, 1);
-}
-
-static void read_g(float g[3]) {
-    uint8_t reg = AX_L, raw[6] = { 0 };
-    i2c_master_transmit_receive(chip, &reg, 1, raw, 6, 100);
-    for (int i = 0; i < 3; i++) g[i] = (int16_t)(raw[2 * i] | raw[2 * i + 1] << 8) / 16384.0f;
 }
 
 // Wake-on-motion off — a threshold of zero — and ordinary readings on.
@@ -116,7 +119,7 @@ bool motion_looked(void) {
     for (int waited = 0; waited < LOOK_FOR_MS; waited += APART_MS) {
         vTaskDelay(pdMS_TO_TICKS(APART_MS));
         read_g(now);
-        if (lift_seen(before, now)) {
+        if (lift_seen(before, now) && lift_moved(rest, now)) {
             ESP_LOGI(TAG, "lift seen after %d ms: %.2f %.2f %.2f", waited + APART_MS, now[0], now[1], now[2]);
             return true;
         }

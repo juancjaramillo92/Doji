@@ -17,7 +17,7 @@ import { nyDate, marketOpen } from '../supabase/functions/_shared/edge.ts';
 const MAIN = 'charm/main';
 
 // Questions on stdin, one answer a line: `due <epoch>`, `announce <epoch>`,
-// `lift <six readings in g>`, `hold <six readings in g>`, `dns <a message in
+// `lift <six readings in g>`, `moved <six readings in g>`, `hold <six readings in g>`, `dns <a message in
 // hex>` (- for no answer), `ogg <room> <packet sizes…> 0` (the file in hex, or
 // - when a packet did not fit), `frames <read size> <a stream in hex>` (the
 // volume, -1 for none, then each sample), `wait <epoch> <charging> <trade>
@@ -52,6 +52,8 @@ int main(int argc, char **argv) {
         if (!strcmp(op, "today") && scanf("%lld", &t) == 1) printf("%d\\n", briefing_today((time_t)t));
         if (!strcmp(op, "lift") && scanf("%f %f %f %f %f %f", a, a + 1, a + 2, b, b + 1, b + 2) == 6)
             printf("%d\\n", lift_seen(a, b));
+        if (!strcmp(op, "moved") && scanf("%f %f %f %f %f %f", a, a + 1, a + 2, b, b + 1, b + 2) == 6)
+            printf("%d\\n", lift_moved(a, b));
         if (!strcmp(op, "hold") && scanf("%f %f %f %f %f %f", a, a + 1, a + 2, b, b + 1, b + 2) == 6)
             printf("%d\\n", lift_hold(a, b));
         if (!strcmp(op, "dns") && scanf("%1024s", hex) == 1) {
@@ -196,6 +198,16 @@ test('over the weekend she asks seldom, and wakes for the open', () => {
   assert.ok(quiet.filter(w => w === 1800).length > 400, 'the weekend never came — the walk has gone blind');
   // A clock the internet has not set reads 1970: a Saturday there decides nothing.
   assert.deepEqual(charm([`wait ${epoch(new Date(Date.UTC(1970, 0, 3, 12)))} 0 0 0`]), ['300']);
+});
+
+test('a wake is a lift only once she has left where she lay as she slept', () => {
+  const moved = (a, b) => `moved ${[...a, ...b].join(' ')}`;
+  assert.deepEqual(charm([
+    moved([0, 0.01, 1.0], [0.01, 0.02, 0.99]),   // still on the table, a jolt or nothing
+    moved([0, 0.38, 0.92], [0, 0.37, 0.93]),     // propped on her keyring, as she lay
+    moved([0, 0.01, 1.0], [0, 0.45, 0.85]),      // picked up and tilted toward him
+    moved([0, 0.1, -0.95], [0, 0.3, 0.9]),       // turned over off her face
+  ]), ['0', '0', '1', '1']);
 });
 
 test('a lift is him looking only when the screen faces up and is held still', () => {

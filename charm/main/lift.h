@@ -7,6 +7,11 @@
    not. Pure, so a test compiles it on its own. */
 bool lift_seen(const float first[3], const float second[3]);
 
+/* And whether she has left where she lay when she went to sleep: a table
+   jolted, or a sensor that fires at nothing, wakes her lying just as she was,
+   facing up and still, which lift_seen alone takes for him looking. */
+bool lift_moved(const float rest[3], const float now[3]);
+
 /* Awake, two readings about a second apart: whether he is holding her up to
    look — she stays awake — or she has been put down, lying still at any
    angle, or face down — she sleeps. Anything else, a pocket,
