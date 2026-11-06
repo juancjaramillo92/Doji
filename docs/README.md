@@ -3734,9 +3734,34 @@ night, in the 03:00 hour in New York and off a low battery, an errand reads the
 newest image's description from its first bytes — a low battery leaves the
 look to a later errand in that hour — and when its version is not
 hers, the rest is written into her other app slot (`charm/partitions.csv`
-gives her two of 7 MB) and she wakes into it at once, quietly. A new app is
-good only once it has reached her Wi-Fi: one that never does is rolled back by
-the bootloader at the wake after, to the app that was (`charm/main/ota.c`).
+gives her two of 7 MB) and she wakes into it at once, quietly. **A new app is
+kept only once it has proved itself** (`prove` in `charm/main/main.c`): the
+first thing every waking of it does is start her screen, draw the sleep screen
+whole and reach her Wi-Fi, under a task watchdog armed to reset her if any of it
+hangs. Any reset before it is kept — a crash, a frozen screen, a waking with no
+network — has the bootloader start the app that was (`charm/main/ota.c`), so a
+build that cannot do the basics never stays on her past one waking. **An
+update reaches her the day it is built**, not only at the night's look: the
+workflow writes the version beside the image (`charm/version`), Gladys's door
+hands it to her in every answer (`app`), and the first errand that sees one
+she has not run fetches it. A version that was on her and failed its proof is
+never fetched again (`ota_offered`, asked of the bootloader's record, not the
+network), so a broken build is tried once, not every five minutes.
+
+**Each waking he uses reports itself** (`report` in `charm/main/main.c`), as
+she goes back to sleep, and so does a new app's proof: one line posted to her
+door's `?report=1`, filed in `eugenia_runs` under the caller `charm` with the
+line as its `detail` — the app, what woke her and which pins did (`pins`, the
+motion sensor's GPIO21 among them) and why the chip last reset, the
+lifts seen and not seen since the last report (counted through sleep, so a
+lift that lit nothing is still told), when she was lit and first listened in ms
+from boot, internal RAM when lit and at its lowest, the Wi-Fi signal, and how
+long she was up. Online only, one try of five seconds, never a reason to stay
+awake. So the board is read without a cable:
+
+```sql
+select at, detail from eugenia_runs where caller = 'charm' order by at desc limit 20;
+```
 Only a power-on chimes, so neither an update nor the setup's restart wakes
 anyone.
 
@@ -3779,11 +3804,13 @@ and otherwise sleeps again with the mark still up.
 flashing — or after BOOT is held for five seconds, she becomes her own Wi-Fi
 network, named for her address like *Charm-4F2A* and **locked with a password
 made up for that setup**, and shows a **QR code** carrying both, centred on her
-screen with the name under it. A phone's camera joins it in one tap, and the
-page opens by itself: her DHCP tells the phone to ask her for every name and
-where her page is (option 114, which newer phones open at once), every name the
-phone asks for resolves to the charm, and every page but its own redirects
-there. The page (`charm/main/setup.html`) is
+screen with the name under it and her page's address under that (*Open
+192.168.4.1*). A phone's camera joins it in one tap, and the page opens by
+itself: her DHCP tells the phone to ask her for every name and where her page
+is (option 114, which newer phones open at once), every name the phone asks
+for resolves to the charm, and every page but its own redirects there. A phone
+that joins and does not open it is sent to it by that address in its browser,
+no rescanning. The page (`charm/main/setup.html`) is
 set in Doji's typeface, which the charm serves herself
 (`charm/main/setup.woff2`, made by `charm/tools/fonts.sh`) since the phone has
 no internet while it is on her network, and it is built for a phone: thumb-sized
@@ -3838,7 +3865,10 @@ armed before every sleep, on GPIO21 (Waveshare's schematic for the 1.75C), it
 wakes the chip on a movement, which then watches it settle for up to a second
 and a half, a pair of readings 150 ms apart at a time, and lights her the moment
 a pair has the screen tilted up toward him and held still (`charm/main/lift.c`),
-so a lift still moving when it woke her is not mistaken for a swing; a swing on the keyring or a bump in a pocket sends her
+so a lift still moving when it woke her is not mistaken for a swing — and only
+once she has left where she lay as she was armed (`lift_moved`), since lying
+face up and still on a table is that same pair, and on the board the sensor
+woke her there with nobody near; a swing on the keyring or a bump in a pocket sends her
 straight back to sleep without lighting the screen, and rests the sensor for
 twenty seconds, so a keyring swinging all day cannot keep waking her. What shows
 first is decided before the screen lights: **a trade waiting puts its questions

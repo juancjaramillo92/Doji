@@ -3,6 +3,10 @@
 // How many trades wait for their journal; -1 when her door could not be reached.
 int gladys_check(void);
 
+/* The newest app the charm workflow published, as her door's last answer
+   said; empty when it said nothing. */
+const char *gladys_app(void);
+
 /* Journals what waits, oldest first, one question at a time, each answer sent
    as he gives it, on the journal's own screens: done, its tick and ring. An
    answer her door does not take, the network still up, is asked again.

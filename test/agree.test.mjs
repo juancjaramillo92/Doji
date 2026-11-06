@@ -303,6 +303,10 @@ test('the charm waits out her silence, records what her door takes, and asks the
   const door = BRIEFING_WORDS();
   assert.ok(asked.length, 'talk.c no longer names the briefing as this test reads it');
   for (const word of asked) assert.ok(door.includes(word), `the charm asks ?briefing=${word} and her door answers ${door.join(', ')}`);
+  // The waking's report: the flag the charm sends is the one her door reads.
+  const sent = talk.match(/EUGENIA_DOOR "\?(\w+)=1", HTTP_METHOD_POST/)?.[1];
+  assert.ok(sent && EUGENIA_TS.includes(`searchParams.has("${sent}")`),
+    `the charm files its report under ?${sent}= and her door reads no such flag`);
 });
 
 /* The rest of what the charm reads off her door is not a name but a value:
@@ -1034,7 +1038,10 @@ test('every word on the charm\'s screens is in the font that draws it', () => {
   const say = setup.match(/SAY\[\] = \{([^}]+)\}/);
   assert.ok(say, 'setup.c no longer lists what its screen says');
   assert.match(setup, /"Charm-%02X%02X"/, 'setup.c no longer names her network as this test reads it');
-  for (const words of [...[...say[1].matchAll(/"([^"]+)"/g)].map(w => w[1]), 'Charm-0123456789ABCDEF']) {
+  // And her page's address under the code, an IPv4 address after its word.
+  const open = setup.match(/snprintf\(address, sizeof address, "([^"]+) " IPSTR/);
+  assert.ok(open, 'setup.c no longer writes her page\'s address as this test reads it');
+  for (const words of [...[...say[1].matchAll(/"([^"]+)"/g)].map(w => w[1]), 'Charm-0123456789ABCDEF', `${open[1]} 0123456789.`]) {
     for (const letter of words) assert.ok(held('hanken_18').includes(letter), `hanken_18 cannot draw the ${JSON.stringify(letter)} of ${words}`);
   }
 });
@@ -2234,25 +2241,39 @@ test('the charm keeps the market\'s week the server keeps', () => {
    though the cable went in minutes later. */
 test('a low battery leaves the night\'s look for an update to a later errand', () => {
   const errand = bodyOf(source('charm/main/main.c'), 'static void errand(void) {');
-  assert.match(errand, /if \(!power_low\(\) && ota_due\(time\(NULL\)\) && ota_update\(\)\)/,
+  assert.match(errand, /if \(!power_low\(\) && \(ota_offered\(gladys_app\(\)\) \|\| ota_due\(time\(NULL\)\)\) && ota_update\(\)\)/,
     'the errand asks for an update before the battery, so a low one spends the night\'s look');
   // And ota_due is what marks the night looked.
   assert.match(bodyOf(source('charm/main/ota.c'), 'bool ota_due(time_t now) {'), /looked = day;\s*return true;/,
     'ota_due no longer marks the night as this test reads it');
 });
 
-/* A new app is good once she has reached her Wi-Fi, whichever waking it is:
-   confirmed where every join succeeds, and nowhere else. Confirmed on one
-   path only, a press in the second after an update took the other, and the
-   bootloader rolled a good app back at the next wake. */
-test('the charm keeps a new app wherever she reaches her Wi-Fi', () => {
+/* A new app is good once it has proved itself, whichever waking it is: her
+   screen started and drawn on, her Wi-Fi reached, under a watchdog that
+   resets her on a hang, and any reset before the confirmation rolls it back.
+   Confirmed on one path only, a press in the second after an update took the
+   other, and the bootloader rolled a good app back at the next wake; confirmed
+   at the join alone, an app whose screen froze was kept. So the proof is the
+   first thing life() does after the battery's check, before any path sleeps,
+   and the one place a new app is confirmed. */
+test('the charm keeps a new app only once it has proved itself, before anything sleeps', () => {
   const callers = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n')
     .filter(f => f.endsWith('.c') && /\bota_confirm\(\);/.test(source(f)));
-  assert.deepEqual(callers, ['charm/main/net.c'], 'a new app is confirmed somewhere other than where she joins, or nowhere');
-  const join = bodyOf(source('charm/main/net.c'), 'static void join(void *arg) {', 'net.c has no join()');
-  const gaveUp = join.indexOf('xEventGroupSetBits(events, GAVE_UP);');
-  assert.ok(gaveUp > -1 && join.indexOf('ota_confirm();') > gaveUp,
-    'join() confirms the app before it knows she joined');
+  assert.deepEqual(callers, ['charm/main/main.c'], 'a new app is confirmed somewhere other than its proof, or nowhere');
+  const main = source('charm/main/main.c');
+  const prove = bodyOf(main, 'static void prove(void) {', 'main.c has no prove()');
+  for (const step of ['esp_task_wdt_add(NULL);', 'light(FACE_DARK);', 'face_draw_dark();', 'esp_task_wdt_delete(NULL);', 'if (joined) ota_confirm();']) {
+    assert.ok(prove.includes(step), `prove() no longer does ${step}`);
+  }
+  assert.ok(prove.indexOf('esp_task_wdt_add(NULL);') < prove.indexOf('light(FACE_DARK);') &&
+            prove.indexOf('esp_task_wdt_delete(NULL);') < prove.indexOf('if (joined) ota_confirm();'),
+    'the screen is no longer started under the watchdog, or the app is kept before the watchdog stands down');
+  const life = bodyOf(main, 'static void life(void *arg) {', 'main.c has no life()');
+  const proved = life.indexOf('if (ota_unproven()) prove();');
+  assert.ok(proved > life.indexOf('power_off();') && proved > -1, 'life() proves a new app before the battery is judged, or not at all');
+  for (const sleeps of ['sleep_until(', 'errand();', 'awake();']) {
+    assert.ok(life.indexOf(sleeps) > proved, `life() reaches ${sleeps} before a new app is proved`);
+  }
 });
 
 /* The charm joins a network by waiting for an address or a refusal, and gives
@@ -2373,6 +2394,21 @@ test('a charm already set up gives the setup up when no phone comes', () => {
     'a phone on her network no longer keeps the setup up');
   assert.match(run, /if \(config_ready\(\) && xTaskGetTickCount\(\) - seen >= pdMS_TO_TICKS\(ALONE_MS\)\) esp_restart\(\);/,
     'the setup no longer gives up on its own, or gives up on a board never set up');
+});
+
+/* A wake by the motion sensor is a lift only once she has left where she
+   lay: lying face up and still is what lift_seen looks for, so a table
+   jolted, or a sensor firing at nothing, woke her again and again. Where she
+   lay is read as she is armed, before the sensor is set to wake her, and
+   kept through sleep. motion.c is the board's, so it is read. */
+test('a wake by the motion sensor is a lift only once she has moved from where she slept', () => {
+  const motion = source('charm/main/motion.c');
+  assert.match(motion, /static RTC_DATA_ATTR float rest\[3\];/, 'where she lay is not kept through sleep');
+  const arm = bodyOf(motion, 'void motion_arm(void) {', 'motion.c has no motion_arm()');
+  assert.ok(arm.indexOf('read_g(rest);') > -1 && arm.indexOf('read_g(rest);') < arm.indexOf('command(WOM_SETTING);'),
+    'where she lay is not read before the sensor is armed to wake her');
+  assert.match(bodyOf(motion, 'bool motion_looked(void) {', 'motion.c has no motion_looked()'),
+    /if \(lift_seen\(before, now\) && lift_moved\(rest, now\)\)/, 'a lift is taken without asking whether she left where she lay');
 });
 
 /* At the end of a charge her radio sags the battery and the chip resets as

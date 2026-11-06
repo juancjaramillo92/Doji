@@ -412,6 +412,23 @@ test('doji-eugenia: the charm is refused at the door without its vendors or a re
     401, 'the charm door admitted a wrong key');
 });
 
+/* The charm's report of a waking is filed as it came, beside her runs, and
+   needs neither vendor: answered before the door asks for them. */
+test('doji-eugenia: the charm files a report of its waking, vendors or not', async () => {
+  const serve = await serving('doji-eugenia', ['STT_URL', 'STT_KEY', 'TTS_KEY']);
+  respond = (url) => url.startsWith('https://db.test/rest/v1/eugenia_runs')
+    ? ok([]) : Promise.reject(new Error(`the report asked something unexpected: ${url}`));
+  calls.length = 0;
+  const report = (key) => new Request('https://fn.test/functions/v1/doji-eugenia?report=1',
+    { method: 'POST', body: 'app=3e45d44 woke=2 lifts=1/0', headers: { 'x-charm-key': key } });
+  assert.equal((await serve(report('charm'))).status, 204, 'the report was not taken');
+  assert.deepEqual(bodies('/rest/v1/eugenia_runs').map(([row]) => [row.caller, row.ok, row.detail]),
+    [['charm', true, 'app=3e45d44 woke=2 lifts=1/0']], 'the report was not filed as it came');
+  calls.length = 0;
+  assert.equal((await serve(report('wrong'))).status, 401, 'a report under a wrong key was taken');
+  assert.deepEqual(calls, [], 'a report under a wrong key made a request');
+});
+
 /* ─── The briefing on the charm ───────────────────────────────────────────
    The charm wakes after the briefing's hour and asks whether it has landed,
    then asks for the briefing itself when he presses. Both read today's stored
