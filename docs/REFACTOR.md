@@ -27,6 +27,7 @@ any change that touches it.
 | whether a prompt still behaves | `scripts/eval.mjs`, run by hand with his key — nothing in `npm test` calls the model |
 | whether a tool's description still says what she needs | reading it against the column or door it describes — the eval sends no tools (R-111) |
 | the charm's firmware beyond its pure C | `charm.test.mjs`'s census for the names in it; the charm workflow's build for the rest of its code; the board itself for what it does |
+| the laptop beyond its pure half | `types.test.mjs` for the names in it and `agree.test.mjs` for its copies; the laptop workflow's Mac for the three things it asks; the Mac itself for what it does |
 
 ---
 
@@ -1386,7 +1387,7 @@ the answer is this section: nothing, until one of those conditions is met.
   nothing is decided, and rounded — and a shared module keeps that difference.
   **Reopen if** the row-for-row test in `agree.test.mjs` ever finds the copies
   apart for a reason that is not a bug in one of them.
-- **Every move in §2 — each reviewed, each standing.** The nine `CLAUDE.md`
+- **Every move in §2 — each reviewed, each standing.** The twelve `CLAUDE.md`
   refuses stay refused. R-9 is built beside `npm test` as `test/db`. R-15 stays
   measured and refused; R-16 is settled outright; R-11, R-12, R-13 and R-17
   stand on their reasoning. Each reopens only on its own **Revisit if**, one at
@@ -1396,7 +1397,7 @@ Looked at in the same pass and NOT on this list:
 
 - **Section placement** — whether each function sits under the right banner in
   `index.html` and `doji-eugenia/index.ts`. No test can judge it, and a sweep is
-  churn in two four-thousand-line files, with load order at stake in the first,
+  churn in files of four and five thousand lines, with load order at stake in the first,
   for readability alone. A block is placed when it is next touched.
 - **The CSS.** About 1,500 lines of `index.html`, worked over while the journal
   was built: every colour is a token on `:root`, and no class is declared that

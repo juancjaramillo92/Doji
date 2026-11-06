@@ -12,7 +12,8 @@ has already been looked at.
 Doji is a personal XAUUSD trading journal: one `index.html`, one flat namespace,
 **no build step, no bundler**. Four writers share one Supabase table — the app,
 `doji-mcp-sync` (the cTrader poller), `doji-email-sync` (the write behind the
-Apps Script's Gmail parse) and `doji-gladys` (the Telegram journal bot). Journal
+Apps Script's Gmail parse) and `doji-gladys` (the journal bot, answered in
+Telegram, on the charm or on the laptop). Journal
 columns and broker columns never meet; the whole design rests on that. Eugenia
 (`doji-eugenia`) owns only her own tables; `doji-tradingview` writes only its own
 sign-in row.
@@ -117,9 +118,9 @@ the run, and run on any other version the suite's first test is the one that fai
 what each suite covers.
 
 - **`types.test.mjs`** asks a compiler two scope questions — a name used and
-  declared nowhere, a name declared and used nowhere — of the Edge Functions and,
-  as a separate program, of `index.html`'s script (`appScript()` is the slice
-  `boot.mjs` runs, exported so both read one program). Only those two, because
+  declared nowhere, a name declared and used nowhere — of the Edge Functions,
+  of `index.html`'s script (`appScript()` is the slice `boot.mjs` runs,
+  exported so both read one program) and of the laptop, each its own program. Only those two, because
   they cannot go red for a reason that is not a defect; a whole typecheck under
   Node's lib reports facts about the invocation. One planted defect per question
   rides in every program. `Chart` is the browser shim, held against the page
@@ -467,7 +468,7 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   boot guard, each guarded where used — `agree.test.mjs` makes that cost
   something.
 - **Everything she writes is spoken, with the text as the fallback**, through
-  `sayAloud`; `agree.test.mjs` reads it and counts the five call sites, and
+  `sayAloud`; `agree.test.mjs` reads it and counts the four call sites, and
   `fold.test.mjs` drives the fallback. There is no length cap and the prompt
   states none; `TTS_LIMIT` is a chunk size. The briefing speaks in a second worker
   (`postSpeak`), stored before the hand-off, falling back to speaking itself.

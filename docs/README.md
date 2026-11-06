@@ -1416,13 +1416,14 @@ it, and a look per print spends the quota the briefing reads on. **Weekdays at
 08:00 ET, Sunday at 17:00 ET** — the gold open, so the week's first briefing
 lands with the market, carrying the review of the week behind it. She says hello her own way, Spanish or English, inside
 the first paragraph, and goes straight to the number. Reply and she answers —
-typed, by voice, or to a chart. And she trades beside you on paper, on your
+typed, by voice, or to a chart, in Telegram, on the charm or on the laptop. And she trades beside you on paper, on your
 rules, scored on price — *Her own calls*.
 
 `schema.sql` holds her memory and her read of the journal, her meters,
 calendar and the trigger that tells her about a trade, and her clock; `prompt.ts` holds who she is,
 `strategy.ts` what he decided, `adherence.ts` the twelve rules a row can
-answer; `index.ts` is the wiring.
+answer, `journal.ts` the app's arithmetic and `structure.ts` her map of his
+charts; `index.ts` is the wiring.
 
 **The conversation and what she remembers are two tables, and stay two.**
 `eugenia_turns` is the conversation window, `eugenia_notes` what she remembers,
@@ -3545,6 +3546,9 @@ again. Per caller:
 | critic | 6 | $1.27 | $1.02 |
 | trade look | 2 | $0.50 | $0.39 |
 | Sunday briefing | 1 | $0.30 | $0.24 |
+
+The release look, the pulse and the move look are since retired; the figures are
+the week as it ran.
 
 **Both tiers are on 5.5** (`claude-opus-5-5`, `claude-sonnet-5-5`): the same
 tiers, Opus a fifth cheaper on input, output and writes, and a cache read down to

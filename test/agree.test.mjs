@@ -6108,8 +6108,9 @@ test('every message she writes goes out through sayAloud', () => {
   /* THE HALF THE FUNCTION CANNOT GUARANTEE: a path calling `say` directly works
      and is silent. Four sites — the briefing's two (the speaking worker and
      postBriefing's fallback), then the trade event and the reply; the week's
-     review rides the Sunday briefing. `/notes`, the apologies, the short operational lines and the
-     charm's copy keep `say` deliberately — the charm's voice is on the charm. */
+     review rides the Sunday briefing. `/notes`, the apologies, the short
+     operational lines and the copy of a charm's or a laptop's turn keep `say`
+     deliberately — that voice was on the device. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
   assert.equal(spoken, 4,
