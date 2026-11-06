@@ -1235,7 +1235,7 @@ export function quoteWindow(now: Date): string {
       "previous close is the overnight move.";
 }
 
-/* One rendering of a quote, with the window inside it, for all three callers —
+/* One rendering of a quote, with the window inside it, for both callers —
    prose, because a bare `change` reads as whatever it sounds like. */
 export function quoteLine(q: Quote, now: Date): string {
   // No previous close, no move — and she is told not to reconstruct one. The
@@ -4135,7 +4135,7 @@ async function critique(draft: string, notes: string, channels: string, desk: st
    direction is checked against the second.
 
    What it returns is what is remembered: storing the draft files words he
-   never read as hers, resent as history. The three callers bind it. */
+   never read as hers, resent as history. Both callers bind it. */
 async function trim(draft: string, desk: string, story: string): Promise<string> {
   return await gate(draft, `${TRIM}${desk}${story}\n\nTHE MESSAGE:\n\n${draft}`, 'trim', TRIM_MOST);
 }

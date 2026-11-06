@@ -566,8 +566,10 @@ the delete back.
 
 **Supabase snapshots the whole database daily**, and the Pro plan keeps the last
 seven, under Database → Backups in the dashboard. A snapshot is every table,
-Vault included, and Doji keeps nothing in Storage but the charm's update, which
-the charm workflow rebuilds from `main`, so it is everything there is.
+Vault included, and not Storage, where Doji keeps three things: the charm's
+update and the laptop's, which their workflows rebuild from `main`, and the
+laptop's signing certificate, which nothing copies — lost, the next build makes
+another, at the price *The laptop* gives. So it is everything that matters.
 It is the repair for a database that is gone or broken: a restore returns the
 whole project to that day, and everything written since — trades, answers, her
 memory — goes with it. Point-in-time recovery between snapshots is a paid
@@ -576,14 +578,18 @@ add-on.
 **A copy of what exists nowhere else is taken daily, outside Supabase.**
 `scripts/backup.mjs`, run every night by `.github/workflows/backup.yml`, reads
 fifteen tables into one JSON artifact: `trades`, whose journal columns only
-you can supply, and the fourteen of hers with no other source — the channel
+you can supply; every stop and target a position carried, which the broker
+keeps none of; and the thirteen of hers with no other source — the channel
 map, notes, turns, thesis, portrait, her record, open loops, calendar,
-feedback, every stop and target a position carried, her calls, what the thesis
-and the portrait said before each rewrite, what each briefing was handed, and
-what gold did on each print. `trades` goes whole, the soft-deleted
-rows included: a restore without them lets the poller rebuild every trade you
-removed. `eugenia_runs` is left out: the largest table, and facts about model
-calls rather than about you. **None of these tables is ever pruned**, so the
+feedback, her calls, what the thesis and the portrait said before each
+rewrite, what each briefing was handed, and what gold did on each print.
+`trades` goes whole, the soft-deleted rows included: a restore without them
+lets the poller rebuild every trade you removed. What is left out is declared
+in `agree.test.mjs` with its reason — `eugenia_runs`, the largest table and
+facts about model calls rather than about you; the market cache, refilled
+every quarter hour; the heartbeats and the dispatch ledger, rewritten by
+their next runs; the calendar's week marks, fetched again by `?history=`; and
+the TradingView sign-in, a live credential no artifact may hold. **None of these tables is ever pruned**, so the
 document only grows, fastest in what each briefing was handed — a whole prompt
 a day. The run's log gives every table's rows and size, which is where that
 growth is read, and ninety copies of the document are what the account's
@@ -1045,7 +1051,7 @@ and a few seconds later:
 
 **What it may read is TradingView's own answer, not a list typed here.** The
 `?tools=1` capture is kept whole in `test/fixtures/tradingview-tools-list.json`:
-35 tools, 24 marked `readOnlyHint`. `ALLOWED_TOOLS` names six of those 24, and
+35 tools, 24 marked `readOnlyHint`. `ALLOWED_TOOLS` names nine of those 24, and
 `agree.test.mjs` holds each against the capture, derives the eleven that write
 from the same file, and fails if any is named in the function at all. One of
 them reads like a read: `mcp-watchlist-get-active-watchlist` activates or
@@ -1639,7 +1645,8 @@ She is handed the week computed — `get_stats`' summary with his answers,
 portrait and what he has on, and may read a trade or a section of his rules
 (`REVIEW_TOOLS`). `TRIM` gates it, since the critic reads the briefing alone;
 the two are joined, then stored under the Sunday briefing's marker and spoken
-as one, so the charm plays both. **A broken review never costs the briefing**:
+as one, so the charm and the laptop play both. **A broken review never costs
+the briefing**:
 `weekReview` catches, writes a `review job` row, and its apology goes out in its
 place. A Sunday whose message failed retries whole, review included.
 
@@ -2883,7 +2890,7 @@ It renders each open position — age, side, size, entry, the stop and target as
 first seen — and where the day stands against R-11's 4%. **A position opened on an earlier day names the day**: his
 holds run multi-session, and a bare `open since 09:15 ET` under *right now* reads
 as this morning. Flat and not traded today, it is nothing at all. It goes to
-three paths — the briefing, a reply and the nightly pass.
+four paths — the briefing, a reply, the nightly pass and the week's review.
 The trade look is reached *from* the position and already holds its row.
 
 **What she may do with it is narrower than what she can see, by design.**
@@ -3313,13 +3320,14 @@ played. **Where the voice failed the row says why** — `sent as text (speech HT
 console line alone, and the two stalls of 26 and 27 October had outlived the
 logs before anyone asked what stalled.
 
-**Three nightly meters write rows, both outcomes.** Her calls' scoring writes
+**Four nightly meters write rows, both outcomes.** Her calls' scoring writes
 `caller: 'calls'`, since a broker door that stopped answering leaves every call
-unscored with nothing else to say so. The embedding sweep writes
+unscored with nothing else to say so, and the filing of what gold did on each
+print writes `caller: 'reactions'` for the same bars. The embedding sweep writes
 `caller: 'embeddings'`, because a dead vendor takes the semantic arm out while
 the lexical one keeps answering; the channel census writes `caller: 'channels'`,
 because a ladder that stopped moving looks like one with no reason to, and a rung
-is read by comparing nights. `caller` is free text, so neither needed a
+is read by comparing nights. `caller` is free text, so none needed a
 migration. **`postConsolidation` has exactly one `return`**, and a test counts
 it: a quiet day is a branch, and an early return is how both meters once skipped
 every night nobody spoke. The census stays after the pass, the only thing that
@@ -3559,7 +3567,7 @@ said read badly. `MODELS` is keyed on the caller's label, the string
 **Her replies run in fast mode** (`FAST`, keyed the same way): the same Opus
 writing up to 2.5× faster at twice the rate, `speed: "fast"` under the
 `fast-mode-2026-02-01` beta. A reply is one turn whichever way it came —
-Telegram or the charm — and it is the one he waits on: in October's thirty days
+Telegram, the charm or the laptop — and it is the one he waits on: in October's thirty days
 62 replies cost $11.95 and took 20.4 s each before a word was spoken, and he
 chose speed over the price. Fast mode is a research preview with its own rate
 limit, so a fast request refused for any reason is sent once more at the
@@ -4072,6 +4080,8 @@ references anything defined below it at load time.
 | `Journal` | the entry modal |
 | `Login` | session gate |
 | `Carousel` | mobile swipe position and dots |
+| `DayWatcher` | a render when the New York day turns, and the calendar moved on at a new month |
+| `wire()` | every control, wired once at boot |
 
 `render()` is the orchestrator and draws nothing itself. Each step runs in its own
 catch, so one widget can degrade without blanking the panel.
@@ -4191,8 +4201,8 @@ expected` answers every behavioural test while leaking the secret through timing
 so `agree.test.mjs` reads its body. Configuration is an argument rather than a
 capture, so each bot binds its own token in one line, and `sbHeaders(prefer?)`
 names the `Prefer` at the call site. `nyDate` (which civil day) and `nyClock`
-(which weekday and hour) answer separate questions; Gladys's `nyTime` is a
-display format with one caller.
+(which weekday and hour) answer separate questions; Gladys's `nyDayTime` and
+Eugenia's `nyTime` are display formats, each its own file's.
 
 **The entry point is deliberately not shared.** All five authorise their callers
 in the same four lines — refuse if a secret is unset, match one, match the other,
@@ -4248,8 +4258,9 @@ job name, so a re-run makes the jobs match the file. Six jobs —
 | `doji-pace-watch` | `37 * * * *` | `pace_watch`'s one-a-day warning |
 | `purge-cron-history` | `0 3 * * *` | trims `cron.job_run_details` |
 
-Only the first four call a function; the two watchers post to Telegram
-themselves, which keeps a watchdog off the thing it watches. `verify.sql` counts
+Only the first three call a function; the two watchers post to Telegram
+themselves, which keeps a watchdog off the thing it watches, and the purge
+touches nothing but pg_cron's own history. `verify.sql` counts
 the jobs, and `agree.test.mjs` holds that count against `schema.sql`.
 
 ---
@@ -4305,7 +4316,16 @@ the jobs, and `agree.test.mjs` holds that count against `schema.sql`.
    Connect TradingView (see **TradingView**), then walk the history door once
    from a year back — see **Applying her schema**.
 8. Run `supabase/verify.sql`. Nothing is set up until it agrees.
-9. For the laptop, when it is wanted — its certificate is the workflow's to
+9. For the charm, when it is wanted:
+   - `EUGENIA_CHARM_SECRET` and `GLADYS_CHARM_SECRET` in Edge Function
+     secrets, and `STT_KEY`, `STT_URL` and `TTS_KEY` with them, since her door
+     answers `503` without a voice; and `SUPABASE_URL` and `SB_SECRET_KEY` as
+     repository secrets, which the charm and laptop workflows publish with.
+   - Download `charm-full.bin` from a run of Actions → charm and write it at
+     `0x0` (*The charms*); she comes up as her own Wi-Fi network with a QR code,
+     and the setup page asks for her networks and the two keys. Every build of
+     `main` after that reaches her by herself.
+10. For the laptop, when it is wanted — its certificate is the workflow's to
    make:
    - **Room for the app** in Storage: the project's upload limit (Project
      Settings → Storage) must pass the zipped app, about 130 megabytes;
@@ -4456,7 +4476,9 @@ Gmail itself, behind the Apps Script stubs. What Supabase's own `pg_net`,
 `pg_cron` and Vault do, behind `test/db`'s stand-ins. The charm's firmware beyond its
 pure C: the charm workflow's build compiles the rest, and only the board shows
 what it does — **To check on the real board first** in **The charms** is that
-list.
+list. The laptop beyond its pure half and what `agree.test.mjs` reads: the
+window, the keys, the microphone, the capture, the sound, the signature and the
+update are the Mac's to show — **To check on the Mac first** in *The laptop*.
 
 **Both broker paths are anchored to what the broker sent, and the anchors
 overlap.** `fixtures/ctrader-get-deals.txt` is a real `?raw=1` capture and
@@ -4522,7 +4544,7 @@ per window. The plan is recorded only for positions the poller saw open, as
 first seen; for the rest the broker's final stop has overwritten it. Never infer
 what a planned R:R was; ask.
 
-**The four calling pg_cron jobs hold no database power.** Each presents the cron
+**The three calling pg_cron jobs hold no database power.** Each presents the cron
 secret read from Vault at call time; the service key lives in the functions'
 secrets and never in a job. The housekeeping job is a DELETE on pg_cron's own
 history and nothing else. The `trades` triggers are `security definer` and build
@@ -4533,16 +4555,17 @@ one `net.http_post` each.
 | Function | What a holder of the secret can do |
 |---|---|
 | `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`), minute bars (`?bars=raw`), the day's bars for her calls (`?bars=1`), his six charts (`?structure=1`), his charts at his newest entries (`?entries=1`), or a past session as she would have seen it (`?replay=N`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
-| `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code. `?consolidate=1` is the one that does more than spend: it runs the nightly pass, which WRITES memory — notes written and superseded, channel rungs moved, loops closed. `?embed=1` spends at the embedding vendor. `?calendar=1` files the calendar and spends nothing, and a `{trade}` body reaches the trade look |
+| `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code. `?consolidate=1` is the one that does more than spend: it runs the nightly pass, which WRITES memory — notes written and superseded, channel rungs moved, loops closed. `?embed=1` spends at the embedding vendor. `?calendar=1` files the calendar and spends nothing, `?history=` walks the calendar's past weeks on TradingView's daily quota, `?speak=` re-sends today's stored briefing, and a `{trade}` body reaches the trade look |
 | `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
+| `doji-tradingview` | `?connect=1` — start a sign-in, which ends the one it replaces until he approves the new one: the market reads stop, and nothing on his account changes. Every read door and `?probe=` spends TradingView's daily quota, the briefing's own |
 
-Neither of the last two can reach a column. The value sits in Vault and in
+None of the last three can reach a column. The value sits in Vault and in
 function secrets and crosses no untrusted channel; the one enforceable bound is
 the spend limit on the Anthropic key's workspace. `DOJI_EMAIL_SECRET` is
 deliberately a different secret: it lives in Google's infrastructure and opens
 five columns of one table.
 
 **One value, two stores, two spellings**: the functions read `DOJI_CRON_SECRET`,
-the database reads `doji_cron_secret` from Vault — the four calling jobs and the
-two trigger functions that present it, `trades_telegram` and
-`trades_eugenia_on_event`. `verify.sql` asks for all six.
+the database reads `doji_cron_secret` from Vault — the three calling jobs and
+the two trigger functions that present it, `trades_telegram` and
+`trades_eugenia_on_event`. `verify.sql` asks for all five.

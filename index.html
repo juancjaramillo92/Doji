@@ -312,7 +312,7 @@ nav {
 .chart-area canvas { position:absolute !important; top:0; left:0; width:100% !important; height:100% !important; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   PERIOD DONUTS (All Time / Week / Month)
+   PERIOD DONUTS (Month / Week / All Time)
    ═══════════════════════════════════════════════════════════════════════════ */
 .period-card {
   background:var(--glass); border:1px solid var(--glass-bd);
@@ -1656,12 +1656,14 @@ tr.broker-pending td:first-child {
      Derive     the four things read off a row rather than stored on it
      Stats      pure arithmetic over a list of rows
      Data       Supabase: load, save, delete, realtime, offline snapshot
-     Charts     Chart.js wrappers and the four shared visual primitives
+     Charts     Chart.js wrappers and the shared visual primitives
      Render     one function per component, orchestrated by render()
      Journal    the entry modal
      Login      session gate
-     Mobile     carousel, zoom lock, keyboard inset
-     boot       wiring and start
+     Mobile     the carousel's dots, and the slide it was on
+     Watcher    a render when the New York day turns
+     Wiring     every control, wired once
+     Boot       start
 
    Column names are the database's, unchanged — one vocabulary end to end.
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -2729,7 +2731,7 @@ function renderCurve(rows) {
 }
 
 /* ─── Period wheels ──────────────────────────────────────────────────────────
-   All Time / This Week / This Month — three identical columns, generated from
+   This Month / This Week / All Time — three identical columns, generated from
    CONFIG.PERIODS, so a fourth window is one array entry rather than markup in
    three places and twelve new ids.
 
