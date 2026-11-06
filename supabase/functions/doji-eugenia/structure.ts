@@ -37,8 +37,10 @@ export type Readings = typeof READINGS;
 
 // The newest wicks through a turn that closed back, the last day's only.
 export const SWEEPS = 3;
-// The closed candles of each entry chart handed over, oldest first: three can
-// make a pattern, which one never does.
+// The closed candles handed over of each chart a pattern is read on, oldest
+// first: three can make a pattern, which one never does. The entry charts for
+// step 3's signal, and the daily and 4H beside their turns for step 1, since a
+// sequence of turns is the slowest thing on a chart to say it has turned.
 export const CANDLES = 4;
 
 // §4's grid: 00 and 50 round, 25 and 75 the quarters between.
@@ -257,8 +259,9 @@ function sessionsOf(bars: Candle[], p: Period, since: number): Session[] {
   return out;
 }
 
-/* Step 3 in numbers: a candle's body and both wicks, and every mark on the map
-   its range traded through with the side it closed on. A wick and a body are
+/* Step 3 in numbers, and step 1's candles beside its turns: a candle's body
+   and both wicks, and every mark on the map its range traded through with the
+   side it closed on. A wick and a body are
    subtraction a model gets wrong across four candles at once, and a candle
    reaching a level and closing back is his signal, so it is said, not left to
    be found. Nothing here names a pattern. */
@@ -325,7 +328,7 @@ export function foldStructure(charts: Partial<Record<Period, Candle[]>>, now: nu
     sweeps: (['H_1', 'M_15'] as const).flatMap(p => sweepsOf(p, read(p), since, r.TURN))
       .sort((a, b) => b.at - a.at).slice(0, SWEEPS),
     sessions: sessionsOf(charts.M_15 ?? [], 'M_15', since),
-    candles: (['M_15', 'M_5'] as const).map(p => {
+    candles: (['D_1', 'H_4', 'M_15', 'M_5'] as const).map(p => {
       const bars = read(p).slice(-CANDLES);
       return { period: p, bars, shapes: bars.map(b => shapeOf(b, marks)) };
     }).filter(c => c.bars.length),

@@ -2541,9 +2541,12 @@ broker token stays in the poller, as for `get_market` — and `foldStructure` in
   back, in the last day — not once a bar has closed through it.
 - **The sessions** over the last day on the 15m, by `sessionAt`, the bar still
   forming included; **the average daily range** over fourteen sessions and what
-  this one has covered; **the last four closed 15m and 5m candles** (`CANDLES`),
-  oldest first, since three can make a pattern and one never does — **each
-  with its step 3 worked out** (`shapeOf`): its body and both wicks in dollars,
+  this one has covered; **the last four closed daily, 4H, 15m and 5m candles**
+  (`CANDLES`), oldest first, since three can make a pattern and one never does —
+  the entry charts for step 3's signal, the daily and 4H for step 1, beside
+  turns that are slow to say a chart has turned, a daily candle timed by the
+  session it closed — **each with its shape worked out** (`shapeOf`): its body
+  and both wicks in dollars,
   and every mark on the map its range traded through, with the side it closed
   on. A candle reaching a level and closing back is his signal, and four
   candles' wicks are subtraction a model gets wrong; no pattern is named.

@@ -6807,6 +6807,8 @@ test('the map is hers, printed, built into her call, and kept out of the briefin
      'a summing-up sentence may draw the range the map never gave across the candles'],
     [/A pattern those candles have printed is a fact you may name; the candle he waits for at his level has not printed yet/,
      'the candles on the map can be read as the confirmation he is still waiting for'],
+    [/THE DAILY AND 4H CANDLES ON THE MAP ARE PART OF THAT WEIGHING.*A candle's shape counts where it traded through a mark and closed back, and means little in the middle of the range/,
+     'a shape on the bigger charts may sway the bias wherever it printed, at a mark or not'],
   ]) assert.match(system, said, `SYSTEM: ${why}`);
   assert.match(critic, /Is the map of his charts in the prose\? It was handed to the writer for the call and for nothing else/,
     'CRITIC no longer takes the map out of the briefing\'s prose, and it runs last');
@@ -6823,7 +6825,7 @@ test('the map\'s grid and candle count are the ones the tool, the writer and §4
   const system = SYSTEM.replace(/\s+/g, ' ');
   for (const [where, text] of [['get_structure', said], ['SYSTEM', system]]) {
     assert.ok(text.includes(`the $${GRID} grid`), `${where} names a grid other than structure.ts's ${GRID}`);
-    assert.ok(text.includes(`the last ${WORDS[CANDLES]} closed 15m and 5m candles`),
+    assert.ok(text.includes(`the last ${WORDS[CANDLES]} closed daily, 4H, 15m and 5m candles`),
       `${where} counts the candles on the map other than CANDLES, ${CANDLES}`);
   }
   assert.ok(source('supabase/functions/doji-eugenia/strategy.ts').includes(`**The quarter grid** — the $${GRID} increments`),
