@@ -456,7 +456,7 @@ single-sourced at run time:
 | the **level her window is raised to** | `setAlwaysOnTop` in `float()` in `laptop/main.mjs`, and the window `.github/workflows/laptop.yml` asks a Mac about, or the check proves a window she is not |
 | what each device asks **`?briefing=`** for | the two in `charm/main/talk.c` and the two in `laptop/main.mjs`, each one `charmBriefing` answers, and every word it answers asked by one of them |
 | where the **charm's update** lives | `FIRMWARE_URL` in `charm/main/net.h`, and the bucket and object `.github/workflows/charm.yml` makes and writes; the version it writes beside the image, the one the build stamped, and the object `APP_VERSION_URL` in `doji-gladys` reads it from |
-| where the **charm's app** boots from | the first app slot's offset in `charm/partitions.csv` and the offset `.github/workflows/charm.yml` checks the image against |
+| where the **charm's app** boots from | the first app slot's offset in `charm/partitions.csv` and the offset `.github/workflows/charm.yml` checks the image against; and the update's, the boot record's offset it starts at and the app's it writes, with NVS wholly below it |
 | the **briefing's hours** | `briefDue` and `retryDue` in `doji-eugenia`, and the charm's `BRIEF_WEEKDAY`, `BRIEF_SUNDAY` and `BRIEF_RETRIES` with the line that gives each day its hour — the charm sleeps, so it wakes to ask in those hours |
 | the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts`, `ROLL_HOUR` in `index.ts`, and the charm's `ROLL_HOUR` in `charm/main/errand.c` with the days its weekend is made of, which `charm.test.mjs` walks against `marketOpen` |
 | the **importance a release may carry** | `IMPORTANCE` in `doji-tradingview`, the check constraint, and the rated reads' `importance=eq.high` |
@@ -3728,6 +3728,12 @@ board in by USB-C and flash it from Chrome with Espressif's web flasher, or with
 `esptool.py write_flash 0x0 charm-full.bin`. Not `charm.bin`, which is
 ESP-IDF's name for the app alone; the workflow fails a build whose image is
 smaller than the first app slot's offset plus the app. Nothing secret is in it.
+It writes the whole flash, her Wi-Fi and keys included, so a board flashed
+with it is set up again. **Over a board already set up, `charm-update.bin`**,
+written at `0xe000` with no erase first: the boot record and the app and
+nothing below them, so the setup in NVS at `0x9000` stays and she comes up as
+herself. The boot record is the first app slot's again, wherever an update
+over Wi-Fi had moved it.
 
 **After the first flash she updates herself.** Every build is stamped with the
 commit it was made from, and a build of `main` is also published, the app
@@ -3810,11 +3816,13 @@ and otherwise sleeps again with the mark still up.
 flashing — or after BOOT is held for five seconds, she becomes her own Wi-Fi
 network, named for her address like *Charm-4F2A* and **locked with a password
 made up for that setup**, and shows a **QR code** carrying both, centred on her
-screen with the name under it. A phone's camera joins it in one tap, and the
-page opens by itself: her DHCP tells the phone to ask her for every name and
-where her page is (option 114, which newer phones open at once), every name the
-phone asks for resolves to the charm, and every page but its own redirects
-there. The page (`charm/main/setup.html`) is
+screen with the name under it and her page's address under that (*Open
+192.168.4.1*). A phone's camera joins it in one tap, and the page opens by
+itself: her DHCP tells the phone to ask her for every name and where her page
+is (option 114, which newer phones open at once), every name the phone asks
+for resolves to the charm, and every page but its own redirects there. A phone
+that joins and does not open it is sent to it by that address in its browser,
+no rescanning. The page (`charm/main/setup.html`) is
 set in Doji's typeface, which the charm serves herself
 (`charm/main/setup.woff2`, made by `charm/tools/fonts.sh`) since the phone has
 no internet while it is on her network, and it is built for a phone: thumb-sized

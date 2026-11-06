@@ -24,7 +24,7 @@ lv_font_conv --font 700.ttf --size 16 --bpp 4 --no-compress --symbols 'SETUPVOLM
 lv_font_conv --font 600.ttf --size 36 --bpp 4 --no-compress --symbols '0123456789%' \
   --format lvgl --lv-include lvgl.h --lv-font-name hanken_36 -o hanken_36.c
 lv_font_conv --font 600.ttf --size 18 --bpp 4 --no-compress --range 0x20 \
-  --symbols '0123456789ABCDEFPTWacdeghikmnorsty-' \
+  --symbols '0123456789ABCDEFOPTWacdeghikmnoprsty.-' \
   --format lvgl --lv-include lvgl.h --lv-font-name hanken_18 -o hanken_18.c
 fonttools subset page.ttf --unicodes=U+0020-007E,U+00A0-00FF,U+2013-2014,U+2018-201D,U+2022,U+2026,U+2192 \
   --layout-features=kern,liga --flavor=woff2 --output-file=setup.woff2

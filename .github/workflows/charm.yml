@@ -46,6 +46,11 @@ jobs:
           idf.py set-target esp32s3
           idf.py build
           idf.py merge-bin -o charm-full.bin
+          # And the update a cable writes over a board already set up: the boot
+          # record and the app, from the boot record on, so her Wi-Fi and keys,
+          # below it, are never written.
+          (cd build && esptool.py --chip esp32s3 merge_bin --target-offset 0xe000 -o charm-update.bin \
+            0xe000 ota_data_initial.bin 0x20000 charm.bin)
       # The components are the versions dependencies.lock names. The manifest
       # asks for ranges, so a build that resolved anything else has changed the
       # firmware with no commit saying so; an uncommitted lock is printed, to be
@@ -66,13 +71,16 @@ jobs:
         shell: bash
         working-directory: charm/build
         run: |
-          app=$(stat -c %s charm.bin); full=$(stat -c %s charm-full.bin)
-          echo "app $app bytes, full image $full bytes"
+          app=$(stat -c %s charm.bin); full=$(stat -c %s charm-full.bin); update=$(stat -c %s charm-update.bin)
+          echo "app $app bytes, full image $full bytes, update $update bytes"
           test "$full" -ge $(( 0x20000 + app ))
+          test "$update" -ge $(( 0x20000 - 0xe000 + app ))
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: charm-firmware
-          path: charm/build/charm-full.bin
+          path: |
+            charm/build/charm-full.bin
+            charm/build/charm-update.bin
           if-no-files-found: error
       # The bucket is made on first use; a version the charm runs already is
       # one she downloads only the first bytes of.

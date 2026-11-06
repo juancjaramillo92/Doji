@@ -405,10 +405,26 @@ test('the charm updates from what the workflow publishes, and the image holds th
   assert.match(workflow, /export CHARM_VERSION="[^"]+"\n\s*echo "CHARM_VERSION=\$CHARM_VERSION" >> "\$GITHUB_ENV"/,
     'the version written beside the image is no longer the one the build stamped into it');
 
-  const slot = source('charm/partitions.csv').match(/^ota_0,\s*app,\s*ota_0,\s*(0x[0-9a-f]+),/im);
+  const table = source('charm/partitions.csv');
+  const slot = table.match(/^ota_0,\s*app,\s*ota_0,\s*(0x[0-9a-f]+),/im);
   const checked = workflow.match(/test "\$full" -ge \$\(\( (0x[0-9a-f]+) \+ app \)\)/i);
   assert.ok(slot && checked, 'partitions.csv or charm.yml no longer places the app as this test reads it');
   assert.equal(Number(checked[1]), Number(slot[1]), 'the workflow checks for the app at an offset the partition table does not boot from');
+
+  /* The update a cable writes over a board set up starts at the boot record
+     and holds the app where it boots, and her Wi-Fi and keys lie wholly
+     below it: an update that reached them would be the setup again. */
+  const update = workflow.match(/merge_bin --target-offset (0x[0-9a-f]+) -o charm-update\.bin\s*\\?\s*(0x[0-9a-f]+) ota_data_initial\.bin (0x[0-9a-f]+) charm\.bin/i);
+  const otadata = table.match(/^otadata,\s*data,\s*ota,\s*(0x[0-9a-f]+),/im);
+  const nvs = table.match(/^nvs,\s*data,\s*nvs,\s*(0x[0-9a-f]+),\s*(0x[0-9a-f]+),/im);
+  const sized = workflow.match(/test "\$update" -ge \$\(\( (0x[0-9a-f]+) - (0x[0-9a-f]+) \+ app \)\)/i);
+  assert.ok(update && otadata && nvs && sized, 'charm.yml or partitions.csv no longer places the update as this test reads it');
+  assert.equal(Number(update[1]), Number(otadata[1]), 'the update starts somewhere other than the boot record');
+  assert.equal(Number(update[2]), Number(otadata[1]), 'the update writes its boot record where the partition table does not keep it');
+  assert.equal(Number(update[3]), Number(slot[1]), 'the update writes the app where the bootloader does not boot it');
+  assert.deepEqual([Number(sized[1]), Number(sized[2])], [Number(slot[1]), Number(otadata[1])],
+    'the workflow checks the update against offsets it is not made with');
+  assert.ok(Number(nvs[1]) + Number(nvs[2]) <= Number(update[1]), 'the update writes over her Wi-Fi and keys');
 });
 
 /* ─── The laptop: a third door, and the charm's face ───────────────────────
@@ -1051,7 +1067,10 @@ test('every word on the charm\'s screens is in the font that draws it', () => {
   const say = setup.match(/SAY\[\] = \{([^}]+)\}/);
   assert.ok(say, 'setup.c no longer lists what its screen says');
   assert.match(setup, /"Charm-%02X%02X"/, 'setup.c no longer names her network as this test reads it');
-  for (const words of [...[...say[1].matchAll(/"([^"]+)"/g)].map(w => w[1]), 'Charm-0123456789ABCDEF']) {
+  // And her page's address under the code, an IPv4 address after its word.
+  const open = setup.match(/snprintf\(address, sizeof address, "([^"]+) " IPSTR/);
+  assert.ok(open, 'setup.c no longer writes her page\'s address as this test reads it');
+  for (const words of [...[...say[1].matchAll(/"([^"]+)"/g)].map(w => w[1]), 'Charm-0123456789ABCDEF', `${open[1]} 0123456789.`]) {
     for (const letter of words) assert.ok(held('hanken_18').includes(letter), `hanken_18 cannot draw the ${JSON.stringify(letter)} of ${words}`);
   }
 });

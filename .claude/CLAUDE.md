@@ -532,9 +532,10 @@ What a change most often breaks:
   finds it.
 - **A wall-clock decision waits for `CLOCK_SET`**: before the internet sets it
   the clock reads 1970.
-- **Flash `charm-full.bin`, never `charm.bin`** — the workflow checks the image
-  holds the app at the first slot's offset, and `agree.test.mjs` holds that
-  offset to `partitions.csv`.
+- **Flash `charm-full.bin` at `0x0`, or `charm-update.bin` at `0xe000` over a
+  board set up, never `charm.bin`** — the workflow checks each image holds the
+  app at the first slot's offset, and `agree.test.mjs` holds the offsets to
+  `partitions.csv`, NVS below the update among them.
 
 ## The laptop
 
