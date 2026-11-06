@@ -1169,7 +1169,7 @@ const STRUCTURE_TOOL = {
     "the daily and 4H turns near price; which of those sit at the edge of the week's hourly " +
     "range and which inside it; equal highs and lows still resting, the liquidity pools of his " +
     "step 2; wicks through a turn that closed back; the sessions' ranges; the average daily range; " +
-    "and the last four closed 15m and 5m candles, each with its body, its wicks and the marks it " +
+    "and the last four closed daily, 4H, 15m and 5m candles, each with its body, its wicks and the marks it " +
     "traded through with the side it closed on. Use it before judging his bias or " +
     "his level when he has sent no chart, and before filing a call, whose levels come off it. It is " +
     "your map, computed the same way every time, and not his. Every figure in it has already " +
@@ -3563,8 +3563,10 @@ export function structureList(s: Structure, now = Date.now()): string {
   const shape = (x: Shape) => (x.body ? `${x.body > 0 ? "up" : "down"} ${dollars(x.body)}` : "closed where it opened") +
     `, wicks ${dollars(x.upper)} above and ${dollars(x.lower)} below` +
     (x.through.length ? `; through ${x.through.map(t => `${t.price}, closed ${t.closed} it`).join(", and ")}` : "");
+  // A daily bar is timed by the session it closed, as `higherOf` times its marks.
+  const opened = (p: Period, t: number) => p === 'D_1' ? `the session closing ${when(t + 86_400_000)},` : when(t);
   lines.push(...s.candles.map(c => `The last closed ${name(c.period)} candles, oldest first: ` +
-    c.bars.map((b, i) => `${when(b.t)} open ${b.open}, high ${b.high}, low ${b.low}, close ${b.close} ` +
+    c.bars.map((b, i) => `${opened(c.period, b.t)} open ${b.open}, high ${b.high}, low ${b.low}, close ${b.close} ` +
       `(${shape(c.shapes[i])})`).join("; ") + "."));
   if (s.missing.length) {
     lines.push(`Not read just now: the ${s.missing.map(name).join(", ")}. Say so rather than judging a ` +

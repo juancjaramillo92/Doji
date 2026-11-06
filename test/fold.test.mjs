@@ -1076,10 +1076,12 @@ test('the map reads his level charts in his words, off printed bars only', () =>
   // Over the weekend the newest daily bar has closed, and there is no today.
   const weekend = foldStructure({ D_1: MAP_CHARTS.D_1 }, Date.UTC(2026, 9, 17, 12));
   assert.deepEqual([weekend.adr, weekend.today], [45, null]);
-  // The last CLOSED candles of each entry chart, oldest first, never the one
-  // forming: four 15m, and the two 5m the fixture has closed.
+  // The last CLOSED candles of each chart a pattern is read on, oldest first,
+  // never the one forming: the three days before the 15th, four 15m, and the
+  // two 5m the fixture has closed. No 4H was read, so none is handed over.
   assert.equal(CANDLES, 4);
   assert.deepEqual(map.candles.map(c => [c.period, c.bars.map(b => b.t)]), [
+    ['D_1', [11, 12, 13].map(d => Date.UTC(2026, 9, d, 21))],
     ['M_15', [0, 1, 2, 3].map(i => MAP_HOUR - HOUR + i * HOUR / 4)],
     ['M_5', [MAP_HOUR - 5 * 60_000, MAP_HOUR]],
   ]);
@@ -1154,6 +1156,8 @@ test('the map is said as hers, with every price timed and nothing about what com
   assert.match(out, /averaged \$50 over the last 14 sessions; this session has covered \$30 so far\./);
   assert.match(out, /The last closed 5m candles, oldest first: 09:55 ET open 4025, high 4027, low 4023, close 4025 \(closed where it opened, wicks \$2\.00 above and \$2\.00 below; through 4023, closed above it, and 4025, closed on it\); 10:00 ET open 4026, high 4028, low 4024, close 4026 \(closed where it opened, wicks \$2\.00 above and \$2\.00 below; through 4025, closed above it\)\./);
   assert.match(out, /The last closed 15m candles, oldest first: 09:00 ET open 4026/);
+  assert.match(out, /The last closed daily candles, oldest first: the session closing 17:00 ET Monday 12 Oct, open 4020, high 4040, low 4000, close 4020 \([^)]*\); the session closing 17:00 ET Tuesday 13 Oct,/,
+    'a daily candle is timed by the 17:00 roll it opened at rather than the session it closed');
   assert.match(out, /· 4023 — equal lows, on the 30m, touched 05:00 ET, 07:30 ET/);
   assert.match(structureList({ ...foldStructure(MAP_CHARTS, MAP_NOW), pools: [] }, MAP_NOW),
     /No equal highs or lows still rest within \$60\./);
