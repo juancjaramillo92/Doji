@@ -2465,7 +2465,7 @@ test('PWR cuts her off while she thinks, not at the next beat', () => {
 /* Nothing joins again once the join is done, so a network lost while she
    talks must say so: kept online, every door she knocks at fails with no
    sign and she records turns that go nowhere, where losing it is meant to
-   send her to the lock screen. net.c's handler is the board's, so it is read. */
+   send her to the sleep screen. net.c's handler is the board's, so it is read. */
 test('the charm hears a network it has joined go', () => {
   const net = source('charm/main/net.c');
   const handler = bodyOf(net, 'static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {',

@@ -1,8 +1,10 @@
 /* Updates over Wi-Fi. The charm workflow publishes every build of main to a
-   public Storage bucket, its version the commit it was built from. Once a
-   night she reads the newest image's description, from its first bytes; when
-   the version differs from hers, the rest is written into her other app slot,
-   which she starts from at her next wake. A new app is good only once it has
+   public Storage bucket, its version the commit it was built from and written
+   beside it, which Gladys's door hands her. The day it names one she has not
+   run, or once a night regardless, she reads the newest image's description
+   from its first bytes; when that version is worth fetching (ota_offered),
+   the rest is written into her other app slot, and she wakes into it at once.
+   A new app is good only once it has
    proved itself (main.c's prove): her screen started and drawn on, and her
    Wi-Fi reached. One that never does — that freezes, crashes or never joins —
    is rolled back by the bootloader at the wake after, to the app that was. */

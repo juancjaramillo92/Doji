@@ -442,10 +442,11 @@ alter table public.eugenia_channels enable row level security;
 
 -- ═══ Her senses ═════════════════════════════════════════════════════════
 
--- Her meters, her calendar, the running story, her open threads, his taps
--- under a briefing, the price mark, trigram search over her memory, the
--- trigger that tells her a position closed, and the three tables the app's
--- card may read.
+-- Her meters, her calendar, the market read ahead, the running story and the
+-- portrait with what each replaced, her record, her calls, what gold did on
+-- each print, what each briefing was handed, her open threads, his taps under
+-- a briefing, trigram search over her memory, the trigger that tells her a
+-- position closed, and the three tables the app's card may read.
 
 -- ─── What each call cost ───────────────────────────────────────────────────
 -- One row per model call, plus rows for a delivered briefing, the gates'

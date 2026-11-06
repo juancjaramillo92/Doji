@@ -8,7 +8,7 @@
 -- what a fresh apply builds. Run the whole file by hand, then schema.sql.
 --
 -- Every statement is guarded, so a second run changes nothing. test/db applies
--- this file between main's schema.sql and this one and compares the result with
+-- this file between main's schema.sql and the branch's and compares the result with
 -- a fresh build, which is what proves it.
 -- ═══════════════════════════════════════════════════════════════════════════
 

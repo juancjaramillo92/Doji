@@ -64,8 +64,8 @@ jobs:
       # of them cannot silently fall behind the others.
       #
       # --no-verify-jwt repeats config.toml on purpose: if either stopped being
-      # honoured, JWT verification back on would break the webhooks and the
-      # poller at once. Two statements of one setting is the cheaper mistake.
+      # honoured, JWT verification back on would break the webhooks, the
+      # devices' doors and the poller at once. Two statements of one setting is the cheaper mistake.
       #
       # --yes, because the CLI now asks before deploying and, with no terminal
       # to ask on, deploys nothing and fails — the price of `latest` above.

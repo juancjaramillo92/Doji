@@ -78,6 +78,7 @@ charm/                                  firmware for the charm — see The charm
   main/frames.c                         her answer, read out of its frames
   main/sleep.c                          deep sleep, and what wakes her
   main/briefing.c                       when Eugenia wakes to ask for the briefing
+  main/errand.c                         how long she sleeps between errands, and the weekend's quiet
   main/gladys.c                         Gladys's door: what waits, and his answers
   main/journal.c                        the journal's questions, a screen each
   main/dial.c                           the volume, a finger round the rim
@@ -85,6 +86,7 @@ charm/                                  firmware for the charm — see The charm
   main/motion.c                         the motion sensor, armed to wake her
   main/lift.c                           whether a lift was him looking
   main/ota.c                            her updates over Wi-Fi, from main
+  main/palette.h                        Doji's colours, copied for the charm and her setup page
   main/hanken_64.c                      Doji's typeface for the journal's words; _16, _18, _36 the rest
   art/HankenGrotesk.ttf                 that typeface, with its licence beside it
   art/eugenia.png                       a render; art/eugenia.rgb565 the bytes drawn
@@ -114,6 +116,7 @@ package-lock.json                       committed — see Tests
 charm/.gitignore                        ESP-IDF's build output and fetched components
 laptop/                                 Eugenia on the Mac — see The laptop
   main.mjs                              the window, the keys, the menu, her door and Gladys's, the chart, the update
+  face.html                             the page her face is drawn on
   face.mjs                              her face and body, the line over her head, his microphone, her voice, the journal's screens
   journal.mjs                           Gladys's journal: the four answers, the question asked first, a tap's grammar
   frames.mjs                            her answer, read out of its frames, and the queue her voice plays from
@@ -158,28 +161,36 @@ it.
              │                       │     Doji     │
              ▼                       │  index.html  │
       ┌──────────────┐               └──────────────┘
-      │    Gladys    │   a tap writes setup and the three
-      │ doji-gladys  │   discipline answers back to trades
-      │ one message  │
-      │  per trade   │
-      └──────────────┘
+      │    Gladys    │   a tap anywhere writes setup and the
+      │ doji-gladys  │   three discipline answers back to trades
+      └──────┬───────┘
+             │ the four questions, one tap grammar
+       ┌─────┴─────────┬───────────────┐
+       ▼               ▼               ▼
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│   Telegram  │ │  the charm  │ │  the laptop │
+│ a message   │ │ asks what   │ │ asks what   │
+│ at the open │ │ waits, each │ │ waits, each │
+│             │ │ errand      │ │ minute      │
+└─────────────┘ └─────────────┘ └─────────────┘
 ```
 
 **The other half has no write path into any of it.** Eugenia reads the journal
 through `eugenia_trades`, a view granted `select` alone, and writes only tables
 of her own. She is woken by a schedule in pg_cron, a message he sent, typed
-or spoken to his charm, or a trigger on `trades` firing when a position opens
-or closes — never by a clock she keeps herself.
+or spoken to his charm or his laptop, or a trigger on `trades` firing when a
+position opens or closes — never by a clock she keeps herself.
 
 ```
    WHAT WAKES HER                        WHAT SHE IS HANDED OR READS
  ┌─────────────────────────┐        ┌────────────────────────────────────┐
  │ pg_cron   hourly        │        │ eugenia_trades   select only       │
- │           calendar ×4/h │        │ her own tables   8, 7 backed up    │
+ │           calendar ×4/h │        │ her own tables   16, 13 backed up  │
  │                         │        │ strategy.ts      no write path     │
  │ Telegram  he writes     │        │ the web          search and fetch  │
  │ charm     he talks      │        │ the broker's price, via the poller │
- │ trades    closed        │        │ calendar, market   via TradingView │
+ │ laptop    he talks      │        │ calendar, market   via TradingView │
+ │ trades    closed        │        │ his chart        when he shows it  │
  └────────────┬────────────┘        └─────────────────┬──────────────────┘
               └───────────────┬───────────────────────┘
                               ▼
@@ -192,11 +203,16 @@ or closes — never by a clock she keeps herself.
                                │ every composed message is read once
                                │ more — CRITIC for the briefing, TRIM
                                │ for the rest — and only then sent
-                               ▼
-                      ┌──────────────────┐
-                      │     Telegram     │  a voice note, with the
-                      │                  │  text as the fallback
-                      └──────────────────┘
+           ┌───────────────────┼───────────────────┐
+           ▼                   ▼                   ▼
+  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+  │     Telegram    │ │    the charm    │ │    the laptop   │
+  │ a voice note,   │ │ her voice, to   │ │ the same, and   │
+  │ the text as     │ │ what he said    │ │ his chart when  │
+  │ fallback; a copy│ │ into it; the    │ │ he shows it     │
+  │ of each turn on │ │ briefing when   │ │                 │
+  │ the devices     │ │ he asks         │ │                 │
+  └─────────────────┘ └─────────────────┘ └─────────────────┘
 ```
 
 Journal columns and broker columns never meet, so between the two halves there
@@ -329,8 +345,8 @@ exists only at sync time.
 
 ### Journal-owned
 
-Written by the app and by the Telegram bot. Neither broker writer ever sends
-these keys.
+Written by the app and by Gladys, from a tap in Telegram, on the charm or on
+the laptop. Neither broker writer ever sends these keys.
 
 | Column | Meaning |
 |---|---|
@@ -1297,11 +1313,11 @@ while anything does. A `GET` with `x-charm-key: <GLADYS_CHARM_SECRET>` answers
 any of the four answers missing, not deleted, oldest first so they are
 journalled in the order he took them — read newest first under `WAITING_MAX`
 and reversed. The week is the bound: a trade left unjournalled would otherwise
-keep the dot lit for ever. `app` is the newest charm build the workflow
-published, read beside the trades from `APP_VERSION_URL`, for a charm that
-updates the day a build is made — the firmware running now updates only at
-the night's look and does not read it; `null` when it cannot be read within
-`APP_MS`, which costs nothing of the answer. **An answer is a tap in a tap's own grammar** — a `POST` of
+keep the ring lit for ever. `app` is the newest charm build the workflow
+published, read beside the trades from `APP_VERSION_URL`, so the charm
+updates the day a build is made rather than at the night's look; `null` when
+it cannot be read within `APP_MS`, which costs nothing of the answer. **An
+answer is a tap in a tap's own grammar** — a `POST` of
 `{ "data": "PID562780708|sl|1" }` — so `parseCallback` is the one boundary for
 both, and no column but the four is reachable; `[Edit]` and `[Done]` are refused
 with a 400, being the Telegram form's. It answers with what waits next, so the
@@ -3911,7 +3927,8 @@ An errand that finds no network makes the next one later — ten minutes, then
 twenty, then every half hour — since until one answers there is nothing to ask.
 Over the weekend, from an hour after the Friday close (a trade's row can trail
 it) to the Sunday open, nothing new can come in for Gladys, so unless a trade
-already waits — its ring cleared by a journal in Telegram — she asks every half
+already waits — its ring cleared by a journal in Telegram, on the laptop or in
+the app — she asks every half
 hour and wakes at the open. No errand is ever an hour from the last, so the
 night's look for an update keeps its hour, and a lift or a press tries the
 network whenever it comes. She asks Gladys's door
@@ -3972,7 +3989,7 @@ strength when every answer was a yes. An answer her door does not take, the
 network still up, leaves the question where it was to be tapped again — the
 screen not moving on is the sign it was not saved. Whatever ends it — done, a
 minute without a tap, PWR, nothing waiting after all because it was journaled
-in Telegram, the network gone — the journal gives way to the dark: the sleep screen is put
+elsewhere, the network gone — the journal gives way to the dark: the sleep screen is put
 up under it before it leaves. Taps, not swipes: a swipe moves
 the whole screen, which this chip may not draw smoothly. The words are Doji's
 typeface, Hanken Grotesk, made into the charm's four fonts by

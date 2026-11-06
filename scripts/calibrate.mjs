@@ -5,7 +5,7 @@
    reading is a guess until it is held against what he did. For each of his
    newest entries the poller serves the 1H and 30m as they stood the minute he
    clicked, nothing after it (`doji-mcp-sync?entries=1`). This folds her map
-   there under every set of readings in GRID and asks three things:
+   there under every set of readings in GRID and asks four things:
 
    · how far his entry sat from the nearest level on the map;
    · how often that was within NEAR, against how often a level would sit that

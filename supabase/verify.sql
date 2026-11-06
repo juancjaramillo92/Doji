@@ -303,7 +303,7 @@ from (values
    'true'),
 
   -- Named, not counted: four is still four when one is renamed and another
-  -- added. agree.test.mjs reads this list against the numbered SQL.
+  -- added. agree.test.mjs reads this list against schema.sql.
   ('exactly the four triggers on trades',
    (select string_agg(tgname, ',' order by tgname) from pg_trigger
      where tgrelid = to_regclass('public.trades') and not tgisinternal),

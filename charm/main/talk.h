@@ -8,7 +8,7 @@
    door answered — 200 when she did — 0 when he said nothing, and -1 when
    her door could not be reached or her answer was cut off, which a network
    already given up answers before he is recorded. With the network gone,
-   that is left to the lock screen to show; with it up, a -1 shows her
+   that is left to the sleep screen to show; with it up, a -1 shows her
    confused, as does any answer but 200, an encoder that will not start or
    no room to record in, which is 0. */
 int talk(void);

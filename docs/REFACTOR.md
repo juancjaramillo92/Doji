@@ -456,7 +456,7 @@ that read plainer as they are.
 What she does next is decided by the exchange's outcome, not by each call on
 the way to it: `esp_http_client_fetch_headers` failing leaves the status at
 0, and `talk()` shows any answer but 200 as her confused face while the
-network is up, the lock screen once it is gone — a −1 included, and an answer
+network is up, the sleep screen once it is gone — a −1 included, and an answer
 whose stream stopped short of its end, which reads like her last word until
 `esp_http_client_is_complete_data_received` is asked (October 2026: a dropped
 line had been playing as a finished answer). An NVS write that fails costs a
@@ -966,7 +966,7 @@ barely notices; it would add a decoder, its stack, and a frame format to keep.
 **Revisit if:** her voice is heard stuttering on a slow network.
 
 ### R-101 — reconnecting after a network lost mid-conversation
-**Why refused:** a network lost once joined takes her to the lock screen, the
+**Why refused:** a network lost once joined takes her to the sleep screen, the
 no-internet mark saying why, and the next waking joins afresh, the network she
 was last on asked first. Rejoining in place would be a second join path beside
 `net.c`'s, for a drop the next press repairs in a couple of seconds.

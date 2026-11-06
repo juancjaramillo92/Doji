@@ -14,8 +14,8 @@
 // SECURITY CONTRACT
 //   1. Every request presents DOJI_EMAIL_SECRET on x-doji-key — its own
 //      secret, since it is the only one living outside his infrastructure.
-//   2. The body is read — the only function here that reads one — so emailRow
-//      whitelists and type-checks it before any value reaches a request.
+//   2. The body is read, and written to `trades`, so emailRow whitelists and
+//      type-checks it before any value reaches a request.
 //   3. user_id comes from secrets, never from the body.
 //
 // Deploy:  supabase functions deploy doji-email-sync --no-verify-jwt
@@ -95,8 +95,8 @@ const upsert = (row: Record<string, unknown>) =>
    settled P&L this system gets. Retrying something permanent costs a thread
    left visibly in the queue, which is the cheap side.
 
-   Exported because it is the joint between the halves: parse.test.mjs holds
-   the script's side, and this is the function's. */
+   answerFor is exported because it is the joint between the halves:
+   parse.test.mjs holds the script's side, and this is the function's. */
 const PERMANENT = [400, 409, 422];
 
 export const answerFor = (status: number): 400 | 500 =>

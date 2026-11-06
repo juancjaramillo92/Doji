@@ -14,8 +14,9 @@
    read of `eugenia_turns` looks exactly like a complete archive until the day
    it is restored. The loop stops on a short page, not on a count it was told.
 
-   `eugenia_runs` is left out: the cost meter, the largest table, and nothing
-   about him.
+   What is left out is declared beside the test that holds this list, each
+   with its reason: `eugenia_runs` the largest of it, the cost meter, and
+   nothing about him.
 
    Run:  SUPABASE_URL=... SB_SECRET_KEY=... node scripts/backup.mjs > backup.json
    ═══════════════════════════════════════════════════════════════════════════ */

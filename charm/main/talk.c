@@ -2,8 +2,8 @@
    long as he likes and pausing as long as he needs, until he presses it
    again or five minutes are up; the recording is encoded as he speaks, Opus
    in an Ogg file as a Telegram voice note is, and goes to her door with what
-   the charm knows of itself — its battery and its volume — in the headers.
-   The briefing is a GET. What comes back is in frames (frames.h): her raw
+   the charm knows of itself — its battery, the cable and its volume — in the
+   headers. The briefing is a GET, and a waking's report a line of text. What comes back is in frames (frames.h): her raw
    voice, 24 kHz mono, played as it arrives — silence while she thinks, which
    her face shows as thinking, then her voice with her mouth following it —
    and a volume she set, ahead of it. */
@@ -209,7 +209,7 @@ static int knock(const char *url, const uint8_t *ogg, size_t len, void (*lit)(vo
 }
 
 /* Her door failed her while the network is still up: a refusal, an answer
-   broken off, or a door out of reach. With the network gone, the lock screen
+   broken off, or a door out of reach. With the network gone, the sleep screen
    says so instead. */
 static void confused(void) {
     face_set_mode(FACE_CONFUSED);

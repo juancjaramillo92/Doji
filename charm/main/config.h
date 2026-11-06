@@ -1,7 +1,7 @@
 #pragma once
 #include <stdbool.h>
 
-/* Everything the setup page asks for, and the volume her dial sets, kept in
+/* Everything the setup page asks for, and the volume the dial or she sets, kept in
    the chip's own flash (NVS, namespace "charm"). Nothing here is built into
    the firmware, which is why one file installs on both boards. */
 #define MAX_NETS 4

@@ -34,7 +34,7 @@ const MCP_TOKEN = env("CTRADER_MCP_TOKEN");
    Two secrets, because they answer different questions. DOJI_CRON_SECRET asks
    "may this caller start a poll?" and carries no database power: against this
    function a holder can start a read-only poll or read deals back with ?raw=1.
-   (Two other functions take the same secret, where it is not harmless — see
+   (Three other functions take the same secret, where it is not harmless — see
    the README.) SB_SECRET_KEY asks "may this function write?", bypasses RLS and
    never leaves this runtime: the thing scheduled every two minutes is not the
    thing that can write.
@@ -190,8 +190,8 @@ async function mcpCall(session: Record<string, string>, tool: AllowedTool, args:
    Established by probe, because the documentation is silent: get_spot_prices
    serves PIPETTES (441982000 is 4419.82) and get_positions serves DISPLAY
    prices, on the same account and symbol. A price a hundred thousand times
-   wrong still looks like gold, so the scale is named once and applied in one
-   place — the spot read. */
+   wrong still looks like gold, so the scale is named once and applied only to
+   the reads that serve it — the spot read here, and the bars below. */
 export const PIPETTES = 100_000;
 export const fromPipettes = (n: number) => Math.round(n / PIPETTES * 100) / 100;
 

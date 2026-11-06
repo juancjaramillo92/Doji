@@ -104,8 +104,9 @@ order by created desc
 limit 10;
 
 -- ─── Is anything wrong right now? ──────────────────────────────────────────
--- The three monitors in one grid, adding no definition of its own: 009's
--- failures come from dispatch_failures and 010's from pace_line. sync_health
+-- The three monitors in one grid, adding no definition of its own: the
+-- dispatch ledger's failures come from dispatch_failures and the pace's from
+-- pace_line. sync_health
 -- shows the mark and its age, because judging it is healthLine's, in
 -- TypeScript, where a scheduled writer and an occasional one are told apart.
 -- A dispatch whose report is in flight is absent, as dispatch_failures has it.

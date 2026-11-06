@@ -1666,7 +1666,7 @@ Return the briefing itself and nothing else. No preamble, no notes on what you
 changed, no explanation. If it is already right, return it unchanged.`;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// A POSITION JUST OPENED, OR A DAY JUST HIT ITS LIMIT
+// A POSITION JUST CLOSED, AND HIS DAY PAST ITS LIMIT WITH IT
 // ───────────────────────────────────────────────────────────────────────────
 // His own rule, read back at the moment it applies. The prohibitions are
 // restated rather than left to SYSTEM: seconds after a fill is the most
