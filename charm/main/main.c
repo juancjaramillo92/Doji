@@ -33,11 +33,8 @@
    tick when something new does, and in the briefing's hours (briefing.c)
    Eugenia's whether it has landed; when it has, her face lights and she says
    so. The screen is started only when its marks must change: the panel keeps
-   its picture while the chip sleeps, so most errands never touch it. An
-   errand also fetches a new app from main, the day Gladys's door names one
-   or at the night's look (ota.c), and a new app proves itself before its
-   first waking does anything else (prove). Each waking he uses reports
-   itself to her door as she goes back to sleep (report).
+   its picture while the chip sleeps, so most errands never touch it. Once a
+   night an errand also looks for a new app from main (ota.c).
 
    PWR is also the power chip's (power.c): off, a press switches her on, and
    held three seconds she says goodnight and switches off. */

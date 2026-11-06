@@ -6,8 +6,7 @@
    The briefing is a GET. What comes back is in frames (frames.h): her raw
    voice, 24 kHz mono, played as it arrives — silence while she thinks, which
    her face shows as thinking, then her voice with her mouth following it —
-   and a volume she set, ahead of it. The waking's report goes to the same
-   door, on the same connection, as she goes to sleep. */
+   and a volume she set, ahead of it. */
 #include "talk.h"
 
 #include <stdio.h>

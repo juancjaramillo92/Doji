@@ -1184,21 +1184,6 @@ the briefing nothing. A door that sends a review on its own would be the second
 Sunday message he asked to be one; he can ask her for his week.
 **Revisit if:** he asks for the review on a day other than Sunday.
 
-### R-132 — `ota_confirm` inlined into `prove`
-**Why refused:** it only forwards to `esp_ota_mark_app_valid_cancel_rollback`,
-and has one caller since the join stopped confirming. It stays: `ota.h` is
-where an update's lifetime is told — offered, written, unproven, kept — and
-`agree.test.mjs` finds the one place an app is kept by that name.
-**Revisit if:** `ota.c` is folded into `main.c`.
-
-### R-133 — a guard on an empty version in the charm workflow's publish
-**Why refused:** the publish writes `$CHARM_VERSION`, which the build step
-hands it through `GITHUB_ENV`. Were it ever empty, Gladys's door would answer
-an empty `app`, which `ota_offered` refuses, so the cost is the same-day update
-alone: the night's look reads the version out of the image itself. A check for
-a runner failing its own mechanism is padding.
-**Revisit if:** a published `charm/version` is ever found empty.
-
 ### R-134 — the laptop watching for a desktop switch
 **Why refused:** every way it was tried — the app in front through
 `lsappinfo`, the window in front through macOS's on-screen list, the switch as

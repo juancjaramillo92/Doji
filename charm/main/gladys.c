@@ -65,8 +65,8 @@ static bool read_answer(const char *body, trade_t *t) {
 /* A GET when `body` is NULL, else a POST of it. One connection serves the
    whole waking — a journal's every answer is a request, and a new TLS
    handshake costs about a second — so an answer read to its end leaves it
-   ready for the next, and one that is not closes it. One kept from before
-   that her door has closed since is tried once more afresh. */
+   ready for the next, and one that is not closes it. One kept from before that her door has closed since
+   is tried once more afresh. */
 static bool knock(const char *body, trade_t *t) {
     static esp_http_client_handle_t h;
     if (!net_wait(NET_ALL_MS)) return false;

@@ -633,7 +633,7 @@ const gladysCharm = (init = {}) => new Request('https://fn.test/functions/v1/doj
 test('doji-gladys: the charm is told what waits, oldest first, a week back at most', async () => {
   const serve = await serving('doji-gladys');
   respond = (url) => url.includes('/rest/v1/trades?') ? ok([trade('PID2', 1), trade('PID1', 30)])
-    : url.endsWith('/storage/v1/object/public/charm/version') ? Promise.resolve(new Response('3e45d44be481'))
+    : url.endsWith('/storage/v1/object/public/charm/version') ? Promise.resolve(new Response('3e45d44be481\n'))
     : pending();
   const res = await answer(await serve(gladysCharm()));
   assert.equal(res.status, 200);

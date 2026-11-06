@@ -467,7 +467,7 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   boot guard, each guarded where used — `agree.test.mjs` makes that cost
   something.
 - **Everything she writes is spoken, with the text as the fallback**, through
-  `sayAloud`; `agree.test.mjs` reads it and counts the four call sites, and
+  `sayAloud`; `agree.test.mjs` reads it and counts the five call sites, and
   `fold.test.mjs` drives the fallback. There is no length cap and the prompt
   states none; `TTS_LIMIT` is a chunk size. The briefing speaks in a second worker
   (`postSpeak`), stored before the hand-off, falling back to speaking itself.

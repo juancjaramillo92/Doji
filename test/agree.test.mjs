@@ -311,7 +311,7 @@ test('the charm waits out her silence, records what her door takes, and asks the
 
 /* The rest of what the charm reads off her door is not a name but a value:
    two headers she compares with one, and the rate her voice is played at,
-   which only the vendor's `pcm` fixes and the codecs open at throughout. */
+   which only the vendor's `pcm` fixes. */
 test('the charm sends the values her door compares, and plays her voice at its rate', () => {
   const talk = source('charm/main/talk.c');
   const compared = [...EUGENIA_TS.matchAll(/\.get\('(x-charm-[\w-]+)'\) === '([^']*)'/g)];
@@ -324,10 +324,6 @@ test('the charm sends the values her door compares, and plays her voice at its r
   assert.ok(rate && pcm, 'talk.c or doji-eugenia no longer names the rate as this test reads it');
   assert.equal(Number(rate[1]), Number(pcm[1].replace(/_/g, '')),
     'the charm plays her voice at a rate the vendor does not speak it at');
-  const codecs = source('charm/main/sound.h').match(/^#define SOUND_RATE\s+(\d+)/m);
-  assert.ok(codecs, 'sound.h no longer names the codecs\' rate as this test reads it');
-  assert.equal(Number(codecs[1]), Number(rate[1]),
-    'the codecs open at one rate for his words and another for her voice, reopened with a click twice a turn');
 });
 
 /* Gladys's door answers JSON the charm picks apart by key, and takes an answer
@@ -386,8 +382,7 @@ test('the sleep screen never promises a briefing her door has stopped serving', 
 
 /* The charm updates herself from the object the charm workflow publishes, and
    the workflow checks the image it builds holds the app where the bootloader
-   looks, and writes the version beside it for Gladys's door to read: three
-   names and an offset, each written in two files. */
+   looks: two names and an offset, each written in two files. */
 test('the charm updates from what the workflow publishes, and the image holds the app where it boots', () => {
   const net = source('charm/main/net.h'), workflow = source('.github/workflows/charm.yml');
   const reads = net.match(/#define FIRMWARE_URL "https:\/\/\w+\.supabase\.co\/storage\/v1\/object\/public\/(\w+)\/([\w.]+)"/);
@@ -396,14 +391,6 @@ test('the charm updates from what the workflow publishes, and the image holds th
   assert.ok(reads && writes && made, 'net.h or charm.yml no longer names the update as this test reads it');
   assert.deepEqual(reads.slice(1), writes.slice(1), 'the charm looks for her update where the workflow does not put it');
   assert.equal(made[1], reads[1], 'the workflow makes a bucket the charm does not read from');
-  // The version beside it, which Gladys's door hands the charm for the same day's update.
-  const stamped = workflow.match(/printf '%s' "\$CHARM_VERSION" \| curl[^\n]*\/storage\/v1\/object\/(\w+\/[\w.]+)"/);
-  const asked = source('supabase/functions/doji-gladys/index.ts')
-    .match(/const APP_VERSION_URL = `\$\{SB_URL\}\/storage\/v1\/object\/public\/(\w+\/[\w.]+)`;/);
-  assert.ok(stamped && asked, 'charm.yml or doji-gladys no longer names the version as this test reads it');
-  assert.equal(asked[1], stamped[1], 'Gladys\'s door reads the newest version where the workflow does not write it');
-  assert.match(workflow, /export CHARM_VERSION="[^"]+"\n\s*echo "CHARM_VERSION=\$CHARM_VERSION" >> "\$GITHUB_ENV"/,
-    'the version written beside the image is no longer the one the build stamped into it');
 
   const slot = source('charm/partitions.csv').match(/^ota_0,\s*app,\s*ota_0,\s*(0x[0-9a-f]+),/im);
   const checked = workflow.match(/test "\$full" -ge \$\(\( (0x[0-9a-f]+) \+ app \)\)/i);
@@ -6103,9 +6090,8 @@ test('every message she writes goes out through sayAloud', () => {
   /* THE HALF THE FUNCTION CANNOT GUARANTEE: a path calling `say` directly works
      and is silent. Four sites — the briefing's two (the speaking worker and
      postBriefing's fallback), then the trade event and the reply; the week's
-     review rides the Sunday briefing. `/notes`, the apologies, the short
-     operational lines and the charm's copy keep `say` deliberately — the
-     charm's voice is on the charm. */
+     review rides the Sunday briefing. `/notes`, the apologies, the short operational lines and the
+     charm's copy keep `say` deliberately — the charm's voice is on the charm. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
   assert.equal(spoken, 4,

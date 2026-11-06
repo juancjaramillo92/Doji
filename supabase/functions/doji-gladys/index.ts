@@ -354,27 +354,31 @@ async function handleTap(req: Request): Promise<Response> {
 const WAITING_DAYS = 7;
 const WAITING_MAX = 20;
 
-/* With it, the newest app the charm workflow published, as the version it
-   writes beside the image: the charm asks this door every few minutes, so an
-   update reaches her that day rather than at the night's look. Read beside
-   the trades, and null when it cannot be read in APP_MS, which costs only the
-   early update, never the answer. */
+async function waiting(): Promise<Response> {
+  const since = new Date(Date.now() - WAITING_DAYS * 86_400_000).toISOString();
+  const res = await fetch(`${SB_URL}/rest/v1/trades?select=${SELECT}&deleted=is.false` +
+    `&entry_time=gte.${encodeURIComponent(since)}` +
+    `&or=(setup.is.null,followed_rules.is.null,followed_sl.is.null,followed_tp.is.null)` +
+    `&order=entry_time.desc&limit=${WAITING_MAX}`, { headers: sbHeaders() });
+  if (!res.ok) throw new Error(`Read failed (HTTP ${res.status}): ${await res.text()}`);
+  const rows: Row[] = (await res.json()).reverse();
+  return json({ ok: true, waiting: rows.length, trade: rows[0] ?? null, app: await newestApp() });
+}
+
+/* The newest app the charm workflow published, as the version it writes beside
+   the image: the charm asks this door every few minutes, so an update reaches
+   her that day rather than at the night's look. Null when it cannot be read
+   in APP_MS, which costs only the early update, never the answer. */
 const APP_VERSION_URL = `${SB_URL}/storage/v1/object/public/charm/version`;
 const APP_MS = 3000;
 
-async function waiting(): Promise<Response> {
-  const since = new Date(Date.now() - WAITING_DAYS * 86_400_000).toISOString();
-  const [res, app] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/trades?select=${SELECT}&deleted=is.false` +
-      `&entry_time=gte.${encodeURIComponent(since)}` +
-      `&or=(setup.is.null,followed_rules.is.null,followed_sl.is.null,followed_tp.is.null)` +
-      `&order=entry_time.desc&limit=${WAITING_MAX}`, { headers: sbHeaders() }),
-    fetch(APP_VERSION_URL, { signal: AbortSignal.timeout(APP_MS) })
-      .then(read => read.ok ? read.text() : null).catch(() => null),
-  ]);
-  if (!res.ok) throw new Error(`Read failed (HTTP ${res.status}): ${await res.text()}`);
-  const rows: Row[] = (await res.json()).reverse();
-  return json({ ok: true, waiting: rows.length, trade: rows[0] ?? null, app });
+async function newestApp(): Promise<string | null> {
+  try {
+    const res = await fetch(APP_VERSION_URL, { signal: AbortSignal.timeout(APP_MS) });
+    return res.ok ? (await res.text()).trim() || null : null;
+  } catch {
+    return null;
+  }
 }
 
 // Answers only: [Edit] and [Done] belong to the Telegram form. Answered with
