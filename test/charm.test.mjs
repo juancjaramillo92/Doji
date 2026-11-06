@@ -17,7 +17,7 @@ import { nyDate, marketOpen } from '../supabase/functions/_shared/edge.ts';
 const MAIN = 'charm/main';
 
 // Questions on stdin, one answer a line: `due <epoch>`, `announce <epoch>`,
-// `stirred <six readings in g>`, `lift <six readings in g>`, `hold <six readings in g>`, `dns <a message in
+// `lift <six readings in g>`, `hold <six readings in g>`, `dns <a message in
 // hex>` (- for no answer), `ogg <room> <packet sizes…> 0` (the file in hex, or
 // - when a packet did not fit), `frames <read size> <a stream in hex>` (the
 // volume, -1 for none, then each sample), `wait <epoch> <charging> <trade>
@@ -50,8 +50,6 @@ int main(int argc, char **argv) {
             printf("%d\\n", errand_wait((time_t)t, charging, trade, away));
         if (!strcmp(op, "announce") && scanf("%lld", &t) == 1) { briefing_announced((time_t)t); printf("ok\\n"); }
         if (!strcmp(op, "today") && scanf("%lld", &t) == 1) printf("%d\\n", briefing_today((time_t)t));
-        if (!strcmp(op, "stirred") && scanf("%f %f %f %f %f %f", a, a + 1, a + 2, b, b + 1, b + 2) == 6)
-            printf("%d\\n", lift_stirred(a, b));
         if (!strcmp(op, "lift") && scanf("%f %f %f %f %f %f", a, a + 1, a + 2, b, b + 1, b + 2) == 6)
             printf("%d\\n", lift_seen(a, b));
         if (!strcmp(op, "hold") && scanf("%f %f %f %f %f %f", a, a + 1, a + 2, b, b + 1, b + 2) == 6)
@@ -98,6 +96,9 @@ const zone = readFileSync(`${MAIN}/net.c`, 'utf8').match(/#define NEW_YORK "([^"
 function charm(questions) {
   const dir = mkdtempSync(join(tmpdir(), 'charm-'));
   try {
+    // RTC_DATA_ATTR places a variable in the memory deep sleep keeps; on a
+    // computer it is an ordinary one.
+    writeFileSync(join(dir, 'esp_attr.h'), '#define RTC_DATA_ATTR\n');
     writeFileSync(join(dir, 'drive.c'), DRIVER);
     execFileSync('cc', ['-std=c11', '-D_DEFAULT_SOURCE', '-Wall', '-Werror', '-I', dir, '-I', MAIN,
       join(dir, 'drive.c'), `${MAIN}/briefing.c`, `${MAIN}/errand.c`, `${MAIN}/lift.c`, `${MAIN}/dns.c`, `${MAIN}/ogg.c`, `${MAIN}/frames.c`, '-lm', '-o', join(dir, 'drive')]);
@@ -195,16 +196,6 @@ test('over the weekend she asks seldom, and wakes for the open', () => {
   assert.ok(quiet.filter(w => w === 1800).length > 400, 'the weekend never came — the walk has gone blind');
   // A clock the internet has not set reads 1970: a Saturday there decides nothing.
   assert.deepEqual(charm([`wait ${epoch(new Date(Date.UTC(1970, 0, 3, 12)))} 0 0 0`]), ['300']);
-});
-
-test('in standby a movement is a hand picking her up, not a table or a pocket carried still', () => {
-  const stirred = (a, b) => `stirred ${[...a, ...b].join(' ')}`;
-  assert.deepEqual(charm([
-    stirred([0, 0.01, 1.0], [0.002, 0.012, 0.998]),   // on a table, the sensor's own noise
-    stirred([0, 0.95, 0.1], [0.02, 0.93, 0.12]),      // upright in a pocket, carried smoothly
-    stirred([0, 0.01, 1.0], [0.05, 0.35, 0.85]),      // picked up off the table
-    stirred([0, 0.1, -0.95], [0.2, 0.3, -0.6]),       // turned over in a hand
-  ]), ['0', '0', '1', '1']);
 });
 
 test('a lift is him looking only when the screen faces up and is held still', () => {

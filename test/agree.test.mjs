@@ -2265,27 +2265,23 @@ test('a low battery leaves the night\'s look for an update to a later errand', (
    other, and the bootloader rolled a good app back at the next wake; confirmed
    at the join alone, an app whose screen froze was kept. So the proof is the
    first thing life() does after the battery's check, before any path sleeps,
-   and the one place a new app is confirmed; and one that could not reach her
-   Wi-Fi restarts into the app that was, since standby never resets her. */
+   and the one place a new app is confirmed. */
 test('the charm keeps a new app only once it has proved itself, before anything sleeps', () => {
   const callers = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n')
     .filter(f => f.endsWith('.c') && /\bota_confirm\(\);/.test(source(f)));
   assert.deepEqual(callers, ['charm/main/main.c'], 'a new app is confirmed somewhere other than its proof, or nowhere');
   const main = source('charm/main/main.c');
   const prove = bodyOf(main, 'static void prove(void) {', 'main.c has no prove()');
-  for (const step of ['esp_task_wdt_add(NULL);', 'light(FACE_DARK);', 'face_draw_dark();', 'esp_task_wdt_delete(NULL);',
-                      'if (!joined) esp_restart();', 'ota_confirm();']) {
+  for (const step of ['esp_task_wdt_add(NULL);', 'light(FACE_DARK);', 'face_draw_dark();', 'esp_task_wdt_delete(NULL);', 'if (joined) ota_confirm();']) {
     assert.ok(prove.includes(step), `prove() no longer does ${step}`);
   }
   assert.ok(prove.indexOf('esp_task_wdt_add(NULL);') < prove.indexOf('light(FACE_DARK);') &&
-            prove.indexOf('esp_task_wdt_delete(NULL);') < prove.indexOf('if (!joined) esp_restart();') &&
-            prove.indexOf('if (!joined) esp_restart();') < prove.indexOf('ota_confirm();'),
-    'the screen is no longer started under the watchdog, or the app is kept before the watchdog stands down, ' +
-    'or kept without her Wi-Fi');
+            prove.indexOf('esp_task_wdt_delete(NULL);') < prove.indexOf('if (joined) ota_confirm();'),
+    'the screen is no longer started under the watchdog, or the app is kept before the watchdog stands down');
   const life = bodyOf(main, 'static void life(void *arg) {', 'main.c has no life()');
   const proved = life.indexOf('if (ota_unproven()) prove();');
   assert.ok(proved > life.indexOf('power_off();') && proved > -1, 'life() proves a new app before the battery is judged, or not at all');
-  for (const sleeps of ['standby();', 'errand();', 'awake();']) {
+  for (const sleeps of ['sleep_until(', 'errand();', 'awake();']) {
     assert.ok(life.indexOf(sleeps) > proved, `life() reaches ${sleeps} before a new app is proved`);
   }
 });
@@ -2332,29 +2328,8 @@ test('the charm asks a network that is there again until its time is up', () => 
   const loop = attempt.match(/while \(\(gone = xTaskGetTickCount\(\) - start\) < span\) \{([^}]*)\}/);
   assert.ok(loop, 'attempt() asks once, so one handshake unanswered gives up the waking');
   assert.match(loop[1], /esp_wifi_connect\(\);/, 'attempt() loops without asking again');
-  assert.match(loop[1], /if \(got & STOPPING \|\| !\(got & REFUSED\) \|\| refusal == WIFI_REASON_NO_AP_FOUND\) break;/,
-    'attempt() ends early on a refusal from a network that is there, or keeps asking one that is not, ' +
-    'or keeps asking with the radio going off');
-});
-
-/* Standby turns the radio off, and a join still trying would go on asking a
-   radio that is gone, to start again beside the next waking's. So the radio
-   goes off only once the join has given up where it was, and a join given up
-   for standby forgets nothing — the network she was last on is still the one
-   to ask first. net.c is the board's, so it is read. */
-test('the charm\'s radio goes off for standby only once its join has stopped', () => {
-  const net = source('charm/main/net.c');
-  const stop = bodyOf(net, 'void net_stop(void) {', 'net.c has no net_stop()');
-  const said = stop.indexOf('xEventGroupSetBits(events, STOPPING);');
-  const waited = stop.indexOf('while (xEventGroupGetBits(events) & JOINING) vTaskDelay(pdMS_TO_TICKS(10));');
-  const off = stop.indexOf('esp_wifi_stop();');
-  assert.ok(said > -1 && said < waited && waited < off,
-    'net_stop() turns the radio off before the join has given up, which goes on asking a radio that is gone');
-  const join = bodyOf(net, 'static void join(void *arg) {', 'net.c has no join()');
-  assert.match(join, /if \(!joined && !stopping\(\)\) \{\s*last\.ssid\[0\] = 0;/,
-    'a join given up for standby forgets the network she was last on, so the next waking scans for it');
-  assert.match(join, /xEventGroupClearBits\(events, JOINING\);\s*vTaskDelete\(NULL\);\s*$/,
-    'join() can end without saying so, and net_stop() waits on it for ever');
+  assert.match(loop[1], /if \(!\(got & REFUSED\) \|\| refusal == WIFI_REASON_NO_AP_FOUND\) break;/,
+    'attempt() ends early on a refusal from a network that is there, or keeps asking one that is not');
 });
 
 /* A dropped line ends a read exactly as her last word does, so an answer is
@@ -2388,27 +2363,19 @@ test('every mark on the sleep screen but the ring wanders', () => {
   assert.match(night, /int top = 62 \+ shift\[1\];/, 'the battery and the no-internet mark no longer wander');
 });
 
-/* Standby is light sleep, entered from a task with an internal stack, since
-   her own is in PSRAM, read through the cache light sleep suspends. The
-   sleeper says it has woken through a semaphore: a notification to her task
-   is a press of PWR, and one waiting before she slept would end the wait with
-   the chip still going down. A press she made while awake for a check comes
-   back as one, and the press that woke her is no tap on its release. main.c
-   and sleep.c are the board's, so they are read. */
-test('standby sleeps from its own task, and every press of PWR is one press', () => {
-  const sleep = source('charm/main/sleep.c');
-  assert.match(bodyOf(sleep, 'static void enter(void *arg) {', 'sleep.c has no enter()'),
-    /esp_light_sleep_start\(\);\s*xSemaphoreGive\(woken\);/, 'the sleeper no longer says it has woken, or says it as a notification');
-  const light = bodyOf(sleep, 'slept_t sleep_light(int64_t ms) {', 'sleep.c has no sleep_light()');
-  assert.match(light, /static StackType_t stack\[STACK\];/, 'the sleeper\'s stack is no longer its own, in internal RAM');
-  assert.match(light, /xTaskNotifyGive\(sleeper\);\s*xSemaphoreTake\(woken, portMAX_DELAY\);/,
-    'her task waits for the sleeper on something a press of PWR also gives');
-  const standby = bodyOf(source('charm/main/main.c'), 'static wake_t standby(void) {', 'main.c has no standby()');
-  assert.ok(standby.indexOf('if (ulTaskNotifyTake(pdTRUE, 0)) return WAKE_PRESS;') > -1 &&
-            standby.indexOf('if (ulTaskNotifyTake(pdTRUE, 0)) return WAKE_PRESS;') < standby.indexOf('sleep_light('),
-    'a press made while she was awake for a check is lost, or waits for the next one');
-  assert.match(standby, /if \(slept == SLEPT_PRESS\) \{\s*power_woke\(\);\s*return WAKE_PRESS;/,
-    'the press that wakes her from standby is taken as a tap too, and ends the turn it began');
+/* With no marks the sleep screen is all black, and the panel kept running to
+   show it through every sleep. It is held in reset instead: the same black,
+   and the screen's next start resets it anyway. sleep_now() and sleep.c are
+   the board's, so they are read. */
+test('an empty sleep screen is the panel held in reset, not drawn', () => {
+  const now = bodyOf(source('charm/main/main.c'), 'static void sleep_now(void) {');
+  const empty = now.match(/if \(marks == face_marks\(false, false, false, false, -1\)\) \{([^}]*)\} else \{([^}]*)\}/);
+  assert.ok(empty, 'sleep_now() no longer tells an empty sleep screen apart');
+  assert.match(empty[1], /^\s*sleep_blank\(\);\s*$/, 'an empty sleep screen does more than hold the panel in reset');
+  assert.match(empty[2], /light\(FACE_DARK\)/, 'marks are no longer drawn');
+  const blank = bodyOf(source('charm/main/sleep.c'), 'void sleep_blank(void) {', 'sleep.c has no sleep_blank()');
+  assert.match(blank, /gpio_set_level\(BSP_LCD_RST, 0\);/, 'sleep_blank() no longer puts the panel in reset');
+  assert.match(source('charm/main/sleep.c'), /HELD\[\] = \{[^}]*BSP_LCD_RST/, 'the panel\'s reset is no longer held through sleep');
 });
 
 /* The charm reads her voice as fast as it plays it, so a budget over the
@@ -2454,24 +2421,26 @@ test('a battery too low for her radio switches her off rather than waking her ag
     'power_off() no longer switches the board off through the power chip');
 });
 
-/* The codecs are powered by the board, not the chip, so sleep alone left
+/* The codecs are powered by the board, not the chip, so deep sleep alone left
    them biased — microphones, converters and the speaker's amplifier — from
-   the first waking on; and the radio left on through standby is a radio
-   asked for nothing. sleep_now() is the one way into standby, and closes
-   both first; the update's restart closes the codecs, the one thing a
-   restart leaves on. */
-test('the charm switches her speaker, microphones and radio off before every standby', () => {
+   the first waking on. Every sleep that can follow sound closes them first;
+   life()'s sleeps come before any sound starts. */
+test('the charm switches her speaker and microphones off before every sleep', () => {
   const main = source('charm/main/main.c');
-  const jumps = [...main.matchAll(/^static void (\w+)\(void(?: \*arg)?\) \{$/gm)].map(m => m[1])
-    .filter(name => bodyOf(main, `static void ${name}(`).includes('longjmp('));
-  assert.deepEqual(jumps, ['sleep_now'], 'something other than sleep_now() ends a waking');
-  const now = bodyOf(main, 'static void sleep_now(void) {');
-  const jump = now.indexOf('longjmp(waking, 1);');
-  assert.ok(now.indexOf('sound_stop();') > -1 && now.indexOf('sound_stop();') < jump &&
-            now.indexOf('net_stop();') > -1 && now.indexOf('net_stop();') < jump,
-    'sleep_now() goes to standby with the codecs or the radio still on');
-  const restart = bodyOf(main, 'static void errand(void) {').match(/updated = UPDATED;\s*sound_stop\(\);\s*esp_restart\(\);/);
-  assert.ok(restart, 'the update restarts her with the codecs still open, or without marking the restart as its own');
+  const sleepers = [...main.matchAll(/^static void (\w+)\(void(?: \*arg)?\) \{$/gm)].map(m => m[1])
+    .filter(name => bodyOf(main, `static void ${name}(`).includes('sleep_until('));
+  assert.deepEqual(sleepers.sort(), ['errand', 'life', 'sleep_now'], 'main.c sleeps from a function this test does not judge');
+  const life = bodyOf(main, 'static void life(');
+  assert.ok(!/sound_start|errand_at = time\(NULL\) \+/.test(life.slice(0, life.lastIndexOf('sleep_until('))),
+    'life() starts sound before one of its sleeps, which would leave the codecs on');
+  for (const name of ['sleep_now', 'errand']) {
+    const body = bodyOf(main, `static void ${name}(`);
+    for (const at of [...body.matchAll(/sleep_until\(/g)].map(m => m.index)) {
+      const before = body.slice(0, at);
+      assert.ok(before.lastIndexOf('sound_stop();') > before.lastIndexOf('{'),
+        `${name}() sleeps with the codecs still open`);
+    }
+  }
 });
 
 /* While she thinks, nothing arrives but a beat of silence every BEAT_MS, and

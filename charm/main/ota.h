@@ -17,8 +17,8 @@ bool ota_update(void);
    roll back again at every errand. Asks nothing of the network. */
 bool ota_offered(const char *version);
 
-/* A new app not yet proved: any reset before ota_confirm has the bootloader
-   start the app that was. */
+/* A new app not yet proved: any reset before ota_confirm, deep sleep included,
+   has the bootloader start the app that was. */
 bool ota_unproven(void);
 
 // The app she runs is good, and stays.

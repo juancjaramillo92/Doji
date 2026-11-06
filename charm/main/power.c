@@ -41,7 +41,6 @@ static const char *TAG = "power";
 #define LOW_PERCENT   15
 
 static i2c_master_dev_handle_t chip;
-static volatile bool waking;  // PWR held now is the press that woke her
 
 static uint8_t get(uint8_t reg) {
     uint8_t v = 0;
@@ -58,7 +57,7 @@ static void watch(void *arg) {
     TaskHandle_t talker = arg;
     // The press that woke her is answered by main.c, which listens at once;
     // only its hold still counts, toward switching off.
-    waking = gpio_get_level(PWR_PIN);
+    bool waking = gpio_get_level(PWR_PIN);
     int pwr_held = 0, boot_held = 0;
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
@@ -97,10 +96,6 @@ void power_start(TaskHandle_t talker) {
     gpio_config_t buttons = { .pin_bit_mask = 1ULL << PWR_PIN | 1ULL << BOOT_PIN, .mode = GPIO_MODE_INPUT };
     gpio_config(&buttons);
     xTaskCreate(watch, "power", 3072, talker, 3, NULL);
-}
-
-void power_woke(void) {
-    waking = true;
 }
 
 void power_off(void) {
