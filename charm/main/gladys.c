@@ -36,9 +36,6 @@ static const struct { const char *key, *column; } ANSWERS[4] = {
 };
 static const char *const SETUPS[2] = { "Break & Retest", "Support & Resistance" };
 
-// The newest app the workflow published, as her door last said; empty when it did not.
-static char newest[32];
-
 #define READ_MS    15000
 
 static bool read_answer(const char *body, trade_t *t) {
@@ -46,8 +43,6 @@ static bool read_answer(const char *body, trade_t *t) {
     const cJSON *waiting = cJSON_GetObjectItem(root, "waiting");
     const cJSON *trade = cJSON_GetObjectItem(root, "trade");
     bool ok = cJSON_IsNumber(waiting);
-    const cJSON *app = cJSON_GetObjectItem(root, "app");
-    snprintf(newest, sizeof newest, "%s", cJSON_IsString(app) ? app->valuestring : "");
     if (ok) {
         t->waiting = waiting->valueint;
         const cJSON *id = cJSON_GetObjectItem(trade, "id");
@@ -65,8 +60,8 @@ static bool read_answer(const char *body, trade_t *t) {
 /* A GET when `body` is NULL, else a POST of it. One connection serves the
    whole waking — a journal's every answer is a request, and a new TLS
    handshake costs about a second — so an answer read to its end leaves it
-   ready for the next, and one that is not closes it. One kept from before
-   that her door has closed since is tried once more afresh. */
+   ready for the next, and one that is not closes it. One kept from before that her door has closed since
+   is tried once more afresh. */
 static bool knock(const char *body, trade_t *t) {
     static esp_http_client_handle_t h;
     if (!net_wait(NET_ALL_MS)) return false;
@@ -107,8 +102,6 @@ static bool knock(const char *body, trade_t *t) {
     got[have] = 0;
     return status == 200 && read_answer(got, t);
 }
-
-const char *gladys_app(void) { return newest; }
 
 int gladys_check(void) {
     trade_t t;

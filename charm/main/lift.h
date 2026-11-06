@@ -1,14 +1,10 @@
 #pragma once
 #include <stdbool.h>
 
-/* In standby, two readings a fifth of a second apart, in g along the motion
-   sensor's three axes: whether she was moved between them, and so may be
-   being lifted. Pure, as everything here is, so a test compiles it. */
-bool lift_stirred(const float before[3], const float now[3]);
-
-/* Whether a lift is him looking: two readings a moment apart, the screen
-   tilted up toward him in both and held still between them. A swing on a
-   keyring or a bump in a pocket is not. */
+/* Whether a lift is him looking: two readings of the motion sensor a moment
+   apart, in g along its three axes, the screen tilted up toward him in both
+   and held still between them. A swing on a keyring or a bump in a pocket is
+   not. Pure, so a test compiles it on its own. */
 bool lift_seen(const float first[3], const float second[3]);
 
 /* Awake, two readings about a second apart: whether he is holding her up to

@@ -1184,21 +1184,6 @@ the briefing nothing. A door that sends a review on its own would be the second
 Sunday message he asked to be one; he can ask her for his week.
 **Revisit if:** he asks for the review on a day other than Sunday.
 
-### R-132 — `ota_confirm` inlined into `prove`
-**Why refused:** it only forwards to `esp_ota_mark_app_valid_cancel_rollback`,
-and has one caller since the join stopped confirming. It stays: `ota.h` is
-where an update's lifetime is told — offered, written, unproven, kept — and
-`agree.test.mjs` finds the one place an app is kept by that name.
-**Revisit if:** `ota.c` is folded into `main.c`.
-
-### R-133 — a guard on an empty version in the charm workflow's publish
-**Why refused:** the publish writes `$CHARM_VERSION`, which the build step
-hands it through `GITHUB_ENV`. Were it ever empty, Gladys's door would answer
-an empty `app`, which `ota_offered` refuses, so the cost is the same-day update
-alone: the night's look reads the version out of the image itself. A check for
-a runner failing its own mechanism is padding.
-**Revisit if:** a published `charm/version` is ever found empty.
-
 ### R-134 — the laptop watching for a desktop switch
 **Why refused:** every way it was tried — the app in front through
 `lsappinfo`, the window in front through macOS's on-screen list, the switch as
@@ -1258,24 +1243,6 @@ job, it drifts from the app it drives. Each change that needs it builds it,
 and compares main with the change.
 **Revisit if:** the page's sequence moves into a pure module a suite can
 drive without a clock, as the queue's did.
-
-### R-143 — the panel asleep under an empty sleep screen in standby
-**Deferred.** Before standby, a sleep screen with no marks held the panel in
-reset, the same black without the panel running. Standby keeps the screen
-started, and a panel held in reset needs the board package's whole start
-again — the 1.2 s standby exists to skip — so the panel now runs under black.
-Its own sleep command would keep the start and cost a wait at waking that the
-board has not been measured for.
-**Revisit if:** the report's `battery` falls faster in standby than the
-checks and the radio account for.
-
-### R-144 — the motion sensor's interrupt instead of checks five times a second
-**Why refused:** waiting on wake-on-motion would cost nothing between
-movements, but on the board its wake never reached the chip, through every
-change made to its setting blind. A check is one I2C read in a waking of a few
-milliseconds, and depends on nothing that has not been seen to work.
-**Revisit if:** the board is on a bench with a log, to find where the
-interrupt stops.
 
 ### R-140 — open interest beside the speculators' count
 **Why refused, after a trial:** added in October 2026 so he could tell new money

@@ -6,21 +6,19 @@
    The briefing is a GET. What comes back is in frames (frames.h): her raw
    voice, 24 kHz mono, played as it arrives — silence while she thinks, which
    her face shows as thinking, then her voice with her mouth following it —
-   and a volume she set, ahead of it. The waking's report goes to the same
-   door, on the same connection, as she goes to sleep. */
+   and a volume she set, ahead of it. */
 #include "talk.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include "config.h"
+#include "esp_attr.h"
 #include "esp_crt_bundle.h"
 #include "esp_heap_caps.h"
 #include "esp_http_client.h"
 #include "esp_log.h"
 #include "esp_opus_enc.h"
 #include "esp_random.h"
-#include "esp_timer.h"
 #include "face.h"
 #include "frames.h"
 #include "freertos/FreeRTOS.h"
@@ -51,10 +49,8 @@ static const char *TAG = "talk";
 #define READ_MS 30000
 #define CONFUSED_MS 4000
 #define PWR_LOOK_MS 100  // while nothing arrives, how often she looks for PWR
-#define REPORT_MS 5000   // a waking's report is never a reason to stay awake
 
 static TickType_t began;
-static int64_t listened;  // since boot, the first time she listened since it was asked
 static bool spoke, speaking, warned;
 static uint32_t heard_ms;
 
@@ -67,7 +63,7 @@ static int frame_bytes, packet_bytes, filled;
 static ogg_t file;
 
 // The battery line is hers to say once a charge: told, until a cable is in.
-static bool told_low;
+static RTC_DATA_ATTR bool told_low;
 
 // PWR is a notification to this task: it ends his turn or cuts her off.
 static bool tapped(void) { return ulTaskNotifyTake(pdTRUE, 0); }
@@ -142,11 +138,13 @@ static bool play_answer(esp_http_client_handle_t h) {
    about a second of every turn: an answer heard to its end leaves it ready
    for the next, and anything else closes it. One kept from before that her
    door has closed since is tried once more afresh. */
-static esp_http_client_handle_t door(const char *url, esp_http_client_method_t method, int timeout_ms) {
+static int knock(const char *url, const uint8_t *ogg, size_t len, void (*lit)(void)) {
     static esp_http_client_handle_t h;
+    if (!net_wait(NET_ALL_MS)) return -1;
     if (!h) {
         esp_http_client_config_t c = {
             .url = url,
+            .timeout_ms = READ_MS,
             .crt_bundle_attach = esp_crt_bundle_attach,
             // Her voice read in pieces the size of `in`, not the default 512 bytes.
             .buffer_size = 4096,
@@ -155,14 +153,8 @@ static esp_http_client_handle_t door(const char *url, esp_http_client_method_t m
         esp_http_client_set_header(h, "x-charm-key", cfg.eugenia_key);
     }
     esp_http_client_set_url(h, url);
-    esp_http_client_set_method(h, method);
-    esp_http_client_set_timeout_ms(h, timeout_ms);
-    return h;
-}
-
-static int knock(const char *url, const uint8_t *ogg, size_t len, void (*lit)(void)) {
-    if (!net_wait(NET_ALL_MS)) return -1;
-    esp_http_client_handle_t h = door(url, ogg ? HTTP_METHOD_POST : HTTP_METHOD_GET, READ_MS);
+    esp_http_client_set_method(h, ogg ? HTTP_METHOD_POST : HTTP_METHOD_GET);
+    esp_http_client_set_timeout_ms(h, READ_MS);
     bool low = false;
     if (ogg) {
         char battery[8], volume[8];
@@ -245,7 +237,6 @@ int talk(void) {
 
     sound_listen();
     ESP_LOGI(TAG, "listening");
-    if (!listened) listened = esp_timer_get_time();
     face_set_mode(FACE_LISTENING);
     spoke = warned = false;
     heard_ms = 0;
@@ -276,22 +267,4 @@ int talk_briefing(void) {
     if (status != 200 && status != 204 && (status > 0 || net_wait(0))) confused();
     face_set_mode(FACE_IDLE);
     return status;
-}
-
-int64_t talk_listened(void) {
-    int64_t at = listened;
-    listened = 0;
-    return at;
-}
-
-/* The waking's report, filed beside her runs. One try on the kept connection,
-   closed after, since she sleeps next. */
-void talk_report(const char *text) {
-    esp_http_client_handle_t h = door(EUGENIA_DOOR "?report=1", HTTP_METHOD_POST, REPORT_MS);
-    esp_http_client_set_header(h, "Content-Type", "text/plain");
-    int len = (int)strlen(text);
-    if (esp_http_client_open(h, len) == ESP_OK && esp_http_client_write(h, text, len) == len) {
-        esp_http_client_fetch_headers(h);
-    }
-    esp_http_client_close(h);
 }

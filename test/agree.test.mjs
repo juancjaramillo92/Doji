@@ -303,15 +303,11 @@ test('the charm waits out her silence, records what her door takes, and asks the
   const door = BRIEFING_WORDS();
   assert.ok(asked.length, 'talk.c no longer names the briefing as this test reads it');
   for (const word of asked) assert.ok(door.includes(word), `the charm asks ?briefing=${word} and her door answers ${door.join(', ')}`);
-  // The waking's report: the flag the charm sends is the one her door reads.
-  const sent = talk.match(/EUGENIA_DOOR "\?(\w+)=1", HTTP_METHOD_POST/)?.[1];
-  assert.ok(sent && EUGENIA_TS.includes(`searchParams.has("${sent}")`),
-    `the charm files its report under ?${sent}= and her door reads no such flag`);
 });
 
 /* The rest of what the charm reads off her door is not a name but a value:
    two headers she compares with one, and the rate her voice is played at,
-   which only the vendor's `pcm` fixes and the codecs open at throughout. */
+   which only the vendor's `pcm` fixes. */
 test('the charm sends the values her door compares, and plays her voice at its rate', () => {
   const talk = source('charm/main/talk.c');
   const compared = [...EUGENIA_TS.matchAll(/\.get\('(x-charm-[\w-]+)'\) === '([^']*)'/g)];
@@ -324,10 +320,6 @@ test('the charm sends the values her door compares, and plays her voice at its r
   assert.ok(rate && pcm, 'talk.c or doji-eugenia no longer names the rate as this test reads it');
   assert.equal(Number(rate[1]), Number(pcm[1].replace(/_/g, '')),
     'the charm plays her voice at a rate the vendor does not speak it at');
-  const codecs = source('charm/main/sound.h').match(/^#define SOUND_RATE\s+(\d+)/m);
-  assert.ok(codecs, 'sound.h no longer names the codecs\' rate as this test reads it');
-  assert.equal(Number(codecs[1]), Number(rate[1]),
-    'the codecs open at one rate for his words and another for her voice, reopened with a click twice a turn');
 });
 
 /* Gladys's door answers JSON the charm picks apart by key, and takes an answer
@@ -386,8 +378,7 @@ test('the sleep screen never promises a briefing her door has stopped serving', 
 
 /* The charm updates herself from the object the charm workflow publishes, and
    the workflow checks the image it builds holds the app where the bootloader
-   looks, and writes the version beside it for Gladys's door to read: three
-   names and an offset, each written in two files. */
+   looks: two names and an offset, each written in two files. */
 test('the charm updates from what the workflow publishes, and the image holds the app where it boots', () => {
   const net = source('charm/main/net.h'), workflow = source('.github/workflows/charm.yml');
   const reads = net.match(/#define FIRMWARE_URL "https:\/\/\w+\.supabase\.co\/storage\/v1\/object\/public\/(\w+)\/([\w.]+)"/);
@@ -396,14 +387,6 @@ test('the charm updates from what the workflow publishes, and the image holds th
   assert.ok(reads && writes && made, 'net.h or charm.yml no longer names the update as this test reads it');
   assert.deepEqual(reads.slice(1), writes.slice(1), 'the charm looks for her update where the workflow does not put it');
   assert.equal(made[1], reads[1], 'the workflow makes a bucket the charm does not read from');
-  // The version beside it, which Gladys's door hands the charm for the same day's update.
-  const stamped = workflow.match(/printf '%s' "\$CHARM_VERSION" \| curl[^\n]*\/storage\/v1\/object\/(\w+\/[\w.]+)"/);
-  const asked = source('supabase/functions/doji-gladys/index.ts')
-    .match(/const APP_VERSION_URL = `\$\{SB_URL\}\/storage\/v1\/object\/public\/(\w+\/[\w.]+)`;/);
-  assert.ok(stamped && asked, 'charm.yml or doji-gladys no longer names the version as this test reads it');
-  assert.equal(asked[1], stamped[1], 'Gladys\'s door reads the newest version where the workflow does not write it');
-  assert.match(workflow, /export CHARM_VERSION="[^"]+"\n\s*echo "CHARM_VERSION=\$CHARM_VERSION" >> "\$GITHUB_ENV"/,
-    'the version written beside the image is no longer the one the build stamped into it');
 
   const slot = source('charm/partitions.csv').match(/^ota_0,\s*app,\s*ota_0,\s*(0x[0-9a-f]+),/im);
   const checked = workflow.match(/test "\$full" -ge \$\(\( (0x[0-9a-f]+) \+ app \)\)/i);
@@ -626,7 +609,7 @@ test('the laptop draws the charm\'s journal, at its numbers, times and colours',
       /const r = i === q \? 5 : 4;\s*dot\(233 \+ \(i - 1\.5\) \* 22, 34, r, r, missing\[i\] \? INK : ACCENT, !missing\[i\] \|\| i === q \? 1 : 56 \/ 255\);/, 'the dots'],
     [/at\[3\]\[2\] = \{ \{ 203, 237 \}, \{ 223, 257 \}, \{ 263, 209 \} \};[^]*?hypotf\(20, 20\), second = hypotf\(40, 48\)[^]*?l\.width = 9;/,
       /^const TICK = \[\[203, 237\], \[223, 257\], \[263, 209\]\];[^]*?Math\.hypot\(20, 20\), second = Math\.hypot\(40, 48\)[^]*?g\.lineWidth = 9;/m, 'the tick'],
-    [/face_ring\(layer, 231, 8, fminf\(1, t \/ \(float\)SWEEP_MS\), all_yes \? 1 : 0\.55f\);/, /ring\(231, 8, Math\.min\(1, t \/ SWEEP_MS\), allYes \? 1 : 0\.55\);/, 'the ring'],
+    [/face_ring\(layer, 231, 8, fminf\(1, t \/ \(float\)SWEEP_MS\), 0, all_yes \? 1 : 0\.55f\);/, /ring\(231, 8, Math\.min\(1, t \/ SWEEP_MS\), allYes \? 1 : 0\.55\);/, 'the ring'],
     [/l\.color = lv_color_hex\(all_yes \? GLOW : INK\);/, /g\.strokeStyle = allYes \? GLOW : INK;/, 'the tick\'s colour'],
     [/text\(tag, &hanken_16, MUTED, 2\), WORDS\[0\]\)/, /word\(WORDS\[0\], 233, 87, 16, 700, MUTED, 2\);/, 'the tag\'s word'],
     [/word = text\(pill, &hanken_64, INK, 2\);/, /word\(WORDS\[j\.q\], 233, 234, 64, 800, INK, 2\);/, 'the pill\'s word'],
@@ -2251,43 +2234,25 @@ test('the charm keeps the market\'s week the server keeps', () => {
    though the cable went in minutes later. */
 test('a low battery leaves the night\'s look for an update to a later errand', () => {
   const errand = bodyOf(source('charm/main/main.c'), 'static void errand(void) {');
-  assert.match(errand, /if \(!power_low\(\) && \(ota_offered\(gladys_app\(\)\) \|\| ota_due\(time\(NULL\)\)\) && ota_update\(\)\)/,
+  assert.match(errand, /if \(!power_low\(\) && ota_due\(time\(NULL\)\) && ota_update\(\)\)/,
     'the errand asks for an update before the battery, so a low one spends the night\'s look');
   // And ota_due is what marks the night looked.
   assert.match(bodyOf(source('charm/main/ota.c'), 'bool ota_due(time_t now) {'), /looked = day;\s*return true;/,
     'ota_due no longer marks the night as this test reads it');
 });
 
-/* A new app is good once it has proved itself, whichever waking it is: her
-   screen started and drawn on, her Wi-Fi reached, under a watchdog that
-   resets her on a hang, and any reset before the confirmation rolls it back.
-   Confirmed on one path only, a press in the second after an update took the
-   other, and the bootloader rolled a good app back at the next wake; confirmed
-   at the join alone, an app whose screen froze was kept. So the proof is the
-   first thing life() does after the battery's check, before any path sleeps,
-   and the one place a new app is confirmed; and one that could not reach her
-   Wi-Fi restarts into the app that was, since standby never resets her. */
-test('the charm keeps a new app only once it has proved itself, before anything sleeps', () => {
+/* A new app is good once she has reached her Wi-Fi, whichever waking it is:
+   confirmed where every join succeeds, and nowhere else. Confirmed on one
+   path only, a press in the second after an update took the other, and the
+   bootloader rolled a good app back at the next wake. */
+test('the charm keeps a new app wherever she reaches her Wi-Fi', () => {
   const callers = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n')
     .filter(f => f.endsWith('.c') && /\bota_confirm\(\);/.test(source(f)));
-  assert.deepEqual(callers, ['charm/main/main.c'], 'a new app is confirmed somewhere other than its proof, or nowhere');
-  const main = source('charm/main/main.c');
-  const prove = bodyOf(main, 'static void prove(void) {', 'main.c has no prove()');
-  for (const step of ['esp_task_wdt_add(NULL);', 'light(FACE_DARK);', 'face_draw_dark();', 'esp_task_wdt_delete(NULL);',
-                      'if (!joined) esp_restart();', 'ota_confirm();']) {
-    assert.ok(prove.includes(step), `prove() no longer does ${step}`);
-  }
-  assert.ok(prove.indexOf('esp_task_wdt_add(NULL);') < prove.indexOf('light(FACE_DARK);') &&
-            prove.indexOf('esp_task_wdt_delete(NULL);') < prove.indexOf('if (!joined) esp_restart();') &&
-            prove.indexOf('if (!joined) esp_restart();') < prove.indexOf('ota_confirm();'),
-    'the screen is no longer started under the watchdog, or the app is kept before the watchdog stands down, ' +
-    'or kept without her Wi-Fi');
-  const life = bodyOf(main, 'static void life(void *arg) {', 'main.c has no life()');
-  const proved = life.indexOf('if (ota_unproven()) prove();');
-  assert.ok(proved > life.indexOf('power_off();') && proved > -1, 'life() proves a new app before the battery is judged, or not at all');
-  for (const sleeps of ['standby();', 'errand();', 'awake();']) {
-    assert.ok(life.indexOf(sleeps) > proved, `life() reaches ${sleeps} before a new app is proved`);
-  }
+  assert.deepEqual(callers, ['charm/main/net.c'], 'a new app is confirmed somewhere other than where she joins, or nowhere');
+  const join = bodyOf(source('charm/main/net.c'), 'static void join(void *arg) {', 'net.c has no join()');
+  const gaveUp = join.indexOf('xEventGroupSetBits(events, GAVE_UP);');
+  assert.ok(gaveUp > -1 && join.indexOf('ota_confirm();') > gaveUp,
+    'join() confirms the app before it knows she joined');
 });
 
 /* The charm joins a network by waiting for an address or a refusal, and gives
@@ -2332,29 +2297,8 @@ test('the charm asks a network that is there again until its time is up', () => 
   const loop = attempt.match(/while \(\(gone = xTaskGetTickCount\(\) - start\) < span\) \{([^}]*)\}/);
   assert.ok(loop, 'attempt() asks once, so one handshake unanswered gives up the waking');
   assert.match(loop[1], /esp_wifi_connect\(\);/, 'attempt() loops without asking again');
-  assert.match(loop[1], /if \(got & STOPPING \|\| !\(got & REFUSED\) \|\| refusal == WIFI_REASON_NO_AP_FOUND\) break;/,
-    'attempt() ends early on a refusal from a network that is there, or keeps asking one that is not, ' +
-    'or keeps asking with the radio going off');
-});
-
-/* Standby turns the radio off, and a join still trying would go on asking a
-   radio that is gone, to start again beside the next waking's. So the radio
-   goes off only once the join has given up where it was, and a join given up
-   for standby forgets nothing — the network she was last on is still the one
-   to ask first. net.c is the board's, so it is read. */
-test('the charm\'s radio goes off for standby only once its join has stopped', () => {
-  const net = source('charm/main/net.c');
-  const stop = bodyOf(net, 'void net_stop(void) {', 'net.c has no net_stop()');
-  const said = stop.indexOf('xEventGroupSetBits(events, STOPPING);');
-  const waited = stop.indexOf('while (xEventGroupGetBits(events) & JOINING) vTaskDelay(pdMS_TO_TICKS(10));');
-  const off = stop.indexOf('esp_wifi_stop();');
-  assert.ok(said > -1 && said < waited && waited < off,
-    'net_stop() turns the radio off before the join has given up, which goes on asking a radio that is gone');
-  const join = bodyOf(net, 'static void join(void *arg) {', 'net.c has no join()');
-  assert.match(join, /if \(!joined && !stopping\(\)\) \{\s*last\.ssid\[0\] = 0;/,
-    'a join given up for standby forgets the network she was last on, so the next waking scans for it');
-  assert.match(join, /xEventGroupClearBits\(events, JOINING\);\s*vTaskDelete\(NULL\);\s*$/,
-    'join() can end without saying so, and net_stop() waits on it for ever');
+  assert.match(loop[1], /if \(!\(got & REFUSED\) \|\| refusal == WIFI_REASON_NO_AP_FOUND\) break;/,
+    'attempt() ends early on a refusal from a network that is there, or keeps asking one that is not');
 });
 
 /* A dropped line ends a read exactly as her last word does, so an answer is
@@ -2388,27 +2332,19 @@ test('every mark on the sleep screen but the ring wanders', () => {
   assert.match(night, /int top = 62 \+ shift\[1\];/, 'the battery and the no-internet mark no longer wander');
 });
 
-/* Standby is light sleep, entered from a task with an internal stack, since
-   her own is in PSRAM, read through the cache light sleep suspends. The
-   sleeper says it has woken through a semaphore: a notification to her task
-   is a press of PWR, and one waiting before she slept would end the wait with
-   the chip still going down. A press she made while awake for a check comes
-   back as one, and the press that woke her is no tap on its release. main.c
-   and sleep.c are the board's, so they are read. */
-test('standby sleeps from its own task, and every press of PWR is one press', () => {
-  const sleep = source('charm/main/sleep.c');
-  assert.match(bodyOf(sleep, 'static void enter(void *arg) {', 'sleep.c has no enter()'),
-    /esp_light_sleep_start\(\);\s*xSemaphoreGive\(woken\);/, 'the sleeper no longer says it has woken, or says it as a notification');
-  const light = bodyOf(sleep, 'slept_t sleep_light(int64_t ms) {', 'sleep.c has no sleep_light()');
-  assert.match(light, /static StackType_t stack\[STACK\];/, 'the sleeper\'s stack is no longer its own, in internal RAM');
-  assert.match(light, /xTaskNotifyGive\(sleeper\);\s*xSemaphoreTake\(woken, portMAX_DELAY\);/,
-    'her task waits for the sleeper on something a press of PWR also gives');
-  const standby = bodyOf(source('charm/main/main.c'), 'static wake_t standby(void) {', 'main.c has no standby()');
-  assert.ok(standby.indexOf('if (ulTaskNotifyTake(pdTRUE, 0)) return WAKE_PRESS;') > -1 &&
-            standby.indexOf('if (ulTaskNotifyTake(pdTRUE, 0)) return WAKE_PRESS;') < standby.indexOf('sleep_light('),
-    'a press made while she was awake for a check is lost, or waits for the next one');
-  assert.match(standby, /if \(slept == SLEPT_PRESS\) \{\s*power_woke\(\);\s*return WAKE_PRESS;/,
-    'the press that wakes her from standby is taken as a tap too, and ends the turn it began');
+/* With no marks the sleep screen is all black, and the panel kept running to
+   show it through every sleep. It is held in reset instead: the same black,
+   and the screen's next start resets it anyway. sleep_now() and sleep.c are
+   the board's, so they are read. */
+test('an empty sleep screen is the panel held in reset, not drawn', () => {
+  const now = bodyOf(source('charm/main/main.c'), 'static void sleep_now(void) {');
+  const empty = now.match(/if \(marks == face_marks\(false, false, false, false, -1\)\) \{([^}]*)\} else \{([^}]*)\}/);
+  assert.ok(empty, 'sleep_now() no longer tells an empty sleep screen apart');
+  assert.match(empty[1], /^\s*sleep_blank\(\);\s*$/, 'an empty sleep screen does more than hold the panel in reset');
+  assert.match(empty[2], /light\(FACE_DARK\)/, 'marks are no longer drawn');
+  const blank = bodyOf(source('charm/main/sleep.c'), 'void sleep_blank(void) {', 'sleep.c has no sleep_blank()');
+  assert.match(blank, /gpio_set_level\(BSP_LCD_RST, 0\);/, 'sleep_blank() no longer puts the panel in reset');
+  assert.match(source('charm/main/sleep.c'), /HELD\[\] = \{[^}]*BSP_LCD_RST/, 'the panel\'s reset is no longer held through sleep');
 });
 
 /* The charm reads her voice as fast as it plays it, so a budget over the
@@ -2454,24 +2390,26 @@ test('a battery too low for her radio switches her off rather than waking her ag
     'power_off() no longer switches the board off through the power chip');
 });
 
-/* The codecs are powered by the board, not the chip, so sleep alone left
+/* The codecs are powered by the board, not the chip, so deep sleep alone left
    them biased — microphones, converters and the speaker's amplifier — from
-   the first waking on; and the radio left on through standby is a radio
-   asked for nothing. sleep_now() is the one way into standby, and closes
-   both first; the update's restart closes the codecs, the one thing a
-   restart leaves on. */
-test('the charm switches her speaker, microphones and radio off before every standby', () => {
+   the first waking on. Every sleep that can follow sound closes them first;
+   life()'s sleeps come before any sound starts. */
+test('the charm switches her speaker and microphones off before every sleep', () => {
   const main = source('charm/main/main.c');
-  const jumps = [...main.matchAll(/^static void (\w+)\(void(?: \*arg)?\) \{$/gm)].map(m => m[1])
-    .filter(name => bodyOf(main, `static void ${name}(`).includes('longjmp('));
-  assert.deepEqual(jumps, ['sleep_now'], 'something other than sleep_now() ends a waking');
-  const now = bodyOf(main, 'static void sleep_now(void) {');
-  const jump = now.indexOf('longjmp(waking, 1);');
-  assert.ok(now.indexOf('sound_stop();') > -1 && now.indexOf('sound_stop();') < jump &&
-            now.indexOf('net_stop();') > -1 && now.indexOf('net_stop();') < jump,
-    'sleep_now() goes to standby with the codecs or the radio still on');
-  const restart = bodyOf(main, 'static void errand(void) {').match(/updated = UPDATED;\s*sound_stop\(\);\s*esp_restart\(\);/);
-  assert.ok(restart, 'the update restarts her with the codecs still open, or without marking the restart as its own');
+  const sleepers = [...main.matchAll(/^static void (\w+)\(void(?: \*arg)?\) \{$/gm)].map(m => m[1])
+    .filter(name => bodyOf(main, `static void ${name}(`).includes('sleep_until('));
+  assert.deepEqual(sleepers.sort(), ['errand', 'life', 'sleep_now'], 'main.c sleeps from a function this test does not judge');
+  const life = bodyOf(main, 'static void life(');
+  assert.ok(!/sound_start|errand_at = time\(NULL\) \+/.test(life.slice(0, life.lastIndexOf('sleep_until('))),
+    'life() starts sound before one of its sleeps, which would leave the codecs on');
+  for (const name of ['sleep_now', 'errand']) {
+    const body = bodyOf(main, `static void ${name}(`);
+    for (const at of [...body.matchAll(/sleep_until\(/g)].map(m => m.index)) {
+      const before = body.slice(0, at);
+      assert.ok(before.lastIndexOf('sound_stop();') > before.lastIndexOf('{'),
+        `${name}() sleeps with the codecs still open`);
+    }
+  }
 });
 
 /* While she thinks, nothing arrives but a beat of silence every BEAT_MS, and
@@ -6134,9 +6072,8 @@ test('every message she writes goes out through sayAloud', () => {
   /* THE HALF THE FUNCTION CANNOT GUARANTEE: a path calling `say` directly works
      and is silent. Four sites — the briefing's two (the speaking worker and
      postBriefing's fallback), then the trade event and the reply; the week's
-     review rides the Sunday briefing. `/notes`, the apologies, the short
-     operational lines and the charm's copy keep `say` deliberately — the
-     charm's voice is on the charm. */
+     review rides the Sunday briefing. `/notes`, the apologies, the short operational lines and the
+     charm's copy keep `say` deliberately — the charm's voice is on the charm. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
   assert.equal(spoken, 4,

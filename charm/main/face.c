@@ -55,8 +55,8 @@ static volatile float level, hold;
 static volatile bool briefing_waits, trade_waits, low, offline;
 static volatile int charge = -1;
 
-// What is on screen, eased toward what the mode asks for, and what was last painted.
-static struct { float open, gx, gy, mouth, smile, dots, confused, lid; } V = { .open = 0, .smile = 1, .lid = 1 }, painted;
+// What is on screen, eased toward what the mode asks for, and what was last drawn.
+static struct { float open, gx, gy, mouth, smile, dots, confused, lid; } V = { .open = 0, .smile = 1, .lid = 1 }, drawn;
 static float gaze[2];
 static uint32_t next_glance, next_blink, blink_at;
 static bool blinking, ring;
@@ -134,11 +134,10 @@ static void dot(lv_layer_t *layer, float cx, float cy, float rx, float ry,
 static const uint32_t RING[] = { DEEP, ACCENT, GLOW, TEAL, DEEP };
 #define RING_STEPS 36
 
-void face_ring(lv_layer_t *layer, int32_t radius, int32_t width, float part, float opa) {
+void face_ring(lv_layer_t *layer, int32_t radius, int32_t width, float part, float turn, float opa) {
     int steps = (int)ceilf(RING_STEPS * part);
     for (int i = 0; i < steps; i++) {
-        // Wrapped, so a part past a whole turn — a gauge read past 100 — stays inside RING.
-        float at = fmodf((float)i / RING_STEPS, 1.0f) * 4;
+        float at = fmodf((float)i / RING_STEPS + turn, 1.0f) * 4;
         int k = (int)at;
         lv_draw_arc_dsc_t d;
         lv_draw_arc_dsc_init(&d);
@@ -248,7 +247,7 @@ static void draw_face(lv_event_t *e) {
     }
 
     // The ring on the rim while she listens.
-    if (ring) face_ring(layer, 231, 6, 1, 1);
+    if (ring) face_ring(layer, 231, 6, 1, 0, 1);
     if (hold > 0) draw_hold(layer);
 }
 
@@ -296,7 +295,7 @@ static void draw_night(lv_event_t *e) {
         a.radius = 226; a.width = 4; a.start_angle = 0; a.end_angle = 360;
         a.color = lv_color_white(); a.opa = 20;
         lv_draw_arc(layer, &a);
-        face_ring(layer, 226, 4, charge / 100.0f, 1);
+        face_ring(layer, 226, 4, charge / 100.0f, 0, 1);
         static char percent[5];
         snprintf(percent, sizeof percent, "%d%%", charge);
         lv_draw_label_dsc_t t;
@@ -395,11 +394,11 @@ static void tick(lv_timer_t *t) {
     if ((m == FACE_LISTENING) != ring) {
         ring = m == FACE_LISTENING;
         lv_obj_invalidate(lv_screen_active());
-    } else if (memcmp(&V, &painted, sizeof V) || V.dots > 0) {
+    } else if (memcmp(&V, &drawn, sizeof V) || V.dots > 0) {
         static const lv_area_t patches[] = { { 150, 94, 326, 218 }, { 195, 16, 272, 48 } };
         for (size_t i = 0; i < sizeof patches / sizeof *patches; i++) lv_obj_invalidate_area(card, &patches[i]);
     }
-    painted = V;
+    drawn = V;
 }
 
 void face_draw_dark(void) {

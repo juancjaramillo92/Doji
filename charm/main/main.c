@@ -9,59 +9,47 @@
    unless a briefing waits too, when Eugenia comes up from black to read it.
    Otherwise Eugenia wakes, and reads a waiting briefing at once. PWR is the
    talk button (power.c, talk.c): a press and she listens, the next sends; from
-   standby, the press that wakes her has her listening before anything else.
+   sleep, the press that wakes her has her listening before anything else.
    The conversation comes first: a trade that waits, or comes in while they
    talk, is kept for when it is over — never put between her words, nor
    before a waiting briefing, which is read after her answer however she is
    held. Between turns she feels about once a second whether she is held up
    to look, which keeps her awake, or has been put down, which puts her to
    sleep DOWN_MS later; a finger on the screen counts as held; otherwise
-   AWAKE_MS without a press does: her eyes close and she goes to standby.
-   Held up and quiet for QUIET_MS, the conversation is over, and a waiting
-   trade's questions come up from the dark her eyes close to; put down, she
-   sleeps with the trade under its ring. PWR closes the questions for her, the
-   trade waiting again. With no internet when she last looked she stays on her
-   lock screen, its mark saying why, unless the network answers within
-   OFFLINE_TRY_MS; and losing it while they talk sends her back there.
+   AWAKE_MS without a press does: her eyes close and the chip stops (sleep.c). Held up and quiet for
+   QUIET_MS, the conversation is over, and a waiting trade's questions come up
+   from the dark her eyes close to; put down, she sleeps with the trade under
+   its ring. PWR closes the questions for her, the trade waiting again. Lifting her to look wakes her
+   (motion.c), and so do a tap on the screen, PWR and BOOT. With no
+   internet when she last looked she stays on her lock screen, its mark saying
+   why, unless the network answers within OFFLINE_TRY_MS; and losing it while
+   they talk sends her back there. A lift that was not him looking — a swing, a
+   bump — sends her straight back to sleep without lighting the screen, and
+   rests the motion sensor for LIFT_REST_S, so a keyring swinging all day
+   cannot keep waking her.
 
-   Standby is light sleep (sleep.c), never a restart: the chip stops where it
-   is, the screen started and the sleep screen on it, and wakes into the same
-   program, so her face is up the moment she wants it. A tap, PWR and BOOT wake
-   her at once; a lift is found at her next check, every POLL_MS, by asking
-   the motion sensor whether she has moved (motion.c) and watching a movement
-   settle into him looking. One that was not him — a swing, a bump — lights
-   nothing and rests the checks for LIFT_REST_S, so a keyring swinging all day
-   costs little. Each waking ends in sleep_now(), wherever it is, and life()
-   takes the next from standby.
-
-   In standby she wakes on her own every few minutes (errand.c), without
+   Asleep, she wakes on her own every few minutes (errand.c), without
    lighting the screen, to ask Gladys's door what waits, with a soft double
    tick when something new does, and in the briefing's hours (briefing.c)
    Eugenia's whether it has landed; when it has, her face lights and she says
-   so. The sleep screen is redrawn only when its marks change. An errand also
-   fetches a new app from main, the day Gladys's door names one or at the
-   night's look (ota.c), and restarts into it in the dark; a new app proves
-   itself before anything else (prove). Each waking he uses reports itself to
-   her door as she goes back to standby (report).
+   so. The screen is started only when its marks must change: the panel keeps
+   its picture while the chip sleeps, so most errands never touch it. Once a
+   night an errand also looks for a new app from main (ota.c).
 
    PWR is also the power chip's (power.c): off, a press switches her on, and
    held three seconds she says goodnight and switches off. */
 #include "bsp/esp-bsp.h"
 #include "bsp/touch.h"
-#include "esp_app_desc.h"
 #include "esp_attr.h"
 #include "esp_flash.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_psram.h"
+#include "esp_sleep.h"
 #include "esp_system.h"
-#include "esp_task_wdt.h"
-#include "esp_timer.h"
-#include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "lvgl.h"
-#include <setjmp.h>
 
 #include "briefing.h"
 #include "config.h"
@@ -84,11 +72,9 @@ static const char *TAG = "charm";
 #define LIFE_STACK    40960  // bytes
 #define DRAW_ROWS     12     // drawn at a time, twice over: 22 KB of internal RAM
 #define AWAKE_MS      30000
-#define PROVE_MS      60000  // a new app's whole proof, the network's wait included
 #define LAST_FRAME_MS 200    // the sleep screen's last rows reaching the panel, once rendered
-#define POLL_MS       200    // in standby, how often she feels for a lift
-#define LIFT_REST_S   20     // her checks' rest after a movement that was not him
-#define EARLY_S       5      // how early an errand may come
+#define LIFT_REST_S   20     // the motion sensor's rest after a lift that was not him
+#define EARLY_S       5      // how early a timer may wake her and still be the errand's
 #define OFFLINE_TRY_MS 8000  // woken offline, how long the network has to answer
 #define LOOK_MS       1000   // awake and idle, how often she feels whether she is held
 #define DOWN_MS       8000   // put down this long, and nothing playing, she sleeps
@@ -96,34 +82,13 @@ static const char *TAG = "charm";
 
 // What waits, whether the internet answered last time and how many errands
 // running it has not, what the sleep screen last drew, and when the next
-// errand is.
-static bool briefing_waits, trade_waits, offline;
-static int away, drawn = -1;
-static time_t errand_at;
+// errand is; all kept through sleep.
+static RTC_DATA_ATTR bool briefing_waits, trade_waits, offline;
+static RTC_DATA_ATTR int away, drawn = -1;
+static RTC_DATA_ATTR time_t errand_at;
 
-/* What a waking is for, and when it began. Each ends in sleep_now(), which
-   jumps back to life() for the next. */
-typedef enum { WAKE_START, WAKE_PRESS, WAKE_TOUCH, WAKE_LIFT, WAKE_ERRAND } wake_t;
-static wake_t wake;
-static int64_t woke_at;
-static jmp_buf waking;
-
-/* An update restarts her into its app, which then finishes the errand that
-   fetched it, in the dark: marked in the memory a restart does not clear. */
-#define UPDATED 0x55504454
-static RTC_NOINIT_ATTR uint32_t updated;
-
+static esp_sleep_wakeup_cause_t woke;
 static bool lit;
-
-/* The waking's report (report()): when the screen was lit and what internal
-   RAM it left, and whether this waking is one worth a report — he woke her,
-   or a new app proved itself. The lifts are counted in standby, so the ones
-   that were not him, which light nothing and send nothing, are in the next
-   report. */
-static int64_t lit_at;
-static unsigned lit_free, lit_largest;
-static bool reporting;
-static int lifts_seen, lifts_not;
 static volatile uint32_t touches;  // every press and slide on the screen, counted
 
 // A slide round the rim is the volume; a tap on a question is the journal's.
@@ -146,83 +111,58 @@ static void even_area(lv_event_t *e) {
     a->y2 |= 1;
 }
 
-/* The screen in `mode`, started at her first waking and kept through every
-   standby after. It is the board package's bsp_display_start but for where
-   she draws: the package's draws into PSRAM, which the SPI driver will not
-   send from, so it copies each draw into an internal buffer as large as the
-   draw, 46 KB, which a board running Wi-Fi seldom has free. DRAW_ROWS rows at
-   a time in internal RAM are sent as they are. */
+/* The screen, started once, in `mode`. It is the board package's
+   bsp_display_start but for where she draws: the package's draws into PSRAM,
+   which the SPI driver will not send from, so it copies each draw into an
+   internal buffer as large as the draw, 46 KB, which a board running Wi-Fi
+   seldom has free. DRAW_ROWS rows at a time in internal RAM are sent as they
+   are. */
 static void light(face_mode_t mode) {
+    if (lit) return;
+    lit = true;
+    sleep_release();
+    bsp_display_cfg_t cfg = {
+        .lv_adapter_cfg = ESP_LV_ADAPTER_DEFAULT_CONFIG(),
+        .touch_flags = { .mirror_x = 1, .mirror_y = 1 },
+    };
+    const bsp_display_config_t whole = { .max_transfer_sz = BSP_LCD_H_RES * BSP_LCD_V_RES * BSP_LCD_BITS_PER_PIXEL / 8 };
+    esp_lcd_panel_handle_t panel;
+    esp_lcd_panel_io_handle_t io;
+    esp_lcd_touch_handle_t touch;
+    ESP_ERROR_CHECK(esp_lv_adapter_init(&cfg.lv_adapter_cfg));
+    ESP_ERROR_CHECK(bsp_display_new(&whole, &panel, &io));
+    const esp_lv_adapter_display_config_t screen = {
+        .panel = panel,
+        .panel_io = io,
+        .profile = {
+            .interface = ESP_LV_ADAPTER_PANEL_IF_OTHER,
+            .rotation = ESP_LV_ADAPTER_ROTATE_0,
+            .hor_res = BSP_LCD_H_RES,
+            .ver_res = BSP_LCD_V_RES,
+            .buffer_height = DRAW_ROWS,
+            .use_psram = false,
+            .require_double_buffer = true,
+        },
+        .tear_avoid_mode = ESP_LV_ADAPTER_TEAR_AVOID_MODE_NONE,
+    };
+    lv_display_t *display = esp_lv_adapter_register_display(&screen);
+    lv_display_add_event_cb(display, even_area, LV_EVENT_INVALIDATE_AREA, NULL);
+    ESP_ERROR_CHECK(bsp_touch_new(&cfg, &touch));
+    const esp_lv_adapter_touch_config_t finger = ESP_LV_ADAPTER_TOUCH_DEFAULT_CONFIG(display, touch);
+    esp_lv_adapter_register_touch(&finger);
+    ESP_ERROR_CHECK(bsp_display_brightness_init());
+    ESP_ERROR_CHECK(esp_lv_adapter_start());
+    bsp_display_brightness_set(BRIGHTNESS);
     face_set_mode(mode);
-    if (!lit) {
-        lit = true;
-        bsp_display_cfg_t cfg = {
-            .lv_adapter_cfg = ESP_LV_ADAPTER_DEFAULT_CONFIG(),
-            .touch_flags = { .mirror_x = 1, .mirror_y = 1 },
-        };
-        const bsp_display_config_t whole = { .max_transfer_sz = BSP_LCD_H_RES * BSP_LCD_V_RES * BSP_LCD_BITS_PER_PIXEL / 8 };
-        esp_lcd_panel_handle_t panel;
-        esp_lcd_panel_io_handle_t io;
-        esp_lcd_touch_handle_t touch;
-        ESP_ERROR_CHECK(esp_lv_adapter_init(&cfg.lv_adapter_cfg));
-        ESP_ERROR_CHECK(bsp_display_new(&whole, &panel, &io));
-        const esp_lv_adapter_display_config_t screen = {
-            .panel = panel,
-            .panel_io = io,
-            .profile = {
-                .interface = ESP_LV_ADAPTER_PANEL_IF_OTHER,
-                .rotation = ESP_LV_ADAPTER_ROTATE_0,
-                .hor_res = BSP_LCD_H_RES,
-                .ver_res = BSP_LCD_V_RES,
-                .buffer_height = DRAW_ROWS,
-                .use_psram = false,
-                .require_double_buffer = true,
-            },
-            .tear_avoid_mode = ESP_LV_ADAPTER_TEAR_AVOID_MODE_NONE,
-        };
-        lv_display_t *display = esp_lv_adapter_register_display(&screen);
-        lv_display_add_event_cb(display, even_area, LV_EVENT_INVALIDATE_AREA, NULL);
-        ESP_ERROR_CHECK(bsp_touch_new(&cfg, &touch));
-        const esp_lv_adapter_touch_config_t finger = ESP_LV_ADAPTER_TOUCH_DEFAULT_CONFIG(display, touch);
-        esp_lv_adapter_register_touch(&finger);
-        ESP_ERROR_CHECK(bsp_display_brightness_init());
-        ESP_ERROR_CHECK(esp_lv_adapter_start());
-        bsp_display_brightness_set(BRIGHTNESS);
-        bsp_display_lock(-1);
-        face_start();
-        bsp_display_unlock();
-    }
-    // From her waking, beside talk.c's first listening: how much of a press's
-    // or a lift's wait is the screen. And what internal RAM the screen and
-    // Wi-Fi leave the codecs and TLS, the board's scarcest memory.
-    if (lit_at) return;
-    lit_at = esp_timer_get_time() - woke_at;
-    lit_free = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-    lit_largest = heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
-    ESP_LOGI(TAG, "lit, %u bytes of internal RAM free, %u in one piece", lit_free, lit_largest);
-}
-
-/* One line for her door to file beside her runs, so a waking on the board is
-   read without a cable: the app, what woke her and why the chip last reset,
-   the lifts since the last report, when she was lit and first listened in ms
-   from her waking, the battery, the internal RAM at lit and at its lowest,
-   the signal, and how long she was up. Sent only online and never retried;
-   built either way, so neither the lifts nor her listening carry into the
-   next waking's line. */
-static void report(void) {
-    wifi_ap_record_t ap;
-    int rssi = esp_wifi_sta_get_ap_info(&ap) == ESP_OK ? ap.rssi : 0;
-    int64_t listened = talk_listened();
-    char text[256];
-    snprintf(text, sizeof text,
-             "app=%.8s woke=%d reset=%d lifts=%d/%d lit=%lld listen=%lld battery=%d free=%u largest=%u lowest=%u "
-             "rssi=%d up=%lld",
-             esp_app_get_description()->version, (int)wake, (int)esp_reset_reason(), lifts_seen, lifts_not,
-             lit_at / 1000, listened ? (listened - woke_at) / 1000 : 0, power_battery(), lit_free, lit_largest,
-             (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL), rssi,
-             (esp_timer_get_time() - woke_at) / 1000);
-    lifts_seen = lifts_not = 0;
-    if (net_wait(0)) talk_report(text);
+    bsp_display_lock(-1);
+    face_start();
+    bsp_display_unlock();
+    // Timestamped from boot, beside talk.c's "listening": how much of a press's
+    // wait is the panel starting. And what internal RAM the screen and Wi-Fi
+    // leave the codecs and TLS, the board's scarcest memory.
+    ESP_LOGI(TAG, "lit, %u bytes of internal RAM free, %u in one piece",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
 }
 
 // Her briefing has landed: lit for Eugenia to say so.
@@ -236,10 +176,10 @@ static void close_eyes(void) {
     }
 }
 
-/* Goodnight, her eyes closing, then the sleep screen, drawn only when she
-   shows something else or its marks differ from what the panel holds, whole
-   before the chip stops; the codecs and the radio off; and back to life(),
-   wherever the waking was, for standby to take the next. */
+/* Goodnight, her eyes closing, then the sleep screen, drawn only when its
+   marks differ from what the panel already holds — and with none, the panel
+   held in reset rather than drawn black — then deep sleep until the
+   next errand, the codecs closed and the motion sensor armed. */
 static void sleep_now(void) {
     // Her door reads today's briefing alone: past midnight, yesterday's is gone.
     if (briefing_waits && !briefing_today(time(NULL))) briefing_waits = false;
@@ -247,20 +187,24 @@ static void sleep_now(void) {
     bool low = power_low();
     int marks = face_marks(briefing_waits, trade_waits, low, offline, charge);
     close_eyes();
-    if (!lit || face_get_mode() != FACE_DARK || marks != drawn) {
-        light(FACE_DARK);
-        face_set_marks(briefing_waits, trade_waits, low, offline, charge);
-        bsp_display_lock(-1);
-        face_draw_dark();
-        bsp_display_unlock();
-        vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
+    if (lit || marks != drawn) {
+        // No marks: the panel held in reset is the same black, not drawn.
+        if (marks == face_marks(false, false, false, false, -1)) {
+            sleep_blank();
+        } else {
+            light(FACE_DARK);
+            face_set_marks(briefing_waits, trade_waits, low, offline, charge);
+            bsp_display_lock(-1);
+            face_draw_dark();
+            bsp_display_unlock();
+            vTaskDelay(pdMS_TO_TICKS(LAST_FRAME_MS));
+        }
         drawn = marks;
     }
     errand_at = time(NULL) + errand_wait(time(NULL), charge >= 0, trade_waits, away);
-    if (reporting) report();
     sound_stop();
-    net_stop();
-    longjmp(waking, 1);
+    motion_arm();
+    sleep_until(errand_at, true);
 }
 
 // Asks Gladys's door, and says whether a trade came in that did not wait before.
@@ -287,16 +231,14 @@ static void errand(void) {
             briefing_waits = true;
             briefing_announced(time(NULL));
         }
-        // A new app from main — the day Gladys's door names one she has not
-        // run or seen fail, or at the night's look in the small hours: she
-        // restarts into it at once, quietly, for this errand's place. The
-        // battery is asked first, since asking ota_due spends the night's look:
-        // one a low battery skips waits for a later errand in the hour, on the
-        // cable perhaps.
-        if (!power_low() && (ota_offered(gladys_app()) || ota_due(time(NULL))) && ota_update()) {
-            updated = UPDATED;
+        // A new app from main, in the small hours: she wakes into it at once,
+        // quietly, for this errand's place. The battery is asked first, since
+        // asking ota_due spends the night's look: one a low battery skips
+        // waits for a later errand in the hour, on the cable perhaps.
+        if (!power_low() && ota_due(time(NULL)) && ota_update()) {
+            errand_at = time(NULL);
             sound_stop();
-            esp_restart();
+            sleep_until(errand_at, false);
         }
     }
     sleep_now();
@@ -351,7 +293,6 @@ static between_t between_turns(bool trade) {
 }
 
 static void awake(void) {
-    reporting = true;
     // Joining runs beside everything else: she listens while it does, and
     // waits for it only to send. Offline when she last looked, nothing lights
     // unless it answers now.
@@ -363,24 +304,17 @@ static void awake(void) {
     // PWR woke her: he wants to talk, so she listens before anything that
     // waits. Otherwise a trade waiting keeps the screen dark until its
     // questions cover it.
-    bool pressed = wake == WAKE_PRESS, trade = trade_waits && !pressed;
+    bool pressed = woke == ESP_SLEEP_WAKEUP_EXT0, trade = trade_waits && !pressed;
     light(trade ? FACE_DARK : FACE_IDLE);
-    // The screen's touch, handed to the dial once: the screen outlives every
-    // waking after the first.
-    static bool felt;
-    if (!felt) {
-        felt = true;
-        bsp_display_lock(-1);
-        lv_obj_t *screen = lv_screen_active();
-        static const lv_event_code_t codes[] = { LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED };
-        for (size_t i = 0; i < sizeof codes / sizeof *codes; i++) lv_obj_add_event_cb(screen, on_touch, codes[i], NULL);
-        bsp_display_unlock();
-    }
+    bsp_display_lock(-1);
+    lv_obj_t *screen = lv_screen_active();
+    static const lv_event_code_t codes[] = { LV_EVENT_PRESSED, LV_EVENT_PRESSING, LV_EVENT_RELEASED };
+    for (size_t i = 0; i < sizeof codes / sizeof *codes; i++) lv_obj_add_event_cb(screen, on_touch, codes[i], NULL);
+    bsp_display_unlock();
 
     sound_start();
     sound_volume(cfg.volume);
-    // Switched on, not woken from standby or restarted.
-    if (wake == WAKE_START && esp_reset_reason() == ESP_RST_POWERON) sound_chime();
+    if (esp_reset_reason() == ESP_RST_POWERON) sound_chime();  // switched on, not woken or restarted
 
     // What waits goes first: the journal, then the briefing, which brings her
     // face up from the dark the journal left. PWR closes the journal and she
@@ -420,65 +354,6 @@ static void awake(void) {
     }
 }
 
-/* A new app from main is kept only once it has done what a broken one could
-   not: started her screen and drawn the sleep screen whole, and reached her
-   Wi-Fi. A hang on the way — a screen that never finishes a frame — is caught
-   by the task watchdog, armed for this alone to reset her, and any reset
-   before ota_confirm has the bootloader start the app that was. Without a
-   network it is not kept: she restarts, and the bootloader starts the app
-   that was, since standby would otherwise keep an unjudged app for as long as
-   nothing reset her. An unproven app does this before anything else, so no
-   path sleeps on an app nothing has judged. */
-static void prove(void) {
-    const esp_task_wdt_config_t strict = { .timeout_ms = PROVE_MS, .idle_core_mask = 0, .trigger_panic = true };
-    esp_task_wdt_reconfigure(&strict);
-    esp_task_wdt_add(NULL);
-    net_start();
-    bool joined = net_wait(NET_ALL_MS);
-    light(FACE_DARK);
-    bsp_display_lock(-1);
-    face_draw_dark();
-    bsp_display_unlock();
-    esp_task_wdt_delete(NULL);
-    const esp_task_wdt_config_t usual = { .timeout_ms = CONFIG_ESP_TASK_WDT_TIMEOUT_S * 1000,
-                                          .idle_core_mask = (1 << portNUM_PROCESSORS) - 1 };
-    esp_task_wdt_reconfigure(&usual);
-    ESP_LOGI(TAG, "a new app %s", joined ? "proved and kept" : "drawn, but no network to keep it on");
-    if (!joined) esp_restart();
-    ota_confirm();
-    reporting = true;
-}
-
-/* Standby until something wants her: PWR, a tap or BOOT at once, and a press
-   she missed while awake for a check; a lift at her next check; the errand
-   at its time. Each check is one reading of the motion sensor; one that has
-   moved her is watched as it settles (motion_looked), and a movement that was
-   not him rests the checks for LIFT_REST_S, so a keyring swinging all day
-   costs a check now and then. */
-static wake_t standby(void) {
-    int64_t rest_until = 0;
-    for (;;) {
-        if (ulTaskNotifyTake(pdTRUE, 0)) return WAKE_PRESS;
-        time_t now = time(NULL);
-        if (now + EARLY_S >= errand_at) return WAKE_ERRAND;
-        int64_t ms = esp_timer_get_time() / 1000, errand_ms = (int64_t)(errand_at - now) * 1000;
-        int64_t nap = ms < rest_until ? rest_until - ms : POLL_MS;
-        slept_t slept = sleep_light(nap < errand_ms ? nap : errand_ms);
-        if (slept == SLEPT_PRESS) {
-            power_woke();
-            return WAKE_PRESS;
-        }
-        if (slept == SLEPT_TOUCH) return WAKE_TOUCH;
-        if (esp_timer_get_time() / 1000 < rest_until || !motion_stirred()) continue;
-        if (motion_looked()) {
-            lifts_seen++;
-            return WAKE_LIFT;
-        }
-        lifts_not++;
-        rest_until = esp_timer_get_time() / 1000 + LIFT_REST_S * 1000;
-    }
-}
-
 static void life(void *arg) {
     (void)arg;
     power_start(xTaskGetCurrentTaskHandle());
@@ -489,30 +364,31 @@ static void life(void *arg) {
     // cannot be read reads as no cable and no battery alike, so it is a
     // battery seen that makes this off the cable.
     if (esp_reset_reason() == ESP_RST_BROWNOUT && power_battery() >= 0 && power_charge() < 0) power_off();
-    if (ota_unproven()) prove();
-    wake = updated == UPDATED ? WAKE_ERRAND : WAKE_START;
-    updated = 0;
-    /* Every waking ends in sleep_now(), however deep in it, as a sleep that
-       restarted the chip once ended it; it jumps back here, and standby says
-       what the next one is for. */
-    if (setjmp(waking)) {
-        reporting = false;
-        wake = standby();
-        woke_at = esp_timer_get_time();
-        lit_at = 0;
+    // A lift that was not him: back to sleep at once, the sensor resting.
+    if (woke == ESP_SLEEP_WAKEUP_EXT1 && (esp_sleep_get_ext1_wakeup_status() & (1ULL << MOTION_PIN)) && !motion_looked()) {
+        time_t rest = time(NULL) + LIFT_REST_S;
+        sleep_until(rest < errand_at ? rest : errand_at, false);
     }
-    if (wake == WAKE_ERRAND) errand();
+    if (woke == ESP_SLEEP_WAKEUP_TIMER && time(NULL) + EARLY_S < errand_at) {
+        // The rest is over before the errand is due: armed again, nothing else.
+        // A timer a moment early is the errand's own.
+        motion_arm();
+        sleep_until(errand_at, true);
+    }
+    if (woke == ESP_SLEEP_WAKEUP_TIMER) errand();
     else awake();
 }
 
 void app_main(void) {
+    woke = esp_sleep_get_wakeup_cause();
+    sleep_woke();
     config_load();
 
     // What the board turned out to be, for the first serial log.
     uint32_t flash = 0;
     esp_flash_get_size(NULL, &flash);
-    ESP_LOGI(TAG, "flash %lu MB · PSRAM %u MB · reset by %d",
-             (unsigned long)(flash >> 20), (unsigned)(esp_psram_get_size() >> 20), (int)esp_reset_reason());
+    ESP_LOGI(TAG, "flash %lu MB · PSRAM %u MB · woken by %d",
+             (unsigned long)(flash >> 20), (unsigned)(esp_psram_get_size() >> 20), (int)woke);
 
     if (config_take_setup_request() || !config_ready()) {
         light(FACE_DARK);
@@ -522,8 +398,8 @@ void app_main(void) {
        codec README puts at about 40 KB. In PSRAM: in internal RAM beside the
        screen and Wi-Fi it leaves the codecs too little for their DMA, and the
        board package aborts as her speaker starts. Her code runs from PSRAM,
-       so the cache stays on while she writes her flash, and light sleep,
-       which suspends it, is entered from a task of its own (sleep.c). */
+       so the cache stays on while she writes her flash, and deep sleep, which
+       suspends it, is entered from a task of its own (sleep.c). */
     static StaticTask_t task;
     xTaskCreateStaticPinnedToCore(life, "life", LIFE_STACK, NULL, 5,
                                   heap_caps_malloc(LIFE_STACK, MALLOC_CAP_SPIRAM), &task, 0);

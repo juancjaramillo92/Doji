@@ -28,16 +28,8 @@ CONFIG_LV_USE_CLIB_SPRINTF=y
 CONFIG_LV_DEF_REFR_PERIOD=15
 CONFIG_LV_OS_FREERTOS=y
 CONFIG_LV_OBJ_STYLE_CACHE=y
-# Internal RAM is what runs short beside the screen, Wi-Fi and the codecs,
-# and three of Waveshare's settings spend it on speed she does not need: one
-# draw unit, not two (each a thread with its own stack, and her face redraws
-# patches, not screens); LVGL's hot code left in PSRAM with the rest rather
-# than copied into IRAM; and any allocation of 4 KB or more taken from PSRAM,
-# where ESP-IDF's default keeps everything under 16 KB internal. Anything that
-# needs DMA asks for it by name and still gets internal RAM.
-CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=1
-CONFIG_LV_ATTRIBUTE_FAST_MEM_USE_IRAM=n
-CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
+CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=2
+CONFIG_LV_ATTRIBUTE_FAST_MEM_USE_IRAM=y
 CONFIG_IDF_EXPERIMENTAL_FEATURES=y
 
 # The setup's code on her screen.
@@ -88,6 +80,5 @@ CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=64
 CONFIG_LWIP_DHCP_DOES_NOT_CHECK_OFFERED_IP=y
 CONFIG_LWIP_DHCP_RESTORE_LAST_IP=y
 
-# An update that never proves itself — her screen drawn, her Wi-Fi reached
-# (main.c's prove) — is rolled back by the bootloader.
+# An update that never reaches her Wi-Fi is rolled back by the bootloader.
 CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y
