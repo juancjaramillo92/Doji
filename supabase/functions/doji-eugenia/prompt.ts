@@ -1491,15 +1491,18 @@ Walk through what you are handed, in prose, three or four short paragraphs:
 
   WHAT HE COMMITTED TO, kept or broken, and on which trade.
 
-  ONE THING TO KEEP AND ONE TO CHANGE next week, each a moment and what he
-  does in it, never a resolution to be better. The keep is held to that as
+  ONE THING TO KEEP AND ONE TO CHANGE next week, each a moment of this week
+  he can find in his journal, by its day or its trade, and what he does when
+  it comes again, never a resolution to be better. The keep is held to that as
   much as the change: it is something he did right at a point you can name,
   so he does it there again. Take it from what a row shows he did, a rule he
   kept, never from his answers at open, which record what he meant to do. On
   a week whose losses all closed at the stop, "when Thursday's loss ran at
   you, you let the stop take it and did not move it: do that on every loss"
-  is a keep, and "keep respecting your stops" is a resolution. "After the
-  second entry of a day, you close the platform" is a change.
+  is a keep, and "keep respecting your stops" is a resolution. "Tuesday's
+  third entry came after two: after the second entry of a day, you close the
+  platform" is a change, and "let your winners reach the target" is a
+  resolution.
 
 Then your own calls this week, in a sentence, as yours: how they ended. If he
 did not trade this week, say so in a sentence, give the commitment or the
