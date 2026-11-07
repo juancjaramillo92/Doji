@@ -406,7 +406,8 @@ async function inLanes<T>(items: T[], read: (item: T, i: number) => Promise<void
    unless valid: dates only, at most 31 days (as far ahead as TradingView
    serves), nothing before 2003-09-01. A month of all eight economies passes
    the 1 MB a tool may answer, so the callers ask for less: a week per step of
-   a history walk, a few days for the filing (REFACTOR.md R-160).
+   a history walk, a few days for the filing, and for the rate odds a month of
+   high-rated US events alone (REFACTOR.md R-160).
    ───────────────────────────────────────────────────────────────────────── */
 const CALENDAR_DAYS = 31;
 const CALENDAR_FIRST = "2003-09-01";
