@@ -1695,11 +1695,11 @@ back it reaches. **The tally is counted in code** (`printsList`): above, below
 or on the consensus, and a pair in different units or with no consensus counted
 apart rather than guessed. Above and below are arithmetic, and the list says so,
 since a higher unemployment rate is above consensus too. What she named goes out
-as a value: `*` is taken out, every other character is escaped into a literal of
-the `imatch` pattern, and the whole is `encodeURIComponent`. A release
-TradingView renamed when its ids changed on 3 November reads as one series only
-once its older rows carry the new name. In `CHAT_TOOLS`, so the briefing and a
-reply can both read it.
+as a value: every character is escaped into a literal of the `imatch` pattern,
+an asterisk included, since one release's name ends in one, and the whole is
+`encodeURIComponent`. A release TradingView renamed when its ids changed on 3
+November reads as one series only once its older rows carry the new name. In
+`CHAT_TOOLS`, so the briefing and a reply can both read it.
 
 **And what gold did on each print** (`fileReactions`, at the nightly pass,
 after the calls are scored). Off the poller's thirty hours of minute bars,

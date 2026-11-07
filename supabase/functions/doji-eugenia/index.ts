@@ -1032,9 +1032,8 @@ const RELEASES_TOOL = {
   },
 } as const;
 
-/* A boundary: cleaned and clamped, never thrown. `*` was once the read's
-   wildcard and is still never part of a name, so it is taken out. */
-export const releaseName = (release: unknown) => String(release ?? "").replace(/\*/g, "").trim().slice(0, 80);
+// A boundary: cleaned and clamped, never thrown.
+export const releaseName = (release: unknown) => String(release ?? "").trim().slice(0, 80);
 
 /* The name whole, with or without its period, every character of it a
    literal: a prefix read "Interest Rate on Reserve Balances" into the Fed's

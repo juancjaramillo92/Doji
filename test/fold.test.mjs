@@ -5226,8 +5226,8 @@ test('the night files gold\'s move on the day\'s home prints, once, and says how
 
 test('the prints read is bounded, newest first, and takes what she named as a value, never a pattern', () => {
   const now = Date.parse('2026-10-15T12:00:00Z');
-  const q = printsQuery(releaseName('  Core *Inflation Rate MoM '), 6, now);
-  // Her wildcard is taken out, and the name is matched whole.
+  const q = printsQuery(releaseName('  Core Inflation Rate MoM '), 6, now);
+  // The name is matched whole, every character of it a literal.
   const whole = new RegExp(decodeURIComponent(q.match(/&name=imatch\.([^&]*)&/)[1]), 'i');
   assert.deepEqual(['Core Inflation Rate MoM (Sep)', 'Core Inflation Rate MoM (Oct. 2026)', 'core inflation rate mom',
     'Core Inflation Rate MoM Final (Sep)', 'Core Inflation Rate YoY (Sep)', 'EU Core Inflation Rate MoM (Sep)']
@@ -5240,13 +5240,18 @@ test('the prints read is bounded, newest first, and takes what she named as a va
   const crop = new RegExp(decodeURIComponent(printsQuery('WASDE Corn Ending Stocks (New Crop)', 6, now)
     .match(/&name=imatch\.([^&]*)&/)[1]), 'i');
   assert.ok(crop.test('WASDE Corn Ending Stocks (New Crop) (Nov. 2026)') && !crop.test('WASDE Corn Ending Stocks Xnew CropX'));
+  // An asterisk is a character of one release's name, never a wildcard.
+  const star = new RegExp(decodeURIComponent(printsQuery(releaseName('United States-EIA OIL STOCKS-EIA Weekly Rfg Stocks*'), 6, now)
+    .match(/&name=imatch\.([^&]*)&/)[1]), 'i');
+  assert.ok(star.test('United States-EIA OIL STOCKS-EIA Weekly Rfg Stocks* (Oct. 2026)') &&
+    !star.test('United States-EIA OIL STOCKS-EIA Weekly Rfg Stocks Change (Oct. 2026)'));
   assert.match(q, /&actual=not\.is\.null&at=gte\.2026-04-15T12:00:00\.000Z&at=lte\.2026-10-15T12:00:00\.000Z/);
   assert.match(q, new RegExp(`&order=at\\.desc&limit=${RELEASE_PRINTS}$`));
   // Clamped: nothing past ten years, nothing under a month, a default for nonsense.
   assert.match(printsQuery('NFP', 999, now), /at=gte\.2016-10-15/);
   assert.match(printsQuery('NFP', 0, now), /at=gte\.2024-10-15/);
   assert.match(printsQuery('NFP', 'soon', now), /at=gte\.2024-10-15/);
-  assert.equal(releaseName('**'), '');
+  assert.equal(releaseName('  '), '');
   assert.equal(releaseName('x'.repeat(200)).length, 80);
   // An ampersand she typed cannot open a second filter.
   assert.match(printsQuery('A&order=id.asc', 12, now), /name=imatch\.%5EA%26order%3Did%5C\.asc/);
