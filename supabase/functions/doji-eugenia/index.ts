@@ -842,9 +842,8 @@ interface TvEvent {
 /* At home, releases only — `timed` false is a marker, not a print — and medium
    or above: low is mortgage rates and rig counts, paid for on every request
    and moving nothing. Since TradingView's ids changed on 3 November it rates
-   some of that medium, so it is named: the three result lines of every
-   Treasury auction (`bnd`), farm exports and the crop report, ethanol, the gas
-   rig count, car and truck sales, and the mortgage series beside the 30-year.
+   some of that medium, so the rating no longer keeps it out and `bnd` and
+   NOISE name it.
 
    Abroad, what she asked for, by kind rather than by rating, which would miss
    some of it: TradingView rates China's reserves low and a dozen surveys high.
@@ -1172,8 +1171,8 @@ const STRUCTURE_TOOL = {
     "the daily and 4H turns near price; which of those sit at the edge of the week's hourly " +
     "range and which inside it; equal highs and lows still resting, the liquidity pools of his " +
     "step 2; wicks through a turn that closed back; the sessions' ranges; the average daily range; " +
-    "and the last four closed daily, 4H, 15m and 5m candles, each with its body, its wicks and the marks it " +
-    "traded through with the side it closed on. Use it before judging his bias or " +
+    "and the last four closed daily, 4H, 15m and 5m candles, each with its body, its wicks and " +
+    "the marks it traded through with the side it closed on. Use it before judging his bias or " +
     "his level when he has sent no chart, and before filing a call, whose levels come off it. It is " +
     "your map, computed the same way every time, and not his. Every figure in it has already " +
     "printed; like get_market, it says nothing about where price goes next.",
@@ -3550,9 +3549,9 @@ export function structureList(s: Structure, now = Date.now()): string {
     `, wicks ${dollars(x.upper)} above and ${dollars(x.lower)} below` +
     (x.through.length ? `; through ${x.through.map(t => `${t.price}, closed ${t.closed} it`).join(", and ")}` : "");
   // A daily bar is timed by the session it closed, as `higherOf` times its marks.
-  const opened = (p: Period, t: number) => p === 'D_1' ? `the session closing ${when(t + 86_400_000)},` : when(t);
   lines.push(...s.candles.map(c => `The last closed ${name(c.period)} candles, oldest first: ` +
-    c.bars.map((b, i) => `${opened(c.period, b.t)} open ${b.open}, high ${b.high}, low ${b.low}, close ${b.close} ` +
+    c.bars.map((b, i) => (c.period === 'D_1' ? `the session closing ${when(b.t + 86_400_000)},` : when(b.t)) +
+      ` open ${b.open}, high ${b.high}, low ${b.low}, close ${b.close} ` +
       `(${shape(c.shapes[i])})`).join("; ") + "."));
   if (s.missing.length) {
     lines.push(`Not read just now: the ${s.missing.map(name).join(", ")}. Say so rather than judging a ` +

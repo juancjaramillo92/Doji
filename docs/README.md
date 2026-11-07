@@ -1076,29 +1076,30 @@ of headlines. Each feed is read to a fixed count and may not hold six hours, so
 where the shorter one stops the block says how far back it reaches; a line from
 another day names the day.
 
-**`?rates=1` is what fed funds futures price for the Fed's meetings over the next
-year** (`MEETINGS_AHEAD`, eight),
-worked out the way CME's FedWatch does. A thirty-day contract's price is 100 less
-the month's average overnight rate; a meeting month averages the rates before
-and after the decision, weighted by days, and a neighbouring clear month pins one
-of the two. The month after is preferred, then the month before; where neither
-is clear or one has expired, the meeting is solved off the meeting beside it,
-since the rate between two decisions is one rate. Contracts are named months
-(`CBOT:ZQV2026`), never `ZQ1!`, which the `fedfunds` probe showed rolling early.
-For each meeting `foldRates` returns the rate before and after, the move in basis
-points, the move since now, and `odds` for the two outcomes either side. An
-unsolvable meeting is named in `unread`. The dates are `FOMC`, the Fed's
-published decision days; a test fails half a year before the table runs out and
-checks every date is a Wednesday, and the last date is never priced. Each read
-also asks the calendar for the month's rate decisions, and one the table does not
-hold refuses the whole answer. `decisions` finds them by TradingView's title for
-one since its ids changed on 3 November, plain *Interest Rate*; a title it missed
-would leave the check nothing to compare and let every answer through. **A year of meetings, because the path is the
-number for gold**: the next meeting says what the Fed does now, and how much is
-priced by a year out says how far the market thinks it goes, which moves the gap
-between rates and inflation before any meeting does. Up to twelve contracts,
-nearest first, so a slow morning keeps the meetings closest; where the table
-runs short of a year the strip is as long as the table.
+**`?rates=1` is what fed funds futures price for the Fed's meetings over the
+next year** (`MEETINGS_AHEAD`, eight), worked out the way CME's FedWatch does. A
+thirty-day contract's price is 100 less the month's average overnight rate; a
+meeting month averages the rates before and after the decision, weighted by
+days, and a neighbouring clear month pins one of the two. The month after is
+preferred, then the month before; where neither is clear or one has expired, the
+meeting is solved off the meeting beside it, since the rate between two
+decisions is one rate. Contracts are named months (`CBOT:ZQV2026`), never
+`ZQ1!`, which the `fedfunds` probe showed rolling early. For each meeting
+`foldRates` returns the rate before and after, the move in basis points, the
+move since now, and `odds` for the two outcomes either side. An unsolvable
+meeting is named in `unread`. The dates are `FOMC`, the Fed's published decision
+days; a test fails half a year before the table runs out and checks every date
+is a Wednesday, and the last date is never priced. Each read also asks the
+calendar for the month's rate decisions, and one the table does not hold refuses
+the whole answer. `decisions` finds them by TradingView's title for one since
+its ids changed on 3 November, plain *Interest Rate*; a title it missed would
+leave the check nothing to compare and let every answer through. **A year of
+meetings, because the path is the number for gold**: the next meeting says what
+the Fed does now, and how much is priced by a year out says how far the market
+thinks it goes, which moves the gap between rates and inflation before any
+meeting does. Up to twelve contracts, nearest first, so a slow morning keeps the
+meetings closest; where the table runs short of a year the strip is as long as
+the table.
 
 Checked against FedWatch on 1 October, on its own prices the October odds were
 identical (24.9%) and December within a point. `ratesList` states the first
@@ -1578,21 +1579,20 @@ trades only: a verdict on an open one is a hard prohibition.
 about his trading only when a rule breaks. So the Sunday briefing carries a
 review of his week after it, as one message — he asked for one thing on Sunday
 rather than a Saturday message of its own. `weekReview` is written beside the
-briefing on the writer's clock, and reviews his week: how he followed
-the rules a row can check, his own answers — how often he marked his rules
-broken and how many he left blank, the one record of entering on the touch —
-what he committed to and whether he kept it, one thing to keep and one to
-change, each a moment of the week he can find in his journal and what he does
-when it comes again, and her own calls in a sentence. Process, never P&L as the measure,
-and nothing about where price goes next week, which is the briefing above it;
-no hello, since the briefing has said it.
-Under 250 words, with what to cut first named beside the count — figures from
-his journal, then her calls, then a commitment kept — and the verdict and the
-one thing to keep and one to change never cut, since a ceiling alone cuts what
-the message is for. **And she counts the words last**, as the gates count their
-countable rules: the first review the eval read came back at 258. Her count of
-her own words comes out short, so she cuts past 220, and 257 got through when
-she cut only at the ceiling.
+briefing on the writer's clock, and reviews his week: how he followed the rules
+a row can check, his own answers — how often he marked his rules broken and how
+many he left blank, the one record of entering on the touch — what he committed
+to and whether he kept it, one thing to keep and one to change, each a moment of
+the week he can find in his journal and what he does when it comes again, and
+her own calls in a sentence. Process, never P&L as the measure, and nothing
+about where price goes next week, which is the briefing above it; no hello,
+since the briefing has said it. Under 250 words, with what to cut first named
+beside the count — figures from his journal, then her calls, then a commitment
+kept — and the verdict and the one thing to keep and one to change never cut,
+since a ceiling alone cuts what the message is for. **And she counts the words
+last**, as the gates count their countable rules: the first review the eval read
+came back at 258. Her count of her own words comes out short, so she cuts past
+220, and 257 got through when she cut only at the ceiling.
 
 She is handed the week computed — `get_stats`' summary with his answers,
 `check_rules`' verdicts, her calls and her record — with his notes, the
@@ -1625,12 +1625,13 @@ lists no speeches: not the Fed's, not the ECB's or the BoJ's.
 
 **From abroad, what she asked for and nothing else** (`wanted`): the central
 banks of the euro area, Britain and Japan (`mny` at medium or above — the
-decisions and the votes beside them); headline inflation in all seven (`prce`
-rated high); and China's reserves. By kind rather than by rating, since the
-rating would miss some of it: TradingView rates China's reserves low and a dozen
-surveys high. About five events a week, out of more than 100 listed. The bond
-auctions in Germany, France, Italy and Britain she once asked for are not on
-the calendar since its ids changed, in November or in December. China's gold
+decisions and the votes beside them, and since the change of ids the money
+supply and reserves TradingView now rates medium too); headline inflation in
+all seven (`prce` rated high); and China's reserves. By kind rather than by
+rating, since the rating would miss some of it: TradingView rates China's
+reserves low and a dozen surveys high. About five events a week, out of more
+than 100 listed. TradingView's calendar has listed no government bond auction
+abroad since its ids changed, in November or in December. China's gold
 imports are not on TradingView's calendar. A row from abroad carries its country
 at the head of its name (*FR Inflation Rate YoY Prel (Sep)*), because three
 economies publish that title in one hour. **None of it is one of his**: R-19
@@ -1681,24 +1682,24 @@ compared without anyone remembering it.
 
 **What is filed is read back as a record: `get_releases`.** Every other read of
 the calendar reaches a day or a week, while the table holds every release the
-filing and the history door have reached, each with its consensus and its
-actual — how core inflation has run against the forecast for a year, out of her
-reach. `get_releases` takes a release as the calendar names it, less its period,
-matched whole, with or without its period: a match on the start of the name
-read *Interest Rate on Reserve Balances* into the Fed's decisions and *Core
-Inflation Rate* into both the MoM and the YoY. A release from abroad, which
-leads with its country's code, never answers for one at home. It reads the newest twenty-four
+filing and the history door have reached, each with its consensus and its actual
+— how core inflation has run against the forecast for a year, out of her reach.
+`get_releases` takes a release as the calendar names it, less its period,
+matched whole, with or without its period: a match on the start of the name read
+*Interest Rate on Reserve Balances* into the Fed's decisions and *Core Inflation
+Rate* into both the MoM and the YoY. A release from abroad, which leads with its
+country's code, never answers for one at home. It reads the newest twenty-four
 prints in the months asked (`RELEASE_PRINTS`; 1 to 120, two years by default),
 newest first under the limit and told oldest first, and a full read says how far
 back it reaches. **The tally is counted in code** (`printsList`): above, below
 or on the consensus, and a pair in different units or with no consensus counted
 apart rather than guessed. Above and below are arithmetic, and the list says so,
 since a higher unemployment rate is above consensus too. What she named goes out
-as a value: `*` is taken out, every other character is escaped into a literal
-of the `imatch` pattern, and the whole is `encodeURIComponent`. A release
+as a value: `*` is taken out, every other character is escaped into a literal of
+the `imatch` pattern, and the whole is `encodeURIComponent`. A release
 TradingView renamed when its ids changed on 3 November reads as one series only
-once its older rows carry the new name. In `CHAT_TOOLS`, so the briefing and a reply can both read
-it.
+once its older rows carry the new name. In `CHAT_TOOLS`, so the briefing and a
+reply can both read it.
 
 **And what gold did on each print** (`fileReactions`, at the nightly pass,
 after the calls are scored). Off the poller's thirty hours of minute bars,

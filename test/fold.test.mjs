@@ -3646,7 +3646,7 @@ test('abroad, the central banks, headline inflation and China\'s reserves are fi
     'BoE MPC Vote Cut', 'BoE MPC Vote Hike', 'BoE MPC Vote Unchanged', 'MPC Meeting Minutes']);
   for (const c of ['DE', 'FR', 'IT']) assert.deepEqual(kept[c], ['Inflation Rate YoY Prel'], `${c} files a survey`);
 
-  // Her own measure, out of nine hundred events in two months.
+  // About five a week, out of nine hundred events in two months.
   const events = ABROAD.filter(k => wanted({ ...k, timed: true })).reduce((n, k) => n + k.n, 0);
   assert.equal(events, 45);
 });

@@ -1147,6 +1147,37 @@ exception for speed.
 than the rule is worth, or the replies leave fast mode, when the hour pays
 again and there is nothing to change.
 
+### R-157 — a release's history read by its ticker
+**Why refused:** the ticker is the series, and it survives TradingView's
+renames, but several releases share one: `ECONOMICS:USINTR` is the Fed's
+decision and every Fed speaker, `ECONOMICS:GBINTR` the BoE's decision and its
+three vote counts, and the counts carry figures. Read by ticker, a history of
+the decision would carry the votes. The renames of 3 November were few — the
+Fed's, the BoE's and the BoJ's decisions and durable goods ex transportation —
+and were put right by renaming the older rows by hand, so `get_releases` reads
+one series by its whole name.
+**Revisit if:** TradingView renames releases again often enough that a hand
+rename each time costs more than telling shared tickers apart.
+
+### R-158 — the calendar keyed on ticker and time rather than TradingView's id
+**Why refused:** the change of ids on 3 November filed 26 releases twice, and a
+key on the series and its minute would have caught every one. But tickers are
+shared within a minute (the BoE's decision and its votes), are null for some
+releases, and a key change is a schema change on a live table. A change of ids
+is rare and one-off: the duplicates were deleted by hand, and the README warns
+the history door off the weeks before it.
+**Revisit if:** TradingView changes its ids again.
+
+### R-159 — the Fed's own calendar beside TradingView's
+**Deferred, not refused.** TradingView's new calendar lists no speeches, the
+Chair's included, which R-19 and R-20 would count when rated high. Its Fed
+decision is still listed (28 October, as *Interest Rate*), so the event his
+rules guard most is safe; the 9 December decision was beyond its four-week
+horizon on 7 November. A reader of federalreserve.gov is a new host, a new door
+and a second writer to `eugenia_calendar`.
+**Revisit if:** the 9 December decision is not on the calendar by 1 December, or
+he wants the Chair's speeches back.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

@@ -30,7 +30,6 @@ import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, se
   from '../supabase/functions/doji-eugenia/journal.ts';
 import { GRID, CANDLES } from '../supabase/functions/doji-eugenia/structure.ts';
 import { FITS } from '../supabase/functions/doji-tradingview/index.ts';
-const ABROAD_KINDS = JSON.parse(readFileSync(new URL('./fixtures/tradingview-abroad.json', import.meta.url), 'utf8')).kinds;
 import { HOME, FULL_STOP, TO_BREAK_EVEN, TARGET_MIN, TARGET_MAX, checkRules } from '../supabase/functions/doji-eugenia/adherence.ts';
 
 // A repository file, read once however many tests ask for it.
@@ -3496,6 +3495,9 @@ test('the importance a release may carry is the one the table accepts', () => {
    while only the Sunday week and the rolling list carry what is filed from
    abroad.
    ─────────────────────────────────────────────────────────────────────────── */
+
+// Every kind TradingView listed abroad: what wanted keeps is read off it.
+const ABROAD_KINDS = JSON.parse(readFileSync(new URL('./fixtures/tradingview-abroad.json', import.meta.url), 'utf8')).kinds;
 
 test('the economies the calendar is asked for are the ones calendarRows keeps', () => {
   const tv = source('supabase/functions/doji-tradingview/index.ts');
