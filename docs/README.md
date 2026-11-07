@@ -1179,11 +1179,14 @@ the reason: from 18 to 21 October whole passes were recorded as a parse error
 that kept eleven characters of what TradingView said.
 `test/fixtures/tradingview-calendar.json` is eight events from the 1 October
 calendar probe, one per shape the fold must handle.
-`test/fixtures/tradingview-abroad.json` is every kind of event TradingView listed
-for the seven economies abroad from 7 September to 4 November, read on 5 October
-— 459 kinds, 862 events, each with its country, rating, category and title — so
-what is filed from abroad is judged against the whole catalogue. It predates
-the 3 November change of ids; `tradingview-home.json`, the US catalogue, follows it.
+`test/fixtures/tradingview-abroad.json` is every kind of event TradingView
+listed for the seven economies abroad from 20 October to 14 November, after its
+ids changed, read on 7 November in two windows — 349 kinds, 364 events, each
+with its country, rating, category and title, with the ECB's and the BoJ's
+October meetings, the BoE's November one and the month-end inflation readings
+among them — so what is filed from abroad is judged against the whole catalogue;
+`tradingview-home.json` is the US catalogue's counterpart. A month across all
+eight economies is refused: the answer passes the 1 MB a tool may return.
 
 **`?probe=` is fixed: nothing in the request reaches a tool.** It picks one from
 the table below, every argument is written in the function, and each call's
@@ -1626,21 +1629,21 @@ lists no speeches: not the Fed's, not the ECB's or the BoJ's.
 
 **From abroad, what she asked for and nothing else** (`wanted`): the central
 banks of the euro area, Britain and Japan (`mny` at medium or above — the
-decisions and the votes beside them, and since the change of ids the money
-supply and reserves TradingView now rates medium too); headline inflation in
-all seven (`prce` rated high); and China's reserves. By kind rather than by
-rating, since the rating would miss some of it: TradingView rates China's
-reserves low and a dozen surveys high. About five events a week, out of more
-than 100 listed. TradingView's calendar has listed no government bond auction
-abroad since its ids changed, in November or in December. China's gold
-imports are not on TradingView's calendar. A row from abroad carries its country
-at the head of its name (*FR Inflation Rate YoY Prel (Sep)*), because three
-economies publish that title in one hour. **None of it is one of his**: R-19
-reads `country=eq.US` (`HOME`, beside
-`HIGH` in `adherence.ts`), and a list that carries a line from abroad tells her
-so once. The rolling list and the Sunday week carry it; the week takes only what
-is rated high, so abroad that is the central banks' decisions and headline
-inflation.
+decisions and the votes beside them, less the money supply and reserves
+TradingView rates medium beside them, which `NOISE` names); headline inflation
+in all seven (`prce` rated high, and by its title, *Inflation Rate YoY*, since
+Britain's core inflation MoM is rated high too); and China's reserves. By kind
+rather than by rating, since the rating would miss some of it: TradingView rates
+China's reserves low and a dozen surveys high. About four events a week, out of
+about ninety listed. TradingView's calendar has listed no government bond
+auction abroad since its ids changed. China's gold imports are not on
+TradingView's calendar. A row from abroad carries its country at the head of its
+name (*FR Inflation Rate YoY Prel (Sep)*), because three economies publish that
+title in one hour. **None of it is one of his**: R-19 reads `country=eq.US`
+(`HOME`, beside `HIGH` in `adherence.ts`), and a list that carries a line from
+abroad tells her so once. The rolling list and the Sunday week carry it; the
+week takes only what is rated high, so abroad that is the central banks'
+decisions and headline inflation.
 
 **The briefing files before it reads, and a quarter-hourly job files on its
 own** — `doji-eugenia-calendar`, on `?calendar=1` — so an actual lands within

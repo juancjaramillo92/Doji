@@ -1178,6 +1178,17 @@ and a second writer to `eugenia_calendar`.
 **Revisit if:** the 9 December decision is not on the calendar by 1 December, or
 he wants the Chair's speeches back.
 
+### R-160 — the calendar door's window cut below a month
+**Why refused:** `calendarWindow` allows 31 days, and on 7 November a month
+across all eight economies was refused: TradingView's tool answers at most
+1 MB, and that month came to 1.7 MB. Nothing scheduled asks for that much —
+the filing reads a few days, the history walk and the Sunday week one week,
+the rate odds a month of the US alone — so only a request made by hand meets
+it, and the refusal names the size. A smaller cap would also refuse the rate
+odds' month, which fits.
+**Revisit if:** a scheduled read starts asking for more than two weeks of every
+economy, or the refusal is ever met by one.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

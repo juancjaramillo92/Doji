@@ -847,17 +847,19 @@ interface TvEvent {
 
    Abroad, what she asked for, by kind rather than by rating, which would miss
    some of it: TradingView rates China's reserves low and a dozen surveys high.
-   The central banks of the euro area, Britain and Japan; each economy's
-   headline inflation; China's reserves. None of it counts for R-19 or R-20,
-   which are about US releases. */
+   The central banks of the euro area, Britain and Japan, less the money supply
+   and reserves the same change rated medium beside them; each economy's
+   headline inflation, by its title, since Britain's core MoM is rated high
+   too; China's reserves. None of it counts for R-19 or R-20, which are about
+   US releases. */
 const BANKS = ['EU', 'GB', 'JP'];
-const NOISE = /^(USDA|WASDE) |Rig Count|Ethanol|^(Car|Truck) Sales$|^MBA (?!30-Year Mortgage Rate$)/;
+const NOISE = /^(USDA|WASDE) |Rig Count|Ethanol|^(Car|Truck) Sales$|^MBA (?!30-Year Mortgage Rate$)|Money Supply|Broad Money|Reserves$/;
 
 export function wanted(e: TvEvent): boolean {
   if (e.country === HOME) return e.timed && e.importance !== 'low' && e.category !== 'bnd' &&
     !NOISE.test(e.title);
-  if (e.category === 'mny' && BANKS.includes(e.country)) return e.importance !== 'low';
-  if (e.category === 'prce') return e.importance === 'high';
+  if (e.category === 'mny' && BANKS.includes(e.country)) return e.importance !== 'low' && !NOISE.test(e.title);
+  if (e.category === 'prce') return e.importance === 'high' && /^Inflation Rate YoY/.test(e.title);
   return e.country === 'CN' && e.title === 'Foreign Exchange Reserves';
 }
 
