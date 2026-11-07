@@ -5227,8 +5227,19 @@ test('the night files gold\'s move on the day\'s home prints, once, and says how
 test('the prints read is bounded, newest first, and takes what she named as a value, never a pattern', () => {
   const now = Date.parse('2026-10-15T12:00:00Z');
   const q = printsQuery(releaseName('  Core *Inflation Rate MoM '), 6, now);
-  // Her wildcard is taken out; the one at the end is the code's.
-  assert.match(q, /&name=ilike\.Core%20Inflation%20Rate%20MoM\*&/);
+  // Her wildcard is taken out, and the name is matched whole.
+  const whole = new RegExp(decodeURIComponent(q.match(/&name=imatch\.([^&]*)&/)[1]), 'i');
+  assert.deepEqual(['Core Inflation Rate MoM (Sep)', 'Core Inflation Rate MoM (Oct. 2026)', 'core inflation rate mom',
+    'Core Inflation Rate MoM Final (Sep)', 'Core Inflation Rate YoY (Sep)', 'EU Core Inflation Rate MoM (Sep)']
+    .filter(n => whole.test(n)), ['Core Inflation Rate MoM (Sep)', 'Core Inflation Rate MoM (Oct. 2026)',
+    'core inflation rate mom'], 'a release is read past its own name, or not under its period');
+  // The Fed's decision is not the rate on reserves set beside it, and a
+  // bracket that belongs to the name is a literal, not a group.
+  const fed = new RegExp(decodeURIComponent(printsQuery('Interest Rate', 6, now).match(/&name=imatch\.([^&]*)&/)[1]), 'i');
+  assert.ok(fed.test('Interest Rate (Oct. 2026)') && !fed.test('Interest Rate on Reserve Balances (Oct. 2026)'));
+  const crop = new RegExp(decodeURIComponent(printsQuery('WASDE Corn Ending Stocks (New Crop)', 6, now)
+    .match(/&name=imatch\.([^&]*)&/)[1]), 'i');
+  assert.ok(crop.test('WASDE Corn Ending Stocks (New Crop) (Nov. 2026)') && !crop.test('WASDE Corn Ending Stocks Xnew CropX'));
   assert.match(q, /&actual=not\.is\.null&at=gte\.2026-04-15T12:00:00\.000Z&at=lte\.2026-10-15T12:00:00\.000Z/);
   assert.match(q, new RegExp(`&order=at\\.desc&limit=${RELEASE_PRINTS}$`));
   // Clamped: nothing past ten years, nothing under a month, a default for nonsense.
@@ -5238,7 +5249,7 @@ test('the prints read is bounded, newest first, and takes what she named as a va
   assert.equal(releaseName('**'), '');
   assert.equal(releaseName('x'.repeat(200)).length, 80);
   // An ampersand she typed cannot open a second filter.
-  assert.match(printsQuery('A&order=id.asc', 12, now), /name=ilike\.A%26order%3Did\.asc\*/);
+  assert.match(printsQuery('A&order=id.asc', 12, now), /name=imatch\.%5EA%26order%3Did%5C\.asc/);
 });
 
 test('a calendar line from another day names the day, and today stays bare', () => {

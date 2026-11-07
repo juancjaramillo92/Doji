@@ -1017,8 +1017,8 @@ const RELEASES_TOOL = {
     "inside the months asked, oldest first, each with its actual against the consensus " +
     "and the prior, and what gold did fifteen and sixty minutes on where that is on file — " +
     "and a count of how many came in above, below or on the consensus. " +
-    "Name the release as the calendar lists it, without the period in brackets: " +
-    "'Core Inflation Rate MoM', 'Non Farm Payrolls', 'Fed Interest Rate Decision'. One " +
+    "Name the release whole, as the calendar lists it, without the period in brackets: " +
+    "'Core Inflation Rate MoM', 'Non Farm Payrolls', 'Interest Rate' for the Fed's decision. One " +
     "from abroad starts with its country's code: 'EU Inflation Rate YoY Flash'. Use it " +
     "when how a release has run against expectations changes what you say about the " +
     "next one, and quote that history from here, never from a search.",
@@ -1033,15 +1033,19 @@ const RELEASES_TOOL = {
   },
 } as const;
 
-/* A boundary: cleaned and clamped, never thrown. `*` is PostgREST's wildcard,
-   so it is taken out of what she named and put back only at the end. */
+/* A boundary: cleaned and clamped, never thrown. `*` was once the read's
+   wildcard and is still never part of a name, so it is taken out. */
 export const releaseName = (release: unknown) => String(release ?? "").replace(/\*/g, "").trim().slice(0, 80);
 
+/* The name whole, with or without its period, every character of it a
+   literal: a prefix read "Interest Rate on Reserve Balances" into the Fed's
+   decisions, and "Core Inflation Rate" into both the MoM and the YoY. */
 export function printsQuery(name: string, months: unknown, now = Date.now()): string {
   const n = Math.min(Math.max(Math.trunc(Number(months)) || 24, 1), 120);
   const from = new Date(now);
   from.setUTCMonth(from.getUTCMonth() - n);
-  return `eugenia_calendar?select=${RELEASE_COLUMNS}&name=ilike.${encodeURIComponent(name)}*` +
+  const whole = `^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}( \\(.*\\))?$`;
+  return `eugenia_calendar?select=${RELEASE_COLUMNS}&name=imatch.${encodeURIComponent(whole)}` +
          `&actual=not.is.null&at=gte.${from.toISOString()}&at=lte.${new Date(now).toISOString()}` +
          `&order=at.desc&limit=${RELEASE_PRINTS}`;
 }
@@ -1099,7 +1103,7 @@ async function readPrints(release: unknown, months: unknown): Promise<string> {
       `eugenia_reactions?select=*&release=in.(${rows.map(r => r.id).join(",")})&order=at.desc&limit=${RELEASE_PRINTS}`) : [];
     return rows.length
       ? printsList(rows, name, moves)
-      : "Nothing on file starts with that name and carries a figure in that window. Check the " +
+      : "Nothing on file carries that name and a figure in that window. Check the " +
         "name against the calendar, and say you have no record rather than that it never printed: " +
         "the calendar holds only what was filed.";
   } catch (err) {

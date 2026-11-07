@@ -1683,16 +1683,20 @@ the calendar reaches a day or a week, while the table holds every release the
 filing and the history door have reached, each with its consensus and its
 actual — how core inflation has run against the forecast for a year, out of her
 reach. `get_releases` takes a release as the calendar names it, less its period,
-matched on the start of the name, so a release from abroad, which leads with its
-country's code, never answers for one at home. It reads the newest twenty-four
+matched whole, with or without its period: a match on the start of the name
+read *Interest Rate on Reserve Balances* into the Fed's decisions and *Core
+Inflation Rate* into both the MoM and the YoY. A release from abroad, which
+leads with its country's code, never answers for one at home. It reads the newest twenty-four
 prints in the months asked (`RELEASE_PRINTS`; 1 to 120, two years by default),
 newest first under the limit and told oldest first, and a full read says how far
 back it reaches. **The tally is counted in code** (`printsList`): above, below
 or on the consensus, and a pair in different units or with no consensus counted
 apart rather than guessed. Above and below are arithmetic, and the list says so,
 since a higher unemployment rate is above consensus too. What she named goes out
-as a value: `*` is taken out and one put back at the end, and the rest is
-`encodeURIComponent`. In `CHAT_TOOLS`, so the briefing and a reply can both read
+as a value: `*` is taken out, every other character is escaped into a literal
+of the `imatch` pattern, and the whole is `encodeURIComponent`. A release
+TradingView renamed when its ids changed on 3 November reads as one series only
+once its older rows carry the new name. In `CHAT_TOOLS`, so the briefing and a reply can both read
 it.
 
 **And what gold did on each print** (`fileReactions`, at the nightly pass,
