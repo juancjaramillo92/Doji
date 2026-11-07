@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DOJI — the copies that have to agree
    ───────────────────────────────────────────────────────────────────────────
-   Four runtimes and no build step, so some facts live in more than one file.
+   Six runtimes and no build step, so some facts live in more than one file.
    Copies are not the problem; copies NOTHING CAN COMPARE are. A test asserting
    each copy against a literal typed beside it lets an editor change a list and
    its own test in one pass, green. So every copy here is read out of its file
@@ -1721,7 +1721,7 @@ test('every file that names the Supabase project names the same one', () => {
     `the project is split across refs: ${[...new Set(found)].join(', ')}`);
 });
 
-/* A budget over the whole speech stream runs for as long as she speaks, and
+/* A budget over the whole speech stream bounds how long she may speak, and
    SPEAK_MS on the stream cut a long briefing off mid-sentence. It bounds the
    vendor's start of each part, and is cleared once the vendor answers. */
 test('her voice to the laptop is bounded while the vendor starts, not while she speaks', () => {

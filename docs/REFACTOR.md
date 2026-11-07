@@ -9,6 +9,10 @@ says what is pending.
 
 Where it disagrees with the README, the README wins and you say so.
 
+A number is never reused or reassigned. An entry whose subject is gone is
+deleted and its number left unused, since commits, pull requests and other
+files cite entries by number.
+
 ---
 
 ## 1 · WHAT NO TEST REACHES
@@ -1123,6 +1127,14 @@ would repeat that boundary in a dozen places.
 is a downgrade of the packager.
 **Revisit if:** a report reaches what ships, or a packager release carries the
 fix.
+
+### R-155 — the frame's kind byte dropped, now voice is its only kind
+**Why refused:** the laptop reads frames in the build he has installed, and an
+update is offered, never taken unasked. A door that answered raw `pcm` would
+play noise on every laptop until he took one, and `laptopFrame` and the
+laptop's framer would change together for four bytes a part.
+**Revisit if:** the door needs a second kind again, or the laptop's audio is
+rewritten for another reason.
 
 ---
 

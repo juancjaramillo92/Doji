@@ -98,7 +98,7 @@ laptop/                                 Eugenia on the Mac — see The laptop
   key.html                              her key and Gladys's, each asked once; key.mjs tries it
   Info.plist                            why she asks for the microphone
   eugenia.png                           her render
-  HankenGrotesk.ttf                     Doji's typeface, with its licence beside it
+  HankenGrotesk.ttf                     Doji's typeface, its licence beside it
   .gitignore                            the stamp and the build
 ```
 
@@ -316,7 +316,8 @@ exists only at sync time.
 
 ### Journal-owned
 
-Written by the app and by Gladys, from a tap in Telegram or on the laptop. Neither broker writer ever sends these keys.
+Written by the app and by Gladys, from a tap in Telegram or on the laptop.
+Neither broker writer ever sends these keys.
 
 | Column | Meaning |
 |---|---|
@@ -390,7 +391,8 @@ nothing can go stale and a backfilled fill corrects itself. There is no override
 
 ## Facts that live in more than one file
 
-Four runtimes, five languages and no build step, so some things cannot be
+Six runtimes — the browser, Deno, Postgres, Apps Script, Node for the scripts
+and Electron — and no build step between them, so some things cannot be
 single-sourced at run time:
 
 | The fact | Where its copies live |
@@ -522,7 +524,8 @@ the delete back.
 **Supabase snapshots the whole database daily**, and the Pro plan keeps the last
 seven, under Database → Backups in the dashboard. A snapshot is every table,
 Vault included, and not Storage, where Doji keeps two things: the laptop's
-update, which its workflow rebuilds from `main`, and its signing certificate, which nothing copies — lost, the next build makes
+update, which its workflow rebuilds from `main`, and its signing certificate,
+which nothing copies — lost, the next build makes
 another, at the price *The laptop* gives. So it is everything that matters.
 It is the repair for a database that is gone or broken: a restore returns the
 whole project to that day, and everything written since — trades, answers, her
@@ -1268,12 +1271,13 @@ the `callback_data` grammar.
 **The laptop journals a trade beside her face.** It asks every minute what
 waits, and shows a near-white ring beside her while anything does (*The
 laptop — her face over his charts*). A `GET` with
-`x-laptop-key: <GLADYS_LAPTOP_SECRET>` answers `{ waiting, trade }`: his trades from the last week (`WAITING_DAYS`) with
-any of the four answers missing, not deleted, oldest first so they are
-journalled in the order he took them — read newest first under `WAITING_MAX`
-and reversed. The week is the bound: a trade left unjournalled would otherwise
-keep the ring lit for ever. **An answer is a tap in a tap's own grammar** — a `POST` of
-`{ "data": "PID562780708|sl|1" }` — so `parseCallback` is the one boundary for
+`x-laptop-key: <GLADYS_LAPTOP_SECRET>` answers `{ waiting, trade }`: his trades
+from the last week (`WAITING_DAYS`) with any of the four answers missing, not
+deleted, oldest first so they are journalled in the order he took them — read
+newest first under `WAITING_MAX` and reversed. The week is the bound: a trade
+left unjournalled would otherwise keep the ring lit for ever. **An answer is a
+tap in a tap's own grammar** — a `POST` of `{ "data": "PID562780708|sl|1" }` —
+so `parseCallback` is the one boundary for
 both, and no column but the four is reachable; `[Edit]` and `[Done]` are refused
 with a 400, being the Telegram form's. It answers with what waits next, so the
 laptop moves on without a second request, and the trigger redraws the Telegram
@@ -1361,7 +1365,8 @@ it, and a look per print spends the quota the briefing reads on. **Weekdays at
 08:00 ET, Sunday at 17:00 ET** — the gold open, so the week's first briefing
 lands with the market, carrying the review of the week behind it. She says hello her own way, Spanish or English, inside
 the first paragraph, and goes straight to the number. Reply and she answers —
-typed, by voice, or to a chart, in Telegram or on the laptop. And she trades beside you on paper, on your
+typed, by voice, or to a chart, in Telegram or on the laptop. And she trades
+beside you on paper, on your
 rules, scored on price — *Her own calls*.
 
 `schema.sql` holds her memory and her read of the journal, her meters,
@@ -2068,7 +2073,7 @@ nothing else happens. A turn that throws is answered with `APOLOGY.reply`, the
 reply's own. A part the speech vendor will not read ends the audio; the copy
 in Telegram is the whole of it. The voice has `SPEAK_MS` for the vendor to
 start answering each part, not to finish it — a budget on the whole stream
-runs for as long as she speaks, and cut a long briefing mid-sentence — and
+bounds how long she may speak, and cut a long briefing mid-sentence — and
 shares the request's wall clock with the turn: a turn that runs to its five
 minutes leaves the voice what is left of four hundred seconds.
 
@@ -2121,8 +2126,10 @@ or shows it again each time a window's desktops are set; hers is told to leave
 it. **Her face floats over TradingView**: her render with its black made
 clear, and her drawing over it — eyes, highlight, smile, thought dots, the
 listening ring — in a 466-pixel square scaled to the window, in Doji's
-colours, which `agree.test.mjs` holds to `index.html`'s tokens. Then a body: **she breathes** (about 1.5% over 4.6 seconds, from her base)
-**and floats** (a few pixels over 3.3 seconds, a rhythm that never falls into
+colours, whose copies of the app's tokens `agree.test.mjs` holds to
+`index.html`. Then a body: **she breathes** (about 1.5% over 4.6 seconds,
+from her base) **and floats** (a few pixels over 3.3 seconds, a rhythm that
+never falls into
 step with the breath), **looks at the cursor** when it comes near, **leans
 in** to listen, **sways** while she thinks and **gives with the loud moments**
 of her voice; eyes and mouth ride the same transform. Reduce Motion in macOS
@@ -2176,7 +2183,8 @@ screen the cursor is on — TradingView's window title is his to set, and no
 source documents it — with her own window kept out of every capture it can be;
 a question whose chart could not be captured is not asked, and she says why.
 The microphone is opened at the press and closed with the recording, so macOS
-shows it in use only while she listens. A recording he never spoke into is let go at thirty seconds, and the last thirty of a five-minute
+shows it in use only while she listens. A recording he never spoke into is let
+go at thirty seconds, and the last thirty of a five-minute
 recording are ticked and empty the ring; a press shorter than 0.4 seconds is
 one he took back. The recording's bitrate keeps it well inside `FILE_MAX`. A
 key another app holds registers as nothing, so she says so, and the menu
@@ -2206,7 +2214,8 @@ hers (*Gladys — the Telegram journal*): what waits every minute — the laptop
 is awake and online whenever he trades on it — and at once when the Mac
 wakes. A trade that came in ticks, and its questions take her place once she
 is idle; a conversation is never interrupted. **The screens are drawn on her
-round square**, in Doji's typeface, Hanken Grotesk, kept beside her: the setup split down the middle, **B&R** left and **S&R** right; then
+round square**, in Doji's typeface, Hanken Grotesk, kept beside her: the setup
+split down the middle, **B&R** left and **S&R** right; then
 **RULES**, **SL** and **TP**, no on the left and yes on the right, each half
 brightening when clicked; four dots at the top; done, the dots fill, the tick
 draws in and the ring sweeps round, brighter when every answer was a yes.
@@ -2221,13 +2230,15 @@ own grammar (`laptop/journal.mjs`, read by Gladys's own `parseCallback` in
 question or the next trade follows without a pause. An answer her door did
 not take leaves the question to be clicked again, and the line above her head
 says why. A minute without a click, the questions give way to her, the trade
-still waiting; the talk key on them closes them and she listens; answered in Telegram while they are up, they follow what is
-left. The journal crosses over her face rather than cutting in. **While a
-trade waits**, a mark sits beside her — a near-white ring, with a dark edge since his chart may be light, the briefing's dot inside
-it when both wait — and the menu bar carries the same shapes, `○`, `•` or `◉`.
+still waiting; the talk key on them closes them and she listens; answered in
+Telegram while they are up, they follow what is left. The journal crosses over
+her face rather than cutting in. **While a trade waits**, a mark sits beside
+her — a near-white ring, with a dark edge since his chart may be light, the
+briefing's dot inside it when both wait — and the menu bar carries the same
+shapes, `○`, `•` or `◉`.
 A click on her takes what waits first, the journal then the briefing;
-*Journal the trade* in her menu does the same. An answer
-is never raced: no look at what waits starts while one is out, and a look one
+*Journal the trade* in her menu does the same. An answer is never raced: no
+look at what waits starts while one is out, and a look one
 overtook is dropped, since it read the row before the answer was written.
 
 **Every failure says what it is and what to do**, as her door's
@@ -4017,7 +4028,8 @@ the upserts, the Telegram sends, the model call — is tested for what it decide
 and through the doors `serve.test.mjs` drives, for what it sends; where a
 decision lives deeper than a test can reach, `agree.test.mjs` reads its source.
 Gmail itself, behind the Apps Script stubs. What Supabase's own `pg_net`,
-`pg_cron` and Vault do, behind `test/db`'s stand-ins. The laptop beyond its pure half and what `agree.test.mjs` reads: the
+`pg_cron` and Vault do, behind `test/db`'s stand-ins. The laptop beyond its
+pure half and what `agree.test.mjs` reads: the
 window, the keys, the microphone, the capture, the sound, the signature and the
 update are the Mac's to show — **To check on the Mac first** in *The laptop*.
 
