@@ -1221,7 +1221,8 @@ calendar probe, one per shape the fold must handle.
 `test/fixtures/tradingview-abroad.json` is every kind of event TradingView listed
 for the seven economies abroad from 7 September to 4 November, read on 5 October
 — 459 kinds, 862 events, each with its country, rating, category and title — so
-what is filed from abroad is judged against the whole catalogue.
+what is filed from abroad is judged against the whole catalogue. It predates
+the 3 November change of ids; `tradingview-home.json`, the US catalogue, follows it.
 
 **`?probe=` is fixed: nothing in the request reaches a tool.** It picks one from
 the table below, every argument is written in the function, and each call's
@@ -1660,7 +1661,15 @@ she already holds, and upserts every timed US release rated medium or above into
 the time, the name with its period (*Core PCE Price Index MoM (Aug)*), the
 country, the importance, the consensus, the prior, and the actual once it prints.
 Low-rated US items are not filed — each would be in front of her on every request
-and none moves gold alone.
+and none moves gold alone. **On 3 November TradingView moved its calendar to new
+ids** — every release since carries a long one and a period that names its year
+(*Non Farm Payrolls (Oct. 2026)*) — and began rating as medium what moves gold not
+at all, so at home `wanted` also names what it leaves out: the three result lines
+of every Treasury auction (`bnd`), farm export sales and the crop report, ethanol,
+the gas rig count, car and truck sales, and the mortgage series beside the 30-year
+rate. `test/fixtures/tradingview-home.json` is the whole US catalogue it is judged
+against, every kind TradingView listed from 2 to 14 November. The new calendar
+lists no speeches: not the Fed's, not the ECB's or the BoJ's.
 
 **From abroad, what she asked for and nothing else** (`wanted`): the central
 banks of the euro area, Britain and Japan (`mny` at medium or above — decisions,
@@ -1871,6 +1880,9 @@ writes the rows first and the mark after:
   answers first and works behind the 200, so its result is one `eugenia_runs`
   row per week under `calendar week`. A refused week is asked again once after a
   pause; refused twice, the walk stops and its last row names where to resume.
+  **Do not walk it over weeks before 3 November 2026**: TradingView now serves
+  them under its new ids, and every release already filed would be filed again
+  beside itself, since a row is keyed on the id.
 
 **A week the read did not reach is not covered either.** `check_rules` reads
 releases newest first, bounded at five hundred over up to a year, so a full read

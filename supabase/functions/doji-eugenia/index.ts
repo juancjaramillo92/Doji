@@ -842,7 +842,10 @@ interface TvEvent {
 
 /* At home, releases only — `timed` false is a marker, not a print — and medium
    or above: low is mortgage rates and rig counts, paid for on every request
-   and moving nothing.
+   and moving nothing. Since TradingView's ids changed on 3 November it rates
+   some of that medium, so it is named: the three result lines of every
+   Treasury auction (`bnd`), farm exports and the crop report, ethanol, the gas
+   rig count, car and truck sales, and the mortgage series beside the 30-year.
 
    Abroad, what she asked for, by kind rather than by rating, which would miss
    most of it: TradingView rates the ECB's president medium, every bond auction
@@ -853,9 +856,10 @@ interface TvEvent {
    files some under `Calendar`, the marker's indicator, at their own minute.
    None of it counts for R-19 or R-20, which are about US releases. */
 const BANKS = ['EU', 'GB', 'JP'], AUCTIONS = ['DE', 'FR', 'IT', 'GB'];
+const NOISE = /^(USDA|WASDE) |Rig Count|Ethanol|^(Car|Truck) Sales$|^MBA (?!30-Year Mortgage Rate$)/;
 
 export function wanted(e: TvEvent): boolean {
-  if (e.country === HOME) return e.timed && e.importance !== 'low';
+  if (e.country === HOME) return e.timed && e.importance !== 'low' && e.category !== 'bnd' && !NOISE.test(e.title);
   if (e.category === 'mny' && BANKS.includes(e.country)) return e.importance !== 'low';
   if (e.category === 'prce') return e.importance === 'high';
   if (AUCTIONS.includes(e.country)) return /Auction|Tender|Syndication/.test(e.title) && !/Month/.test(e.title);
