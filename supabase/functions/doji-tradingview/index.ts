@@ -768,6 +768,15 @@ export function foldRates(prices: Record<string, number>, today: string, meeting
   return { meetings: priced, unread };
 }
 
+/* The Fed's decisions on a calendar read, as New York dates. Since its ids
+   changed on 3 November TradingView calls one "Interest Rate"; the rate on
+   reserve balances, set in the same minute, is not one. A title this misses
+   leaves `unlisted` no meeting to compare, and the check passes whatever the
+   Fed does, so the match is driven against the capture. */
+export function decisions(events: { title: string; at: string }[]): string[] {
+  return events.filter(e => e.title === "Interest Rate").map(e => nyDate(new Date(e.at)));
+}
+
 /* A decision the calendar lists and the table lacks. Only this direction
    refuses: a gap in a feed is not a moved meeting. */
 export function unlisted(listed: string[], meetings = FOMC): string[] {
@@ -799,8 +808,7 @@ export async function readRates() {
     const events = foldCalendar(await tvCall(session, "mcp-tv-get-economic-calendar",
       { countries: "US", date_from: today,
         date_to: new Date(Date.parse(today) + CALENDAR_DAYS * 86_400_000).toISOString().slice(0, 10) }, signal));
-    calendar = events.filter((e: { title: string }) => /interest rate decision/i.test(e.title))
-      .map((e: { at: string }) => nyDate(new Date(e.at)));
+    calendar = decisions(events);
   } catch (err) {
     console.error("doji-tradingview: calendar unread for the meeting check —", unreached(signal, err));
   }
