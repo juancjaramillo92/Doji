@@ -1846,8 +1846,9 @@ writes the rows first and the mark after:
   last row names where to resume. **A filed week is never walked again**: a row
   is keyed on TradingView's id, and when its ids changed on 3 November 2026
   every week behind it came back under new ones, so a second walk would file
-  each release beside itself. A walk that cannot read the marks writes its row
-  and does not start; to file a week again, delete its mark first.
+  each release beside itself. A walk that cannot read the marks does not start:
+  it fails as any job does, with a `history job` row and its apology; to file a
+  week again, delete its mark first.
 
 **A week the read did not reach is not covered either.** `check_rules` reads
 releases newest first, bounded at five hundred over up to a year, so a full read
@@ -3113,9 +3114,10 @@ untrusted: his journal, and notes that are her sentences or his.
 **A failure must reach him, not the console.** `pg_net` discards the function's
 response, nobody reads Edge logs, and `net._http_response` is pruned within
 hours, so the cron half sends a short Telegram message naming the error. **The
-apology names the job that died** — `APOLOGY` is a word per job, and a test
-asserts no two are alike — because a nightly pass that dies is her memory not
-growing, not a missing briefing.
+apology names the job that died** — `APOLOGY` is a word per job, and two tests
+assert no two are alike and that every job that can reach `jobFailed` has its
+own — because a nightly pass that dies is her memory not growing, not a missing
+briefing.
 
 **A read that fails does not take the turn with it.** Everything the tool loop
 serves — `get_trades`, `search_memory`, `remember`, `set_channel` and the rest —
