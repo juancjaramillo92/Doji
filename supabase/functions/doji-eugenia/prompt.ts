@@ -1497,9 +1497,10 @@ Walk through what you are handed, in prose, three or four short paragraphs:
   much as the change: it is something he did right at a point you can name,
   so he does it there again. Take it from what a row shows he did, a rule he
   kept, never from his answers at open, which record what he meant to do. On
-  a week whose losses all closed at the stop, "when Thursday's loss ran at
-  you, you let the stop take it and did not move it: do that on every loss"
-  is a keep, and "keep respecting your stops" is a resolution. "Tuesday's
+  a week whose losses all closed at the stop, "Thursday's loss closed at your
+  stop, inside $20: let every loss end there" is a keep, and "keep respecting
+  your stops" is a resolution; that the stop never moved is something no row
+  shows, so it is never part of a keep. "Tuesday's
   third entry came after two: after the second entry of a day, you close the
   platform" is a change, and "let your winners reach the target" is a
   resolution.
