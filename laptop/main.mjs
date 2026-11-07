@@ -1,11 +1,10 @@
 /* Eugenia on the laptop — the main process.
    ───────────────────────────────────────────────────────────────────────────
-   A third door into her conversation, for when he trades away from home
-   without the charm. Her face floats over his charts; the talk key and he
+   A second door into her conversation, beside Telegram. Her face floats over his charts; the talk key and he
    talks, again and she answers, with Shift and she looks at the chart as
    well. Nothing about her is here: the door is doji-eugenia's, the turn is
    hers, and this file only carries his words and his chart to it and her
-   voice back. Gladys's journal comes with her, as it does on the charm: what
+   voice back. Gladys's journal comes with her: what
    waits is asked of Gladys's door, and his answers carried to it.
 
    This half owns everything the page may not: the keys, the doors, the window
@@ -58,10 +57,9 @@ const DOWNLOAD_MS = 10 * 60_000;
    and open the pane. */
 const LOOK_MS = 8_000;
 const PROMPT_MS = 1_500;
-// Whether a briefing waits, asked every few minutes: the charm's wakings, more often.
+// Whether a briefing waits, asked every few minutes.
 const BRIEFING_EVERY_MS = 5 * 60_000;
-/* What waits for its journal, asked oftener than the charm can afford to:
-   the laptop is awake and online whenever he trades on it, and a trade's
+/* What waits for its journal, asked oftener still: the laptop is awake and online whenever he trades on it, and a trade's
    questions belong to the minute it opened. */
 const JOURNAL_EVERY_MS = 60_000;
 const UPDATE_EVERY_MS = 24 * 60 * 60_000;
@@ -132,13 +130,11 @@ function load() {
 }
 const save = () => writeFileSync(kept('settings.json'), JSON.stringify(settings));
 
-/* A key is tried at its door before it is kept, as the charm's setup tries
-   one. Hers is asked with an empty form, which her door refuses with a 400
+/* A key is tried at its door before it is kept. Hers is asked with an empty form, which her door refuses with a 400
    for a right key — a 503 when the right key finds the door without its
    vendors — and a 401 for a wrong one; Gladys's is asked what waits, which
    her door answers with a 200 for a right key alone. Hers kept and Gladys's
-   never given, the window asks for Gladys's next, as the charm's setup asks
-   for both. */
+   never given, the window asks for Gladys's next. */
 async function tryKey(who, candidate) {
   const signal = AbortSignal.timeout(ASK_MS);
   const res = await (who === 'gladys'
@@ -257,8 +253,8 @@ function bind() {
 
 /* Her menu, in the menu bar and on her Dock icon alike: the menu bar's
    icon carries the marks of what waits, the Dock's is where an app is looked
-   for. The marks are the charm's sleep screen's — a dot for the briefing, a
-   ring for a trade, the dot inside the ring for both. */
+   for. The marks are the ones beside her — a dot for the briefing, a ring
+   for a trade, the dot inside the ring for both. */
 function menu() {
   if (!tray) return;
   const name = talkKey(), accelerator = KEYS[name];
@@ -311,7 +307,7 @@ async function talk(path, body) {
     });
     if (res.status === 401) { askForKey('eugenia'); return send('trouble', 'key'); }
     if (res.status === 503) return send('trouble', 'voice');
-    // Nothing to say: the briefing asked for as midnight passed, or heard on the charm since its dot was drawn.
+    // Nothing to say: the briefing asked for as midnight passed.
     if (res.status === 204) { send('done'); return true; }
     if (!res.ok || !res.body) return send('trouble', 'door');
     const feed = framer((kind, bytes) => send('frame', kind, bytes));
@@ -367,16 +363,15 @@ async function look() {
   return chart.thumbnail.toJPEG(85);
 }
 
-/* The briefing, as the charm has it: a dot beside her and in the menu bar
-   while one waits for him. Her door says whether one does — today's, landed,
-   and heard whole on neither the charm nor the laptop — so the dot goes when
-   he hears it on the charm, at midnight in New York, and stays gone after a
-   restart. Asked as ?briefing=waits, whose answer has no voice in it; the
-   charm's ready line is spoken, and the dot is the news. An answer that is
+/* The briefing: a dot beside her and in the menu bar while one waits for
+   him. Her door says whether one does — today's, landed, and not yet heard
+   whole — so the dot goes at midnight in New York, and stays gone after a
+   restart. Asked as ?briefing=waits, whose answer has no voice in it: the
+   dot is the news. An answer that is
    neither leaves the dot as it was, and so does one asked before a briefing
    heard here ended, since it read the door before the door knew.
 
-   The dot goes once the briefing has come to its end, as on the charm: a
+   The dot goes once the briefing has come to its end: a
    briefing that failed — the line gone, her door's error — leaves it up, to
    be heard again. */
 async function briefing() {
@@ -401,7 +396,7 @@ async function hearBriefing() {
 }
 
 /* ─── Gladys's journal ──────────────────────────────────────────────────────
-   Asked of her door as the charm asks it, on the laptop's own key: a GET
+   Asked of her door on the laptop's own key: a GET
    answers what waits, { waiting, trade }, and an answer is a POST in a tap's
    own grammar, answered with what waits after it, so the page moves on
    without a second request. The page draws the questions and says which

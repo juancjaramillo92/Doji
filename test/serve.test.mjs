@@ -23,8 +23,8 @@ const ENV = {
   GLADYS_BOT_TOKEN: 'gladys', GLADYS_WEBHOOK_SECRET: 'gladys-hook',
   EUGENIA_BOT_TOKEN: 'eugenia', EUGENIA_WEBHOOK_SECRET: 'eugenia-hook',
   ANTHROPIC_API_KEY: 'sk-ant-test', CTRADER_MCP_TOKEN: 'ctrader',
-  EUGENIA_CHARM_SECRET: 'charm', EUGENIA_LAPTOP_SECRET: 'laptop', STT_URL: 'https://stt.test/v1/audio/transcriptions',
-  STT_KEY: 'stt', TTS_KEY: 'tts', GLADYS_CHARM_SECRET: 'gladys-charm', GLADYS_LAPTOP_SECRET: 'gladys-laptop',
+  EUGENIA_LAPTOP_SECRET: 'laptop', STT_URL: 'https://stt.test/v1/audio/transcriptions',
+  STT_KEY: 'stt', TTS_KEY: 'tts', GLADYS_LAPTOP_SECRET: 'gladys-laptop',
 };
 
 let env = ENV;
@@ -265,13 +265,15 @@ test('doji-eugenia: a message, a trade event and the hour each answer first and 
   }
 });
 
-/* ─── The charm: one request, answered at once, her voice after it ─────────
+/* ─── The laptop: one request, answered at once, her voice after it ────────
    Through the real door and the real turn — the transcription, the reads, the
    model, the gate, the speech, the copy and the write — each answered by URL,
-   and what comes back read to its end. */
+   and what comes back read to its end. A form for a body: the recording under
+   the name and type the laptop gave it, and the TradingView window beside his
+   words when he shows it. */
 
 const PCM = [1, 2, 3, 4];
-const charmTurn = (said, answer) => (url, init) => {
+const laptopTurn = (said, answer) => (url, init) => {
   if (url.startsWith('https://stt.test/')) return ok({ text: said });
   if (url.startsWith('https://api.anthropic.com/')) {
     return ok({ model: JSON.parse(init.body).model, stop_reason: 'end_turn',
@@ -281,15 +283,24 @@ const charmTurn = (said, answer) => (url, init) => {
   if (url.includes('/audio/speech')) return Promise.resolve(new Response(new Uint8Array(PCM)));
   if (url.startsWith('https://api.telegram.org/')) return ok({ ok: true });
   if (url.startsWith('https://db.test/rest/v1/')) return ok([]);
-  return Promise.reject(new Error(`the charm asked something unexpected: ${url}`));
+  return Promise.reject(new Error(`the laptop asked something unexpected: ${url}`));
 };
-const charm = (body, headers = {}) => new Request('https://fn.test/functions/v1/doji-eugenia',
-  { method: 'POST', body, headers: { 'x-charm-key': 'charm', ...headers } });
 const bodies = (part) => calls.filter(c => c.url.includes(part)).map(c => JSON.parse(c.body));
+const laptopForm = (voice, chart) => {
+  const form = new FormData();
+  if (voice) form.append('voice', voice, 'laptop.webm');
+  if (chart) form.append('chart', chart, 'chart.png');
+  return form;
+};
+const laptop = (body, key = 'laptop', path = '') =>
+  new Request(`https://fn.test/functions/v1/doji-eugenia${path}`,
+    { method: body === undefined ? 'GET' : 'POST', body, headers: { 'x-laptop-key': key } });
+const webm = new Blob([new Uint8Array(64)], { type: 'audio/webm' });
+const png = new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' });
 
-/* What the charm is sent, read as the charm reads it: a kind byte, three bytes
-   of length, that many bytes, to the last byte. A frame that overran the end
-   or a stray byte after the last is a stream the charm cannot follow. */
+/* What the laptop is sent, read as its framer reads it: a kind byte, three
+   bytes of length, that many bytes, to the last byte. A frame that overran
+   the end or a stray byte after the last is a stream it cannot follow. */
 async function framesOf(res) {
   assert.equal(res.headers.get('content-type'), 'application/octet-stream');
   const b = new Uint8Array(await res.arrayBuffer());
@@ -305,28 +316,30 @@ async function framesOf(res) {
 }
 const voiceOf = (frames) => frames.filter(f => f.kind === 0).flatMap(f => f.bytes);
 
-test('doji-eugenia: the charm is answered at once, hears her answer, and Telegram gets the copy', async () => {
+test('doji-eugenia: the laptop is answered at once, hears her answer, and Telegram gets the copy', async () => {
   const serve = await serving('doji-eugenia');
-  respond = charmTurn('how is gold doing', 'Gold is holding 4,410.');
-  const res = await serve(charm(new Uint8Array(64)));
+  respond = laptopTurn('how is gold doing', 'Gold is holding 4,410.');
+  const res = await serve(laptop(laptopForm(webm)));
   assert.equal(res.status, 200);
-  assert.equal(kept.length, 1, 'the turn was not handed to EdgeRuntime.waitUntil, so a charm that hangs up kills it');
+  assert.equal(kept.length, 1, 'the turn was not handed to EdgeRuntime.waitUntil, so a laptop that hangs up kills it');
 
   const frames = await framesOf(res);
   await Promise.all(kept);
-  assert.deepEqual([...new Set(frames.map(f => f.kind))], [0], 'a frame other than her voice was sent unasked');
+  assert.deepEqual([...new Set(frames.map(f => f.kind))], [0], 'a frame other than her voice was sent');
   const played = voiceOf(frames);
   assert.ok(played.length > PCM.length, 'nothing was on the wire while she thought');
   assert.ok(played.slice(0, -PCM.length).every(b => b === 0),
     'what played before her answer was not silence');
-  assert.deepEqual(played.slice(-PCM.length), PCM, 'her answer is not what the charm played');
+  assert.deepEqual(played.slice(-PCM.length), PCM, 'her answer is not what the laptop played');
 
   const file = calls.find(c => c.url.startsWith('https://stt.test/')).body.get('file');
-  assert.deepEqual([file.name, file.type], ['charm.ogg', 'audio/ogg'],
-    'the recording was handed to transcription as something other than the Ogg it is');
+  assert.deepEqual([file.name, file.type], ['laptop.webm', 'audio/webm'],
+    'the recording was handed to transcription as something other than what the laptop sent');
+  assert.equal(typeof bodies('api.anthropic.com/v1/messages')[0].messages.at(-1).content, 'string',
+    'her turn carried an image he never showed her');
   assert.deepEqual(bodies('/audio/speech').map(b => [b.input, b.response_format]),
     [['Gold is holding 4,410.', 'pcm']],
-    'the charm was read something other than the gated answer, or in a format it cannot play');
+    'the laptop was read something other than the gated answer, or in a format it cannot play');
   assert.deepEqual(bodies('/sendMessage').map(b => b.text), ['«how is gold doing»\n\nGold is holding 4,410.'],
     'Telegram did not get the copy, his words first');
   assert.deepEqual(calls.filter(c => c.url.endsWith('/rest/v1/eugenia_turns')).map(c => JSON.parse(c.body)),
@@ -335,219 +348,14 @@ test('doji-eugenia: the charm is answered at once, hears her answer, and Telegra
     'the exchange was not stored as one conversation with Telegram');
 });
 
-test('doji-eugenia: a long answer reaches the charm whole, every part in order', async () => {
-  // Two paragraphs past the vendor's input limit together: two readings, joined.
-  const long = `${'Gold held. '.repeat(250).trim()}\n\n${'Then it gave way. '.repeat(150).trim()}`;
+test('doji-eugenia: the laptop sees the chart he shows her, and its copy names it', async () => {
   const serve = await serving('doji-eugenia');
-  respond = charmTurn('tell me everything', long);
-  const played = voiceOf(await framesOf(await serve(charm(new Uint8Array(64)))));
+  respond = laptopTurn('what do you make of this', 'A clean break of the Asian high.');
+  await framesOf(await serve(laptop(laptopForm(webm, png))));
   await Promise.all(kept);
-  const read = bodies('/audio/speech').map(b => b.input);
-  assert.equal(read.length, 2, `the answer was read in ${read.length} parts`);
-  assert.equal(read.join('\n\n'), long, 'what was read is not the whole answer, in order');
-  assert.deepEqual(played.slice(-2 * PCM.length), [...PCM, ...PCM], 'the charm did not play every part');
-});
-
-test('doji-eugenia: the charm tells her about itself, and the volume she sets goes ahead of her voice', async () => {
-  const serve = await serving('doji-eugenia');
-  respond = charmTurn('speak up a little', '[volume 80] Is this better, jefe?');
-  const frames = await framesOf(await serve(charm(new Uint8Array(64),
-    { 'x-charm-battery': '37', 'x-charm-charging': '1', 'x-charm-volume': '55' })));
-  await Promise.all(kept);
-  const told = JSON.stringify(bodies('api.anthropic.com/v1/messages')[0].messages.at(-1));
-  for (const fact of ['battery is at 37% and charging', 'volume is 55 of 100', '[volume N]']) {
-    assert.ok(told.includes(fact), `her turn was not told ${fact}`);
-  }
-  const volume = frames.findIndex(f => f.kind === 1);
-  assert.deepEqual(frames[volume]?.bytes, [80], 'the charm was not sent the volume she set');
-  assert.ok(frames.slice(volume + 1).some(f => f.kind === 0 && f.bytes.some(b => b !== 0)) &&
-            !frames.slice(0, volume).some(f => f.bytes.some(b => b !== 0)),
-    'her voice did not wait for the volume');
-  const answer = 'Is this better, jefe?';
-  assert.deepEqual(bodies('/audio/speech').map(b => b.input), [answer], 'the volume marker was read aloud');
-  assert.ok(bodies('/sendMessage')[0].text.endsWith(`\n\n${answer}`), 'the copy carries the volume marker');
-  assert.equal(calls.filter(c => c.url.endsWith('/rest/v1/eugenia_turns'))
-    .map(c => JSON.parse(c.body))[0][1].content, answer, 'the volume marker was stored as hers');
-});
-
-test('doji-eugenia: a low battery is said on the charm after her answer, and nowhere else', async () => {
-  const serve = await serving('doji-eugenia');
-  respond = charmTurn('anything else', 'Nothing more today.');
-  await framesOf(await serve(charm(new Uint8Array(64), { 'x-charm-low': '1' })));
-  await Promise.all(kept);
-  assert.deepEqual(bodies('/audio/speech').map(b => b.input),
-    ["Nothing more today. Jefe, I'm running out of battery. Charge me when you can."],
-    'the charm did not say its battery is low after her answer');
-  assert.ok(!bodies('/sendMessage')[0].text.includes('battery'), 'the battery line reached Telegram');
-  assert.ok(!calls.filter(c => c.url.endsWith('/rest/v1/eugenia_turns')).some(c => c.body.includes('battery')),
-    'the battery line was stored as a turn of hers');
-});
-
-test('doji-eugenia: a recording with no words is answered on the charm, and nothing else happens', async () => {
-  const serve = await serving('doji-eugenia');
-  respond = charmTurn('', 'never asked');
-  const res = await serve(charm(new Uint8Array(64)));
-  await res.arrayBuffer();
-  await Promise.all(kept);
-  assert.match(bodies('/audio/speech')[0]?.input ?? '', /could not make out any words/,
-    'the charm was not told it could not be heard');
-  for (const asked of ['api.anthropic.com', 'api.telegram.org', 'eugenia_turns']) {
-    assert.ok(!calls.some(c => c.url.includes(asked)), `a recording with no words reached ${asked}`);
-  }
-});
-
-test('doji-eugenia: the charm is refused at the door without its vendors or a recording', async () => {
-  for (const unset of ['STT_URL', 'STT_KEY', 'TTS_KEY']) {
-    calls.length = 0;
-    const serve = await serving('doji-eugenia', [unset]);
-    const res = await answer(await serve(charm(new Uint8Array(64))));
-    assert.equal(res.status, 503, `the charm was let in with ${unset} unset`);
-    assert.deepEqual(calls, [], `the charm made a request with ${unset} unset`);
-  }
-  const serve = await serving('doji-eugenia');
-  calls.length = 0;
-  assert.equal((await serve(charm(new Uint8Array(0)))).status, 400, 'an empty recording was let in');
-  assert.deepEqual(calls, [], 'an empty recording made a request');
-  assert.equal((await serve(request('doji-eugenia', { header: 'x-charm-key', key: 'wrong', body: 'x' }))).status,
-    401, 'the charm door admitted a wrong key');
-});
-
-/* The charm's report of a waking is filed as it came, beside her runs, and
-   needs neither vendor: answered before the door asks for them. */
-test('doji-eugenia: the charm files a report of its waking, vendors or not', async () => {
-  const serve = await serving('doji-eugenia', ['STT_URL', 'STT_KEY', 'TTS_KEY']);
-  respond = (url) => url.startsWith('https://db.test/rest/v1/eugenia_runs')
-    ? ok([]) : Promise.reject(new Error(`the report asked something unexpected: ${url}`));
-  calls.length = 0;
-  const report = (key) => new Request('https://fn.test/functions/v1/doji-eugenia?report=1',
-    { method: 'POST', body: 'app=3e45d44 woke=2 lifts=1/0', headers: { 'x-charm-key': key } });
-  assert.equal((await serve(report('charm'))).status, 204, 'the report was not taken');
-  assert.deepEqual(bodies('/rest/v1/eugenia_runs').map(([row]) => [row.caller, row.ok, row.detail]),
-    [['charm', true, 'app=3e45d44 woke=2 lifts=1/0']], 'the report was not filed as it came');
-  calls.length = 0;
-  assert.equal((await serve(report('wrong'))).status, 401, 'a report under a wrong key was taken');
-  assert.deepEqual(calls, [], 'a report under a wrong key made a request');
-});
-
-/* ─── The briefing on the charm ───────────────────────────────────────────
-   The charm wakes after the briefing's hour and asks whether it has landed,
-   then asks for the briefing itself when he presses. Both read today's stored
-   briefing by its marker, as the speaking worker does, and whether either
-   device has heard it: `heard` is when that was, if ever. */
-
-const briefingStored = (content, heard = null) => (url, init) => {
-  if (url.includes('/rest/v1/eugenia_turns?select=created_at')) {
-    return ok(content === null ? [] : [{ created_at: new Date().toISOString() }]);
-  }
-  if (url.includes('/rest/v1/eugenia_turns?select=content')) return ok([{ content }]);
-  if (url.includes('/rest/v1/eugenia_runs?select=at')) return ok(heard ? [{ at: heard }] : []);
-  if (url.endsWith('/rest/v1/eugenia_runs') && init?.method === 'POST') return ok([]);
-  if (url.includes('/audio/speech')) return Promise.resolve(new Response(new Uint8Array(PCM)));
-  return Promise.reject(new Error(`the briefing door asked something unexpected: ${url}`));
-};
-// The runs filed, by caller — a heard briefing is one.
-const filed = () => calls.filter(c => c.method === 'POST' && c.url.endsWith('/rest/v1/eugenia_runs'))
-  .map(c => JSON.parse(c.body)[0].caller);
-const briefingDoor = (which) => new Request(`https://fn.test/functions/v1/doji-eugenia?briefing=${which}`,
-  { method: 'GET', headers: { 'x-charm-key': 'charm' } });
-
-test('doji-eugenia: the charm hears that the briefing landed, then the briefing itself', async () => {
-  const serve = await serving('doji-eugenia');
-  respond = briefingStored('Gold opened quiet.');
-  for (const [which, said] of [['ready', 'Your briefing is ready, jefe.'], ['today', 'Gold opened quiet.']]) {
-    calls.length = 0;
-    const res = await serve(briefingDoor(which));
-    assert.equal(res.status, 200, `?briefing=${which} did not answer with audio`);
-    assert.deepEqual(voiceOf(await framesOf(res)).slice(-PCM.length), PCM);
-    assert.deepEqual(bodies('/audio/speech').map(b => [b.input, b.response_format]), [[said, 'pcm']],
-      `?briefing=${which} read the charm something other than ${JSON.stringify(said)}`);
-    // Sunday's briefing on a Sunday in New York, the weekday one otherwise.
-    const sunday = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' })
-      .format(new Date()) === 'Sun';
-    const marker = calls.find(c => c.url.includes('select=created_at')).url;
-    assert.ok(marker.includes(encodeURIComponent(`[${sunday ? 'sunday' : 'weekday'} briefing]`)),
-      `the charm looked for the wrong briefing today: ${marker}`);
-    // The briefing spoken to its end is heard, and her line that it landed is not.
-    assert.deepEqual(filed(),
-      which === 'today' ? [`${sunday ? 'sunday' : 'weekday'} briefing heard`] : [],
-      `?briefing=${which} marked the briefing heard wrongly`);
-  }
-});
-
-/* Heard on one device is heard on both: today's heard answers every question
-   as though none were stored, and speaks nothing; yesterday's does not. The
-   laptop's question that has no voice answers 200 while one waits. A
-   briefing whose speech broke off is not heard. */
-test('doji-eugenia: a briefing heard on either device is gone from both, and only one heard whole', async () => {
-  const serve = await serving('doji-eugenia');
-  respond = briefingStored('Gold opened quiet.', new Date().toISOString());
-  for (const which of ['ready', 'today', 'waits']) {
-    calls.length = 0;
-    assert.equal((await serve(briefingDoor(which))).status, 204, `?briefing=${which} answered a briefing already heard`);
-    assert.ok(!calls.some(c => c.url.includes('/audio/speech')), `?briefing=${which} spoke a briefing already heard`);
-  }
-
-  respond = briefingStored('Gold opened quiet.', new Date(Date.now() - 86_400_000).toISOString());
-  calls.length = 0;
-  const waits = await serve(briefingDoor('waits'));
-  assert.equal(waits.status, 200, 'a briefing heard yesterday kept today\'s from waiting');
-  assert.equal((await waits.arrayBuffer()).byteLength, 0, '?briefing=waits answered with something to play');
-  assert.ok(!calls.some(c => c.url.includes('/audio/speech')), '?briefing=waits spoke');
-
-  const stored = briefingStored('Gold opened quiet.');
-  respond = (url, init) => url.includes('/audio/speech') ? Promise.resolve(new Response('busy', { status: 503 })) : stored(url, init);
-  calls.length = 0;
-  await framesOf(await serve(briefingDoor('today')));
-  assert.deepEqual(filed(), [], 'a briefing whose speech broke off was marked heard');
-});
-
-test('doji-eugenia: a briefing not stored yet is a 204, and nothing is spoken', async () => {
-  const serve = await serving('doji-eugenia');
-  respond = briefingStored(null);
-  for (const which of ['ready', 'today']) {
-    calls.length = 0;
-    const res = await serve(briefingDoor(which));
-    assert.equal(res.status, 204, `?briefing=${which} answered ${res.status} with no briefing stored`);
-    assert.ok(!calls.some(c => c.url.includes('/audio/speech')), 'a briefing that is not there was spoken');
-  }
-  calls.length = 0;
-  assert.equal((await serve(briefingDoor('yesterday'))).status, 400, 'a briefing door it does not open answered');
-  assert.deepEqual(calls, [], 'a briefing door it does not open made a request');
-});
-
-/* ─── The laptop: the charm's turn, with his chart when he shows it ────────
-   The same door, a form for a body: the recording under the name and type the
-   laptop gave it, and the TradingView window beside his words. */
-
-const laptopForm = (voice, chart) => {
-  const form = new FormData();
-  if (voice) form.append('voice', voice, 'laptop.webm');
-  if (chart) form.append('chart', chart, 'chart.png');
-  return form;
-};
-const laptop = (body, key = 'laptop', path = '') =>
-  new Request(`https://fn.test/functions/v1/doji-eugenia${path}`,
-    { method: body === undefined ? 'GET' : 'POST', body, headers: { 'x-laptop-key': key } });
-const webm = new Blob([new Uint8Array(64)], { type: 'audio/webm' });
-const png = new Blob([new Uint8Array([137, 80, 78, 71])], { type: 'image/png' });
-
-test('doji-eugenia: the laptop is answered as the charm is, and sees the chart he shows her', async () => {
-  const serve = await serving('doji-eugenia');
-  respond = charmTurn('what do you make of this', 'A clean break of the Asian high.');
-  const res = await serve(laptop(laptopForm(webm, png)));
-  assert.equal(res.status, 200);
-  assert.equal(kept.length, 1, 'the turn was not handed to EdgeRuntime.waitUntil, so a laptop that hangs up kills it');
-  const played = voiceOf(await framesOf(res));
-  await Promise.all(kept);
-  assert.deepEqual(played.slice(-PCM.length), PCM, 'her answer is not what the laptop played');
-
-  const file = calls.find(c => c.url.startsWith('https://stt.test/')).body.get('file');
-  assert.deepEqual([file.name, file.type], ['laptop.webm', 'audio/webm'],
-    'the recording was handed to transcription as something other than what the laptop sent');
   const turn = bodies('api.anthropic.com/v1/messages')[0].messages.at(-1);
   assert.deepEqual(turn.content[0], { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'iVBORw==' } },
     'the chart did not reach her turn as the image he showed her');
-  assert.ok(!JSON.stringify(turn).includes('charm'), 'her turn was told about a charm he is not holding');
   assert.deepEqual(bodies('/sendMessage').map(b => b.text),
     ['«what do you make of this» — with your chart\n\nA clean break of the Asian high.'],
     'Telegram did not get the copy, his words first and the chart named');
@@ -557,14 +365,30 @@ test('doji-eugenia: the laptop is answered as the charm is, and sees the chart h
     'the exchange was not stored as one conversation, or the chart was stored with it');
 });
 
-test('doji-eugenia: the laptop talks without a chart, and its copy names none', async () => {
+test('doji-eugenia: a long answer reaches the laptop whole, every part in order', async () => {
+  // Two paragraphs past the vendor's input limit together: two readings, joined.
+  const long = `${'Gold held. '.repeat(250).trim()}\n\n${'Then it gave way. '.repeat(150).trim()}`;
   const serve = await serving('doji-eugenia');
-  respond = charmTurn('how is gold doing', 'Gold is holding 4,410.');
-  await framesOf(await serve(laptop(laptopForm(webm))));
+  respond = laptopTurn('tell me everything', long);
+  const played = voiceOf(await framesOf(await serve(laptop(laptopForm(webm)))));
   await Promise.all(kept);
-  assert.equal(typeof bodies('api.anthropic.com/v1/messages')[0].messages.at(-1).content, 'string',
-    'her turn carried an image he never showed her');
-  assert.deepEqual(bodies('/sendMessage').map(b => b.text), ['«how is gold doing»\n\nGold is holding 4,410.']);
+  const read = bodies('/audio/speech').map(b => b.input);
+  assert.equal(read.length, 2, `the answer was read in ${read.length} parts`);
+  assert.equal(read.join('\n\n'), long, 'what was read is not the whole answer, in order');
+  assert.deepEqual(played.slice(-2 * PCM.length), [...PCM, ...PCM], 'the laptop did not play every part');
+});
+
+test('doji-eugenia: a recording with no words is answered on the laptop, and nothing else happens', async () => {
+  const serve = await serving('doji-eugenia');
+  respond = laptopTurn('', 'never asked');
+  const res = await serve(laptop(laptopForm(webm)));
+  await res.arrayBuffer();
+  await Promise.all(kept);
+  assert.match(bodies('/audio/speech')[0]?.input ?? '', /could not make out any words/,
+    'the laptop was not told it could not be heard');
+  for (const asked of ['api.anthropic.com', 'api.telegram.org', 'eugenia_turns']) {
+    assert.ok(!calls.some(c => c.url.includes(asked)), `a recording with no words reached ${asked}`);
+  }
 });
 
 test('doji-eugenia: the laptop is refused at the door without its vendors, a recording or a chart she can read', async () => {
@@ -590,10 +414,9 @@ test('doji-eugenia: the laptop is refused at the door without its vendors, a rec
     assert.deepEqual(calls, [], `${what} made a request`);
   }
   assert.equal((await serve(laptop(laptopForm(webm), 'wrong'))).status, 401, 'the laptop door admitted a wrong key');
-  assert.equal((await serve(laptop(laptopForm(webm), 'charm'))).status, 401, 'the laptop door admitted the charm\'s key');
 });
 
-test('doji-eugenia: the laptop\'s door is shut while its secret is unset, and the charm\'s stays open', async () => {
+test('doji-eugenia: the laptop\'s door is shut while its secret is unset', async () => {
   const serve = await serving('doji-eugenia', ['EUGENIA_LAPTOP_SECRET']);
   for (const key of ['', 'laptop']) {
     calls.length = 0;
@@ -601,24 +424,88 @@ test('doji-eugenia: the laptop\'s door is shut while its secret is unset, and th
       `the laptop door opened to ${JSON.stringify(key)} with no secret set`);
     assert.deepEqual(calls, [], 'a shut laptop door made a request');
   }
-  respond = briefingStored(null);
-  assert.equal((await serve(briefingDoor('ready'))).status, 204, 'the charm\'s door shut with the laptop\'s');
 });
 
-test('doji-eugenia: the laptop hears that the briefing landed, then the briefing itself', async () => {
+/* ─── The briefing on the laptop ──────────────────────────────────────────
+   The laptop asks every few minutes whether the briefing waits, then asks for
+   the briefing itself when he does. Both read today's stored briefing by its
+   marker, as the speaking worker does, and whether he has heard it: `heard`
+   is when that was, if ever. */
+
+const briefingStored = (content, heard = null) => (url, init) => {
+  if (url.includes('/rest/v1/eugenia_turns?select=created_at')) {
+    return ok(content === null ? [] : [{ created_at: new Date().toISOString() }]);
+  }
+  if (url.includes('/rest/v1/eugenia_turns?select=content')) return ok([{ content }]);
+  if (url.includes('/rest/v1/eugenia_runs?select=at')) return ok(heard ? [{ at: heard }] : []);
+  if (url.endsWith('/rest/v1/eugenia_runs') && init?.method === 'POST') return ok([]);
+  if (url.includes('/audio/speech')) return Promise.resolve(new Response(new Uint8Array(PCM)));
+  return Promise.reject(new Error(`the briefing door asked something unexpected: ${url}`));
+};
+// The runs filed, by caller — a heard briefing is one.
+const filed = () => calls.filter(c => c.method === 'POST' && c.url.endsWith('/rest/v1/eugenia_runs'))
+  .map(c => JSON.parse(c.body)[0].caller);
+const briefingDoor = (which) => laptop(undefined, 'laptop', `?briefing=${which}`);
+
+test('doji-eugenia: the laptop hears the briefing, and it is heard once spoken to its end', async () => {
   const serve = await serving('doji-eugenia');
   respond = briefingStored('Gold opened quiet.');
-  for (const [which, said] of [['ready', 'Your briefing is ready, jefe.'], ['today', 'Gold opened quiet.']]) {
-    calls.length = 0;
-    const res = await serve(laptop(undefined, 'laptop', `?briefing=${which}`));
-    assert.equal(res.status, 200, `?briefing=${which} did not answer the laptop with audio`);
-    assert.deepEqual(voiceOf(await framesOf(res)).slice(-PCM.length), PCM);
-    assert.deepEqual(bodies('/audio/speech').map(b => b.input), [said],
-      `?briefing=${which} read the laptop something other than ${JSON.stringify(said)}`);
-  }
+  const res = await serve(briefingDoor('today'));
+  assert.equal(res.status, 200, '?briefing=today did not answer with audio');
+  assert.deepEqual(voiceOf(await framesOf(res)).slice(-PCM.length), PCM);
+  assert.deepEqual(bodies('/audio/speech').map(b => [b.input, b.response_format]), [['Gold opened quiet.', 'pcm']],
+    '?briefing=today read the laptop something other than the stored briefing');
+  // Sunday's briefing on a Sunday in New York, the weekday one otherwise.
+  const sunday = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', weekday: 'short' })
+    .format(new Date()) === 'Sun';
+  const marker = calls.find(c => c.url.includes('select=created_at')).url;
+  assert.ok(marker.includes(encodeURIComponent(`[${sunday ? 'sunday' : 'weekday'} briefing]`)),
+    `the laptop looked for the wrong briefing today: ${marker}`);
+  assert.deepEqual(filed(), [`${sunday ? 'sunday' : 'weekday'} briefing heard`], 'the briefing spoken to its end was not marked heard');
 });
 
-/* ─── Gladys's charm: what waits, and an answer on its screen ─────────────
+/* Today's heard answers every question as though none were stored, and
+   speaks nothing; yesterday's does not. The question that has no voice
+   answers 200 while one waits. A briefing whose speech broke off is not
+   heard. */
+test('doji-eugenia: a briefing heard is gone, and only one heard whole', async () => {
+  const serve = await serving('doji-eugenia');
+  respond = briefingStored('Gold opened quiet.', new Date().toISOString());
+  for (const which of ['today', 'waits']) {
+    calls.length = 0;
+    assert.equal((await serve(briefingDoor(which))).status, 204, `?briefing=${which} answered a briefing already heard`);
+    assert.ok(!calls.some(c => c.url.includes('/audio/speech')), `?briefing=${which} spoke a briefing already heard`);
+  }
+
+  respond = briefingStored('Gold opened quiet.', new Date(Date.now() - 86_400_000).toISOString());
+  calls.length = 0;
+  const waits = await serve(briefingDoor('waits'));
+  assert.equal(waits.status, 200, 'a briefing heard yesterday kept today\'s from waiting');
+  assert.equal((await waits.arrayBuffer()).byteLength, 0, '?briefing=waits answered with something to play');
+  assert.ok(!calls.some(c => c.url.includes('/audio/speech')), '?briefing=waits spoke');
+
+  const stored = briefingStored('Gold opened quiet.');
+  respond = (url, init) => url.includes('/audio/speech') ? Promise.resolve(new Response('busy', { status: 503 })) : stored(url, init);
+  calls.length = 0;
+  await framesOf(await serve(briefingDoor('today')));
+  assert.deepEqual(filed(), [], 'a briefing whose speech broke off was marked heard');
+});
+
+test('doji-eugenia: a briefing not stored yet is a 204, and nothing is spoken', async () => {
+  const serve = await serving('doji-eugenia');
+  respond = briefingStored(null);
+  for (const which of ['today', 'waits']) {
+    calls.length = 0;
+    const res = await serve(briefingDoor(which));
+    assert.equal(res.status, 204, `?briefing=${which} answered ${res.status} with no briefing stored`);
+    assert.ok(!calls.some(c => c.url.includes('/audio/speech')), 'a briefing that is not there was spoken');
+  }
+  calls.length = 0;
+  assert.equal((await serve(briefingDoor('yesterday'))).status, 400, 'a briefing door it does not open answered');
+  assert.deepEqual(calls, [], 'a briefing door it does not open made a request');
+});
+
+/* ─── Gladys's laptop: what waits, and an answer given on it ──────────────
    What waits is read oldest first from a newest-first page; an answer is a
    tap's own grammar, so it can only ever write one of the four columns. */
 
@@ -627,19 +514,16 @@ const trade = (id, hoursAgo, fields = {}) => ({
   entry_time: new Date(Date.now() - hoursAgo * 3_600_000).toISOString(),
   setup: null, followed_rules: null, followed_sl: null, followed_tp: null, ...fields,
 });
-const gladysCharm = (init = {}) => new Request('https://fn.test/functions/v1/doji-gladys',
-  { method: 'GET', ...init, headers: { 'x-charm-key': 'gladys-charm', ...(init.headers ?? {}) } });
+const gladysLaptop = (init = {}, key = 'gladys-laptop') => new Request('https://fn.test/functions/v1/doji-gladys',
+  { method: 'GET', ...init, headers: { 'x-laptop-key': key } });
 
-test('doji-gladys: the charm is told what waits, oldest first, a week back at most', async () => {
+test('doji-gladys: the laptop is told what waits, oldest first, a week back at most', async () => {
   const serve = await serving('doji-gladys');
-  respond = (url) => url.includes('/rest/v1/trades?') ? ok([trade('PID2', 1), trade('PID1', 30)])
-    : url.endsWith('/storage/v1/object/public/charm/version') ? Promise.resolve(new Response('3e45d44be481'))
-    : pending();
-  const res = await answer(await serve(gladysCharm()));
+  respond = (url) => url.includes('/rest/v1/trades?') ? ok([trade('PID2', 1), trade('PID1', 30)]) : pending();
+  const res = await answer(await serve(gladysLaptop()));
   assert.equal(res.status, 200);
   assert.equal(res.body.waiting, 2);
-  assert.equal(res.body.app, '3e45d44be481', 'the charm is not told the newest app the workflow published');
-  assert.equal(res.body.trade.id, 'PID1', 'the charm was handed the newer trade first');
+  assert.equal(res.body.trade.id, 'PID1', 'the laptop was handed the newer trade first');
   const read = decodeURIComponent(calls[0].url);
   for (const part of ['deleted=is.false', 'entry_time=gte.', 'order=entry_time.desc', 'limit=20',
                       'or=(setup.is.null,followed_rules.is.null,followed_sl.is.null,followed_tp.is.null)']) {
@@ -650,72 +534,37 @@ test('doji-gladys: the charm is told what waits, oldest first, a week back at mo
   assert.ok(days > 6.9 && days < 7.1, `what waits reaches back ${days.toFixed(2)} days, not a week`);
 });
 
-test('doji-gladys: an answer from the charm writes its one column, then says what waits', async () => {
+test('doji-gladys: an answer from the laptop writes its one column, then says what waits', async () => {
   const serve = await serving('doji-gladys');
   respond = (url, init) => {
     if (init.method === 'PATCH') return ok([trade('PID1', 30, JSON.parse(init.body))]);
     if (url.includes('/rest/v1/trades?')) return ok([]);
-    // The version unread: the answer still comes, without it.
-    if (url.includes('/storage/')) return Promise.resolve(new Response('', { status: 404 }));
     return pending();
   };
-  const res = await answer(await serve(gladysCharm({ method: 'POST', body: JSON.stringify({ data: 'PID1|sl|1' }) })));
-  assert.deepEqual(res, { status: 200, body: { ok: true, waiting: 0, trade: null, app: null } });
+  const res = await answer(await serve(gladysLaptop({ method: 'POST', body: JSON.stringify({ data: 'PID1|sl|1' }) })));
+  assert.deepEqual(res, { status: 200, body: { ok: true, waiting: 0, trade: null } });
   const writes = calls.filter(c => c.method === 'PATCH');
   assert.equal(writes.length, 1);
   assert.ok(writes[0].url.includes('trades?id=eq.PID1'), writes[0].url);
-  assert.deepEqual(JSON.parse(writes[0].body), { followed_sl: true }, 'the charm wrote more than its one answer');
+  assert.deepEqual(JSON.parse(writes[0].body), { followed_sl: true }, 'the laptop wrote more than its one answer');
 });
 
-test('doji-gladys: the charm cannot write anything but an answer, and is shut without its key', async () => {
+test('doji-gladys: the laptop cannot write anything but an answer, and is shut without its key', async () => {
   const serve = await serving('doji-gladys');
   for (const body of [JSON.stringify({ data: 'PID1|edit' }), JSON.stringify({ data: 'PID1|exit_price|1' }),
                       JSON.stringify({ data: 'PID1|setup|Scalp' }), JSON.stringify({ data: 'PID1|rules|yes' }),
                       'not json']) {
     calls.length = 0;
-    const res = await answer(await serve(gladysCharm({ method: 'POST', body })));
-    assert.equal(res.status, 400, `the charm's ${body} was accepted`);
-    assert.deepEqual(calls, [], `the charm's ${body} made a request`);
+    const res = await answer(await serve(gladysLaptop({ method: 'POST', body })));
+    assert.equal(res.status, 400, `the laptop's ${body} was accepted`);
+    assert.deepEqual(calls, [], `the laptop's ${body} made a request`);
   }
-  const shut = await serving('doji-gladys', ['GLADYS_CHARM_SECRET']);
   calls.length = 0;
-  assert.equal((await shut(gladysCharm())).status, 401, 'the charm door opened with its secret unset');
-  assert.deepEqual(calls, [], 'a shut charm door made a request');
-});
-
-/* The laptop asks the charm's half on a key of its own, so a lost laptop is
-   cut off without touching the charm: neither key opens the other's header,
-   and with its secret unset the laptop's door is shut. */
-const gladysLaptop = (key, init = {}) => new Request('https://fn.test/functions/v1/doji-gladys',
-  { method: 'GET', ...init, headers: { 'x-laptop-key': key } });
-
-test('doji-gladys: the laptop journals as the charm does, on a key of its own', async () => {
-  const serve = await serving('doji-gladys');
-  respond = (url, init) => {
-    if (init.method === 'PATCH') return ok([trade('PID1', 2, JSON.parse(init.body))]);
-    if (url.includes('/rest/v1/trades?')) return ok([trade('PID1', 2, { setup: 'Break & Retest' })]);
-    if (url.includes('/storage/')) return Promise.resolve(new Response('', { status: 404 }));
-    return pending();
-  };
-  const told = await answer(await serve(gladysLaptop('gladys-laptop')));
-  assert.equal(told.status, 200);
-  assert.equal(told.body.waiting, 1);
-  assert.equal(told.body.trade.id, 'PID1', 'the laptop is not told what waits');
-
-  calls.length = 0;
-  const after = await answer(await serve(gladysLaptop('gladys-laptop', { method: 'POST', body: JSON.stringify({ data: 'PID1|rules|0' }) })));
-  assert.equal(after.status, 200);
-  const writes = calls.filter(c => c.method === 'PATCH');
-  assert.equal(writes.length, 1);
-  assert.deepEqual(JSON.parse(writes[0].body), { followed_rules: false }, 'the laptop wrote more than its one answer');
-  assert.equal(after.body.trade.id, 'PID1', 'the laptop\'s answer is not answered with what waits after it');
-
-  calls.length = 0;
-  assert.equal((await serve(gladysLaptop('gladys-charm'))).status, 401, 'the charm\'s key opens the laptop\'s door');
-  assert.equal((await serve(gladysCharm({ headers: { 'x-charm-key': 'gladys-laptop' } }))).status, 401,
-    'the laptop\'s key opens the charm\'s door');
+  assert.equal((await serve(gladysLaptop({}, 'wrong'))).status, 401, 'the laptop door admitted a wrong key');
   const shut = await serving('doji-gladys', ['GLADYS_LAPTOP_SECRET']);
-  assert.equal((await shut(gladysLaptop(''))).status, 401, 'the laptop door opened with its secret unset');
+  for (const key of ['', 'gladys-laptop']) {
+    assert.equal((await shut(gladysLaptop({}, key))).status, 401, `the laptop door opened to ${JSON.stringify(key)} with its secret unset`);
+  }
   assert.deepEqual(calls, [], 'a refused laptop made a request');
 });
 

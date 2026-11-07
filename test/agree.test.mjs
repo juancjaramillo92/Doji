@@ -77,10 +77,10 @@ const CRON_SQL = subject('Everything that runs on a timer');
 const SEMANTIC_SQL = subject('Searching her memory');
 const SCHEMA_008 = subject('Whether the silent writers are writing');
 const EUGENIA_TS = source('supabase/functions/doji-eugenia/index.ts');
-// The words ?briefing= is answered for, as charmBriefing refuses every other.
+// The words ?briefing= is answered for, as laptopBriefing refuses every other.
 const BRIEFING_WORDS = () => {
   const refused = EUGENIA_TS.match(/if \(((?:which !== '\w+'(?: && )?)+)\) \{\s*return json\(\{ ok: false, error: "briefing is/)?.[1];
-  assert.ok(refused, 'charmBriefing no longer refuses the words it does not answer as this test reads it');
+  assert.ok(refused, 'laptopBriefing no longer refuses the words it does not answer as this test reads it');
   return [...refused.matchAll(/'(\w+)'/g)].map(m => m[1]).sort();
 };
 const EUGENIA_PROMPT = source('supabase/functions/doji-eugenia/prompt.ts');
@@ -240,168 +240,10 @@ test('the setups vocabulary is the same list in all three places', async () => {
   } finally { close(); }
 });
 
-/* Gladys's charm sends a setup by its name and an answer by its key, and reads
-   the trade's answers by their columns: the same three lists in C. */
-const GLADYS_C = source('charm/main/gladys.c');
-
-test('Gladys\'s charm sends the setups and answers her door takes', () => {
-  const setups = GLADYS_C.match(/SETUPS\[2\] = \{ ("[^"]+"), ("[^"]+") \}/);
-  assert.ok(setups, 'gladys.c no longer lists SETUPS as this test reads them');
-  assert.deepEqual(setups.slice(1).map(s => JSON.parse(s)), [...SETUPS],
-    'the charm offers a setup her door would refuse');
-
-  const pairs = [...GLADYS_C.matchAll(/\{ "(\w+)",\s*"(\w+)" \}/g)].map(m => [m[1], m[2]]);
-  assert.deepEqual(pairs, Object.entries(COLUMNS),
-    'the charm answers a key, or reads a column, her door does not have — or in another order ' +
-    'than the screens ask them');
-});
-
-/* Eugenia's charm tells her door about itself in headers, and reads her
-   answer in frames whose kinds are a copy of the door's. Both directions: a
-   header the charm sends that nothing reads is news she never hears, and one
-   the door reads that the charm never sends is a sentence she is never told. */
-test('Eugenia\'s charm sends the headers her door reads, and knows the frames it sends', () => {
-  const talk = source('charm/main/talk.c');
-  const sent = [...talk.matchAll(/esp_http_client_set_header\(h, "(x-charm-[\w-]+)"/g)].map(m => m[1]).sort();
-  const read = [...new Set([...EUGENIA_TS.matchAll(/\.get\((['"])(x-charm-[\w-]+)\1\)|percent\('(x-charm-[\w-]+)'\)/g)]
-    .map(m => m[2] ?? m[3]))].sort();
-  assert.ok(sent.length > 1, 'talk.c no longer sets its headers as this test reads them');
-  assert.deepEqual(sent, read, 'the charm sends a header her door does not read, or the door reads one it never sends');
-
-  const kinds = Object.fromEntries([...source('charm/main/frames.h').matchAll(/^#define FRAME_(\w+)\s+(\d+)$/gm)]
-    .map(m => [m[1].toLowerCase(), Number(m[2])]));
-  assert.deepEqual(kinds, { ...FRAME }, 'the charm and her door number the frames differently');
-
-  // Each Ogg page counts FRAME_MS of sound, and the encoder is set to its own
-  // frame by name: two spellings of one length, a granule apart if they part.
-  const ms = talk.match(/^#define FRAME_MS\s+(\d+)/m), set = [...talk.matchAll(/ESP_OPUS_ENC_FRAME_DURATION_(\d+)_MS/g)];
-  assert.ok(ms && set.length === 1, 'talk.c no longer sets the encoder\'s frame and counts it as this test reads them');
-  assert.equal(set[0][1], ms[1], 'the Ogg pages count a frame the encoder is not making');
-});
-
-/* Three more things the charm holds of her door, each a number or a word in
-   C beside the one in TypeScript it must agree with. The charm hangs up on a
-   silence longer than READ_MS, so it must outlast two of her BEAT_MS beats;
-   it records into FILE_ROOM, which her door refuses past FILE_MAX; and it
-   asks ?briefing= for the words charmBriefing answers, and no other. */
-test('the charm waits out her silence, records what her door takes, and asks the briefing it answers', () => {
-  const talk = source('charm/main/talk.c');
-  const number = (text, pattern, what) => {
-    const m = text.match(pattern);
-    assert.ok(m && /^[\d\s*+()_]+$/.test(m[1]), `${what} is no longer defined as this test reads it`);
-    return Function(`return ${m[1].replace(/_/g, '')}`)();
-  };
-  const readMs = number(talk, /^#define READ_MS\s+(.+)$/m, "talk.c's READ_MS");
-  const beatMs = number(EUGENIA_TS, /^const BEAT_MS = (.+);$/m, "doji-eugenia's BEAT_MS");
-  assert.ok(readMs >= 2 * beatMs,
-    `the charm gives up after ${readMs} ms of nothing, inside two of her ${beatMs} ms beats — it hangs up while she thinks`);
-  const room = number(talk, /^#define FILE_ROOM\s+(.+)$/m, "talk.c's FILE_ROOM");
-  const max = number(EUGENIA_TS, /^const FILE_MAX = (.+);$/m, "doji-eugenia's FILE_MAX");
-  assert.ok(room <= max, `the charm records up to ${room} bytes and her door refuses past ${max}`);
-
-  const asked = [...talk.matchAll(/EUGENIA_DOOR "\?briefing=(\w+)"/g)].map(m => m[1]).sort();
-  const door = BRIEFING_WORDS();
-  assert.ok(asked.length, 'talk.c no longer names the briefing as this test reads it');
-  for (const word of asked) assert.ok(door.includes(word), `the charm asks ?briefing=${word} and her door answers ${door.join(', ')}`);
-  // The waking's report: the flag the charm sends is the one her door reads.
-  const sent = talk.match(/EUGENIA_DOOR "\?(\w+)=1", HTTP_METHOD_POST/)?.[1];
-  assert.ok(sent && EUGENIA_TS.includes(`searchParams.has("${sent}")`),
-    `the charm files its report under ?${sent}= and her door reads no such flag`);
-});
-
-/* The rest of what the charm reads off her door is not a name but a value:
-   two headers she compares with one, and the rate her voice is played at,
-   which only the vendor's `pcm` fixes. */
-test('the charm sends the values her door compares, and plays her voice at its rate', () => {
-  const talk = source('charm/main/talk.c');
-  const compared = [...EUGENIA_TS.matchAll(/\.get\('(x-charm-[\w-]+)'\) === '([^']*)'/g)];
-  assert.ok(compared.length >= 2, `only ${compared.length} header values read out of doji-eugenia — the reader has gone blind`);
-  for (const [, name, value] of compared) {
-    assert.match(talk, new RegExp(`esp_http_client_set_header\\(h, "${name}", (?:[^;]*\\? )?"${value}"`),
-      `her door reads ${name} as '${value}' and the charm never sends that — what it means is never said`);
-  }
-  const rate = talk.match(/^#define HER_RATE\s+(\d+)/m), pcm = EUGENIA_TS.match(/^const PCM_RATE = ([\d_]+);$/m);
-  assert.ok(rate && pcm, 'talk.c or doji-eugenia no longer names the rate as this test reads it');
-  assert.equal(Number(rate[1]), Number(pcm[1].replace(/_/g, '')),
-    'the charm plays her voice at a rate the vendor does not speak it at');
-});
-
-/* Gladys's door answers JSON the charm picks apart by key, and takes an answer
-   as one key: a rename on either side is a charm that sees nothing waiting, or
-   an answer refused as a malformed body. */
-test('Gladys\'s charm reads the keys her door answers with, and posts the one it reads', () => {
-  const gladys = source('supabase/functions/doji-gladys/index.ts');
-  const answered = bodyOf(gladys, 'async function waiting(').match(/return json\(\{ ([^}]+) \}\);/);
-  assert.ok(answered, 'waiting() no longer answers as this test reads it');
-  const keys = answered[1].split(',').map(k => k.split(':')[0].trim());
-  const root = [...GLADYS_C.matchAll(/cJSON_GetObjectItem\(root, "(\w+)"\)/g)].map(m => m[1]);
-  assert.ok(root.length >= 2, 'gladys.c no longer reads her answer as this test reads it');
-  for (const k of root) {
-    assert.ok(keys.includes(k), `the charm reads "${k}" and her door answers ${keys.join(', ')}`);
-  }
-  const select = gladys.match(/const SELECT = "([^"]+)"/)?.[1].split(',');
-  assert.ok(select, 'doji-gladys no longer names the columns it selects as this test reads them');
-  const fields = [...GLADYS_C.matchAll(/cJSON_GetObjectItem\(trade, "(\w+)"\)/g)].map(m => m[1]);
-  assert.ok(fields.length, 'gladys.c no longer reads the trade as this test reads it');
-  for (const f of [...fields, ...Object.values(COLUMNS)]) {
-    assert.ok(select.includes(f), `the charm reads the trade's ${f} and her door does not select it`);
-  }
-  const posted = GLADYS_C.match(/"\{\\"(\w+)\\":\\"%s\|%s\|%s\\"\}"/);
-  assert.ok(posted, 'gladys.c no longer posts its answer as this test reads it');
-  assert.match(bodyOf(gladys, 'async function charmAnswer('), new RegExp(`\\?\\.${posted[1]}\\b`),
-    `the charm posts its answer as "${posted[1]}" and her door reads it under another key`);
-});
-
-/* The setup proves a key by asking its door: the answer a right key gets is a
-   status in setup.c and a refusal in each function. */
-test('the setup proves a key by the answers each door gives a right one', () => {
-  const m = source('charm/main/setup.c')
-    .match(/bool ok = status == (\d+) \|\| \(eugenia \? status == (\d+) : status == (\d+)\);/);
-  assert.ok(m, 'setup.c no longer judges a key as this test reads it');
-  const [short, eugenia, gladys] = m.slice(1);
-  const door = EUGENIA_TS.slice(EUGENIA_TS.indexOf('if (secretMatches(fromCharm, CHARM_SECRET))'));
-  assert.match(door, new RegExp(`"the charm needs STT_URL, STT_KEY and TTS_KEY" \\}, ${short}\\)`),
-    `the setup takes a ${short} as a right key at a door short of its vendors, and her door answers that otherwise`);
-  assert.match(door, new RegExp(`a recording, up to \\$\\{FILE_MAX\\} bytes\` \\}, ${eugenia}\\)`),
-    `the setup takes a ${eugenia} as Eugenia's answer to a right key, and her door refuses an empty recording otherwise`);
-  // Gladys's GET is waiting(), answered with json's own status.
-  assert.match(source('supabase/functions/doji-gladys/index.ts'), /\? await charmAnswer\(req\) : await waiting\(\)/);
-  assert.equal(source('supabase/functions/_shared/edge.ts').match(/export const json = \(body: unknown, status = (\d+)\)/)?.[1],
-    gladys, `the setup takes a ${gladys} as Gladys's answer to a right key, and her door answers what waits otherwise`);
-});
-
-/* Her door serves today's briefing alone, so the dot that says one waits goes
-   at midnight: decided by briefing_today, which the charm suite drives, and
-   asked where the marks are drawn, which only this can read. */
-test('the sleep screen never promises a briefing her door has stopped serving', () => {
-  const body = bodyOf(source('charm/main/main.c'), 'static void sleep_now(void) {');
-  const drop = body.indexOf('if (briefing_waits && !briefing_today(time(NULL))) briefing_waits = false;');
-  assert.ok(drop > -1 && body.indexOf('face_marks(briefing_waits') > drop,
-    'the sleep screen draws a briefing waiting before asking whether it is still today\'s');
-});
-
-/* The charm updates herself from the object the charm workflow publishes, and
-   the workflow checks the image it builds holds the app where the bootloader
-   looks: two names and an offset, each written in two files. */
-test('the charm updates from what the workflow publishes, and the image holds the app where it boots', () => {
-  const net = source('charm/main/net.h'), workflow = source('.github/workflows/charm.yml');
-  const reads = net.match(/#define FIRMWARE_URL "https:\/\/\w+\.supabase\.co\/storage\/v1\/object\/public\/(\w+)\/([\w.]+)"/);
-  const writes = workflow.match(/\/storage\/v1\/object\/(\w+)\/([\w.]+)"/);
-  const made = workflow.match(/"id":"(\w+)","name":"\w+","public":true/);
-  assert.ok(reads && writes && made, 'net.h or charm.yml no longer names the update as this test reads it');
-  assert.deepEqual(reads.slice(1), writes.slice(1), 'the charm looks for her update where the workflow does not put it');
-  assert.equal(made[1], reads[1], 'the workflow makes a bucket the charm does not read from');
-
-  const slot = source('charm/partitions.csv').match(/^ota_0,\s*app,\s*ota_0,\s*(0x[0-9a-f]+),/im);
-  const checked = workflow.match(/test "\$full" -ge \$\(\( (0x[0-9a-f]+) \+ app \)\)/i);
-  assert.ok(slot && checked, 'partitions.csv or charm.yml no longer places the app as this test reads it');
-  assert.equal(Number(checked[1]), Number(slot[1]), 'the workflow checks for the app at an offset the partition table does not boot from');
-});
-
-/* ─── The laptop: a third door, and the charm's face ───────────────────────
-   laptop/ is JavaScript in Electron, a fourth runtime beside the door it
-   calls and the charm whose face it draws. Every fact it shares with either
-   is a copy, read here out of both. */
+/* ─── The laptop: a second door ────────────────────────────────────────────
+   laptop/ is JavaScript in Electron, a runtime of its own beside the door it
+   calls. Every fact it shares with the door is a copy, read here out of
+   both. */
 const LAPTOP_MAIN = source('laptop/main.mjs');
 const LAPTOP_FACE = source('laptop/face.mjs');
 const LAPTOP_DOOR = EUGENIA_TS.slice(EUGENIA_TS.indexOf('if (secretMatches(fromLaptop, LAPTOP_SECRET))'));
@@ -437,22 +279,19 @@ test('the laptop knocks with the key, the form and the words her door reads', ()
   const chart = appended.find(m => m[1] === 'chart');
   assert.ok(chart && images.includes(chart[2]), `the laptop sends its chart as ${chart?.[2]}, which her door refuses`);
 
-  // Every word the laptop asks is one her door answers, and every word her door answers is asked by the charm or the laptop.
+  // Every word the laptop asks is one her door answers, and every word her door answers the laptop asks.
   const asked = [...new Set([...LAPTOP_MAIN.matchAll(/\?briefing=(\w+)/g)].map(m => m[1]))].sort();
-  const charm = [...source('charm/main/talk.c').matchAll(/EUGENIA_DOOR "\?briefing=(\w+)"/g)].map(m => m[1]);
-  const door = BRIEFING_WORDS();
   assert.ok(asked.length, 'the laptop no longer names the briefing as this test reads it');
-  for (const word of asked) assert.ok(door.includes(word), `the laptop asks ?briefing=${word} and her door answers ${door.join(', ')}`);
-  assert.deepEqual([...new Set([...asked, ...charm])].sort(), door, 'her door answers a ?briefing= word neither device asks');
-  // The dot goes once the briefing came to its end, as the charm's does, and a failed one leaves it up.
+  assert.deepEqual(asked, BRIEFING_WORDS(), 'the laptop asks a ?briefing= word her door does not answer, or her door answers one it never asks');
+  // The dot goes once the briefing came to its end, and a failed one leaves it up.
   assert.match(bodyOf(LAPTOP_MAIN, 'async function hearBriefing('), /\(\) \{\s*if \(!await talk\('\?briefing=today'\)\) return;[^]*briefingWaits = false;/,
     'the laptop lets the briefing\'s dot go before the briefing came to its end, and a failed one is lost for the day');
-  // Her door's 204 is nothing to play, on the laptop as on the charm.
-  assert.match(EUGENIA_TS, /return new Response\(null, \{ status: 204 \}\);/, 'charmBriefing no longer answers a briefing not there with a 204');
+  // Her door's 204 is nothing to play.
+  assert.match(EUGENIA_TS, /return new Response\(null, \{ status: 204 \}\);/, 'laptopBriefing no longer answers a briefing not there with a 204');
   assert.match(bodyOf(LAPTOP_MAIN, 'async function talk('), /if \(res\.status === 204\) \{ send\('done'\); return true; \}/,
     'the laptop reads her door\'s 204 as a failure, and a briefing no longer there shows her confused');
-  assert.match(LAPTOP_DOOR, /if \(briefing !== null\) return await charmBriefing\(briefing\);/,
-    'the laptop\'s door no longer answers the briefing as the charm\'s does');
+  assert.match(LAPTOP_DOOR, /if \(briefing !== null\) return await laptopBriefing\(briefing\);/,
+    'the laptop\'s door no longer answers the briefing');
 });
 
 /* Each key is proved by asking its door — hers with an empty form, Gladys's
@@ -469,7 +308,7 @@ test('the laptop proves each key by the answers its door gives a right one', () 
   assert.match(LAPTOP_MAIN, /fetch\(DOOR, \{ method: 'POST', body: new FormData\(\), headers: \{ 'x-laptop-key': candidate \}/,
     'tryKey no longer asks her door with an empty form');
   // Gladys's GET is waiting(), answered with json's own status.
-  assert.match(GLADYS_TS, /\? await charmAnswer\(req\) : await waiting\(\)/, 'Gladys\'s door no longer answers a GET with what waits');
+  assert.match(GLADYS_TS, /\? await laptopAnswer\(req\) : await waiting\(\)/, 'Gladys\'s door no longer answers a GET with what waits');
   assert.equal(source('supabase/functions/_shared/edge.ts').match(/export const json = \(body: unknown, status = (\d+)\)/)?.[1],
     gladys, `the laptop takes a ${gladys} as Gladys's answer to a right key, and her door answers what waits otherwise`);
   assert.match(LAPTOP_MAIN, /fetch\(GLADYS, \{ headers: \{ 'x-laptop-key': candidate \}, signal \}\)/,
@@ -492,46 +331,9 @@ test('the laptop records no more than her door takes', () => {
   assert.match(LAPTOP_FACE, /recorder\.stop\(\); \}, RECORD_MS\);/, 'nothing stops a recording at RECORD_MS');
 });
 
-/* The face is the charm's, drawn by a second hand. Its geometry in
-   face_geometry_t's order, its thought dots, the four colours of the drawing
-   itself and the emeralds of the ring, each read out of face.c and palette.h. */
-test('the laptop draws the charm\'s face, at the charm\'s numbers and in its colours', () => {
-  const face = source('charm/main/face.c');
-  const numbers = (text) => [...text.matchAll(/-?\d+(?:\.\d+)?/g)].map(m => Number(m[0]));
-  const block = (text, from, what) => {
-    const at = text.indexOf(from);
-    assert.ok(at > -1, `${what} no longer begins as this test reads it`);
-    return text.slice(at + from.length, text.indexOf(';', at));
-  };
-  const geometry = numbers(block(face, 'static const face_geometry_t F =', "face.c's F"));
-  assert.ok(geometry.length >= 15, `only ${geometry.length} numbers in face.c's F — the reader has gone blind`);
-  assert.deepEqual(numbers(block(LAPTOP_FACE, 'const F =', "face.mjs's F").replace(/eye_[lr]|mouth_w/g, '')), geometry,
-    'the laptop draws her eyes, highlight or smile somewhere the charm does not');
-  assert.deepEqual(numbers(block(LAPTOP_FACE, 'const DOTS =', "face.mjs's DOTS")),
-    numbers(block(face, 'static const float dots[3][3] =', "face.c's thought dots").replace(/\[3\]\[3\]/, '')),
-    'the laptop\'s thought dots are not where the charm\'s are');
-
-  const drawn = bodyOf(face, 'static void draw_face(', 'face.c has no draw_face()');
-  const inks = [...new Set([...drawn.matchAll(/lv_color_hex\(0x([0-9a-f]{6})\)/gi)].map(m => `#${m[1].toLowerCase()}`))].sort();
-  const copied = LAPTOP_FACE.match(/^const FEATURES = '(#\w+)', SHINE = '(#\w+)', THROAT = '(#\w+)', THOUGHT = '(#\w+)';$/m);
-  assert.ok(inks.length >= 4 && copied, 'face.c or face.mjs no longer names the drawing\'s colours as this test reads them');
-  assert.deepEqual(copied.slice(1).sort(), inks, 'the laptop draws her face in colours the charm does not');
-
-  const palette = Object.fromEntries([...source('charm/main/palette.h').matchAll(/^#define (\w+)\s+0x([0-9a-f]{6})/gim)]
-    .map(m => [m[1], `#${m[2].toLowerCase()}`]));
-  const emeralds = [...LAPTOP_FACE.matchAll(/\b([A-Z]+) = '(#[0-9a-f]{6})'/g)].filter(m => m[1] in palette);
-  assert.ok(emeralds.length >= 4, `only ${emeralds.length} of palette.h's colours found in face.mjs — the reader has gone blind`);
-  for (const [, name, hex] of emeralds) assert.equal(hex, palette[name], `face.mjs's ${name} is not palette.h's`);
-  // The ring turns through the charm's RING, in its order.
-  const ring = face.match(/static const uint32_t RING\[\] = \{ ([A-Z, ]+) \};/)?.[1].split(', ');
-  assert.ok(ring, 'face.c no longer lists RING as this test reads it');
-  assert.match(LAPTOP_FACE, new RegExp(`\\[${ring.join(', ')}\\]\\.forEach`), 'the laptop\'s ring turns through other colours than the charm\'s');
-});
-
-/* Gladys's journal on the laptop asks her door as the charm does: the header
-   her door reads, the four answers by key and column and the setups by name,
-   the keys of her answer it reads and the one it posts. The laptop's door is
-   the charm's half, on a key of its own. */
+/* Gladys's journal on the laptop asks her door: the header her door reads,
+   the four answers by key and column and the setups by name, the keys of her
+   answer it reads and the one it posts. */
 test('the laptop journals through the door, the keys and the answers Gladys reads', async () => {
   const { ANSWERS, SETUPS: setups } = await import('../laptop/journal.mjs');
   assert.deepEqual(ANSWERS, Object.entries(COLUMNS),
@@ -543,8 +345,8 @@ test('the laptop journals through the door, the keys and the answers Gladys read
   const sent = [...knocked.matchAll(/'(x-[\w-]+)'/g)].map(m => m[1]);
   assert.deepEqual(sent, ['x-laptop-key'], 'the laptop knocks at Gladys\'s door with another header');
   assert.match(GLADYS_TS, /const fromLaptop\s+= req\.headers\.get\("x-laptop-key"\);/, 'Gladys\'s door no longer reads the laptop\'s header');
-  assert.match(GLADYS_TS, /if \(secretMatches\(fromCharm, CHARM_SECRET\) \|\| secretMatches\(fromLaptop, LAPTOP_SECRET\)\) \{\s*return req\.method === "POST" \? await charmAnswer\(req\) : await waiting\(\);/,
-    'the laptop\'s key no longer opens the charm\'s half of Gladys\'s door');
+  assert.match(GLADYS_TS, /if \(secretMatches\(fromLaptop, LAPTOP_SECRET\)\) \{\s*return req\.method === "POST" \? await laptopAnswer\(req\) : await waiting\(\);/,
+    'the laptop\'s key no longer opens its half of Gladys\'s door');
   assert.match(GLADYS_TS, /^const LAPTOP_SECRET\s+= env\("GLADYS_LAPTOP_SECRET"\);$/m, 'Gladys\'s laptop key is no longer her own');
 
   const answered = bodyOf(GLADYS_TS, 'async function waiting(').match(/return json\(\{ ([^}]+) \}\);/);
@@ -561,84 +363,8 @@ test('the laptop journals through the door, the keys and the answers Gladys read
   assert.match(LAPTOP_FACE, /window\.doji\.answer\(j\.trade\.id, /, 'the page no longer answers a trade by its id');
   const posted = bodyOf(LAPTOP_MAIN, 'async function answer(').match(/JSON\.stringify\(\{ (\w+): tap\(/)?.[1];
   assert.ok(posted, 'answer() no longer posts its answer as this test reads it');
-  assert.match(bodyOf(GLADYS_TS, 'async function charmAnswer('), new RegExp(`\\?\\.${posted}\\b`),
+  assert.match(bodyOf(GLADYS_TS, 'async function laptopAnswer('), new RegExp(`\\?\\.${posted}\\b`),
     `the laptop posts its answer as "${posted}" and her door reads it under another key`);
-});
-
-/* The journal's screens are the charm's, drawn by a second hand: the words,
-   the halves' gradients, the tag, the pill, the dots, the tick, the ring and
-   the times, each read out of journal.c, with its colours by palette.h's
-   names; the first question as gladys.c picks it; and the mark for a trade
-   waiting, face.c's sleep screen's ring. */
-test('the laptop draws the charm\'s journal, at its numbers, times and colours', () => {
-  const journal = source('charm/main/journal.c'), face = source('charm/main/face.c');
-  const palette = Object.fromEntries([...source('charm/main/palette.h').matchAll(/^#define (\w+)\s+0x([0-9a-f]{6})/gim)]
-    .map(m => [m[1], `#${m[2].toLowerCase()}`]));
-  const words = (text, name) => {
-    const m = text.match(new RegExp(`${name}(?:\\[\\d\\])? = [{\\[]([^}\\]]+)[}\\]]`));
-    assert.ok(m, `${name} is no longer listed as this test reads it`);
-    return [...m[1].matchAll(/["']([^"']+)["']/g)].map(w => w[1]);
-  };
-  for (const name of ['WORDS', 'SHORT']) {
-    assert.deepEqual(words(LAPTOP_FACE, name), words(journal, name), `the laptop's ${name} are not the charm's`);
-  }
-
-  const inC = journal.match(/HALVES\[3\]\[2\]\[2\] = \{([^;]+)\};/)?.[1]
-    .replace(/\/\*[^*]*\*\/|\/\/.*$/gm, '').match(/0x[0-9a-f]{6}|[A-Z]{3,}/gi)
-    .map(c => c.startsWith('0x') ? `#${c.slice(2).toLowerCase()}` : palette[c]);
-  const inJs = LAPTOP_FACE.match(/^const HALVES = \[([^;]+)\];$/m)?.[1]
-    .replace(/\/\*[^*]*\*\/|\/\/.*$/gm, '').match(/'#[0-9a-f]{6}'|\b[A-Z]{3,}\b/g)
-    .map(c => c.startsWith("'") ? c.slice(1, -1) : palette[c]);
-  assert.ok(inC?.length === 12 && inC.every(Boolean), 'journal.c no longer lists HALVES as this test reads them');
-  assert.deepEqual(inJs, inC, 'the laptop paints the journal\'s halves in other colours than the charm');
-
-  const ms = (text, name) => {
-    const m = text.match(new RegExp(`^(?:#define ${name}\\s+(\\d+)|const ${name} = ([\\d_]+);)`, 'm'));
-    assert.ok(m, `${name} is no longer defined as this test reads it`);
-    return Number((m[1] ?? m[2]).replace(/_/g, ''));
-  };
-  for (const name of ['ASK_MS', 'FLASH_MS', 'TICK_MS', 'SWEEP_MS', 'DONE_MS']) {
-    assert.equal(ms(LAPTOP_FACE, name), ms(journal, name), `the laptop's ${name} is not the charm's`);
-  }
-  assert.match(journal, new RegExp(`lv_obj_fade_in\\(pill, ${ms(LAPTOP_FACE, 'FADE_MS')}, 0\\)`), 'the laptop fades the pill in over another time than the charm');
-
-  // Where everything sits, as the lines that place it in each.
-  const held = [
-    [/half\[i\] = box\(root, i \? 235 : 0, 0, 231, 466,/, /x = i \? 235 : 0;[^]*?g\.fillRect\(x, 0, 231, 466\)/, 'the halves'],
-    [/tag = box\(root, 183, 70, 100, 34,[^]*?lv_obj_set_style_radius\(tag, 17, 0\)/, /g\.roundRect\(183, 70, 100, 34, 17\)/, 'the setup\'s tag'],
-    [/pill = box\(root, 0, 190, 150, 88, GROUND\);[^]*?radius\(pill, 44, 0\)[^]*?border_width\(pill, 2, 0\)/,
-      /g\.roundRect\(233 - w \/ 2 \+ 1, 191, w - 2, 86, 43\)/, 'the pill'],
-    [/int32_t w = lv_obj_get_width\(word\) \+ 64;\s*lv_obj_set_width\(pill, w > 150 \? w : 150\);/, /Math\.max\(150, g\.measureText\(WORDS\[j\.q\]\)\.width - 2 \+ 64\)/, 'the pill\'s width'],
-    [/int r = i == q \? 5 : 4;[^]*?233 \+ \(i - 1\.5f\) \* 22 - r, 34 - r\);[^]*?!missing\[i\] \? ACCENT : INK[^]*?LV_OPA_COVER : 56, 0\)/,
-      /const r = i === q \? 5 : 4;\s*dot\(233 \+ \(i - 1\.5\) \* 22, 34, r, r, missing\[i\] \? INK : ACCENT, !missing\[i\] \|\| i === q \? 1 : 56 \/ 255\);/, 'the dots'],
-    [/at\[3\]\[2\] = \{ \{ 203, 237 \}, \{ 223, 257 \}, \{ 263, 209 \} \};[^]*?hypotf\(20, 20\), second = hypotf\(40, 48\)[^]*?l\.width = 9;/,
-      /^const TICK = \[\[203, 237\], \[223, 257\], \[263, 209\]\];[^]*?Math\.hypot\(20, 20\), second = Math\.hypot\(40, 48\)[^]*?g\.lineWidth = 9;/m, 'the tick'],
-    [/face_ring\(layer, 231, 8, fminf\(1, t \/ \(float\)SWEEP_MS\), 0, all_yes \? 1 : 0\.55f\);/, /ring\(231, 8, Math\.min\(1, t \/ SWEEP_MS\), allYes \? 1 : 0\.55\);/, 'the ring'],
-    [/l\.color = lv_color_hex\(all_yes \? GLOW : INK\);/, /g\.strokeStyle = allYes \? GLOW : INK;/, 'the tick\'s colour'],
-    [/text\(tag, &hanken_16, MUTED, 2\), WORDS\[0\]\)/, /word\(WORDS\[0\], 233, 87, 16, 700, MUTED, 2\);/, 'the tag\'s word'],
-    [/word = text\(pill, &hanken_64, INK, 2\);/, /word\(WORDS\[j\.q\], 233, 234, 64, 800, INK, 2\);/, 'the pill\'s word'],
-    [/half_word\[i\] = text\(half\[i\], &hanken_64, INK, 1\);[^]*?lv_obj_set_style_text_color\(half_word\[side\], lv_color_white\(\), 0\)/,
-      /word\(SHORT\[i\], x \+ 231 \/ 2, 233, 64, 800, j\.lit === i \? '#ffffff' : INK, 1\);/, 'the setups\' words'],
-    [/int side = p\.x >= 233;/, /const side = pixel\(x, 0\)\[0\] >= 233 \? 1 : 0;/, 'which half a tap is on'],
-  ];
-  for (const [c, js, what] of held) {
-    assert.match(journal, c, `journal.c no longer draws ${what} as this test reads it`);
-    assert.match(LAPTOP_FACE, js, `the laptop draws ${what} otherwise than the charm`);
-  }
-  // The weights the words are drawn in, fonts.sh's for the 64 and the 16.
-  const fonts = source('charm/tools/fonts.sh');
-  for (const [size, weight] of [[64, 800], [16, 700]]) {
-    assert.match(fonts, new RegExp(`--font ${weight}\\.ttf --size ${size} `), `the charm no longer draws ${size} px at ${weight}`);
-  }
-  assert.ok(LAPTOP_FACE.includes("64, 800, INK") && LAPTOP_FACE.includes("16, 700, MUTED"), 'the laptop draws the journal\'s words at other weights');
-
-  assert.match(source('charm/main/gladys.c'), /int q = 0;\s*while \(q < 3 && !t\.missing\[q\]\) q\+\+;/,
-    'gladys.c no longer asks the first question a trade lacks of the first three, else the last');
-  const night = bodyOf(face, 'static void draw_night(', 'face.c has no draw_night()');
-  const mark = night.match(/a\.radius = \d+; a\.width = (\d+);[^}]*a\.color = lv_color_hex\(0x([0-9a-f]{6})\);/);
-  assert.ok(mark, 'face.c no longer marks a trade waiting as this test reads it');
-  assert.equal(LAPTOP_FACE.match(/^const WAITS = '(#[0-9a-f]{6})';$/m)?.[1], `#${mark[2]}`, 'the laptop marks a trade waiting in another colour');
-  assert.match(bodyOf(LAPTOP_FACE, 'function waits('), new RegExp(`g\\.lineWidth = ${mark[1]};`), 'the laptop\'s ring for a trade is another width');
 });
 
 /* The swap holds a new app to her signer, named as the app in place names it;
@@ -718,21 +444,14 @@ test('the key window names each secret as its function reads it', () => {
   }
 });
 
-/* What the page draws and the tray shows from charm/art is copied in by both
-   scripts that run her, and the workflow builds when it changes: a file
-   copied by one alone is a face or a typeface missing from the other. */
-test('the laptop copies in every file it draws from the charm\'s art', () => {
-  const { prestart, prepackage } = JSON.parse(source('laptop/package.json')).scripts;
+/* What the page draws and the tray shows is committed beside it: a file
+   loaded and not kept is a face or a typeface missing from the app. */
+test('the laptop holds every file it draws', () => {
   const loaded = new Set([...source('laptop/face.html').matchAll(/url\('([\w.-]+)'\)/g), ...LAPTOP_FACE.matchAll(/\.src = '([\w.-]+)'/g),
                           ...LAPTOP_MAIN.matchAll(/join\(here, '([\w.-]+\.png)'\)/g)].map(m => m[1]));
   assert.ok(loaded.size >= 2, `only ${loaded.size} files read as loaded — the reader has gone blind`);
-  const workflow = source('.github/workflows/laptop.yml');
-  for (const file of loaded) {
-    for (const [name, script] of [['prestart', prestart], ['prepackage', prepackage]]) {
-      assert.ok(script.includes(`../charm/art/${file}`), `${name} does not copy ${file} in`);
-    }
-    assert.ok(workflow.includes(`- 'charm/art/${file}'`), `the laptop is not rebuilt when charm/art/${file} changes`);
-  }
+  const kept = execSync('git ls-files laptop', { encoding: 'utf8' }).split('\n');
+  for (const file of loaded) assert.ok(kept.includes(`laptop/${file}`), `the laptop loads ${file} and does not keep it`);
 });
 
 /* An answer is never raced by a look at what waits: none starts while one
@@ -875,52 +594,14 @@ test('the laptop stops its clocks when it quits, and touches no window that is g
   assert.match(LAPTOP_MAIN, /const send = \(channel, \.\.\.args\) => \{ if \(present\(\)\) face\.webContents\.send/, 'send() no longer asks whether her window is there');
 });
 
-/* What the laptop copies of the charm's ear and voice, and of the door's
-   beat. Her two notes and the tick are drawn by the charm's own formula;
-   his voice is heard past the charm's VOICE on the charm's scale, let go
-   after its SILENT_MS and ticked WARN_LEFT before its ceiling; and a line
-   silent for READ_MS outlasts two of her door's beats, or the laptop hangs
-   up while she thinks. */
-test('the laptop hears, sounds and waits as the charm and her door do', () => {
-  const sound = source('charm/main/sound.c'), talk = source('charm/main/talk.c');
-  const numbers = (text) => [...text.matchAll(/-?\d+(?:\.\d+)?/g)].map(m => Number(m[0]));
-  // How a note rises, dies and how loud, in the charm's order: play_notes' attack, decay and loudness.
-  const shaped = bodyOf(LAPTOP_FACE, 'function notes(').match(/Math\.min\(1, t \* (\d+)\) \* Math\.exp\(-t \* (\d+)\) \* (\d+) \/ 32768/)
-    ?.slice(1).map(Number);
-  assert.ok(shaped, 'the laptop no longer shapes a note as this test reads it');
-  for (const [cue, fn] of [['LISTEN', 'sound_listen'], ['SENT', 'sound_sent']]) {
-    const charm = bodyOf(sound, `void ${fn}(void) {`, `sound.c has no ${fn}()`);
-    const copy = LAPTOP_FACE.match(new RegExp(`^const ${cue} = (\\[\\[[^;]+\\]\\]);$`, 'm'));
-    assert.ok(copy, `face.mjs no longer lists ${cue} as this test reads it`);
-    const played = numbers(charm.match(/play_notes\(notes, ([^)]+)\)/)?.[1] ?? '');
-    assert.deepEqual([...numbers(copy[1]), ...shaped], [...numbers(charm.match(/\{ \{[^;]+\} \}/)?.[0] ?? ''), ...played],
-      `the laptop's ${cue} is not the charm's ${fn}: its notes, or how they rise, die and how loud`);
-  }
-  assert.match(sound, /float env = fminf\(1\.0f, t \* attack\) \* expf\(-t \* decay\);/, 'sound.c no longer shapes a note as this test reads it');
-  const tick = bodyOf(sound, 'void sound_tick(void) {', 'sound.c has no sound_tick()');
-  const [span, click, decay, hz, loud] = [/SOUND_RATE \* (\d+) \/ 100/, /t < (0\.\d+)f/, /expf\(-t \* ([\d.]+)f\)/, /M_PI \* ([\d.]+)f \* t/, /env \* (\d+)\)/]
-    .map(re => Number(tick.match(re)?.[1]));
-  assert.ok([span, click, decay, hz, loud].every(Number.isFinite), 'sound.c no longer draws the tick as this test reads it');
-  assert.ok(LAPTOP_FACE.includes(`span = Math.round(rate * ${span / 100})`) &&
-            LAPTOP_FACE.includes(`t < ${click} ? Math.sin(2 * Math.PI * ${hz} * t) * Math.exp(-t * ${decay}) * ${loud} / 32768`),
-    'the laptop\'s tick is not the charm\'s');
-
-  const scale = sound.match(/float l = rms \* ([\d.]+)f;/)?.[1];
-  assert.ok(scale && LAPTOP_FACE.includes(`Math.min(1, ${Number(scale)} * Math.sqrt(`), 'the laptop hears his voice on another scale than the charm');
+/* A line silent for READ_MS outlasts two of her door's beats, or the laptop
+   hangs up while she thinks. */
+test('the laptop waits out her silence', () => {
   const value = (text, re, what) => {
     const m = text.match(re);
     assert.ok(m, `${what} is no longer defined as this test reads it`);
-    return Function(`return ${m[1].replace(/_/g, '').replace(/f$/, '')}`)();
+    return Number(m[1].replace(/_/g, ''));
   };
-  assert.equal(value(LAPTOP_FACE, /^const VOICE = ([\d.]+);$/m, "face.mjs's VOICE"), value(talk, /^#define VOICE\s+([\d.]+f?)/m, "talk.c's VOICE"),
-    'the laptop counts as his voice a level the charm does not');
-  assert.equal(value(LAPTOP_FACE, /^const SILENT_MS = ([\d_]+);$/m, "face.mjs's SILENT_MS"), value(talk, /^#define SILENT_MS\s+(\d+)/m, "talk.c's SILENT_MS"),
-    'the laptop lets a silent recording go at another time than the charm');
-  const max = value(talk, /^#define MAX_MS\s+(\(.+\))/m, "talk.c's MAX_MS");
-  const warn = Function('MAX_MS', `return ${talk.match(/^#define WARN_MS\s+(\(.+\))/m)?.[1]}`)(max);
-  assert.equal(value(LAPTOP_FACE, /^const WARN_LEFT = ([\d_]+);$/m, "face.mjs's WARN_LEFT"), max - warn,
-    'the laptop ticks a recording\'s end at another distance from it than the charm');
-
   const read = value(LAPTOP_MAIN, /^const READ_MS = ([\d_]+);$/m, "main.mjs's READ_MS");
   const beat = value(EUGENIA_TS, /^const BEAT_MS = ([\d_]+);$/m, "doji-eugenia's BEAT_MS");
   assert.ok(read >= 2 * beat, `the laptop gives up after ${read} ms of nothing, inside two of her ${beat} ms beats`);
@@ -928,168 +609,18 @@ test('the laptop hears, sounds and waits as the charm and her door do', () => {
     'the laptop no longer counts its silence from the last thing the door sent');
 });
 
-/* The conversation comes first, and a trade waits for it to end. Its
-   questions come up only once the conversation is over with him looking —
-   never after a single answer, never before a waiting briefing, which is read
-   however she is held — and PWR on them is a press she keeps: the questions
-   only look for it, and her task takes it to listen. main.c and journal.c are
-   the board's, so the calls are read. */
-test('a trade\'s questions wait for the conversation to end, and PWR on them goes back to her', () => {
-  const main = source('charm/main/main.c');
-  const awake = bodyOf(main, 'static void awake(void) {', 'main.c has no awake()');
-  const loop = awake.slice(awake.indexOf('for (;;) {'));
-  assert.equal((loop.match(/journal\(\)/g) ?? []).length, 1, 'the conversation reaches the journal by more than one path');
-  assert.match(loop, /if \(next == OVER_LOOKING\) \{[^}]*if \(!journal\(\)\) sleep_now\(\);/,
-    'the journal after a conversation no longer waits for it to be over, or no longer goes back to her on PWR');
-  const briefing = loop.match(/if \(brief\) \{[^}]*\}/);
-  assert.ok(briefing, 'awake() no longer reads a waiting briefing as this test finds it');
-  assert.match(awake, /bool brief = briefing_waits;\s*for \(;;\) \{/,
-    'a waiting briefing is no longer read once a waking, so a failing one is retried after every answer');
-  const read = briefing[0].indexOf('int status = talk_briefing();'),
-        kept = briefing[0].indexOf('briefing_waits = status != 200 && status != 204;');
-  assert.ok(read > -1 && kept > read && !/briefing_waits = false/.test(briefing[0]),
-    'the briefing\'s dot goes before it is read, so one that fails is lost to the charm for the day');
-  assert.ok(loop.indexOf(briefing[0]) < loop.indexOf('between_turns('), 'a waiting briefing now waits for the conversation to end');
-  assert.doesNotMatch(briefing[0], /motion_hold|between_turns/, 'a waiting briefing now waits on how she is held');
-
-  const between = bodyOf(main, 'static between_t between_turns(bool trade) {', 'main.c has no between_turns()');
-  assert.match(between, /if \(trade && hold == LIFT_HELD && now - finished >= pdMS_TO_TICKS\(QUIET_MS\)\) return OVER_LOOKING;/,
-    'the conversation is no longer over only when a trade waits and he is held up and quiet');
-  assert.match(bodyOf(main, 'static bool journal(void) {', 'main.c has no journal()'), /return ulTaskNotifyTake\(pdTRUE, 0\);/,
-    'the journal no longer hands back the PWR that closed it');
-
-  const ask = bodyOf(source('charm/main/journal.c'), 'int journal_ask(int q, const bool missing[4]) {', 'journal.c has no journal_ask()');
-  assert.match(ask, /ulTaskNotifyValueClear\(NULL, 0\)/, 'a question no longer gives way to PWR');
-  assert.doesNotMatch(ask, /ulTaskNotifyTake/, 'a question takes the press that closed it, so she never hears it');
-});
-
-/* An answer her door did not take ended the journal on the dark, with nothing
-   to say it was not saved. While the network is up the question stays to be
-   tapped again — knock() leaves the trade as it was, so the loop asks the
-   same one — and only the network gone ends it. gladys.c is the board's, so
-   the line is read. */
-test('a journal answer her door does not take is asked again while the network is up', () => {
-  const journal = bodyOf(source('charm/main/gladys.c'), 'int gladys_journal(void) {', 'gladys.c has no gladys_journal()');
-  assert.match(journal, /reached = knock\(body, &t\) \|\| net_wait\(0\);/,
-    'a refused answer ends the journal with the network still up, and nothing says it was not saved');
-  assert.match(bodyOf(source('charm/main/gladys.c'), 'static bool knock(const char *body, trade_t *t) {'),
-    /return status == 200 && read_answer\(got, t\);/, 'a refused answer now changes the trade, so the same question is not asked again');
-});
-
-/* The charm's manifest asks for ranges, so a build resolves its components
-   afresh unless dependencies.lock names them: a new board package would
-   change the firmware under a commit that never touched it. The lock is
-   committed, names every component the manifest asks for, and the charm
-   workflow fails a build that resolved anything else. */
-test('the charm builds from the component versions its lock names', () => {
-  const lock = source('charm/dependencies.lock'), manifest = source('charm/main/idf_component.yml');
-  const asked = [...manifest.matchAll(/^  ([\w/.-]+):$/gm)].map(m => m[1]).sort();
-  const direct = lock.slice(lock.indexOf('direct_dependencies:')).match(/^- ([\w/.-]+)$/gm)?.map(l => l.slice(2)).sort();
-  assert.ok(asked.length >= 4, `only ${asked.length} components read off the manifest — the reader has gone blind`);
-  assert.deepEqual(direct, asked, 'dependencies.lock does not pin what idf_component.yml asks for');
-  const workflow = source('.github/workflows/charm.yml');
-  assert.match(workflow, /git ls-files --error-unmatch dependencies\.lock/, 'the charm workflow builds without a committed lock');
-  assert.match(workflow, /git diff --exit-code -- dependencies\.lock/, 'the charm workflow builds from versions its lock does not name');
-});
-
-/* The charm's words are drawn in fonts holding only the letters
-   tools/fonts.sh gave them; a word with any other letter draws a gap. */
-test('every word on the charm\'s screens is in the font that draws it', () => {
-  // The files that draw words, found rather than listed: a fifth would draw
-  // letters nothing below checks.
-  const drawers = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n')
-    .filter(f => f.endsWith('.c') && /LV_FONT_DECLARE\(hanken_/.test(source(f))).map(f => f.slice('charm/main/'.length));
-  assert.deepEqual(drawers.sort(), ['dial.c', 'face.c', 'journal.c', 'setup.c'],
-    'a file draws words in the charm\'s fonts that this test does not read');
-  const journal = source('charm/main/journal.c');
-  const list = (name) => {
-    const m = journal.match(new RegExp(`${name}\\[\\d\\] = \\{([^}]+)\\}`));
-    assert.ok(m, `journal.c no longer lists ${name}`);
-    return [...m[1].matchAll(/"([^"]+)"/g)].map(w => w[1]);
-  };
-  // What a font holds, as its own header records the run: its symbols, and
-  // the space when it was asked for by code point.
-  const held = (font) => {
-    const opts = source(`charm/main/${font}.c`);
-    const m = opts.match(/--symbols (\S+)/);
-    assert.ok(m, `${font}.c no longer says which letters it holds`);
-    return m[1] + (/--range 0x20 /.test(opts) ? ' ' : '');
-  };
-  const words = list('WORDS'), short = list('SHORT');
-  assert.equal(words.length, 4, 'a word for each of the four answers');
-  for (const word of [...words, ...short]) {
-    for (const letter of word) assert.ok(held('hanken_64').includes(letter), `hanken_64 cannot draw the ${letter} of ${word}`);
-  }
-  // The setup screen's label is the small font's.
-  for (const letter of words[0]) assert.ok(held('hanken_16').includes(letter), `hanken_16 cannot draw the ${letter} of ${words[0]}`);
-
-  // The dial's label and its number, any of 0 to 100; the charge's, with its %.
-  const dial = source('charm/main/dial.c');
-  const label = dial.match(/t\.text = "([^"]+)";/);
-  assert.ok(label, 'dial.c no longer draws its label as this test reads it');
-  for (const letter of label[1]) assert.ok(held('hanken_16').includes(letter), `hanken_16 cannot draw the ${letter} of ${label[1]}`);
-  for (const digit of '0123456789%') assert.ok(held('hanken_36').includes(digit), `hanken_36 cannot draw a ${digit}`);
-  assert.match(source('charm/main/face.c'), /snprintf\(percent, sizeof percent, "%d%%", charge\)/,
-    'face.c no longer draws the charge as a number and %, which is what this test checks the font for');
-
-  // The setup screen: what it says while it works, and her network's name,
-  // Charm- and four hex digits.
-  const setup = source('charm/main/setup.c');
-  const say = setup.match(/SAY\[\] = \{([^}]+)\}/);
-  assert.ok(say, 'setup.c no longer lists what its screen says');
-  assert.match(setup, /"Charm-%02X%02X"/, 'setup.c no longer names her network as this test reads it');
-  // And her page's address under the code, an IPv4 address after its word.
-  const open = setup.match(/snprintf\(address, sizeof address, "([^"]+) " IPSTR/);
-  assert.ok(open, 'setup.c no longer writes her page\'s address as this test reads it');
-  for (const words of [...[...say[1].matchAll(/"([^"]+)"/g)].map(w => w[1]), 'Charm-0123456789ABCDEF', `${open[1]} 0123456789.`]) {
-    for (const letter of words) assert.ok(held('hanken_18').includes(letter), `hanken_18 cannot draw the ${JSON.stringify(letter)} of ${words}`);
-  }
-});
-
-/* The charm draws in Doji's colours: copies of the app's tokens in C, each
-   beside the token it copies, and in the setup page's CSS under the app's own
-   names. Each copy is read against index.html's first declaration. */
-test('the charm and its setup page draw in the app\'s own colours', () => {
+/* Her face draws in Doji's colours: copies of the app's tokens, each beside
+   the token it copies, read against index.html's first declaration. */
+test('her face draws in the app\'s own colours', () => {
   const app = new Map();
   for (const [, name, value] of source('index.html').matchAll(/(--[\w-]+):\s*(#[0-9a-f]{6})\b/gi)) {
     if (!app.has(name)) app.set(name, value.toLowerCase());
   }
-  const palette = [...source('charm/main/palette.h').matchAll(/^#define (\w+)\s+0x([0-9a-f]{6})\s+\/\/ (--[\w-]+)$/gim)];
-  assert.ok(palette.length >= 5, `palette.h names only ${palette.length} tokens beside its colours — the reader has gone blind`);
-  for (const [, name, hex, token] of palette) {
-    assert.equal(`#${hex.toLowerCase()}`, app.get(token), `palette.h's ${name} is not index.html's ${token}`);
+  const copies = [...LAPTOP_FACE.matchAll(/^const (\w+)\s+= '(#[0-9a-f]{6})';\s+\/\/ (--[\w-]+)$/gm)];
+  assert.ok(copies.length >= 5, `face.mjs names only ${copies.length} tokens beside its colours — the reader has gone blind`);
+  for (const [, name, hex, token] of copies) {
+    assert.equal(hex, app.get(token), `face.mjs's ${name} is not index.html's ${token}`);
   }
-  const page = source('charm/main/setup.html').match(/:root \{([^}]+)\}/);
-  assert.ok(page, 'setup.html no longer declares its colours in :root');
-  const shared = [...page[1].matchAll(/(--[\w-]+):\s*(#[0-9a-f]{6})\b/gi)].filter(([, name]) => app.has(name));
-  assert.ok(shared.length >= 5, `setup.html shares only ${shared.length} of the app's tokens — the reader has gone blind`);
-  for (const [, name, value] of shared) {
-    assert.equal(value.toLowerCase(), app.get(name), `setup.html's ${name} is not index.html's`);
-  }
-});
-
-/* The setup page draws some of the charm's own colours too, and is served as
-   written, so it holds copies: each named in palette.h beside the page's name
-   for it, and the page's --sheen begun with DEEP and ACCENT. The firmware
-   draws each by its name, never as a literal a pass could miss. */
-test('the setup page draws the charm\'s own colours as palette.h has them', () => {
-  const palette = source('charm/main/palette.h');
-  const root = source('charm/main/setup.html').match(/:root \{([^}]+)\}/)?.[1];
-  assert.ok(root, 'setup.html no longer declares its colours in :root');
-  const page = new Map([...root.matchAll(/(--[\w-]+):\s*(#[0-9a-f]{6})\b/gi)].map(([, name, value]) => [name, value.toLowerCase()]));
-  const named = [...palette.matchAll(/^#define (\w+)\s+0x([0-9a-f]{6})\s+\/\/ the page's (--[\w-]+)\b/gim)];
-  assert.ok(named.length >= 2, `palette.h names only ${named.length} of the page's colours — the reader has gone blind`);
-  for (const [, name, hex, token] of named) {
-    assert.equal(page.get(token), `#${hex.toLowerCase()}`, `palette.h's ${name} is not the setup page's ${token}`);
-  }
-  const hex = (name) => `#${palette.match(new RegExp(`^#define ${name}\\s+0x([0-9a-f]{6})`, 'mi'))?.[1].toLowerCase()}`;
-  const sheen = root.match(/--sheen: linear-gradient\(\d+deg, (#[0-9a-f]{6}), (#[0-9a-f]{6})/i);
-  assert.ok(sheen, 'setup.html no longer draws --sheen as this test reads it');
-  assert.deepEqual(sheen.slice(1).map(c => c.toLowerCase()), [hex('DEEP'), hex('ACCENT')],
-    'the setup page\'s --sheen no longer begins with palette.h\'s DEEP and ACCENT');
-  const literals = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n').filter(f => f.endsWith('.c'))
-    .flatMap(f => named.filter(([, , h]) => new RegExp(`0x${h}\\b`, 'i').test(source(f))).map(([, name]) => `${f}: ${name}`));
-  assert.deepEqual(literals, [], 'the firmware draws one of the page\'s colours as a literal, where a change to palette.h misses it');
 });
 
 /* A meta tag and a data URI cannot read a custom property, so the browser's
@@ -1618,19 +1149,18 @@ const read = (path) => ({ path, text: source(path) });
 
 // Everything that names a FUNCTION, each on its own, so one that stops naming
 // any is not covered by the others: Gladys's trigger, the trade event, the
-// schedules, the Apps Script, the charm and the laptop.
+// schedules, the Apps Script and the laptop.
 const CALLERS = [
   ...['Gladys', 'Her senses', 'Everything that runs on a timer']
     .map(t => ({ path: `schema.sql (${t})`, text: subject(t) })),
   read('doji_gmail_sync.gs'),
-  read('charm/main/net.h'),
   read('laptop/main.mjs'),
 ];
 
 // Every file that names the PROJECT, which is a longer list: the app connects
 // to it, config.toml links the CLI to it and the deploy workflow pushes to it.
 const PROJECT_FILES = ['supabase/schema.sql', 'doji_gmail_sync.gs', 'index.html',
-  'supabase/config.toml', '.github/workflows/deploy-functions.yml', 'charm/main/net.h', 'laptop/main.mjs'].map(read);
+  'supabase/config.toml', '.github/workflows/deploy-functions.yml', 'laptop/main.mjs'].map(read);
 
 const called = (text) =>
   [...text.matchAll(/https:\/\/([a-z0-9]+)\.supabase\.co\/functions\/v1\/([a-z0-9-]+)/g)]
@@ -2073,9 +1603,8 @@ test('every workflow takes its Node version from the one file that states it', (
     '.npmrc no longer sets engine-strict, so engines.node is documentation again ' +
     'and npm installs on any version without a word');
 
-  // The rule is about Node, so it binds the workflows that run it: the charm's
-  // firmware build runs ESP-IDF in its own image and has no Node to version.
-  // Comments are not running anything.
+  // The rule is about Node, so it binds the workflows that run it. Comments
+  // are not running anything.
   const runsNode = ({ text }) => text.split('\n')
     .some(line => !/^\s*#/.test(line) && /\b(npm|node)\b/.test(line));
   const nodeWorkflows = WORKFLOWS.filter(runsNode);
@@ -2192,294 +1721,26 @@ test('every file that names the Supabase project names the same one', () => {
     `the project is split across refs: ${[...new Set(found)].join(', ')}`);
 });
 
-/* The charm cannot be told the briefing has landed — it sleeps — so it wakes
-   to ask in the hours the briefing is written, and holds its own copy of them.
-   Read out of briefing.c and walked against briefDue and retryDue, every hour
-   of a week: a copy an hour early asks for nothing, an hour short misses the
-   last retry. */
-test('the charm asks for the briefing in the hours it is written', () => {
-  const c = source('charm/main/briefing.c');
-  const [weekday, sunday, retries] = ['BRIEF_WEEKDAY', 'BRIEF_SUNDAY', 'BRIEF_RETRIES'].map(name => {
-    const m = c.match(new RegExp(`^#define ${name}\\s+(\\d+)`, 'm'));
-    assert.ok(m, `briefing.c no longer defines ${name}`);
-    return Number(m[1]);
-  });
-  // The days, as the walk below takes them: Sunday's hour, weekdays', none on Saturday.
-  assert.match(c, /(\w+)\.tm_wday == 0 \? BRIEF_SUNDAY : \1\.tm_wday <= 5 \? BRIEF_WEEKDAY : -1;/,
-    'briefing.c no longer gives the days their hours as this test walks them');
-  // Sunday 16 August 2026 to the Saturday after, New York on daylight time.
-  for (let day = 0; day < 7; day++) {
-    const first = day === 0 ? sunday : day <= 5 ? weekday : null;
-    for (let hour = 0; hour < 24; hour++) {
-      const at = new Date(Date.UTC(2026, 7, 16 + day, hour + 4));
-      const charm = first !== null && hour >= first && hour <= first + retries;
-      assert.equal(charm, Boolean(briefDue(at) || retryDue(at)),
-        `day ${day} at ${hour}:00 New York: the charm ${charm ? 'asks' : 'does not ask'} and the briefing ` +
-        `${charm ? 'is not' : 'is'} written`);
-    }
-  }
-});
-
-
-/* The charm asks Gladys seldom while the market is shut, from its own copy
-   of the market's week. Read out of errand.c beside marketOpen's hours and
-   index.ts's roll; charm.test.mjs walks what the copy does. */
-test('the charm keeps the market\'s week the server keeps', () => {
-  const c = source('charm/main/errand.c');
-  const roll = Number(c.match(/^#define ROLL_HOUR\s+(\d+)/m)?.[1]);
-  const open = bodyOf(source('supabase/functions/_shared/edge.ts'), 'export function marketOpen(');
-  const close = Number(open.match(/wd === 5 && hour >= (\d+)/)?.[1]), opens = Number(open.match(/wd === 0 && hour < (\d+)/)?.[1]);
-  assert.ok(roll && close && opens, 'errand.c or marketOpen no longer states the week as this test reads it');
-  assert.deepEqual([roll, roll], [close, opens], 'the charm keeps a market week the server does not');
-  assert.equal(Number(EUGENIA_TS.match(/^export const ROLL_HOUR = (\d+);/m)?.[1]), roll, 'the charm\'s roll is not doji-eugenia\'s');
-  assert.match(c, /\(t\.tm_wday == 5 && t\.tm_hour >= ROLL_HOUR \+ GRACE_H\) \|\| t\.tm_wday == 6 \|\|\s*\(t\.tm_wday == 0 && t\.tm_hour < ROLL_HOUR\)/,
-    'errand.c no longer gives the weekend its days as marketOpen does');
-});
-
-/* Asking ota_due spends the night's look, so the battery is asked before it:
-   asked after, a low battery at the hour's first errand would spend the night
-   though the cable went in minutes later. */
-test('a low battery leaves the night\'s look for an update to a later errand', () => {
-  const errand = bodyOf(source('charm/main/main.c'), 'static void errand(void) {');
-  assert.match(errand, /if \(!power_low\(\) && \(ota_offered\(gladys_app\(\)\) \|\| ota_due\(time\(NULL\)\)\) && ota_update\(\)\)/,
-    'the errand asks for an update before the battery, so a low one spends the night\'s look');
-  // And ota_due is what marks the night looked.
-  assert.match(bodyOf(source('charm/main/ota.c'), 'bool ota_due(time_t now) {'), /looked = day;\s*return true;/,
-    'ota_due no longer marks the night as this test reads it');
-});
-
-/* A new app is good once it has proved itself, whichever waking it is: her
-   screen started and drawn on, her Wi-Fi reached, under a watchdog that
-   resets her on a hang, and any reset before the confirmation rolls it back.
-   Confirmed on one path only, a press in the second after an update took the
-   other, and the bootloader rolled a good app back at the next wake; confirmed
-   at the join alone, an app whose screen froze was kept. So the proof is the
-   first thing life() does after the battery's check, before any path sleeps,
-   and the one place a new app is confirmed. */
-test('the charm keeps a new app only once it has proved itself, before anything sleeps', () => {
-  const callers = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n')
-    .filter(f => f.endsWith('.c') && /\bota_confirm\(\);/.test(source(f)));
-  assert.deepEqual(callers, ['charm/main/main.c'], 'a new app is confirmed somewhere other than its proof, or nowhere');
-  const main = source('charm/main/main.c');
-  const prove = bodyOf(main, 'static void prove(void) {', 'main.c has no prove()');
-  for (const step of ['esp_task_wdt_add(NULL);', 'light(FACE_DARK);', 'face_draw_dark();', 'esp_task_wdt_delete(NULL);', 'if (joined) ota_confirm();']) {
-    assert.ok(prove.includes(step), `prove() no longer does ${step}`);
-  }
-  assert.ok(prove.indexOf('esp_task_wdt_add(NULL);') < prove.indexOf('light(FACE_DARK);') &&
-            prove.indexOf('esp_task_wdt_delete(NULL);') < prove.indexOf('if (joined) ota_confirm();'),
-    'the screen is no longer started under the watchdog, or the app is kept before the watchdog stands down');
-  const life = bodyOf(main, 'static void life(void *arg) {', 'main.c has no life()');
-  const proved = life.indexOf('if (ota_unproven()) prove();');
-  assert.ok(proved > life.indexOf('power_off();') && proved > -1, 'life() proves a new app before the battery is judged, or not at all');
-  for (const sleeps of ['sleep_until(', 'errand();', 'awake();']) {
-    assert.ok(life.indexOf(sleeps) > proved, `life() reaches ${sleeps} before a new app is proved`);
-  }
-});
-
-/* The charm joins a network by waiting for an address or a refusal, and gives
-   up on a failed attempt by leaving it. That leaving arrives as a disconnect,
-   possibly once the next attempt has begun, and counted as a refusal it ends
-   that attempt before it is tried. So every file that marks a refusal on a
-   disconnect skips the reason her own leaving carries. Found, not listed, so
-   a third joiner is held too. */
-test('the charm never takes her own leaving for a network refusing her', () => {
-  const joiners = execSync('git ls-files charm/main', { encoding: 'utf8' }).split('\n')
-    .filter(f => f.endsWith('.c') && /WIFI_EVENT_STA_DISCONNECTED/.test(source(f)) && /REFUSED\)/.test(source(f)));
-  assert.ok(joiners.length >= 2, `only ${joiners.length} files join a network — the reader has gone blind`);
-  for (const f of joiners) {
-    assert.match(source(f), /id == WIFI_EVENT_STA_DISCONNECTED &&\s*\(\(wifi_event_sta_disconnected_t \*\)data\)->reason != WIFI_REASON_ASSOC_LEAVE\)/,
-      `${f} marks a refusal on any disconnect, her own leaving included`);
-  }
-});
-
-/* ESP-IDF's DHCP server keeps the captive-portal address it is handed by
-   pointer and reads it at every offer, so the address must outlive the call
-   that sets it: on the stack, each offer reads whatever the frame has become. */
-test('the setup hands her DHCP a portal address that outlives the call', () => {
-  const setup = source('charm/main/setup.c');
-  const handed = setup.match(/ESP_NETIF_CAPTIVEPORTAL_URI, (\w+),/);
-  assert.ok(handed, 'setup.c no longer offers its page as the captive portal as this reads it');
-  assert.match(setup, new RegExp(`\\bstatic char ${handed[1]}\\[`),
-    `the portal address ${handed[1]} is not static, so the DHCP server reads a dead stack frame`);
-});
-
-/* A handshake can go unanswered, as the first after a restart was on the
-   board, and a refusal that ended the attempt would give up the waking with
-   her network in range. So a refusal from a network that is there asks it
-   again within its time, and only one that is not there ends the attempt
-   early. net.c is the board's, so the loop is read. */
-test('the charm asks a network that is there again until its time is up', () => {
-  const net = source('charm/main/net.c');
-  const handler = bodyOf(net, 'static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {',
-    'net.c has no on_event()');
-  assert.match(handler, /refusal = \(\(wifi_event_sta_disconnected_t \*\)data\)->reason;/,
-    'on_event() no longer keeps why she was refused, so the attempt cannot tell a network absent from one that is there');
-  const attempt = bodyOf(net, 'static bool attempt(const charm_net_t *net, bool fast) {', 'net.c has no attempt()');
-  const loop = attempt.match(/while \(\(gone = xTaskGetTickCount\(\) - start\) < span\) \{([^}]*)\}/);
-  assert.ok(loop, 'attempt() asks once, so one handshake unanswered gives up the waking');
-  assert.match(loop[1], /esp_wifi_connect\(\);/, 'attempt() loops without asking again');
-  assert.match(loop[1], /if \(!\(got & REFUSED\) \|\| refusal == WIFI_REASON_NO_AP_FOUND\) break;/,
-    'attempt() ends early on a refusal from a network that is there, or keeps asking one that is not');
-});
-
-/* A dropped line ends a read exactly as her last word does, so an answer is
-   finished only when its stream says so; one PWR did not stop that ends short
-   is a failure, and a failure while the network is up is shown, where it once
-   played as a finished answer and a briefing cut off counted as read. talk.c
-   is the board's, so the calls are read. */
-test('the charm tells an answer cut off from a finished one, and shows the failure', () => {
-  const talk = source('charm/main/talk.c');
-  const knock = bodyOf(talk, 'static int knock(', 'talk.c has no knock()');
-  assert.match(knock, /bool heard = play_answer\(h\);\s*if \(heard && !esp_http_client_is_complete_data_received\(h\)\) status = -1;/,
-    'knock() takes an answer that stopped short of its end for a finished one');
-  assert.match(bodyOf(talk, 'static bool play_answer(', 'talk.c has no play_answer()'), /return false;/,
-    'play_answer() no longer says when PWR stopped it, so a press reads as a line cut');
-  for (const [fn, ok] of [['int talk(void) {', 'status != 200'], ['int talk_briefing(void) {', 'status != 200 && status != 204']]) {
-    assert.ok(bodyOf(talk, fn).includes(`if (${ok} && (status > 0 || net_wait(0))) confused();`),
-      `${fn} no longer shows her confused at a failure while the network is up`);
-  }
-});
-
-/* The marks wander so none left all night burns in, and the one left longest
-   is the charge's percent, every night on the cable: it was drawn at one
-   place. Every mark but the ring round the rim is placed off the shift. */
-test('every mark on the sleep screen but the ring wanders', () => {
-  const night = bodyOf(source('charm/main/face.c'), 'static void draw_night(lv_event_t *e) {', 'face.c has no draw_night()');
-  const percent = night.match(/lv_area_t where = \{([^}]*)\};\s*lv_draw_label/);
-  assert.ok(percent, 'draw_night() no longer places the charge\'s percent as this test reads it');
-  assert.ok((percent[1].match(/shift\[0\]/g) ?? []).length === 2 && (percent[1].match(/shift\[1\]/g) ?? []).length === 2,
-    'the charge\'s percent is drawn at one place every night, where it burns in');
-  assert.match(night, /int x = 233 \+ shift\[0\], y = 404 \+ shift\[1\];/, 'what waits no longer wanders');
-  assert.match(night, /int top = 62 \+ shift\[1\];/, 'the battery and the no-internet mark no longer wander');
-});
-
-/* With no marks the sleep screen is all black, and the panel kept running to
-   show it through every sleep. It is held in reset instead: the same black,
-   and the screen's next start resets it anyway. sleep_now() and sleep.c are
-   the board's, so they are read. */
-test('an empty sleep screen is the panel held in reset, not drawn', () => {
-  const now = bodyOf(source('charm/main/main.c'), 'static void sleep_now(void) {');
-  const empty = now.match(/if \(marks == face_marks\(false, false, false, false, -1\)\) \{([^}]*)\} else \{([^}]*)\}/);
-  assert.ok(empty, 'sleep_now() no longer tells an empty sleep screen apart');
-  assert.match(empty[1], /^\s*sleep_blank\(\);\s*$/, 'an empty sleep screen does more than hold the panel in reset');
-  assert.match(empty[2], /light\(FACE_DARK\)/, 'marks are no longer drawn');
-  const blank = bodyOf(source('charm/main/sleep.c'), 'void sleep_blank(void) {', 'sleep.c has no sleep_blank()');
-  assert.match(blank, /gpio_set_level\(BSP_LCD_RST, 0\);/, 'sleep_blank() no longer puts the panel in reset');
-  assert.match(source('charm/main/sleep.c'), /HELD\[\] = \{[^}]*BSP_LCD_RST/, 'the panel\'s reset is no longer held through sleep');
-});
-
-/* The charm reads her voice as fast as it plays it, so a budget over the
-   whole speech stream runs at the pace of speech: SPEAK_MS on the stream cut a
-   briefing past two and a half minutes off mid-sentence. It bounds the
+/* A budget over the whole speech stream runs for as long as she speaks, and
+   SPEAK_MS on the stream cut a long briefing off mid-sentence. It bounds the
    vendor's start of each part, and is cleared once the vendor answers. */
-test('the charm\'s voice is bounded while the vendor starts, not while she speaks', () => {
-  const audio = bodyOf(EUGENIA_TS, 'async function* charmAudio(', 'doji-eugenia has no charmAudio()');
+test('her voice to the laptop is bounded while the vendor starts, not while she speaks', () => {
+  const audio = bodyOf(EUGENIA_TS, 'async function* laptopAudio(', 'doji-eugenia has no laptopAudio()');
   assert.doesNotMatch(audio, /AbortSignal\.timeout\(SPEAK_MS\)/,
-    'charmAudio() bounds the whole stream again, at the pace the charm plays it');
+    'laptopAudio() bounds the whole stream again, for as long as she speaks');
   const part = audio.slice(audio.indexOf('for (const part of chunk('));
   assert.match(part, /const wait = setTimeout\(\(\) => started\.abort\(\), SPEAK_MS\);\s*const spoken = await reading\(part, "pcm", started\.signal\)\.finally\(\(\) => clearTimeout\(wait\)\);/,
     'a part\'s budget no longer ends once the vendor answers, or no longer bounds its start');
 });
 
-/* The setup ran until something restarted her, so BOOT held in a pocket left
-   her network up and a white code lit on her screen until the battery went.
-   Set up already and left alone, she restarts as herself; setup.c is the
-   board's, so the loop is read. */
-test('a charm already set up gives the setup up when no phone comes', () => {
-  const setup = source('charm/main/setup.c');
-  const run = bodyOf(setup, 'void setup_run(void) {', 'setup.c has no setup_run()');
-  const alone = Number(setup.match(/^#define ALONE_MS\s+(\d+)/m)?.[1]);
-  assert.ok(alone >= 60_000 && alone <= 30 * 60_000, `the setup gives up after ${alone} ms alone, or no longer says when`);
-  assert.match(run, /if \(esp_wifi_ap_get_sta_list\(&phones\) == ESP_OK && phones\.num\) seen = xTaskGetTickCount\(\);/,
-    'a phone on her network no longer keeps the setup up');
-  assert.match(run, /if \(config_ready\(\) && xTaskGetTickCount\(\) - seen >= pdMS_TO_TICKS\(ALONE_MS\)\) esp_restart\(\);/,
-    'the setup no longer gives up on its own, or gives up on a board never set up');
-});
-
-/* A wake by the motion sensor is a lift only once she has left where she
-   lay: lying face up and still is what lift_seen looks for, so a table
-   jolted, or a sensor firing at nothing, woke her again and again. Where she
-   lay is read as she is armed, before the sensor is set to wake her, and
-   kept through sleep. motion.c is the board's, so it is read. */
-test('a wake by the motion sensor is a lift only once she has moved from where she slept', () => {
-  const motion = source('charm/main/motion.c');
-  assert.match(motion, /static RTC_DATA_ATTR float rest\[3\];/, 'where she lay is not kept through sleep');
-  const arm = bodyOf(motion, 'void motion_arm(void) {', 'motion.c has no motion_arm()');
-  assert.ok(arm.indexOf('read_g(rest);') > -1 && arm.indexOf('read_g(rest);') < arm.indexOf('command(WOM_SETTING);'),
-    'where she lay is not read before the sensor is armed to wake her');
-  assert.match(bodyOf(motion, 'bool motion_looked(void) {', 'motion.c has no motion_looked()'),
-    /if \(lift_seen\(before, now\) && lift_moved\(rest, now\)\)/, 'a lift is taken without asking whether she left where she lay');
-});
-
-/* At the end of a charge her radio sags the battery and the chip resets as
-   a brownout, which is no sleep wake, so it woke her — screen and radio —
-   into the next reset. Off the cable that reset switches the board off, before
-   anything is lit or joined — off the cable as a battery seen says, since a
-   power chip read that fails answers 0, no cable and no battery alike, and
-   would switch her off charging. life() is the board's, so it is read. */
-test('a battery too low for her radio switches her off rather than waking her again', () => {
-  const life = bodyOf(source('charm/main/main.c'), 'static void life(void *arg) {', 'main.c has no life()');
-  const off = life.indexOf('if (esp_reset_reason() == ESP_RST_BROWNOUT && power_battery() >= 0 && power_charge() < 0) power_off();');
-  assert.ok(off > life.indexOf('power_start(') && off < life.indexOf('errand()') && off < life.indexOf('awake()'),
-    'a brownout no longer switches her off before she wakes into the radio again, or does on a power chip it could not read');
-  assert.match(bodyOf(source('charm/main/power.c'), 'void power_off(void) {'), /set\(COMMON, get\(COMMON\) \| 1\);/,
-    'power_off() no longer switches the board off through the power chip');
-});
-
-/* The codecs are powered by the board, not the chip, so deep sleep alone left
-   them biased — microphones, converters and the speaker's amplifier — from
-   the first waking on. Every sleep that can follow sound closes them first;
-   life()'s sleeps come before any sound starts. */
-test('the charm switches her speaker and microphones off before every sleep', () => {
-  const main = source('charm/main/main.c');
-  const sleepers = [...main.matchAll(/^static void (\w+)\(void(?: \*arg)?\) \{$/gm)].map(m => m[1])
-    .filter(name => bodyOf(main, `static void ${name}(`).includes('sleep_until('));
-  assert.deepEqual(sleepers.sort(), ['errand', 'life', 'sleep_now'], 'main.c sleeps from a function this test does not judge');
-  const life = bodyOf(main, 'static void life(');
-  assert.ok(!/sound_start|errand_at = time\(NULL\) \+/.test(life.slice(0, life.lastIndexOf('sleep_until('))),
-    'life() starts sound before one of its sleeps, which would leave the codecs on');
-  for (const name of ['sleep_now', 'errand']) {
-    const body = bodyOf(main, `static void ${name}(`);
-    for (const at of [...body.matchAll(/sleep_until\(/g)].map(m => m.index)) {
-      const before = body.slice(0, at);
-      assert.ok(before.lastIndexOf('sound_stop();') > before.lastIndexOf('{'),
-        `${name}() sleeps with the codecs still open`);
-    }
-  }
-});
-
-/* While she thinks, nothing arrives but a beat of silence every BEAT_MS, and
-   a press was looked for only when audio came: up to fifteen seconds before
-   PWR cut her off. The answer is read in short waits, PWR looked for on each,
-   and READ_MS of nothing stays the dead line. */
-test('PWR cuts her off while she thinks, not at the next beat', () => {
-  const talk = source('charm/main/talk.c');
-  const play = bodyOf(talk, 'static bool play_answer(', 'talk.c has no play_answer()');
-  const look = Number(talk.match(/^#define PWR_LOOK_MS\s+(\d+)/m)?.[1]);
-  assert.ok(look > 0 && look <= 250, `talk.c looks for PWR every ${look} ms while nothing arrives, or no longer says how often`);
-  assert.match(play, /esp_http_client_set_timeout_ms\(h, PWR_LOOK_MS\);/, 'play_answer() waits for her door as long as a beat');
-  assert.match(play, /if \(n == -ESP_ERR_HTTP_EAGAIN\) \{\s*if \(tapped\(\)\) return false;\s*if \(xTaskGetTickCount\(\) - heard < pdMS_TO_TICKS\(READ_MS\)\) continue;/,
-    'a wait with nothing in it no longer looks for PWR, or no longer gives up at READ_MS');
-});
-
-/* Nothing joins again once the join is done, so a network lost while she
-   talks must say so: kept online, every door she knocks at fails with no
-   sign and she records turns that go nowhere, where losing it is meant to
-   send her to the sleep screen. net.c's handler is the board's, so it is read. */
-test('the charm hears a network it has joined go', () => {
-  const net = source('charm/main/net.c');
-  const handler = bodyOf(net, 'static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {',
-    'net.c has no on_event()');
-  const lost = handler.slice(handler.indexOf('WIFI_EVENT_STA_DISCONNECTED'));
-  assert.match(lost, /^[^}]*if \(xEventGroupClearBits\(events, JOINED\) & JOINED\) xEventGroupSetBits\(events, GAVE_UP\);/,
-    'a disconnect once joined no longer takes her offline, so net_wait() says online about a network that has gone');
-  assert.match(bodyOf(net, 'bool net_wait(int ms) {'), /JOINED \| GAVE_UP/,
-    'net_wait() no longer returns on the network given up');
-  // And a press once it has gone is not a turn recorded into nothing.
-  const talk = bodyOf(source('charm/main/talk.c'), 'int talk(void) {', 'talk.c has no talk()');
-  const gone = talk.indexOf('if (net_gone()) return -1;');
-  assert.ok(gone > -1 && gone < talk.indexOf('sound_listen()'),
-    'talk() listens on a network already given up, so his words are recorded and dropped');
+/* The market's week turns at the 17:00 New York roll in both places that
+   keep it: marketOpen, which the poller and her blocks ask, and her ROLL_HOUR. */
+test('the market\'s week turns at doji-eugenia\'s roll', () => {
+  const open = bodyOf(source('supabase/functions/_shared/edge.ts'), 'export function marketOpen(');
+  const close = Number(open.match(/wd === 5 && hour >= (\d+)/)?.[1]), opens = Number(open.match(/wd === 0 && hour < (\d+)/)?.[1]);
+  const roll = Number(EUGENIA_TS.match(/^export const ROLL_HOUR = (\d+);/m)?.[1]);
+  assert.ok(roll && close && opens, 'marketOpen or ROLL_HOUR no longer states the week as this test reads it');
+  assert.deepEqual([close, opens], [roll, roll], 'marketOpen turns the week at another hour than doji-eugenia\'s roll');
 });
 
 /* ─── Every secret a function needs is one it refuses to run without ────────
@@ -2507,15 +1768,15 @@ const guardClause = (text) => {
 /* SECRETS A FUNCTION CAN GENUINELY RUN WITHOUT, each a decision written down.
    Four are external vendors for one capability: speech-to-text (the Messages
    API takes no audio), embeddings (unset, search is full text and trigram),
-   and speech (unset, the text goes). The fifth and sixth are the charm's door
-   and the laptop's: unset, there is no charm, or no laptop. Unlike a missing bot token, one capability is absent and
-   every other path is untouched.
+   and speech (unset, the text goes). The fifth is the laptop's door: unset,
+   there is no laptop. Unlike a missing bot token, one capability is absent
+   and every other path is untouched.
 
    NOT FREE: each must be guarded where it is USED — a branch that handles its
    absence rather than an empty string reaching a fetch. A door's own secret is
    guarded by the door, since secretMatches refuses an empty one and
    fold.test.mjs holds that. That check is below. */
-const OPTIONAL = new Set(['STT_URL', 'STT_KEY', 'EMBED_KEY', 'TTS_KEY', 'CHARM_SECRET', 'LAPTOP_SECRET']);
+const OPTIONAL = new Set(['STT_URL', 'STT_KEY', 'EMBED_KEY', 'TTS_KEY', 'LAPTOP_SECRET']);
 
 test('an optional secret is guarded where it is used', () => {
   for (const { name, text } of FUNCTIONS) {
@@ -2688,7 +1949,7 @@ test('the documents name only symbols the repository has', () => {
 
     for (const name of named) {
       // A name with a file extension is a FILE, checked against what git tracks.
-      // Checked by its last part, `net.h` would be found in any file holding an h.
+      // Checked by its tail alone, `edge.ts` would be found in `knowledge.ts`.
       if (/\.(sql|html|ts|gs|mjs|toml|json|yml|md|c|h|py)$/.test(name)) {
         if (!TRACKED.some(f => f === name || f.endsWith('/' + name))) {
           missing.push(`${doc}: ${name} (no such file)`);
@@ -6109,7 +5370,7 @@ test('every message she writes goes out through sayAloud', () => {
      and is silent. Four sites — the briefing's two (the speaking worker and
      postBriefing's fallback), then the trade event and the reply; the week's
      review rides the Sunday briefing. `/notes`, the apologies, the short
-     operational lines and the copy of a charm's or a laptop's turn keep `say`
+     operational lines and the copy of a laptop's turn keep `say`
      deliberately — that voice was on the device. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
@@ -7564,22 +6825,19 @@ const SENDS = {
                          'what he hears differ from what she remembers',
                     stored: 'by postBriefing, before the hand-off — this reads ' +
                             'the stored turn rather than writing one' },
-  charmBriefing:  { gate: null,       carries: 'turn.content', aloud: 'charmAudio',
-                    why: 'the briefing read back on the charm, as postSpeak ' +
+  laptopBriefing: { gate: null,       carries: 'turn.content', aloud: 'laptopAudio',
+                    why: 'the briefing read back on the laptop, as postSpeak ' +
                          'reads it: the text critique() returned and ' +
-                         'postBriefing stored, so the charm says exactly what ' +
+                         'postBriefing stored, so the laptop says exactly what ' +
                          'Telegram received',
                     stored: 'by postBriefing — this reads the stored turn ' +
                             'rather than writing one' },
   handleMessage:  { gate: 'trim',     carries: 'answer', through: 'converse' },
-  hear:           { gate: 'trim',     carries: 'answer', through: 'converse',
-                    copy: 'the charm speaks what this returns, through ' +
-                          'charmAudio — the voice goes to his keyring, so ' +
+  hearLaptop:     { gate: 'trim',     carries: 'answer', through: 'converse',
+                    copy: 'the laptop speaks what this returns, through ' +
+                          'laptopAudio — the voice goes to his laptop, so ' +
                           'Telegram is sent the text as its copy, not a ' +
-                          'second voice note of a thing he has just heard. ' +
-                          'It returns the volume she set beside the text, and ' +
-                          'the battery line the door may add after it is the ' +
-                          "charm's news, neither copied nor stored" },
+                          'second voice note of a thing he has just heard' },
   postTradeEvent: { gate: null,       carries: 'said',
                     why: 'TRIM REWRITES, and this one reaches a man who is ' +
                          'in a position or has just breached his day — the ' +
@@ -7603,14 +6861,14 @@ const SENDS_APART = {
 
 test('every path that sends him something is in the census', () => {
   // A path that speaks, takes a turn of conversation, or sends text — the
-  // charm speaks through charmAudio rather than sayAloud, and a command's
+  // laptop speaks through laptopAudio rather than sayAloud, and a command's
   // answer goes as text through say, and each is still a path that sends.
   const fns = [...EUGENIA_TS.matchAll(/^(?:export )?async function (\w+)/gm)]
     .map(m => [m[1], m.index]);
   const sending = fns.filter(([name, at]) => {
     const end = EUGENIA_TS.indexOf('\n}\n', at);
     return !SEND_PRIMITIVES.includes(name) &&
-      /await sayAloud\(|= await converse\(|charmAudio\(|\bsay\(|tg\("send/.test(EUGENIA_TS.slice(at, end === -1 ? undefined : end));
+      /await sayAloud\(|= await converse\(|laptopAudio\(|\bsay\(|tg\("send/.test(EUGENIA_TS.slice(at, end === -1 ? undefined : end));
   }).map(([name]) => name).sort();
   for (const name of SEND_PRIMITIVES) {
     assert.match(EUGENIA_TS, new RegExp(`^(?:export )?async function ${name}\\(`, 'm'),

@@ -1,9 +1,8 @@
-/* Her answer off the wire, read as the charm reads it: frames of a kind byte,
-   three bytes of length, big-endian, then that many bytes. A voice frame is
-   the vendor's raw `pcm`, 24 kHz, 16-bit little-endian, mono; a volume frame
-   is one byte from 0 to 100. Pure, so laptop.test.mjs feeds it the door's own
+/* Her answer off the wire: frames of a kind byte, three bytes of length,
+   big-endian, then that many bytes. A voice frame is the vendor's raw `pcm`,
+   24 kHz, 16-bit little-endian, mono. Pure, so laptop.test.mjs feeds it the door's own
    bytes, and agree.test.mjs holds FRAME and PCM_RATE to the door's. */
-export const FRAME = { voice: 0, volume: 1 };
+export const FRAME = { voice: 0 };
 export const PCM_RATE = 24000;
 
 /* Frames out of a stream whatever its chunks: a frame split across two reads
@@ -59,7 +58,7 @@ export function sampler() {
    late part is one pause rather than a stammer; at the end it plays what is
    left, however little. `fill` writes one block of output, silence where
    nothing plays, and says 'voice' the first time a sample above nothing goes
-   out — her silence while she thinks is exact zeros, as on the charm — and
+   out — her silence while she thinks is exact zeros — and
    'drained' once the answer has played to its end. */
 export const LEAD = 0.3;
 

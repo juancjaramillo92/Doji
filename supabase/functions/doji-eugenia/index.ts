@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // EUGENIA — market briefing and conversation  ·  Supabase Edge Function (Deno)
 // ───────────────────────────────────────────────────────────────────────────
-// The second bot: Gladys collects the journal, Eugenia does macro. Four
+// The second bot: Gladys collects the journal, Eugenia does macro. Three
 // callers, told apart by the secret they present:
 //
 //   x-doji-key                        the scheduled jobs and the trades
@@ -9,10 +9,9 @@
 //                                     speaking worker — postScheduled reads
 //                                     which.
 //   x-telegram-bot-api-secret-token   Telegram — he replied, answer him.
-//   x-charm-key                       her charm — he spoke to it, or it asks
-//                                     after the briefing.
-//   x-laptop-key                      her face on his laptop — the same, with
-//                                     his chart when he shows it.
+//   x-laptop-key                      her face on his laptop — he spoke to
+//                                     it, with his chart when he shows it,
+//                                     or it asks after the briefing.
 //
 // She owns no column of `trades` and has no write path to it: she reads the
 // journal through eugenia_trades, granted SELECT alone, and writes only her
@@ -32,8 +31,8 @@
 // Secrets:  EUGENIA_BOT_TOKEN, EUGENIA_WEBHOOK_SECRET, TELEGRAM_CHAT_ID,
 //           DOJI_CRON_SECRET, ANTHROPIC_API_KEY, SB_SECRET_KEY; optional —
 //           each guarded where it is used — STT_URL, STT_KEY, TTS_KEY,
-//           EMBED_KEY, and EUGENIA_CHARM_SECRET and EUGENIA_LAPTOP_SECRET,
-//           each of which, unset, shuts its door
+//           EMBED_KEY, and EUGENIA_LAPTOP_SECRET, which, unset, shuts the
+//           laptop's door
 // ═══════════════════════════════════════════════════════════════════════════
 import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, TRADE_EVENT, REVIEW, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
@@ -1999,9 +1998,8 @@ export const modelFor = (label: string): string => MODELS[label] ?? OPUS;
 
 /* Fast mode, keyed on the caller's label as MODELS is: the same model writing
    up to 2.5× faster, at twice the rate. The replies are the caller he waits
-   on — one reply, whether it came through Telegram, the charm or the laptop —
-   and at about
-   $12 a month on Opus he chose speed over the price, 30 October. Opus alone
+   on — one reply, whether it came through Telegram or the laptop — and at
+   about $12 a month on Opus he chose speed over the price, 30 October. Opus alone
    serves it. A research preview with its own rate limit, so a fast request
    refused for any reason is sent once more at the ordinary speed: the turn
    is slower, never lost. A change of speed is a cache of its own, so the
@@ -2570,8 +2568,8 @@ async function speak(answer: string, keyboard: unknown, signal: AbortSignal): Pr
    whenever any part did not land. What is stored is unaffected.
 
    Not `say` itself, which keeps four things silent: the /notes audit, the
-   apologies, short operational lines, and the copy of a turn the charm or the
-   laptop has already spoken. Exported so the fallback is driven —
+   apologies, short operational lines, and the copy of a turn the laptop has
+   already spoken. Exported so the fallback is driven —
    with no TTS key every speak answers why not, a refusing vendor's shape — with
    the budget a parameter so a stall needs no waiting out.
 
@@ -4681,13 +4679,10 @@ async function handleFeedback(query: any): Promise<void> {
    What she is handed when he talks to her, the model and the gate — one turn
    however he reached her, so every door into the conversation reads the same
    memory, notes, map and desk. What comes back is his turn as it is stored
-   (marked when he was quoting her), her answer as the gate left it, and a
-   volume she set for the charm. `device` is the charm telling her about
-   itself, for this turn only — never stored, like the rest of the context; ""
-   from Telegram.
+   (marked when he was quoting her) and her answer as the gate left it.
    ───────────────────────────────────────────────────────────────────────── */
-async function converse(text: string, blocks: any[], quoting: Promise<string | null>,
-                        device: string): Promise<{ asked: string; answer: string; volume: number | null }> {
+async function converse(text: string, blocks: any[],
+                        quoting: Promise<string | null>): Promise<{ asked: string; answer: string }> {
   const [history, notes, portrait, channels, story, loops, calendar, desk, record, calls, quoted] = await Promise.all([
     recent(), notesBlock(), portraitBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
     calendarBlock(), positionsBlock(), recordBlock(), callsBlock(), quoting,
@@ -4707,7 +4702,7 @@ async function converse(text: string, blocks: any[], quoting: Promise<string | n
     `\n\nYour answer reaches him as a voice note, so write it ` +
     `to be heard: plain sentences, no headings, and nothing that only works ` +
     `on a page. Lead with the answer and say only what decides it.`;
-  const context = asked + about + aloud + device + notes + portrait + channels + story + loops + calendar + desk + record +
+  const context = asked + about + aloud + notes + portrait + channels + story + loops + calendar + desk + record +
     calls;
   const draft = await ask(
     [...history, {
@@ -4716,13 +4711,8 @@ async function converse(text: string, blocks: any[], quoting: Promise<string | n
       content: blocks.length ? [...blocks, { type: 'text', text: context }] : context,
     }],
     'medium', 'reply');
-  // A volume she set for the charm opens her draft, and comes off before the
-  // gate, so TRIM never sees it and nothing stores or speaks it. Only the
-  // charm's turn is told it may set one.
-  const set = draft.match(/^\s*\[volume (\d{1,3})\]\s*/i);
-  const said = set ? draft.slice(set[0].length) : draft;
-  const answer = await trim(said, desk, story);
-  return { asked, answer, volume: set ? Math.min(100, Number(set[1])) : null };
+  const answer = await trim(draft, desk, story);
+  return { asked, answer };
 }
 
 /* ─── The Telegram half: he replied ─────────────────────────────────────── */
@@ -4845,7 +4835,7 @@ async function handleMessage(update: any): Promise<void> {
     try {
       // Gated while the indicator still runs, or three silent seconds read as
       // her finishing and saying nothing.
-      ({ asked, answer } = await converse(text, blocks, quoting, ""));
+      ({ asked, answer } = await converse(text, blocks, quoting));
     } finally {
       // Stopped before sending, or a ping lands after the message.
       clearInterval(keepTyping);
@@ -4885,137 +4875,116 @@ function background(work: Promise<unknown>) {
   waitUntil.call((globalThis as any).EdgeRuntime, guarded);
 }
 
-/* ─── The charm half: he spoke to the charm ────────────────────────────────
-   A round screen on his keyring with a microphone and a speaker. He presses,
-   talks and presses again; it posts the recording here, an Ogg Opus file as a
-   Telegram voice note is, and plays what comes back, all on one request. The
-   turn is converse, the reply's own, so the charm and Telegram are one
-   conversation with one memory. Telegram gets the text as a copy, his words
-   first, so a mishearing shows where he can scroll back.
-   ───────────────────────────────────────────────────────────────────────── */
-const CHARM_SECRET = env("EUGENIA_CHARM_SECRET");
+/* ─── The laptop half: he spoke to her face on his laptop ──────────────────
+   Her face floats over his charts. He presses, talks and presses again; the
+   laptop posts the recording here and plays what comes back, all on one
+   request. The turn is converse, the reply's own, so the laptop and Telegram
+   are one conversation with one memory: nothing about her changes — she is
+   told nothing of the device, as she is told nothing of Telegram. Telegram
+   gets the text as a copy, his words first, so a mishearing shows where he
+   can scroll back. What the laptop adds is sight: the TradingView window,
+   when he asks her to look, rides beside his words as a chart sent in
+   Telegram does, for this turn only.
 
-type Spoken = { answer: string; volume: number | null };
+   The laptop's browser engine records WebM; the file goes to the transcriber
+   under the name and type the laptop gave it, which is what the vendor reads
+   the format from.
+   ───────────────────────────────────────────────────────────────────────── */
+const LAPTOP_SECRET = env("EUGENIA_LAPTOP_SECRET");
 
 /* A recording heard, answered as a turn of the conversation. Never throws:
-   whatever happens, the device that asked has something to say. The copy and
-   the write go after it has her words, which are what he is waiting on, and
-   the pair is stored whether or not the copy lands. */
-async function hear(heard: Heard, blocks: any[], device: string): Promise<Spoken> {
-  if ('trouble' in heard) return { answer: VOICE_TROUBLE[heard.trouble], volume: null };
+   whatever happens, the laptop has something to say. The copy and the write
+   go after it has her words, which are what he is waiting on, and the pair is
+   stored whether or not the copy lands. */
+async function hearLaptop(voice: File, chart: File | null): Promise<string> {
+  const blocks = chart ? [{
+    type: "image",
+    source: { type: "base64", media_type: chart.type, data: base64(new Uint8Array(await chart.arrayBuffer())) },
+  }] : [];
+  const heard = await transcribe(new Uint8Array(await voice.arrayBuffer()), voice.name, voice.type);
+  if ('trouble' in heard) return VOICE_TROUBLE[heard.trouble];
   try {
-    const { asked, answer, volume } = await converse(`[voice note] ${heard.said}`, blocks, Promise.resolve(null), device);
+    const { asked, answer } = await converse(`[voice note] ${heard.said}`, blocks, Promise.resolve(null));
     background(say(`«${heard.said}»${blocks.length ? ' — with your chart' : ''}\n\n${answer}`));
     background(remember([{ role: 'user', content: asked }, { role: 'assistant', content: answer }]));
-    return { answer, volume };
+    return answer;
   } catch (err) {
     console.error("doji-eugenia:", why(err));
-    return { answer: APOLOGY.reply, volume: null };
+    return APOLOGY.reply;
   }
 }
 
-/* The headers are the charm telling her about itself — its battery, whether
-   it is charging, its volume — for this turn only, and how she sets its volume
-   when he asks. Clamped: a header is only what the charm sent. */
-async function hearCharm(bytes: Uint8Array, h: Headers): Promise<Spoken> {
-  const percent = (name: string) => {
-    const v = parseInt(h.get(name) ?? '', 10);
-    return Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : null;
-  };
-  const battery = percent('x-charm-battery'), volume = percent('x-charm-volume');
-  const device = `\n\nHe is talking to you through the charm on his keyring` +
-    (battery === null ? '' : `; its battery is at ${battery}%${h.get('x-charm-charging') === '1' ? ' and charging' : ''}`) +
-    (volume === null ? '' : `; its volume is ${volume} of 100`) +
-    `. If he asks you to speak louder or softer, or for a volume, open your answer with ` +
-    `[volume N], N from 0 to 100: the charm sets it before your answer plays, so answer ` +
-    `as if it already sounds that way.`;
-  return await hear(await transcribe(bytes, "charm.ogg", "audio/ogg"), [], device);
-}
+/* What the laptop plays is the vendor's raw `pcm`: 24 kHz, 16-bit
+   little-endian, mono. The parts of a long answer join end to end, where each
+   part of a file format would carry its own header. It arrives in frames — a
+   kind byte, three bytes of length, then that many bytes — as the laptop's
+   framer reads them. Exported so that framer can be fed these exact bytes in
+   a test. */
+export const FRAME = { voice: 0 } as const;
 
-/* What the charm plays is the vendor's raw `pcm`: 24 kHz, 16-bit little-endian,
-   mono. It needs no decoder on the device, and the parts of a long answer join
-   end to end, where each part of a file format would carry its own header.
-
-   It arrives in frames — a kind byte, three bytes of length, then that many
-   bytes — because the answer starts before she has decided anything, so a
-   volume she sets cannot ride in a header: a volume frame, one byte from 0 to
-   100, goes ahead of her voice, so it already sounds that way. Exported so the
-   charm's own parser can be fed these exact bytes in a test. */
-export const FRAME = { voice: 0, volume: 1 } as const;
-
-export function charmFrame(kind: number, bytes: Uint8Array): Uint8Array {
+export function laptopFrame(kind: number, bytes: Uint8Array): Uint8Array {
   const out = new Uint8Array(4 + bytes.length);
   out.set([kind, bytes.length >> 16 & 255, bytes.length >> 8 & 255, bytes.length & 255]);
   out.set(bytes, 4);
   return out;
 }
 
-// The vendor's `pcm`, in samples a second: the rate the charm plays her voice at.
+// The vendor's `pcm`, in samples a second: the rate the laptop plays her voice at.
 const PCM_RATE = 24_000;
-const BEAT = charmFrame(FRAME.voice, new Uint8Array(PCM_RATE / 10 * 2));
+const BEAT = laptopFrame(FRAME.voice, new Uint8Array(PCM_RATE / 10 * 2));
 const BEAT_MS = 15_000;
-
-// Said at the end of an answer when the charm asks, once a charge: its battery is low.
-const CHARM_LOW = "Jefe, I'm running out of battery. Charge me when you can.";
 
 /* Silence while she thinks: a tenth of a second of zeros every BEAT_MS, from
    the first instant. A turn can run for minutes, and a response with nothing
-   on the wire that long is closed by a proxy between here and the charm —
+   on the wire that long is closed by a proxy between here and the laptop —
    which one has never been measured, so the beat sits well inside the
    shortest such limit known, a hundred seconds. Zeros are silence in this
-   format, so the charm plays them like anything else, and its face can tell
+   format, so the laptop plays them like anything else, and her face can tell
    thinking from speaking by the level alone. A part the vendor will not read
    ends the audio; the copy in Telegram is the whole of it.
 
    SPEAK_MS bounds each part's wait for the vendor to start answering, not its
-   reading: the charm takes the voice as fast as it plays it, so a budget on
+   reading: the laptop takes the voice as fast as it plays it, so a budget on
    the whole stream runs at the pace of speech, and cut a long briefing off
-   mid-sentence. Once she speaks, the charm's own hanging up and the worker's
+   mid-sentence. Once she speaks, the laptop's own hanging up and the worker's
    wall clock are the bounds. */
-async function* charmAudio(words: Promise<Spoken>): AsyncGenerator<Uint8Array, boolean> {
-  let said: Spoken | null = null;
+async function* laptopAudio(words: Promise<string>): AsyncGenerator<Uint8Array, boolean> {
+  let said: string | null = null;
   while (said === null) {
     yield BEAT;
     let beat = 0;
     said = await Promise.race([words, new Promise<null>(r => { beat = setTimeout(r, BEAT_MS, null); })]);
     clearTimeout(beat);
   }
-  if (said.volume !== null) yield charmFrame(FRAME.volume, Uint8Array.of(said.volume));
   try {
-    for (const part of chunk(said.answer, TTS_LIMIT)) {
+    for (const part of chunk(said, TTS_LIMIT)) {
       const started = new AbortController();
       const wait = setTimeout(() => started.abort(), SPEAK_MS);
       const spoken = await reading(part, "pcm", started.signal).finally(() => clearTimeout(wait));
       if (!spoken.ok || !spoken.body) throw new Error(`speech HTTP ${spoken.status}`);
-      for await (const bytes of spoken.body) yield charmFrame(FRAME.voice, bytes);
+      for await (const bytes of spoken.body) yield laptopFrame(FRAME.voice, bytes);
     }
     return true;
   } catch (err) {
-    console.error("doji-eugenia: the charm could not speak —", why(err));
+    console.error("doji-eugenia: the laptop could not speak —", why(err));
     return false;
   }
 }
 
-/* The briefing, on the charm. The charm sleeps, so it is never told: it wakes
-   after the briefing's hour and asks `?briefing=ready`, which answers with her
-   line that it has landed, or 204 while it has not; then the charm shows its
-   dot until he presses and asks `?briefing=today` for the briefing itself. The
-   text is the one postBriefing stored, read back as the speaking worker reads
-   it, so the charm says exactly what Telegram received. The laptop asks for
-   the briefing the same way, and whether one waits as `?briefing=waits`,
-   whose answer has no voice in it, so asking every few minutes costs no
-   speech.
+/* The briefing, on the laptop. It asks every few minutes whether one waits,
+   as `?briefing=waits`, whose answer has no voice in it, so asking costs no
+   speech: 204 while none does, 200 once one has landed. Then it shows its dot
+   until he asks `?briefing=today` for the briefing itself. The text is the
+   one postBriefing stored, read back as the speaking worker reads it, so the
+   laptop says exactly what Telegram received.
 
-   Heard is the briefing spoken whole to either device: a run row, written once
-   the last of it has gone, so a line that drops halfway leaves it waiting.
-   From then on every question is answered as though none were stored, and
-   the other device's dot goes — the charm's at its next waking, the laptop's
-   at its next ask. Telegram's copy is sent regardless. */
-const CHARM_READY = "Your briefing is ready, jefe.";
-
-async function charmBriefing(which: string): Promise<Response> {
-  if (which !== 'ready' && which !== 'today' && which !== 'waits') {
-    return json({ ok: false, error: "briefing is ready, today or waits" }, 400);
+   Heard is the briefing spoken whole: a run row, written once the last of it
+   has gone, so a line that drops halfway leaves it waiting. From then on every
+   question is answered as though none were stored, and the dot goes.
+   Telegram's copy is sent regardless. */
+async function laptopBriefing(which: string): Promise<Response> {
+  if (which !== 'today' && which !== 'waits') {
+    return json({ ok: false, error: "briefing is today or waits" }, 400);
   }
   const now = new Date(), today = nyDate(now);
   const due: Brief = nyClock(now).wd === 0 ? 'sunday' : 'weekday', heard = `${due} briefing heard`;
@@ -5026,39 +4995,16 @@ async function charmBriefing(which: string): Promise<Response> {
   ]);
   if (!turn || (run && nyDate(new Date(run.at)) === today)) return new Response(null, { status: 204 });
   if (which === 'waits') return new Response(null, { status: 200 });
-  const said = charmAudio(Promise.resolve({ answer: which === 'ready' ? CHARM_READY : turn.content, volume: null }));
-  return new Response(ReadableStream.from(which === 'ready' ? said : (async function* () {
+  const said = laptopAudio(Promise.resolve(turn.content));
+  return new Response(ReadableStream.from((async function* () {
     if (yield* said) await recordRun({ caller: heard, ok: true });
   })()), { headers: { "Content-Type": "application/octet-stream" } });
-}
-
-/* ─── The laptop half: he spoke to her face on his laptop ──────────────────
-   Her face floats over his charts, and he talks to it as he talks to the
-   charm: one request, the same turn, the same frames back, the same copy in
-   Telegram. Nothing about her changes — she is told nothing of the device,
-   as she is told nothing of Telegram. What the laptop adds is sight: the
-   TradingView window, when he asks her to look, rides beside his words as a
-   chart sent in Telegram does, for this turn only.
-
-   The laptop's browser engine records WebM, not the charm's Ogg; the file
-   goes to the transcriber under the name and type the laptop gave it, which
-   is what the vendor reads the format from. Its own key, so a lost laptop is
-   cut off without the charm. */
-const LAPTOP_SECRET = env("EUGENIA_LAPTOP_SECRET");
-
-async function hearLaptop(voice: File, chart: File | null): Promise<Spoken> {
-  const blocks = chart ? [{
-    type: "image",
-    source: { type: "base64", media_type: chart.type, data: base64(new Uint8Array(await chart.arrayBuffer())) },
-  }] : [];
-  return await hear(await transcribe(new Uint8Array(await voice.arrayBuffer()), voice.name, voice.type), blocks, "");
 }
 
 // ─── Entry point ───────────────────────────────────────────────────────────
 if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: Request) => {
   const fromTelegram = req.headers.get("x-telegram-bot-api-secret-token");
   const fromCron     = req.headers.get("x-doji-key");
-  const fromCharm    = req.headers.get("x-charm-key");
   const fromLaptop   = req.headers.get("x-laptop-key");
 
   if (!BOT_TOKEN || !CHAT_ID || !WEBHOOK_SECRET || !CRON_SECRET || !ANTHROPIC_KEY || !SB_KEY) {
@@ -5100,42 +5046,12 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       background(postScheduled(url));
       return json({ ok: true, accepted: url.search.slice(1) || "hourly" });
     }
-    if (secretMatches(fromCharm, CHARM_SECRET)) {
-      /* A waking's report, one line the charm writes as it goes to sleep: filed
-         beside her runs as it came, so the board is read without a cable. It
-         needs no vendor, so it is answered before they are asked for. */
-      if (new URL(req.url).searchParams.has("report")) {
-        await recordRun({ caller: 'charm', ok: true, detail: (await req.text()).slice(0, 500) });
-        return new Response(null, { status: 204 });
-      }
-      // Without both vendors it can neither hear nor speak, said at the door
-      // rather than as silence.
-      if (!STT_URL || !STT_KEY || !TTS_KEY) {
-        return json({ ok: false, error: "the charm needs STT_URL, STT_KEY and TTS_KEY" }, 503);
-      }
-      const briefing = new URL(req.url).searchParams.get("briefing");
-      if (briefing !== null) return await charmBriefing(briefing);
-      const bytes = new Uint8Array(await req.arrayBuffer());
-      if (!bytes.length || bytes.length > FILE_MAX) {
-        return json({ ok: false, error: `a recording, up to ${FILE_MAX} bytes` }, 400);
-      }
-      // Answered at once, the audio following as it exists. The turn is kept
-      // alive past a charm that hangs up, so the copy and the memory still land.
-      // A low battery is said after her answer when the charm asks, and only
-      // spoken: it is the charm's news, not a turn of hers to keep.
-      const words = hearCharm(bytes, req.headers);
-      background(words);
-      const low = req.headers.get('x-charm-low') === '1';
-      const spoken = words.then(w => low ? { ...w, answer: `${w.answer} ${CHARM_LOW}` } : w);
-      return new Response(ReadableStream.from(charmAudio(spoken)),
-                          { headers: { "Content-Type": "application/octet-stream" } });
-    }
     if (secretMatches(fromLaptop, LAPTOP_SECRET)) {
       if (!STT_URL || !STT_KEY || !TTS_KEY) {
         return json({ ok: false, error: "the laptop needs STT_URL, STT_KEY and TTS_KEY" }, 503);
       }
       const briefing = new URL(req.url).searchParams.get("briefing");
-      if (briefing !== null) return await charmBriefing(briefing);
+      if (briefing !== null) return await laptopBriefing(briefing);
       // A form: the recording as `voice`, and `chart` when he asked her to look.
       const form = await req.formData().catch(() => null);
       const voice = form?.get("voice"), chart = form?.get("chart") ?? null;
@@ -5147,7 +5063,7 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       }
       const words = hearLaptop(voice, chart instanceof File ? chart : null);
       background(words);
-      return new Response(ReadableStream.from(charmAudio(words)),
+      return new Response(ReadableStream.from(laptopAudio(words)),
                           { headers: { "Content-Type": "application/octet-stream" } });
     }
     return json({ ok: false, error: "unauthorized" }, 401);
