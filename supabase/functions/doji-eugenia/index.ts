@@ -982,17 +982,16 @@ const HISTORY_PAUSE_MS = 35_000;
 export async function postHistory(start: string, pause = HISTORY_PAUSE_MS): Promise<Response> {
   const weeks = historyWeeks(start, Date.now());
   if (!weeks) return json({ ok: false, error: "history takes a date, YYYY-MM-DD" }, 400);
-  let marked: { week: string }[];
+  let marked: Set<string>;
   try {
-    marked = await readRows<{ week: string }>('Weeks', `calendar_weeks?select=week&week=gte.${weeks[0]}` +
-      `&week=lte.${weeks.at(-1)}&order=week.desc&limit=${HISTORY_WEEKS}`);
+    marked = new Set((await readRows<{ week: string }>('Weeks', `calendar_weeks?select=week&week=gte.${weeks[0]}` +
+      `&week=lte.${weeks.at(-1)}&order=week.desc&limit=${HISTORY_WEEKS}`)).map(m => m.week));
   } catch (err) {
     const detail = `${why(err)}, so nothing was walked`;
     await recordRun({ caller: 'calendar week', ok: false, detail });
     return json({ ok: false, error: detail }, 503);
   }
-  const filedWeeks = new Set(marked.map(m => m.week));
-  for (const week of weeks.filter(w => !filedWeeks.has(w))) {
+  for (const week of weeks.filter(w => !marked.has(w))) {
     if (await filedWeek(week)) continue;
     await new Promise(r => setTimeout(r, pause));
     if (!await filedWeek(week)) break;
