@@ -5240,7 +5240,7 @@ test('the prints read is bounded, newest first, and takes what she named as a va
   const crop = new RegExp(decodeURIComponent(printsQuery('WASDE Corn Ending Stocks (New Crop)', 6, now)
     .match(/&name=imatch\.([^&]*)&/)[1]), 'i');
   assert.ok(crop.test('WASDE Corn Ending Stocks (New Crop) (Nov. 2026)') && !crop.test('WASDE Corn Ending Stocks Xnew CropX'));
-  // An asterisk is a character of one release's name, never a wildcard.
+  // An asterisk is a character, never a wildcard: TradingView lists a name ending in one.
   const star = new RegExp(decodeURIComponent(printsQuery(releaseName('United States-EIA OIL STOCKS-EIA Weekly Rfg Stocks*'), 6, now)
     .match(/&name=imatch\.([^&]*)&/)[1]), 'i');
   assert.ok(star.test('United States-EIA OIL STOCKS-EIA Weekly Rfg Stocks* (Oct. 2026)') &&
