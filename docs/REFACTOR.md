@@ -1183,9 +1183,9 @@ he wants the Chair's speeches back.
 across all eight economies was refused: TradingView's tool answers at most
 1 MB, and that month came to 1.7 MB. Nothing scheduled asks for that much —
 the filing reads a few days, the history walk and the Sunday week one week,
-the rate odds a month of the US alone — so only a request made by hand meets
-it, and the refusal names the size. A smaller cap would also refuse the rate
-odds' month, which fits.
+and the rate odds a month of high-rated US events alone, since a month of
+every US event comes to about the limit itself — so only a request made by
+hand meets it, and the refusal names the size.
 **Revisit if:** a scheduled read starts asking for more than two weeks of every
 economy, or the refusal is ever met by one.
 

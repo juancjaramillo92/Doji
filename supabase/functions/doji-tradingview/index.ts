@@ -802,10 +802,13 @@ export async function readRates() {
       missing[i] = { symbol, error: unreached(signal, err) };
     }
   });
+  // High-rated only, as the decision is: since the change of ids a month of
+  // every US event comes to about the 1 MB a tool may answer, and a refused
+  // read leaves the check nothing to compare.
   let calendar: string[] | null = null;
   try {
     const events = foldCalendar(await tvCall(session, "mcp-tv-get-economic-calendar",
-      { countries: "US", date_from: today,
+      { countries: "US", min_importance: 1, date_from: today,
         date_to: new Date(Date.parse(today) + CALENDAR_DAYS * 86_400_000).toISOString().slice(0, 10) }, signal));
     calendar = decisions(events);
   } catch (err) {

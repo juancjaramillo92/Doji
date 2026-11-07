@@ -1090,17 +1090,19 @@ move since now, and `odds` for the two outcomes either side. An unsolvable
 meeting is named in `unread`. The dates are `FOMC`, the Fed's published decision
 days; a test fails half a year before the table runs out and checks every date
 is a Wednesday, and the last date is never priced. Each read also asks the
-calendar for the month's rate decisions, and one the table does not hold refuses
-the whole answer. `decisions` finds them by TradingView's title for one since
-its ids changed on 3 November, plain *Interest Rate*, held once as
-`FED_DECISION` in `_shared/edge.ts`, which also names it to her in
-`get_releases`'s description; a title it missed would leave the check nothing to
-compare and let every answer through. **A year of meetings, because the path is
-the number for gold**: the next meeting says what the Fed does now, and how much
-is priced by a year out says how far the market thinks it goes, which moves the
-gap between rates and inflation before any meeting does. Up to twelve contracts,
-nearest first, so a slow morning keeps the meetings closest; where the table
-runs short of a year the strip is as long as the table.
+calendar for the month's high-rated US events, the rate decisions among them,
+since a month of every US event comes to about the 1 MB TradingView's tool may
+answer, and one the table does not hold refuses the whole answer. `decisions`
+finds them by TradingView's title for one since its ids changed on 3 November,
+plain *Interest Rate*, held once as `FED_DECISION` in `_shared/edge.ts`, which
+also names it to her in `get_releases`'s description; a title it missed would
+leave the check nothing to compare and let every answer through. **A year of
+meetings, because the path is the number for gold**: the next meeting says what
+the Fed does now, and how much is priced by a year out says how far the market
+thinks it goes, which moves the gap between rates and inflation before any
+meeting does. Up to twelve contracts, nearest first, so a slow morning keeps the
+meetings closest; where the table runs short of a year the strip is as long as
+the table.
 
 Checked against FedWatch on 1 October, on its own prices the October odds were
 identical (24.9%) and December within a point. `ratesList` states the first
