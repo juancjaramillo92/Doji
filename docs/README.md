@@ -1091,7 +1091,9 @@ unsolvable meeting is named in `unread`. The dates are `FOMC`, the Fed's
 published decision days; a test fails half a year before the table runs out and
 checks every date is a Wednesday, and the last date is never priced. Each read
 also asks the calendar for the month's rate decisions, and one the table does not
-hold refuses the whole answer. **A year of meetings, because the path is the
+hold refuses the whole answer. `decisions` finds them by TradingView's title for
+one since its ids changed on 3 November, plain *Interest Rate*; a title it missed
+would leave the check nothing to compare and let every answer through. **A year of meetings, because the path is the
 number for gold**: the next meeting says what the Fed does now, and how much is
 priced by a year out says how far the market thinks it goes, which moves the gap
 between rates and inflation before any meeting does. Up to twelve contracts,

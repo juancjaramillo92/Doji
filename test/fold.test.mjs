@@ -27,7 +27,7 @@ import {
 import { SETUPS, COLUMNS, answered, parseCallback, renderMessage, staysOpen } from '../supabase/functions/doji-gladys/index.ts';
 import { emailRow, answerFor } from '../supabase/functions/doji-email-sync/index.ts';
 import { pkceChallenge, challenge, wellKnown, tokenFields, fresh, accessToken, unwrap, foldCalendar,
-  calendarWindow, foldBars, foldHeadlines, foldAlerts, FOMC, contractMonths, foldRates, oddsOf, unlisted, zq, foldSessions,
+  calendarWindow, foldBars, foldHeadlines, foldAlerts, FOMC, contractMonths, foldRates, oddsOf, unlisted, decisions, zq, foldSessions,
   readMarket, readRates, readTrend, foldTrend, BACK, FITS, fitOf, foldReserves, foldFunds, FUNDS, readFlows, RESERVES,
 } from '../supabase/functions/doji-tradingview/index.ts';
 import {
@@ -1783,6 +1783,18 @@ test('a decision the calendar lists and the table does not refuses the odds; a g
   assert.deepEqual(unlisted(['2026-10-28']), []);
   assert.deepEqual(unlisted([]), [], 'a calendar listing nothing is taken as a moved meeting');
   assert.deepEqual(unlisted(['2026-10-21']), ['2026-10-21']);
+});
+
+/* The decision as the calendar served the week of 28 October after the change
+   of ids, with the rate on reserves set in the same minute beside it. */
+test('the calendar names the Fed\'s decision the way the meeting check finds it', () => {
+  const event = (id, title, importance) => ({ id, date: '2026-10-28T18:00:00.000Z', title, country: 'US',
+    category: 'mny', importance, indicator: title, period: 'Oct. 2026', ticker: null });
+  const served = foldCalendar({ status: 'ok', result: [event('1001609054701', 'Interest Rate', 1),
+    event('1001609055701', 'Interest Rate on Reserve Balances', 0), event('3000039046319', 'Fed Balance Sheet', -1)] });
+  assert.deepEqual(decisions(served), ['2026-10-28'],
+    'the meeting check finds no decision on the calendar, and passes whatever the Fed does');
+  assert.deepEqual(unlisted(decisions(served)), []);
 });
 
 /* What ?rates=1 answered on 1 October at the 18:00 bar. FedWatch shows a later
