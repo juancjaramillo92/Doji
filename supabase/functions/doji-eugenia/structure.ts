@@ -261,10 +261,10 @@ function sessionsOf(bars: Candle[], p: Period, since: number): Session[] {
 
 /* Step 3 in numbers, and step 1's candles beside its turns: a candle's body
    and both wicks, and every mark on the map its range traded through with the
-   side it closed on. A wick and a body are
-   subtraction a model gets wrong across four candles at once, and a candle
-   reaching a level and closing back is his signal, so it is said, not left to
-   be found. Nothing here names a pattern. */
+   side it closed on. A wick and a body are subtraction a model gets wrong
+   across four candles at once, and a candle reaching a level and closing back
+   is his signal, so it is said, not left to be found. Nothing here names a
+   pattern. */
 export function shapeOf(b: Candle, marks: number[]): Shape {
   const top = Math.max(b.open, b.close), bottom = Math.min(b.open, b.close);
   return {
