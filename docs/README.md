@@ -3524,9 +3524,10 @@ head of the conversation (`effortMessages`, beta
 `mid-conversation-output-config-2026-07-01`, a header beside the fallback one),
 which changes effort without touching what is cached before it. Each caller
 still runs at its own effort and `eugenia_runs.effort` records that one. Sonnet's
-one caller, `trim`, has its own array and keeps its effort at the top. **Whether
-it worked is one morning's rows**: the first reply after a briefing should read
-the hour's prefix (`cached`) rather than write it (`wrote_1h`). The message is
+one caller, `trim`, has its own array and keeps its effort at the top. **Fast
+mode split the prefix again**: a change of speed invalidates the system prompt's
+cache, so a reply writes its own hour's prefix and reads only what an earlier
+reply wrote, never the briefing's. The message is
 sent and never stored, so it is not a role a turn may have. `cached` counts
 reads; `wrote_1h` and `wrote_5m` count writes, kept apart because their rates
 differ.
