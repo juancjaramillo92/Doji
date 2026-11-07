@@ -3652,6 +3652,35 @@ test('abroad, the central banks, headline inflation, bond auctions and China\'s 
   assert.equal(events, 103);
 });
 
+/* ─── At home, releases rated medium or above, less the named noise ─────────
+   Judged against every kind of US event TradingView listed over two weeks
+   after its ids changed on 3 November, when it began rating as medium what
+   moves gold not at all.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+const HOME_KINDS = JSON.parse(readFileSync(
+  new URL('./fixtures/tradingview-home.json', import.meta.url), 'utf8')).kinds;
+
+test('at home, every release rated medium or above is filed but the named noise', () => {
+  const rated = HOME_KINDS.filter(k => k.importance !== 'low');
+  const dropped = rated.filter(k => !wanted({ ...k, timed: true })).map(k => k.title);
+  const auction = (t) => /(Note|Bond|Bill) Auction (Allotted at High|Bid-to-Cover|Total Accepted)$/.test(t);
+  assert.deepEqual(dropped.filter(t => !auction(t)), ['Car Sales', 'Truck Sales', 'USDA Pork Gross Export Sales',
+    'USDA Pork Net Export Sales', 'WASDE Poultry Production', 'Baker Hughes Gas Rig Count', 'EIA Ethanol Production',
+    'EIA Ethanol Stocks', 'MBA 15-Year Mortgage Contract Rate', 'MBA 15-Year Mortgage Effective Rate',
+    'MBA 15-Year Mortgage Points', 'MBA 5/1 ARM Contract Rate', 'MBA 5/1 ARM Effective Rate', 'MBA 5/1 ARM Points']);
+  assert.deepEqual(dropped.filter(auction), rated.filter(k => k.category === 'bnd').map(k => k.title),
+    'a Treasury auction result line is filed');
+  assert.equal(dropped.filter(auction).length, 18, 'the auction lines the catalogue holds are not the ones dropped');
+  // Everything rated high, and the medium prints that move gold, stay.
+  for (const k of rated.filter(k => k.importance === 'high')) assert.ok(wanted({ ...k, timed: true }), `${k.title} is dropped`);
+  for (const title of ['Initial Jobless Claims', 'ADP Employment Change', 'Average Hourly Earnings MoM', 'Core PPI MoM',
+    'MBA 30-Year Mortgage Rate', 'United States-NY Fed Consumer Expectation-NY Fed Inflation Expectation 1yr']) {
+    assert.ok(wanted({ ...HOME_KINDS.find(k => k.title === title), timed: true }), `${title} is dropped`);
+  }
+  assert.equal(HOME_KINDS.filter(k => wanted({ ...k, timed: true })).reduce((n, k) => n + k.n, 0), 47);
+});
+
 test('a release from abroad is filed under its country, and led by it', () => {
   const at = '2026-09-30T12:00:00.000Z';
   const event = (country, title, extra = {}) => ({ id: `${country}-${title}`, at, title, country,
