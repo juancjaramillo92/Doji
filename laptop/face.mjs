@@ -1,16 +1,14 @@
-/* Her face on the laptop: the charm's face, with a body that breathes.
+/* Her face on the laptop, with a body that breathes.
    ───────────────────────────────────────────────────────────────────────────
-   The same render and the same drawing over it — eyes, highlight, smile,
-   thought dots, the listening ring — at the charm's own coordinates, in the
-   charm's 466-pixel square, scaled to the window; agree.test.mjs holds the
-   numbers to charm/main/face.c, and her sounds to charm/main/sound.c. What the
-   laptop adds is the body: she breathes and floats a little at rest, looks
+   Her render and the drawing over it — eyes, highlight, smile, thought dots,
+   the listening ring — in a 466-pixel square of her own, scaled to the
+   window. Then the body: she breathes and floats a little at rest, looks
    at the cursor when it comes near, leans in to listen, sways while she
    thinks and gives with the loud moments of her voice. Eyes and mouth ride
    the same transform, so they stay on her. And a line above her head, for
    what her face alone cannot say: why something failed, and how to talk.
-   When a trade waits for its journal, the charm's journal screens take her
-   place, and his clicks answer them.
+   When a trade waits for its journal, the journal's screens take her place,
+   and his clicks answer them.
 
    This page records him and plays her; the main process carries both to her
    door and back, and his answers to Gladys's, and owns the keys, the chart
@@ -21,9 +19,9 @@ import { FRAME, PCM_RATE, sampler } from './frames.mjs';
 import { asked } from './journal.mjs';
 import { ROOM } from './place.mjs';
 
-/* ─── The charm's face, copied ─────────────────────────────────────────────
-   Measured from the drawing of her face over the render, in pixels of the
-   charm's 466 × 466 screen, in face_geometry_t's order. */
+/* ─── Her face ──────────────────────────────────────────────────────────────
+   Measured from the drawing of her face over the render, in pixels of her
+   466 × 466 square. */
 const F = {
   eye_l: [188.8, 148.0], eye_r: [286.7, 132.6], rx: 8.8, ry: 9.0,
   hl: [4.3, -2.6, 1.8],
@@ -32,35 +30,39 @@ const F = {
 };
 const DOTS = [[208, 38, 3.2], [233, 30, 3.8], [258, 38, 3.2]];
 const FEATURES = '#0d0c0b', SHINE = '#f2f0ec', THROAT = '#1d0e0b', THOUGHT = '#ead3b6';
-// Doji's colours as the charm has them, copies of charm/main/palette.h.
-const DEEP = '#0e6f5c', ACCENT = '#0c8650', GLOW = '#3cc488', TEAL = '#1f9e93';
-const INK = '#e6ece9', GROUND = '#070c0a', LINE = '#1c2922', MUTED = '#96a89e';
+/* Doji's colours. Those named beside a token are the app's own, copies of
+   index.html's, which agree.test.mjs holds them against; the emeralds the
+   gradients are made of are her own. */
+const ACCENT = '#0c8650';  // --p
+const INK    = '#e6ece9';  // --tx
+const MUTED  = '#96a89e';  // --mt2
+const GROUND = '#070c0a';  // --glass
+const LINE   = '#1c2922';  // --bd
+const DEEP = '#0e6f5c', GLOW = '#3cc488', TEAL = '#1f9e93';
 const BLINK_EVERY_MS = 4000;
 const LOOK_RANGE = 6;
 const CONFUSED_MS = 4000;
 
-/* ─── The charm's ear and sounds, copied ───────────────────────────────────
+/* ─── Her ear and sounds ───────────────────────────────────────────────────
    His voice is heard when its level, a sixth of full scale, passes VOICE; a
    recording he never spoke into is let go at SILENT_MS, and the last
-   WARN_LEFT of one is ticked, as on the charm. Two notes start her
-   listening and two in reverse send what she heard. */
+   WARN_LEFT of one is ticked. Two notes start her listening and two in
+   reverse send what she heard. */
 const VOICE = 0.12;
 const SILENT_MS = 30_000;
 const WARN_LEFT = 30_000;
 const LISTEN = [[660.0, 0.07], [990.0, 0.11]];
 const SENT = [[990.0, 0.07], [660.0, 0.11]];
 
-/* ─── Gladys's journal, copied ─────────────────────────────────────────────
-   The charm's journal screens, at journal.c's own coordinates on its round
-   screen: each question owns the whole of it, split down the middle, with
-   one word in Doji's typeface. Left is no and right is yes — the setup's
-   halves its two setups — in Doji's emeralds rather than a win's teal and a
-   loss's red, each a gradient from top to bottom that brightens when
-   clicked. Four dots at the top say what is answered; done, they fill, a
-   tick draws itself in and the ring sweeps round once, brighter when every
-   answer was a yes. Unclicked for ASK_MS, the questions give way to her, the
-   trade still waiting. agree.test.mjs holds all of it to journal.c, and the
-   mark for a trade waiting to face.c's sleep screen. */
+/* ─── Gladys's journal ─────────────────────────────────────────────────────
+   The journal's screens, drawn on her round square: each question owns the
+   whole of it, split down the middle, with one word in Doji's typeface. Left
+   is no and right is yes — the setup's halves its two setups — in Doji's
+   emeralds rather than a win's teal and a loss's red, each a gradient from
+   top to bottom that brightens when clicked. Four dots at the top say what
+   is answered; done, they fill, a tick draws itself in and the ring sweeps
+   round once, brighter when every answer was a yes. Unclicked for ASK_MS,
+   the questions give way to her, the trade still waiting. */
 const WORDS = ['SETUP', 'RULES', 'SL', 'TP'];
 const SHORT = ['B&R', 'S&R'];
 const HALVES = [
@@ -94,7 +96,7 @@ const BREATH_S = 4.6, BREATH = 0.015;
 const BOB_S = 3.3, BOB = 2.5;
 const SWAY_S = 2.6, SWAY = 0.026;
 const LEAN = 0.02, SQUASH = 0.035, LIFT = 4;
-// The journal crosses over her rather than cutting in: nothing flashes, as on the charm.
+// The journal crosses over her rather than cutting in: nothing flashes.
 const CROSS = 12;
 const FRAME_MS = 33, REST_FRAME_MS = 50;
 // The cursor within this many of her pixels has her eyes.
@@ -180,9 +182,8 @@ function say(reason, ms = SAY_MS) {
 const unsay = () => { said.classList.remove('shown'); sayUntil = 0; };
 
 /* ─── Her sounds ─────────────────────────────────────────────────────────────
-   The charm's own: two notes rising in and dying away, and the tick, two
-   8 ms clicks of a high note 110 ms apart — each drawn sample by sample by
-   the charm's formula, at the charm's loudness. */
+   Two notes rising in and dying away, and the tick, two 8 ms clicks of a
+   high note 110 ms apart — each drawn sample by sample. */
 const sounds = () => (cues ??= new AudioContext());
 
 function notes(pair) {
@@ -230,8 +231,8 @@ function dot(cx, cy, rx, ry, color, fade = 1) {
 }
 
 /* A smile through its two ends and its lowest point, turned through F.tilt
-   with her head. The charm draws the arc of the circle those points lie on;
-   at this size the arc and this curve are the same line. */
+   with her head. At this size the arc of the circle those points lie on and
+   this curve are the same line. */
 function curve(cx, y, half, sag, width, color) {
   g.save();
   g.translate(cx, y);
@@ -289,7 +290,7 @@ function features(now) {
   }
 }
 
-/* The charm's ring round the rim, Doji's emeralds turning through it, `part`
+/* The ring round the rim, Doji's emeralds turning through it, `part`
    of the way round from the top. */
 function ring(radius, width, part, fade = 1) {
   const conic = g.createConicGradient(-Math.PI / 2, 233, 233);
@@ -305,10 +306,9 @@ function ring(radius, width, part, fade = 1) {
   g.restore();
 }
 
-/* What waits, low beside her, marked as the charm's sleep screen marks it:
-   a near-white ring for a trade, an emerald dot with a glow for the briefing,
-   the dot inside the ring for both — shape tells them apart. The charm's
-   ring is on black and his chart may be light, so it has a dark edge. */
+/* What waits, low beside her: a near-white ring for a trade, an emerald dot
+   with a glow for the briefing, the dot inside the ring for both — shape
+   tells them apart. His chart may be light, so the ring has a dark edge. */
 function waits() {
   if (trade) {
     g.save();
@@ -330,7 +330,7 @@ function waits() {
 }
 
 /* ─── The journal's screens ─────────────────────────────────────────────────
-   Drawn in the charm's 466 square, on its round screen. */
+   Drawn in her 466 square, on its round screen. */
 function word(text, x, y, size, weight, color, spacing) {
   g.font = `${weight} ${size}px ${TYPE}`;
   g.letterSpacing = `${spacing}px`;
@@ -418,9 +418,9 @@ function finished(t, allYes) {
   ring(231, 8, Math.min(1, t / SWEEP_MS), allYes ? 1 : 0.55);
 }
 
-/* The charm's tick, then the body. Each value eases toward what the mode asks
-   for, so nothing jumps between modes. At rest, a cursor near her has her
-   eyes; otherwise she glances about, as on the charm. */
+/* The face, then the body. Each value eases toward what the mode asks for,
+   so nothing jumps between modes. At rest, a cursor near her has her eyes;
+   otherwise she glances about. */
 function step(now, dt) {
   const m = mode;
   let tOpen = 1, tMouth = 0, tSmile = 1, tDots = 0, tConfused = 0, glance = 1, fixed = null;
@@ -522,19 +522,19 @@ function fit() {
    Played from one queue in the audio thread (voice.mjs), which holds a
    moment of her voice before it starts and plays it sample by sample, so her
    first words come whole. It says when her voice first sounds — thinking
-   until then, as on the charm — and when the answer has played to its end.
+   until then — and when the answer has played to its end.
    Its module loads while her first frames arrive; they wait for it. */
 function voice() {
   if (!audio) {
     const ctx = new AudioContext({ sampleRate: PCM_RATE });
-    const a = audio = { ctx, gain: ctx.createGain(), meter: ctx.createAnalyser(), sample: sampler(),
+    const a = audio = { ctx, meter: ctx.createAnalyser(), sample: sampler(),
                         player: null, waiting: [], voiced: false, drained: false };
     a.meter.fftSize = 512;
-    a.gain.connect(a.meter).connect(ctx.destination);
+    a.meter.connect(ctx.destination);
     ctx.audioWorklet.addModule('voice.mjs').then(() => {
       if (audio !== a) return;
       a.player = new AudioWorkletNode(ctx, 'voice', { outputChannelCount: [1] });
-      a.player.connect(a.gain);
+      a.player.connect(a.meter);
       a.player.port.onmessage = ({ data }) => { a[data === 'voice' ? 'voiced' : 'drained'] = true; };
       for (const said of a.waiting) a.player.port.postMessage(said);
     });
@@ -547,7 +547,6 @@ const tell = (a, said) => (a.player ? a.player.port.postMessage(said) : a.waitin
 function answer(kind, bytes) {
   if (mode !== 'thinking' && mode !== 'speaking') return;
   const a = voice();
-  if (kind === FRAME.volume) { a.gain.gain.value = bytes[0] / 100; return; }
   if (kind !== FRAME.voice) return;
   const samples = a.sample(bytes);
   if (samples.length) tell(a, samples);
@@ -685,13 +684,12 @@ function briefing() {
 
 /* ─── His journal ───────────────────────────────────────────────────────────
    What waits comes from the main process, asked of Gladys's door every
-   minute; a trade that came in ticks, as on the charm, and its questions come
-   up once she is idle — the conversation first, as on the charm. Each answer
+   minute; a trade that came in ticks, and its questions come up once she is
+   idle — the conversation first. Each answer
    is sent as he gives it and answered with what waits after it, so the next
    question, or the next trade, follows at once; one her door did not take
    leaves the question where it was, to be clicked again, and the line says
-   why. The talk key on them closes them and she listens, as PWR does on the
-   charm. Answered elsewhere while they are up, they follow what is left. */
+   why. The talk key on them closes them and she listens. Answered elsewhere while they are up, they follow what is left. */
 function journalNow() {
   if (mode !== 'idle' || !trade) return false;
   due = false;

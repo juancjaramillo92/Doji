@@ -4,16 +4,16 @@
    The app in laptop/ is Electron: a window, a microphone, a speaker and a
    screen capture, none of which a suite can open. What it can drive is the
    pure half — her frames read off the wire, and her voice read out of them,
-   fed the door's own bytes, from `charmFrame`, cut at every place a network
+   fed the door's own bytes, from `laptopFrame`, cut at every place a network
    read can cut them; her voice played from its queue while it arrives late
    and unevenly, as a real stream does; where her window goes when a screen
    is gone; the journal's answers, read by Gladys's own boundary, and the
    question a trade is asked first; and the swap an update leaves behind,
    run in a scratch folder with macOS's `ditto`, `open` and `codesign` stood
    in for, in every way it can fail.
-   The copies the app holds of the doors and of the charm are
-   agree.test.mjs's; whether she looks, sounds and floats as she should is
-   his to see on the Mac (README, The laptop).
+   The copies the app holds of the doors are agree.test.mjs's; whether she
+   looks, sounds and floats as she should is his to see on the Mac (README,
+   The laptop).
    ═══════════════════════════════════════════════════════════════════════════ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,7 +21,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { charmFrame } from '../supabase/functions/doji-eugenia/index.ts';
+import { laptopFrame } from '../supabase/functions/doji-eugenia/index.ts';
 import { parseCallback } from '../supabase/functions/doji-gladys/index.ts';
 import { FRAME, LEAD, PCM_RATE, Queue, framer, sampler } from '../laptop/frames.mjs';
 import { ANSWERS, SETUPS, asked, tap } from '../laptop/journal.mjs';
@@ -30,18 +30,17 @@ import { BUNDLE, swapScript } from '../laptop/update.mjs';
 
 const bytes = (n, seed) => Uint8Array.from({ length: n }, (_, i) => (i * 31 + seed) & 255);
 
-/* A stream as the door sends one: silence first, a volume, her voice in parts
+/* A stream as the door sends one: silence first, then her voice in parts
    of every awkward length — empty, one byte, odd, and one past 65,535, which
    needs the length's third byte. */
 const SENT = [
   [FRAME.voice, new Uint8Array(4800)],
-  [FRAME.volume, Uint8Array.of(80)],
   [FRAME.voice, bytes(0, 1)],
   [FRAME.voice, bytes(1, 2)],
   [FRAME.voice, bytes(4801, 3)],
   [FRAME.voice, bytes(70_001, 4)],
 ];
-const WIRE = Uint8Array.from(SENT.flatMap(([kind, b]) => [...charmFrame(kind, b)]));
+const WIRE = Uint8Array.from(SENT.flatMap(([kind, b]) => [...laptopFrame(kind, b)]));
 
 function read(cuts) {
   const got = [];

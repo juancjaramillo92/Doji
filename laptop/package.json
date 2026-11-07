@@ -6,9 +6,8 @@
   "type": "module",
   "main": "main.mjs",
   "scripts": {
-    "prestart": "cp ../charm/art/eugenia.png ../charm/art/HankenGrotesk.ttf .",
     "start": "electron .",
-    "prepackage": "cp ../charm/art/eugenia.png ../charm/art/HankenGrotesk.ttf . && cc -Wall -Werror -bundle -undefined dynamic_lookup -arch arm64 -mmacosx-version-min=12.0 -framework AppKit -I \"$(dirname \"$npm_node_execpath\")/../include/node\" spaces.m -o spaces.node",
+    "prepackage": "cc -Wall -Werror -bundle -undefined dynamic_lookup -arch arm64 -mmacosx-version-min=12.0 -framework AppKit -I \"$(dirname \"$npm_node_execpath\")/../include/node\" spaces.m -o spaces.node",
     "package": "electron-packager . Eugenia --platform=darwin --arch=arm64 --overwrite --out=out --app-bundle-id=app.doji.eugenia --extend-info=Info.plist --icon=Eugenia.icns --ignore=^/out --ignore=^/Info\\.plist --ignore=^/Eugenia\\.icns --ignore=^/Eugenia\\.iconset --ignore=^/spaces\\.m '--asar.unpack=*.node'"
   },
   "devDependencies": {

@@ -26,7 +26,6 @@ any change that touches it.
 | an Edge Function path no test can drive | `types.test.mjs` for the names in it; the rest by reading |
 | whether a prompt still behaves | `scripts/eval.mjs`, run by hand with his key — nothing in `npm test` calls the model |
 | whether a tool's description still says what she needs | reading it against the column or door it describes — the eval sends no tools (R-111) |
-| the charm's firmware beyond its pure C | `charm.test.mjs`'s census for the names in it; the charm workflow's build for the rest of its code; the board itself for what it does |
 | the laptop beyond its pure half | `types.test.mjs` for the names in it and `agree.test.mjs` for its copies; the laptop workflow's Mac for the three things it asks; the Mac itself for what it does |
 
 ---
@@ -357,117 +356,6 @@ the same night.
 **Revisit if:** reads about a week — Sunday's — are untested so often that the
 record stops saying anything about them.
 
-### R-33 — folding the charm's `sound_tick` into `play_notes`
-**Why refused:** the chime and the listening notes were one loop with
-different numbers and now share `play_notes`, proved byte-identical. The tick
-is not the same sound: its note stops dead at 8 ms where `play_notes` lets a
-decay run on, so folding it changes the samples, and a refactor may not.
-**Revisit if:** the tick is redesigned, as a behaviour change with its own
-commit.
-
-### R-34 — dropping `agree.test.mjs`'s read of the charm's briefing hours
-**Why refused:** `charm.test.mjs` compiles `briefing.c` and walks it against
-`briefDue` and `retryDue`, which is the stronger proof, and the two look like
-one check twice. They answer different questions: the Facts list is held by
-`agree.test.mjs`, which reads every copy as written, and the compiled walk
-proves what the copy does. Each would go red where the other might not.
-**Revisit if:** the Facts list stops being `agree.test.mjs`'s alone.
-
-### R-35 — one register helper for the charm's power chip and motion sensor
-**Why refused:** `power.c` and `motion.c` each write a register through their
-own device handle in three lines. A shared helper needs a file of its own, or
-one driver reaching into the other, to save six lines between two chips that
-share nothing but the bus.
-**Revisit if:** a third chip on the bus is driven.
-
-### R-36 — signing the charm's updates
-**Why refused:** she installs whatever app the public `charm` bucket holds,
-over TLS, and only the workflow writes it, with `SB_SECRET_KEY`. Whoever holds
-that key already reads and writes every table, so a signature would guard a
-door behind one already open, at the price of a signing key to keep and a
-public key built into every board.
-**Revisit if:** anyone but him ever holds a credential here, or the bucket is
-ever written by anything but the workflow.
-
-### R-38 — `-Werror` on the charm's own component
-**Why refused:** the C version of `types.test.mjs`'s two questions is asked
-already. A name used and declared nowhere fails the ESP-IDF build — its
-`-Werror=all` makes an implicit declaration an error, and an undeclared
-variable is one under any flags — which was seen red on the workflow, planted.
-A name declared and used nowhere is `charm.test.mjs`'s census, which runs on
-every push in `npm test`, needs no toolchain, and reaches what no warning
-does: a header export no other file calls, a function missing from its
-header. Wholesale `-Werror` would add a red build for every warning the pinned
-toolchain or a component's header raises — facts about the invocation, which
-is why `types.test.mjs` asks two questions and not a whole typecheck.
-**Revisit if:** a defect the compiler warned about reaches `main` past the
-census.
-
-### R-39 — moving `FRAME_VOICE` and `FRAME_VOLUME` into `frames.c`
-**Why refused:** they are the one header export only its own file reads, so
-the strict reading of "a header exports only what another file calls" moves
-them. But they are the wire format `frames.h` documents beside the function
-that decodes it, the Facts row names them there, and `agree.test.mjs` reads
-them there against `FRAME`. The census holds a header's functions to another
-caller and its other names to a use, which these have.
-**Revisit if:** a header grows constants that are not part of what it
-documents.
-
-### R-40 — naming the charm's screen centre and size
-**Why refused:** 233 and 466 recur in every file that draws, but they are two
-of some hundred coordinates measured in the same pixels — the render is bytes
-for this panel, and every position is a number measured on it. Naming
-two leaves the rest literal in the same space and makes no decision movable.
-**Revisit if:** a second panel size is ever driven.
-
-### R-41 — the charm's single-use colours into `palette.h`
-**Why refused:** `palette.h` holds a colour the app or a second file shares.
-The render's ink, highlight and mouth in `face.c` and the journal's resting
-halves are each drawn by one function, beside which they are read — the reason §3 gives for leaving each CSS rule beside its
-component.
-**Revisit if:** a second file draws one of them.
-
-### R-42 — one tick for the setup screen and the journal's done
-**Why refused:** the two ticks share three points, but one is an `lv_line`
-object shown whole and the other is drawn in stroke by stroke by its own
-event; sharing the points needs a header for six numbers, and they may part
-the day either is redesigned.
-**Revisit if:** the tick is redesigned and both are meant to stay one shape.
-
-### R-43 — one Wi-Fi bring-up for `net.c` and `setup.c`
-**Why refused:** one starts a station that joins in the background with a
-fast path through the last access point; the other an access point and a
-station side by side, every event routed to the setup screen. What they must
-agree on — her own leaving is no refusal — is already held, found rather than
-listed, by `agree.test.mjs`. A shared start would be an options object over
-two modes. The same holds for the `yyyymmdd` day `briefing.c` and `ota.c`
-each keep: each is compared only with itself, so the two cannot disagree in a
-way that matters.
-**Revisit if:** a third file joins a network.
-
-### R-44 — one bare full-screen object for `face.c`, `journal.c` and `setup.c`
-**Why refused:** `plain()`, `box()` and `group()` each make a 466 × 466 object,
-but on different parents, with different flags, one with a background and one
-hidden at birth. One helper would take those as arguments for three callers
-that read plainer as they are.
-**Revisit if:** a fourth file draws a screen of its own.
-
-### R-45 — checking every `esp_err_t` in the firmware
-**Why refused:** a check is for a failure that changes what she does next.
-What she does next is decided by the exchange's outcome, not by each call on
-the way to it: `esp_http_client_fetch_headers` failing leaves the status at
-0, and `talk()` shows any answer but 200 as her confused face while the
-network is up, the sleep screen once it is gone — a −1 included, and an answer
-whose stream stopped short of its end, which reads like her last word until
-`esp_http_client_is_complete_data_received` is asked (October 2026: a dropped
-line had been playing as a finished answer). An NVS write that fails costs a
-setting the next save repeats; the codecs and the radio's start-up fail into
-the same refusals the doors report. Each check would be padding where nothing
-untrusted enters.
-**Revisit if:** a failure is found that the exchange's outcome does not carry,
-or a setting is ever written once and never again.
-
-
 ### R-46 — search by date, and a scroll around a hit
 **Deferred, not refused.** Hermes's session search takes date bounds, sorts
 newest or oldest, and returns the turns around a match. Hers returns twelve
@@ -559,30 +447,12 @@ fact that has not moved. The words stay, and `agree.test.mjs` holds them to
 **Revisit if:** one of the call rules changes, when the edit is a prompt change
 anyway.
 
-### R-57 — several Opus packets to an Ogg page on the charm
-**Deferred, not refused.** `ogg.c` writes one 20 ms packet a page, and each
-page's head is 28 bytes against a packet of about 60 at 24 kbit/s, so a
-quarter or more of a five-minute file is heads — about 1.3 MB where packing
-pages would make it under a megabyte. It fits her door's 3 MB and the room
-`talk.c` gives it, and one packet a page is what the test can read against
-the specification page by page. **Revisit if:** the upload's time shows in
-how long he waits for her, or the room on the board proves short.
-
 ### R-58 — the five-minute tick without a gap in the recording
 **Deferred, not refused.** The tick half a minute before the end plays on the
 same task that reads the microphones, so about a fifth of a second of his
 voice is not recorded while it sounds. Playing it beside the recording means
 a second task on a codec pair that is opened and closed together. **Revisit
 if:** a transcript is seen to lose the words said over the tick.
-
-### R-59 — one wait for the sleep screen reaching the panel
-**Why refused:** `main.c`'s `LAST_FRAME_MS` (200 ms) and the journal's two
-face frames both wait for the dark to be drawn, but before different things:
-the first before deep sleep stops the chip, which the panel must have
-finished with, the second only before the journal object is hidden over a
-dark that is already drawing. The first has no frame to count and keeps a
-margin the second does not need. **Revisit if:** the sleep screen is ever
-seen half drawn after she sleeps, or a flash is seen when the journal leaves.
 
 ### R-60 — reading all fourteen charts at once
 **Why refused:** one at a time, fourteen outran `DOOR_MS` at the five or six
@@ -812,16 +682,6 @@ without a side can reach it.
 **Revisit if:** the live database holds no broker row whose `direction` is
 null.
 
-### R-86 — the setup refusing a 503 its door gives before the key
-**Deferred, not refused.** `setup.c` takes a 503 as a right key at a door short
-of a secret of its own, which Eugenia's charm door answers after the key. Each
-function's boot guard answers 503 before it, so while a required secret is
-missing any key is saved as right. Telling the two apart means the setup reading
-the body, for a function that is down anyway and a key the next exchange would
-refuse.
-**Revisit if:** a key saved at setup is ever found wrong after a function came
-back up.
-
 ### R-87 — the keys each door answers, held as a list
 **Why refused:** a list of the keys Eugenia reads off each door, beside the keys
 the door's return literal names, is what the other copies here get. It would see
@@ -950,63 +810,12 @@ roles are `nologin`. Revoking it everywhere is one statement and a
 **Revisit if:** anything comes to run SQL as `anon` or `authenticated`, or a
 table of hers is ever found readable by the key.
 
-### R-99 — skipping the bootloader's check of the app on every waking
-**Why refused:** the bootloader hashes the whole 2.18 MB app on every deep-sleep
-wake (ESP-IDF's option to skip it then is off), a fraction of a second
-at most per errand and under a milliamp-hour a day by the October 2026
-estimate. Skipping it gives up the one check that tells a corrupted slot from a
-good one, which is what lets the rollback fall back to the app that was.
-**Revisit if:** the board's own measurement shows a waking's boot is a share
-of the battery worth naming.
-
-### R-100 — her voice sent to the charm as Opus rather than raw pcm
-**Why refused:** pcm needs no decoder on the board and joins end to end across
-parts. Opus would cut the bytes about twelvefold, but the radio is on for the
-whole playback either way, since she is played as she arrives, so the battery
-barely notices; it would add a decoder, its stack, and a frame format to keep.
-**Revisit if:** her voice is heard stuttering on a slow network.
-
-### R-101 — reconnecting after a network lost mid-conversation
-**Why refused:** a network lost once joined takes her to the sleep screen, the
-no-internet mark saying why, and the next waking joins afresh, the network she
-was last on asked first. Rejoining in place would be a second join path beside
-`net.c`'s, for a drop the next press repairs in a couple of seconds.
-**Revisit if:** drops mid-conversation turn out common on the networks she
-lives on.
-
 ### R-102 — keeping a recording the network could not take, to send later
 **Why refused:** a turn of conversation answered minutes late is not the
 conversation he started, and keeping it means flash writes and a queue to drain
 and expire. A network already given up is not recorded into at all, so what
 is lost is a turn said while she was still joining and the join then failed.
 **Revisit if:** he says a turn lost that way mattered.
-
-### R-103 — TLS sessions resumed across sleep, the last DHCP lease restored
-**Deferred, not refused.** Each waking makes a fresh TLS handshake to each door
-and asks DHCP from the start. Resuming a session needs it kept in RTC memory
-through sleep; restoring a lease writes it to flash. Each would shorten an
-errand by a part of a second, unmeasured against the radio's whole waking.
-**Revisit if:** the board's measurement puts errands at the top of where the
-charge goes.
-
-### R-104 — encrypting her flash
-**Why refused:** her Wi-Fi passwords and both keys sit in NVS in the clear, so
-a charm in someone else's hands over USB gives them up. Flash or NVS
-encryption burns eFuses for good, and a mistake in it bricks the board; the
-keys are cut off by changing them in Supabase, which is the README's answer to
-a lost charm.
-**Revisit if:** a charm is lost on a network whose password cannot be changed.
-
-### R-105 — a dimmer sleep screen, and listening before the screen is up
-**Deferred, not refused.** The sleep screen draws its marks at the face's 75%,
-and the briefing's dot wanders less than its own width; a dimmer sleep screen
-would spare the panel and some charge, at a look he has not seen. A press from
-sleep plays the listening notes only after the panel has started, whose board
-package alone waits 1.2 s; listening first means the screen starting beside
-her recording, a concurrency the firmware does not have today.
-**Revisit if:** he has seen the sleep screen on the board, for the first; the
-serial log's `lit` and `listening` lines put the panel's start at most of a
-press's wait, for the second.
 
 ### R-106 — a planted defect for the unexplained-move sentence
 **Deferred, not refused, his decision of 22 October.** `SYSTEM`'s *THEN SAY
@@ -1094,19 +903,6 @@ measures how often the two would disagree on these criteria.
 **Revisit if:** the eval's cost matters more than its strictness, and then
 only after both judges have graded the same answers and been compared.
 
-### R-115 — caching the charm's build between runs
-**Deferred, measured.** In October the charm's 74 builds were about 630 of
-roughly 2,000 billed minutes, each about 2.5 minutes pulling the pinned ESP-IDF
-image and 5 building. A cache reaches only the second. ccache could cut it to a
-fraction, but the workflow's claim is that the pinned image builds the firmware
-from the commit alone, and nothing could show a cached build equals a clean
-one: the image embeds its compile time, so no two builds of one commit match
-byte for byte. Making them match is a firmware config change, which the board
-has to check.
-**Revisit if:** the minutes run out again with the database suite path-filtered,
-and then with the build made reproducible first, so a cached image can be
-compared with a clean one.
-
 ### R-116 — asking the eval's cases in parallel
 **Deferred.** A full run spends about ten minutes of Actions time waiting on the
 model one case at a time. Asked together, 26 Opus calls invite rate-limit
@@ -1133,21 +929,6 @@ the map out on its own, so no slot is left where the rule alone decides. The
 case stays, checking the real prompt; `agree.test.mjs` holds the rule's
 sentences in `SYSTEM` and `CRITIC`.
 **Revisit if:** the briefing gains a slot a sentence off the map could sit in.
-
-### R-126 — asking a network that is not there again within its time
-**Why refused:** `attempt` asks a network again on any refusal but
-`WIFI_REASON_NO_AP_FOUND`. Asking an absent one again would keep the radio on
-for its whole time at every errand away from home, for a network a scan has
-already not found; the next errand asks it afresh.
-**Revisit if:** the board shows a network in range reported as not found.
-
-### R-127 — the screen's SPI transfers sized to the rows she draws
-**Deferred.** `light` keeps the board package's `max_transfer_sz`, the whole
-screen, though she draws only `DRAW_ROWS` rows at a time; the bus allocates DMA
-descriptors for the larger size out of internal RAM, a couple of kilobytes by
-reading. Sizing it to the rows is a change to the panel's driver to prove on
-the board, for memory the `lit` line says she now has.
-**Revisit if:** the `lit` line runs short again.
 
 ### R-128 — the Apps Script every five minutes, for fewer failure emails
 **Why refused:** a behaviour change dressed as quiet. The email's `fill_time`
@@ -1205,12 +986,12 @@ signs and publishes once the bump is merged.
 **Revisit if:** the certificate is kept behind a credential that opens nothing
 else.
 
-### R-136 — `hearLaptop` and `hearCharm` inlined into the entry point
-**Why refused:** each has one caller, the door it serves. They stay as the
-device's half under its own banner, beside the frames and the briefing it
-shares, so the entry point stays the four lines of authorisation every function
-keeps readable; `hear` is the turn they share.
-**Revisit if:** a device's half shrinks to the call to `hear` alone.
+### R-136 — `hearLaptop` inlined into the entry point
+**Why refused:** it has one caller, the door it serves. It stays as the
+laptop's half under its own banner, beside the frames and the briefing, so the
+entry point stays the four lines of authorisation every function keeps
+readable.
+**Revisit if:** the laptop's half shrinks to the call to `converse` alone.
 
 ### R-137 — `spaces.node` built by `npm start` as well
 **Deferred.** A copy run from the repository has no `spaces.node` and shows
@@ -1224,8 +1005,8 @@ copy misleads.
 **Why refused:** much of `main.mjs` and `face.mjs` is a function with one
 caller — `float`, `hideHer`, `settle`, `trayIcon`, `tryKey`, `step`, `draw`,
 `features`, `ring`. Each is a job named for what it does and bound to one
-event, menu item or channel, or a part of her drawing named as `face.c` names
-its own, and `agree.test.mjs` reads several by name; inlined, the entry point
+event, menu item or channel, or a part of her drawing named for what it
+draws, and `agree.test.mjs` reads several by name; inlined, the entry point
 and the frame would be one long body where a reader finds nothing by its name.
 What only split a body into halves was inlined: the two hearings in `live`,
 and the microphone's release in the recorder's stop.
@@ -1313,22 +1094,6 @@ throwaway run.
 **Revisit if:** the journal's page half changes again, so the move and its
 first test land together.
 
-### R-146 — the charm asking quietly whether its briefing was heard
-**Deferred.** A briefing heard on the laptop leaves the charm's dot on its
-sleep screen until its next waking, where `?briefing=today` answers 204 and the
-dot goes without a word. Clearing it sooner means the errand asking a question
-with no voice in it while the dot is up — a firmware change only the board can
-prove, for a dot nobody reads while the charm sleeps.
-**Revisit if:** he notices the charm's dot after hearing the briefing on the
-laptop.
-
-### R-147 — the laptop asking `?briefing=ready` every few minutes
-**Why refused:** the laptop needs whether a briefing still waits, asked often
-enough to follow the other device, and `ready` answers 200 with her line
-spoken: speech paid for on every ask while the dot is up, and never played.
-`?briefing=waits` answers the same question with no voice in it.
-**Revisit if:** never; the charm keeps `ready` because it plays the line.
-
 ### R-148 — a column or table for the heard briefing
 **Why refused:** `eugenia_runs.caller` is free text, a delivered briefing is
 already a run row there, and a heard one is the same kind of fact: a row,
@@ -1344,13 +1109,6 @@ further, but her pages are files loaded as modules, and whether she still loads,
 with them set only a Mac launch shows. The three that let another program
 borrow her permissions are off.
 **Revisit if:** he can run a build on the Mac before it is published.
-
-### R-150 — Gladys's door not reading the charm's version for the laptop
-**Why refused:** `waiting()` reads the charm's newest version beside what waits,
-in parallel and bounded at `APP_MS`, and the laptop ignores it. Leaving it out
-for the laptop is an argument to `waiting()` for one caller, to save a public
-read that costs nothing while Storage answers.
-**Revisit if:** the laptop's answers are slow and the version read is why.
 
 ### R-151 — the main process refusing IPC from the wrong window
 **Why refused:** the pages are sandboxed with context isolation, so their

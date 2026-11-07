@@ -63,35 +63,6 @@ supabase/functions/doji-eugenia/        Edge Function: Eugenia, the market bot
   doji-eugenia/structure.ts             his six charts, read in his words: her map
 supabase/functions/doji-tradingview/    Edge Function: the TradingView sign-in
 doji_gmail_sync.gs                      Apps Script: broker email parser
-charm/                                  firmware for the charm — see The charms
-  main/main.c                           who wakes, her errands, and what a touch does
-  main/face.c                           her face, drawn live, and the sleep screen
-  main/sound.c                          the speaker and both microphones
-  main/config.c                         what the setup page saved, in her flash
-  main/setup.c                          the setup, on her own Wi-Fi network
-  main/setup.html                       the page the setup serves to the phone
-  main/setup.woff2                      Doji's typeface for that page, served by the charm
-  main/dns.c                            the setup's answer to every name the phone asks
-  main/net.c                            joining her Wi-Fi, and New York time
-  main/talk.c                           talking with Eugenia, through her door
-  main/ogg.c                            the Ogg file a recording travels in
-  main/frames.c                         her answer, read out of its frames
-  main/sleep.c                          deep sleep, and what wakes her
-  main/briefing.c                       when Eugenia wakes to ask for the briefing
-  main/errand.c                         how long she sleeps between errands, and the weekend's quiet
-  main/gladys.c                         Gladys's door: what waits, and his answers
-  main/journal.c                        the journal's questions, a screen each
-  main/dial.c                           the volume, a finger round the rim
-  main/power.c                          the two buttons and the battery
-  main/motion.c                         the motion sensor, armed to wake her
-  main/lift.c                           whether a lift was him looking
-  main/ota.c                            her updates over Wi-Fi, from main
-  main/palette.h                        Doji's colours, copied for the charm and her setup page
-  main/hanken_64.c                      Doji's typeface for the journal's words; _16, _18, _36 the rest
-  art/HankenGrotesk.ttf                 that typeface, with its licence beside it
-  art/eugenia.png                       a render; art/eugenia.rgb565 the bytes drawn
-  tools/art.py                          turns a render into those bytes
-  tools/fonts.sh                        turns the typeface into the charm's fonts and the page's
 scripts/backup.mjs                      the paged read behind the daily copy
 scripts/health.mjs                      whether anything is running, asked from outside
 scripts/eval.mjs                        whether Eugenia still behaves, asked of the model, by hand
@@ -103,7 +74,6 @@ test/                                   node:test suites — see Tests
 .github/workflows/deploy-functions.yml  deploys the Edge Functions on push to main
 .github/workflows/backup.yml            the daily copy of the tables nothing else holds
 .github/workflows/health.yml            the hourly outside check; a failed run is the alarm
-.github/workflows/charm.yml             builds the charm firmware, kept as a download; main's is her update
 .github/workflows/laptop.yml            builds the laptop app, signed with the certificate it keeps; main's is her update
 .github/workflows/calibrate.yml         runs scripts/calibrate.mjs, by hand from the Actions tab
 .github/workflows/eval.yml              runs scripts/eval.mjs --plant, or one case alone, by hand from the Actions tab
@@ -113,7 +83,6 @@ package.json                            two dev dependencies and the test script
 package-lock.json                       committed — see Tests
 .npmrc                                  engine-strict: the Node floor made a gate
 .gitignore                              node_modules, and nothing else
-charm/.gitignore                        ESP-IDF's build output and fetched components
 laptop/                                 Eugenia on the Mac — see The laptop
   main.mjs                              the window, the keys, the menu, her door and Gladys's, the chart, the update
   face.html                             the page her face is drawn on
@@ -128,7 +97,9 @@ laptop/                                 Eugenia on the Mac — see The laptop
   preload.cjs                           what the pages may ask the main process
   key.html                              her key and Gladys's, each asked once; key.mjs tries it
   Info.plist                            why she asks for the microphone
-  .gitignore                            the copied render and typeface, the stamp and the build
+  eugenia.png                           her render
+  HankenGrotesk.ttf                     Doji's typeface, with its licence beside it
+  .gitignore                            the stamp and the build
 ```
 
 ---
@@ -165,20 +136,20 @@ it.
       │ doji-gladys  │   three discipline answers back to trades
       └──────┬───────┘
              │ the four questions, one tap grammar
-       ┌─────┴─────────┬───────────────┐
-       ▼               ▼               ▼
-┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-│   Telegram  │ │  the charm  │ │  the laptop │
-│ a message   │ │ asks what   │ │ asks what   │
-│ at the open │ │ waits, each │ │ waits, each │
-│             │ │ errand      │ │ minute      │
-└─────────────┘ └─────────────┘ └─────────────┘
+       ┌─────┴─────────┐
+       ▼               ▼
+┌─────────────┐ ┌─────────────┐
+│   Telegram  │ │  the laptop │
+│ a message   │ │ asks what   │
+│ at the open │ │ waits, each │
+│             │ │ minute      │
+└─────────────┘ └─────────────┘
 ```
 
 **The other half has no write path into any of it.** Eugenia reads the journal
 through `eugenia_trades`, a view granted `select` alone, and writes only tables
 of her own. She is woken by a schedule in pg_cron, a message he sent, typed
-or spoken to his charm or his laptop, or a trigger on `trades` firing when a
+or spoken to his laptop, or a trigger on `trades` firing when a
 position opens or closes — never by a clock she keeps herself.
 
 ```
@@ -188,9 +159,9 @@ position opens or closes — never by a clock she keeps herself.
  │           calendar ×4/h │        │ her own tables   16, 13 backed up  │
  │                         │        │ strategy.ts      no write path     │
  │ Telegram  he writes     │        │ the web          search and fetch  │
- │ charm     he talks      │        │ the broker's price, via the poller │
- │ laptop    he talks      │        │ calendar, market   via TradingView │
- │ trades    closed        │        │ his chart        when he shows it  │
+ │ laptop    he talks      │        │ the broker's price, via the poller │
+ │ trades    closed        │        │ calendar, market   via TradingView │
+ │                         │        │ his chart        when he shows it  │
  └────────────┬────────────┘        └─────────────────┬──────────────────┘
               └───────────────┬───────────────────────┘
                               ▼
@@ -203,16 +174,16 @@ position opens or closes — never by a clock she keeps herself.
                                │ every composed message is read once
                                │ more — CRITIC for the briefing, TRIM
                                │ for the rest — and only then sent
-           ┌───────────────────┼───────────────────┐
-           ▼                   ▼                   ▼
-  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
-  │     Telegram    │ │    the charm    │ │    the laptop   │
-  │ a voice note,   │ │ her voice, to   │ │ the same, and   │
-  │ the text as     │ │ what he said    │ │ his chart when  │
-  │ fallback; a copy│ │ into it; the    │ │ he shows it     │
-  │ of each turn on │ │ briefing when   │ │                 │
-  │ the devices     │ │ he asks         │ │                 │
-  └─────────────────┘ └─────────────────┘ └─────────────────┘
+           ┌───────────────────┴───────────────────┐
+           ▼                                       ▼
+  ┌─────────────────┐                     ┌─────────────────┐
+  │     Telegram    │                     │    the laptop   │
+  │ a voice note,   │                     │ her voice, to   │
+  │ the text as     │                     │ what he said    │
+  │ fallback; a copy│                     │ and his chart   │
+  │ of each turn on │                     │ when he shows   │
+  │ the laptop      │                     │ it; the briefing│
+  └─────────────────┘                     └─────────────────┘
 ```
 
 Journal columns and broker columns never meet, so between the two halves there
@@ -345,8 +316,7 @@ exists only at sync time.
 
 ### Journal-owned
 
-Written by the app and by Gladys, from a tap in Telegram, on the charm or on
-the laptop. Neither broker writer ever sends these keys.
+Written by the app and by Gladys, from a tap in Telegram or on the laptop. Neither broker writer ever sends these keys.
 
 | Column | Meaning |
 |---|---|
@@ -425,13 +395,10 @@ single-sourced at run time:
 
 | The fact | Where its copies live |
 |---|---|
-| the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check`, her charm's `SETUPS` in `charm/main/gladys.c`, and the laptop's in `laptop/journal.mjs` |
-| the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns, and twice in `trades_telegram_on_answer` — the `is distinct from` list and the `before` object — and her charm's `ANSWERS`, keys and columns in `COLUMNS`' order, and the laptop's in `laptop/journal.mjs` |
-| the **app's colours on the charm** | `index.html`'s tokens, and their copies in `charm/main/palette.h`, each beside the token it copies, and in `charm/main/setup.html`'s `:root` under the app's own names |
-| the **charm's own colours on its setup page** | `charm/main/palette.h`'s `GLOW` and `CORAL`, each beside the page's name for it, and `DEEP` and `ACCENT`, which begin the page's `--sheen`, and their copies in `charm/main/setup.html`'s `:root` — the page is served as written and reads no C |
+| the **setups vocabulary** | `CONFIG.SETUPS`, Gladys's `SETUPS`, `trades_setup_check`, and the laptop's in `laptop/journal.mjs` |
+| the **four journal column names** | `Data.OWNED`, Gladys's `COLUMNS`, the columns, and twice in `trades_telegram_on_answer` — the `is distinct from` list and the `before` object — and the laptop's `ANSWERS` in `laptop/journal.mjs`, keys and columns in `COLUMNS`' order |
+| the **app's colours on the laptop** | `index.html`'s tokens, and their copies in `laptop/face.mjs`, each beside the token it copies |
 | the **page's ground and accent outside its sheet** | `--bg` and `--p` in `index.html`'s `:root`, and their copies in its `theme-color` meta and its favicon's SVG, neither of which can read a custom property |
-| the **disconnect that is the charm's own** | each charm file that joins a network — `charm/main/net.c` and `charm/main/setup.c` — skipping `WIFI_REASON_ASSOC_LEAVE` where it marks a refusal, so leaving a failed attempt cannot end the next |
-| the **letters the charm's fonts hold** | the `--symbols` in `charm/tools/fonts.sh`, as each generated font records them, and the words drawn in `charm/main/journal.c`, `charm/main/dial.c`, `charm/main/face.c` and `charm/main/setup.c` — found as the files that declare a font, so a fifth is held too |
 | the **five columns the app may WRITE** | the `grant update (…)` in `schema.sql` and both lists in `verify.sql`. Four are `Data.OWNED`; the fifth is `deleted`, which no tap or save names but `remove()` and `undo()` write — a grant built from `Data.OWNED` alone takes soft delete out |
 | the **two sides a trade may have** | `trades_direction_check`, the poller's `tradeSide` and its P&L inversion, `emailRow`'s check, the Apps Script's `BUY`/`SELL` mapping, the app's Long/Short label |
 | the **two roles a turn may have** | `eugenia_turns_role_check` and every `role:` she writes |
@@ -449,32 +416,20 @@ single-sourced at run time:
 | the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `schema.sql`, and the cast inside the search |
 | the **journal's own arithmetic** | `index.html`'s `CONFIG.BE`, `resultOf`, `counts`, `money`, `averages` and `Dates.MARKETS`, and `journal.ts`'s port — the band, the session names, the market hours and the SHAPE of the three definitions that part on one case — and both run over the same rows, and every half hour of a year, must answer alike |
 | the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys`, two in `doji-eugenia` — each stating `hourCycle: 'h23'`, since a locale resolving to h24 renders midnight as 24 and breaks `nyParts` and `nyWall` |
-| the **charm's answer frames** | `FRAME` and `charmFrame` in `doji-eugenia`, and `FRAME_VOICE` and `FRAME_VOLUME` in `charm/main/frames.h`, whose parser `charm.test.mjs` feeds `charmFrame`'s own bytes |
-| the **charm's headers** | each `x-charm-` header `charm/main/talk.c` sets and `doji-eugenia` reads, in both directions, and the value she compares two of them with |
-| the **rate her voice plays at** | `HER_RATE` in `charm/main/talk.c` and `PCM_RATE` in `doji-eugenia`, the vendor's `pcm` |
-| what **Gladys's charm** reads and posts | the keys `charm/main/gladys.c` reads off her door's answer and the trade in it, against `waiting()`'s answer and `SELECT`, and the one key it posts, against what `charmAnswer` reads |
-| what a **right key** gets at each door | the statuses `charm/main/setup.c` takes as a key proved, and the refusals and the answer each door gives a right one |
-| how long the **charm waits out her silence** | `READ_MS` in `charm/main/talk.c`, at least two of `BEAT_MS` in `doji-eugenia`, or the charm hangs up while she thinks |
-| the **largest recording** | `FILE_ROOM` in `charm/main/talk.c`, at most `FILE_MAX` in `doji-eugenia`; on the laptop, `RECORD_MS` at `RECORD_BPS` in `laptop/face.mjs`, at most half of it |
+| the **largest recording** | `RECORD_MS` at `RECORD_BPS` in `laptop/face.mjs`, at most half of `FILE_MAX` in `doji-eugenia` |
 | the **laptop's answer frames and rate** | `FRAME` and `PCM_RATE` in `laptop/frames.mjs`, and the door's, whose bytes `laptop.test.mjs` feeds it |
-| what **the laptop sends her door** | the `x-laptop-` header, the form's fields with their types and names, and the briefing's two words in `laptop/main.mjs`, against what the laptop's door reads and `IMAGE_TYPES`; and the statuses `tryKey` takes as a key proved, against the door's answers to a right one |
+| what **the laptop sends her door** | the `x-laptop-` header, the form's fields with their types and names, in `laptop/main.mjs`, against what the laptop's door reads and `IMAGE_TYPES`; and the statuses `tryKey` takes as a key proved, against the door's answers to a right one |
 | how the **laptop's update names her signer** | the `codesign -d -r-` reading and the requirement it holds the new app to in `swapScript` (`laptop/update.mjs`), against the same two commands `.github/workflows/laptop.yml` asks of the real signature, a stranger's beside it refused |
 | the **laptop's channels between its halves** | each channel `laptop/main.mjs` tells the page on, `TOLD` in `laptop/preload.cjs` and each `window.doji.on` in `laptop/face.mjs`; and each ask the bridge makes, by `send` or `invoke`, against `ipcMain.on` or `ipcMain.handle` |
 | the **reasons the laptop gives a page** | each `trouble` and `say` in `laptop/main.mjs` and what `look()` and `gladys()` answer, against `SAY` in `laptop/face.mjs`; what `tryKey` answers, against `SAID` in `laptop/key.mjs` |
 | the **secrets the key window names** | `WHOSE` in `laptop/key.mjs`, against `LAPTOP_SECRET`'s name in `doji-eugenia` and `doji-gladys` |
-| the **charm's art and typeface on the laptop** | the files `laptop/face.html`, `laptop/face.mjs` and `laptop/main.mjs` load, against what `prestart` and `prepackage` in `laptop/package.json` copy from `charm/art/`, and the paths `.github/workflows/laptop.yml` builds on |
-| what **the laptop sends Gladys** | the `x-laptop-` header `gladys()` in `laptop/main.mjs` presents and the one `doji-gladys` reads, opening the charm's half; the keys it reads off her answer, against `waiting()`'s answer and `SELECT`; the one key it posts, against what `charmAnswer` reads; and the `200` `tryKey` takes as her answer to a right key |
-| **the charm's journal on the laptop** | `WORDS`, `SHORT`, `HALVES`, the tag, the pill, the dots, the tick, the ring, the weights and `ASK_MS`, `FLASH_MS`, `TICK_MS`, `SWEEP_MS`, `DONE_MS` and the pill's fade in `laptop/face.mjs`, against `charm/main/journal.c`, `palette.h` and `charm/tools/fonts.sh`; the first question asked, against `charm/main/gladys.c`; and the mark for a trade waiting, against `draw_night` in `charm/main/face.c` |
-| **the charm's face on the laptop** | `F`, `DOTS`, the drawing's four colours and the ring's emeralds in `laptop/face.mjs`, against `F`, the thought dots, `draw_face`'s colours and `RING` in `charm/main/face.c`, and `charm/main/palette.h` |
-| the **charm's sounds and ear on the laptop** | `LISTEN`, `SENT`, the tick, `VOICE`, `SILENT_MS`, `WARN_LEFT` and the level's scale in `laptop/face.mjs`, against `sound_listen`, `sound_sent`, `sound_tick`, the level and `play_notes`' shape in `charm/main/sound.c`, and `VOICE`, `SILENT_MS`, `MAX_MS` and `WARN_MS` in `charm/main/talk.c` |
+| the **render and typeface the laptop draws** | the files `laptop/face.html`, `laptop/face.mjs` and `laptop/main.mjs` load, against the files `laptop/` keeps |
+| what **the laptop sends Gladys** | the `x-laptop-` header `gladys()` in `laptop/main.mjs` presents and the one `doji-gladys` reads, opening the laptop's half; the keys it reads off her answer, against `waiting()`'s answer and `SELECT`; the one key it posts, against what `laptopAnswer` reads; and the `200` `tryKey` takes as her answer to a right key |
 | how long the **laptop waits out her silence** | `READ_MS` in `laptop/main.mjs`, at least two of `BEAT_MS` in `doji-eugenia`, or the laptop hangs up while she thinks |
 | where the **laptop's update** lives | the two objects `.github/workflows/laptop.yml` writes and the version it stamps, and `UPDATES`, the objects and `build.txt` in `laptop/main.mjs`; the bundle the workflow zips, and `BUNDLE` in `laptop/update.mjs`, which the swap unpacks |
 | the **level her window is raised to** | `setAlwaysOnTop` in `float()` in `laptop/main.mjs`, and the window `.github/workflows/laptop.yml` asks a Mac about, or the check proves a window she is not |
-| what each device asks **`?briefing=`** for | the two in `charm/main/talk.c` and the two in `laptop/main.mjs`, each one `charmBriefing` answers, and every word it answers asked by one of them |
-| where the **charm's update** lives | `FIRMWARE_URL` in `charm/main/net.h`, and the bucket and object `.github/workflows/charm.yml` makes and writes; the version it writes beside the image, and the object `APP_VERSION_URL` in `doji-gladys` reads it from |
-| where the **charm's app** boots from | the first app slot's offset in `charm/partitions.csv` and the offset `.github/workflows/charm.yml` checks the image against |
-| the **briefing's hours** | `briefDue` and `retryDue` in `doji-eugenia`, and the charm's `BRIEF_WEEKDAY`, `BRIEF_SUNDAY` and `BRIEF_RETRIES` with the line that gives each day its hour — the charm sleeps, so it wakes to ask in those hours |
-| the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts`, `ROLL_HOUR` in `index.ts`, and the charm's `ROLL_HOUR` in `charm/main/errand.c` with the days its weekend is made of, which `charm.test.mjs` walks against `marketOpen` |
+| what the laptop asks **`?briefing=`** for | the two in `laptop/main.mjs` and the two `laptopBriefing` answers, in both directions |
+| the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts` and `ROLL_HOUR` in `index.ts` |
 | the **importance a release may carry** | `IMPORTANCE` in `doji-tradingview`, the check constraint, and the rated reads' `importance=eq.high` |
 | the **economies the calendar reads** | `CALENDAR_COUNTRIES` in `doji-tradingview` and the countries `wanted` keeps in `doji-eugenia` |
 | the **country his rules count** | `HOME` in `adherence.ts`, the default on `eugenia_calendar.country`, and the watch card's `.eq('country', 'US')` — and every rated read but the Sunday week filters on it |
@@ -497,8 +452,8 @@ single-sourced at run time:
 | the **number of scheduled jobs** | the `cron.schedule` calls in `schema.sql` and the count `verify.sql` asserts |
 | a **long door's deadline** | `DOOR_MS` in `doji-tradingview` and `READ_MS` in `doji-eugenia`, ten seconds apart for the boot, the sign-in and the wire |
 | the **paid worker wall clock** | `ceiling_ms` in `pace_line` and the sentence in `CLAUDE.md` on why the cron half answers first; its three-quarter share, `speak_at` in `pace_line` and `TURN_MS` in `doji-eugenia`; `WRITER_MS` beneath it |
-| each **function's name** | its directory, the triggers, the cron jobs, the Apps Script, the charm's `charm/main/net.h`, the laptop's `laptop/main.mjs` |
-| the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow, the Apps Script, the charm's `charm/main/net.h` and the laptop's `laptop/main.mjs` |
+| each **function's name** | its directory, the triggers, the cron jobs, the Apps Script, the laptop's `laptop/main.mjs` |
+| the **project ref** | every `net.http_post` URL in the SQL, `index.html`, `config.toml`, the deploy workflow, the Apps Script and the laptop's `laptop/main.mjs` |
 | each function's **required secrets** | its `env()` calls and its own boot guard |
 | each function's **gateway setting** | `config.toml`'s stanza and the deploy command's flag |
 | the **confirming candle** | `CONFIRM_MS` in `doji-eugenia`, which `scoreCall` builds candles at, said in words by `make_call`'s description and by `SYSTEM`, and named in §6's Entry and §12's Confirmation in `strategy.ts` |
@@ -566,9 +521,8 @@ the delete back.
 
 **Supabase snapshots the whole database daily**, and the Pro plan keeps the last
 seven, under Database → Backups in the dashboard. A snapshot is every table,
-Vault included, and not Storage, where Doji keeps three things: the charm's
-update and the laptop's, which their workflows rebuild from `main`, and the
-laptop's signing certificate, which nothing copies — lost, the next build makes
+Vault included, and not Storage, where Doji keeps two things: the laptop's
+update, which its workflow rebuilds from `main`, and its signing certificate, which nothing copies — lost, the next build makes
 another, at the price *The laptop* gives. So it is everything that matters.
 It is the repair for a database that is gone or broken: a restore returns the
 whole project to that day, and everything written since — trades, answers, her
@@ -1304,37 +1258,27 @@ function behind them.
 `GLADYS_BOT_TOKEN`, `GLADYS_WEBHOOK_SECRET`. `TELEGRAM_CHAT_ID` is the exception:
 the one value the two bots share, since there is one trader and one chat.
 
-**One function, four callers**, told apart by the secret presented: `x-doji-key`
-is the database (a position opened, or its answers moved),
-`x-telegram-bot-api-secret-token` is Telegram reporting a tap, `x-charm-key`
-is her charm, and `x-laptop-key` is Eugenia's laptop, which asks the charm's
-half. They share the keyboard, the message and the `callback_data`
-grammar.
+**One function, three callers**, told apart by the secret presented:
+`x-doji-key` is the database (a position opened, or its answers moved),
+`x-telegram-bot-api-secret-token` is Telegram reporting a tap, and
+`x-laptop-key` is Eugenia's laptop. They share the keyboard, the message and
+the `callback_data` grammar.
 
-**Her charm journals a trade on its own screen.** It sleeps, wakes every few
-minutes to ask what waits — every half hour while the market is shut and
-nothing waits already — and shows a still near-white ring on its sleep screen
-while anything does. A `GET` with `x-charm-key: <GLADYS_CHARM_SECRET>` answers
-`{ waiting, trade, app }`: his trades from the last week (`WAITING_DAYS`) with
+**The laptop journals a trade beside her face.** It asks every minute what
+waits, and shows a near-white ring beside her while anything does (*The
+laptop — her face over his charts*). A `GET` with
+`x-laptop-key: <GLADYS_LAPTOP_SECRET>` answers `{ waiting, trade }`: his trades from the last week (`WAITING_DAYS`) with
 any of the four answers missing, not deleted, oldest first so they are
 journalled in the order he took them — read newest first under `WAITING_MAX`
 and reversed. The week is the bound: a trade left unjournalled would otherwise
-keep the ring lit for ever. `app` is the newest charm build the workflow
-published, read beside the trades from `APP_VERSION_URL`, so the charm
-updates the day a build is made rather than at the night's look; `null` when
-it cannot be read within `APP_MS`, which costs nothing of the answer. **An
-answer is a tap in a tap's own grammar** — a `POST` of
+keep the ring lit for ever. **An answer is a tap in a tap's own grammar** — a `POST` of
 `{ "data": "PID562780708|sl|1" }` — so `parseCallback` is the one boundary for
 both, and no column but the four is reachable; `[Edit]` and `[Done]` are refused
 with a 400, being the Telegram form's. It answers with what waits next, so the
-charm moves on without a second request, and the trigger redraws the Telegram
-message as it does for an answer from the app. **`GLADYS_CHARM_SECRET` is
+laptop moves on without a second request, and the trigger redraws the Telegram
+message as it does for an answer from the app. **`GLADYS_LAPTOP_SECRET` is
 optional**: unset, the door is shut, since `secretMatches` refuses an empty
-secret. **The laptop asks the same half** with `x-laptop-key:
-<GLADYS_LAPTOP_SECRET>` — the same `GET`, the same `POST`, the same answers
-(*The laptop — her face over his charts*). The key is its own, so a lost
-laptop is cut off without touching the charm, neither key opens the other's
-header, and **`GLADYS_LAPTOP_SECRET` is optional** in the same way.
+secret.
 
 **One message, edited in place.** It opens `Hola Jefe, new fill below`, with four
 rows of buttons — the two setups, then Rules, Stop Loss and Take Profit —
@@ -1416,7 +1360,7 @@ it, and a look per print spends the quota the briefing reads on. **Weekdays at
 08:00 ET, Sunday at 17:00 ET** — the gold open, so the week's first briefing
 lands with the market, carrying the review of the week behind it. She says hello her own way, Spanish or English, inside
 the first paragraph, and goes straight to the number. Reply and she answers —
-typed, by voice, or to a chart, in Telegram, on the charm or on the laptop. And she trades beside you on paper, on your
+typed, by voice, or to a chart, in Telegram or on the laptop. And she trades beside you on paper, on your
 rules, scored on price — *Her own calls*.
 
 `schema.sql` holds her memory and her read of the journal, her meters,
@@ -1646,7 +1590,7 @@ She is handed the week computed — `get_stats`' summary with his answers,
 portrait and what he has on, and may read a trade or a section of his rules
 (`REVIEW_TOOLS`). `TRIM` gates it, since the critic reads the briefing alone;
 the two are joined, then stored under the Sunday briefing's marker and spoken
-as one, so the charm and the laptop play both. **A broken review never costs
+as one, so the laptop plays both. **A broken review never costs
 the briefing**:
 `weekReview` catches, writes a `review job` row, and its apology goes out in its
 place. A Sunday whose message failed retries whole, review included.
@@ -1975,8 +1919,8 @@ to him, was never spoken. He decided it the other way. Four call sites speak:
 the briefing twice (its speaking worker, and its own fallback), the trade event
 and the reply; the week's review rides the Sunday briefing. `say()` keeps the
 `/notes` audit (a table, unlistenable), the apologies (failure notices, not her
-words), the short operational lines and the charm's copy, whose voice is on the
-charm.
+words), the short operational lines and the laptop's copy, whose voice is on
+the laptop.
 
 **The voice note is the message, and the text is the fallback.** Both together
 were two notifications for one thing she said. But an unset key, a refusing
@@ -2064,141 +2008,84 @@ that no split strands it. A test reads the call site.
 The vendor's policy requires the listener to know the voice is synthetic. Here
 the listener built the bot; a forwarded note carries no such context.
 
-### The charm — her voice on his keyring
+### The laptop — her face over his charts
 
-A round screen with a microphone and a speaker: he presses, talks, presses
-again, and she answers out of it. **It is a door into the same conversation,
-not a second bot.** The charm posts its recording to `doji-eugenia` with
-`x-charm-key: <EUGENIA_CHARM_SECRET>` — an Ogg Opus file, as a Telegram voice
-note is — and plays the response body; nothing
-about it goes near Telegram's Bot API, which has no way to speak to a bot as
-him. The turn is **`converse`**, the reply's own — the same twelve turns, notes,
-map, thesis, loops, calendar and desk, the same model and the same `TRIM` gate —
-so the charm and Telegram are one memory and either can follow up the other.
-His words are stored marked `[voice note]`, which is what they are.
+Her face floats over his charts, and he talks to it: he presses, talks,
+presses again, and she answers. **It is a door into the same conversation,
+not a second bot.** The laptop posts a **form** to `doji-eugenia` with
+`x-laptop-key: <EUGENIA_LAPTOP_SECRET>` — the recording as `voice`, and the
+**TradingView window** as `chart` when he asks her to look — and plays the
+response body; nothing about it goes near Telegram's Bot API, which has no way
+to speak to a bot as him. The turn is **`converse`**, the reply's own — the
+same twelve turns, notes, map, thesis, loops, calendar and desk, the same model
+and the same `TRIM` gate — so the laptop and Telegram are one memory and
+either can follow up the other. **Nothing about her changes**: she is told
+nothing of the device, as she is told nothing of Telegram. His words are
+stored marked `[voice note]`, which is what they are.
 
-**The charm tells her about itself.** Its headers carry its battery
-(`x-charm-battery`, a percent), whether a cable is charging it
-(`x-charm-charging`) and its volume (`x-charm-volume`), clamped and put into
-her turn as context, never stored. That turn alone is told she may set the
-volume: asked to speak up or down, she opens her draft with `[volume N]`,
-which comes off before `TRIM`, so nothing gates, stores, copies or speaks it.
-**A low battery is the charm's news**: with `x-charm-low: 1` the line *"Jefe,
-I'm running out of battery. Charge me when you can."* is spoken after her
-answer, and is neither copied to Telegram nor stored. The charm asks once a
-charge — told, it does not ask again until a cable is in.
+**The chart rides beside his words** as a chart sent in Telegram does — one of
+the four image types the API reads, up to `FILE_MAX` — and is not stored.
+**The recording keeps the name and type the laptop gave it**: its browser
+engine records WebM, and the transcriber reads the format off the file, so the
+door passes both through rather than naming the file itself.
 
 **One request, answered at once.** The response starts before the turn does and
 is the audio itself, in **frames**: a kind byte, three bytes of length,
-big-endian, then that many bytes (`FRAME`, `charmFrame`). A voice frame is the
-vendor's raw **`pcm` — 24 kHz, 16-bit little-endian, mono**: no decoder on the
-device, and the parts of a long answer join end to end where a file format's
-header would not; `chunk()` splits it at `TTS_LIMIT` as for a voice note. A
-volume frame, one byte from 0 to 100, goes ahead of her voice when she set one,
-so she already sounds that way — it cannot be a header, since the response
-starts before she has decided anything. **While she thinks, the wire carries
-silence**: a tenth of a second of zeros at once and every fifteen seconds
-(`BEAT`, `BEAT_MS`), because a turn can run for minutes and a response quiet
-that long is closed by a proxy on the way — the shortest such limit known is a
-hundred seconds. Zeros are silence in this format, so the device plays them like
-anything else and its face tells thinking from speaking by the level alone. The
-work is kept past a charm that hangs up, so the copy and the memory still land.
+big-endian, then that many bytes (`FRAME`, `laptopFrame`). A voice frame is the
+vendor's raw **`pcm` — 24 kHz, 16-bit little-endian, mono**: the parts of a
+long answer join end to end where a file format's header would not; `chunk()`
+splits it at `TTS_LIMIT` as for a voice note. **While she thinks, the wire
+carries silence**: a tenth of a second of zeros at once and every fifteen
+seconds (`BEAT`, `BEAT_MS`), because a turn can run for minutes and a response
+quiet that long is closed by a proxy on the way — the shortest such limit
+known is a hundred seconds. Zeros are silence in this format, so the laptop
+plays them like anything else and her face tells thinking from speaking by the
+level alone. The work is kept past a laptop that hangs up, so the copy and the
+memory still land.
 
 **Telegram gets the text as a copy**, his words first — `«what she heard»`, a
-blank line, her answer — so a mishearing shows where he can scroll back. It is
-`say()`, not `sayAloud()`: the voice went to the charm, and a second voice note
-of a thing he has just heard is noise. The pair is stored whether or not the
-copy lands.
+blank line, her answer, with `— with your chart` after his words when he
+showed one — so a mishearing shows where he can scroll back. It is `say()`,
+not `sayAloud()`: the voice went to the laptop, and a second voice note of a
+thing he has just heard is noise. The pair is stored whether or not the copy
+lands.
 
-**What the charm hears when it goes wrong.** A recording with no words, or a
+**What the laptop hears when it goes wrong.** A recording with no words, or a
 transcriber that fails, is answered with its `VOICE_TROUBLE` line, spoken, and
 nothing else happens. A turn that throws is answered with `APOLOGY.reply`, the
 reply's own. A part the speech vendor will not read ends the audio; the copy
 in Telegram is the whole of it. The voice has `SPEAK_MS` for the vendor to
-start answering each part, not to finish it — the charm takes her voice as fast
-as it plays it, so a budget on the whole stream ran at the pace of speech and
-cut a long briefing mid-sentence — and shares the request's wall clock with the
-turn: a turn that runs to its five minutes leaves the voice what is left of
-four hundred seconds.
+start answering each part, not to finish it — a budget on the whole stream
+runs for as long as she speaks, and cut a long briefing mid-sentence — and
+shares the request's wall clock with the turn: a turn that runs to its five
+minutes leaves the voice what is left of four hundred seconds.
 
-**The briefing reaches the charm without waking it.** The charm sleeps with its
-radio off, so nothing can be pushed to it: after the briefing's hour it wakes
-and asks **`?briefing=ready`** (a `GET` with the same key), which answers with
-her line *"Your briefing is ready, jefe."* in the same frames, or a `204` while
-no briefing is stored for today. Writing takes up to six minutes, so the charm
-asks again every few minutes until it lands. Then it shows a still emerald dot
-until he presses, and asks **`?briefing=today`** for the briefing itself; at
-midnight in New York the dot goes (`briefing_today`), as the door's today does. Both
-read today's briefing through `storedBriefing`, the speaking worker's own
-find-and-pair, so the charm says exactly what Telegram received: Sunday's on a
-Sunday, the weekday one otherwise.
+**The briefing waits for him on the laptop.** It asks **`?briefing=waits`**
+(a `GET` with the same key) every few minutes: `200` with no body while a
+briefing waits, `204` otherwise — whether it waits, with nothing spoken, so it
+costs no speech. He asks **`?briefing=today`** for the briefing itself, in the
+same frames, or a `204` while no briefing is stored for today. Both read
+today's briefing through `storedBriefing`, the speaking worker's own
+find-and-pair, so the laptop says exactly what Telegram received: Sunday's on
+a Sunday, the weekday one otherwise.
 
-**Heard on one device is heard on both.** A briefing spoken whole through
-`?briefing=today`, on the charm or the laptop, files a run row,
-`<weekday|sunday> briefing heard`, once the last of it has gone — a line that
-drops halfway, or speech that breaks off, leaves it waiting. From then until
-midnight in New York every `?briefing=` answers `204`, as though none were
-stored: the charm, waking with its dot, finds none and lets the dot go without
-a word, and the laptop's dot goes at its next ask. Telegram's copy is sent
-regardless; a briefing heard is one fewer dot, never one fewer message.
+**A briefing heard is heard.** One spoken whole through `?briefing=today`
+files a run row, `<weekday|sunday> briefing heard`, once the last of it has
+gone — a line that drops halfway, or speech that breaks off, leaves it
+waiting. From then until midnight in New York every `?briefing=` answers
+`204`, as though none were stored, and the dot goes at the laptop's next ask.
+Telegram's copy is sent regardless; a briefing heard is one fewer dot, never
+one fewer message.
 
 **The door refuses before it works**: a wrong key is a 401 like any other; a
-right key without `STT_URL`, `STT_KEY` and `TTS_KEY` is a 503 naming them, since
-it could neither hear nor speak; an empty recording, or one over `FILE_MAX`, is
-a 400. **`EUGENIA_CHARM_SECRET` is optional** — unset, the door is shut, because
-`secretMatches` refuses an empty secret, and nothing else changes.
+right key without `STT_URL`, `STT_KEY` and `TTS_KEY` is a 503 naming them,
+since it could neither hear nor speak; no recording, an empty one or one past
+`FILE_MAX` is a 400, and so is a chart that is not an image the API reads, or
+too large. **`EUGENIA_LAPTOP_SECRET` is optional** — unset, the door is shut,
+because `secretMatches` refuses an empty secret, and nothing else changes.
 
-A laptop stands in for the charm with `sox`, `ffmpeg`, `curl` and Node —
-record, make it Ogg Opus, post it, and play the voice frames of what streams
-back:
-
-```sh
-rec -r 16000 -c 1 -b 16 ask.wav      # talk, then Ctrl-C
-ffmpeg -loglevel error -i ask.wav -c:a libopus -b:a 24k ask.ogg
-curl -sN --data-binary @ask.ogg -H "x-charm-key: $EUGENIA_CHARM_SECRET" \
-     "https://<project>.supabase.co/functions/v1/doji-eugenia" |
-  node -e 'let b=Buffer.alloc(0);process.stdin.on("data",d=>{b=Buffer.concat([b,d]);
-    while(b.length>=4&&b.length>=4+b.readUIntBE(1,3)){const n=b.readUIntBE(1,3);
-    if(!b[0])process.stdout.write(b.subarray(4,4+n));b=b.subarray(4+n)}})' |
-  play -t raw -r 24000 -e signed -b 16 -c 1 -
-```
-
-### The laptop — her face over his charts
-
-When he trades away from home without the charm, the laptop is a third door
-into the same conversation. **Nothing about her changes**: the turn is
-`hear`, the charm's own — `converse`, the same memory, gate, prohibitions and
-voice — and she is told nothing of the device, as she is told nothing of
-Telegram. The charm's door hands her its battery and volume; the laptop has
-neither to tell.
-
-The laptop posts a **form** to `doji-eugenia` with `x-laptop-key:
-<EUGENIA_LAPTOP_SECRET>`: the recording as `voice`, and the **TradingView
-window** as `chart` when he asks her to look. The chart rides beside his words
-as a chart sent in Telegram does — one of the four image types the API reads,
-up to `FILE_MAX` — and is not stored; the Telegram copy says it was there,
-`«what she heard» — with your chart`. The answer is the charm's: the same
-frames, the same silence while she thinks, kept past a laptop that hangs up.
-`?briefing=today` answers the laptop as it answers the charm. In place of
-the charm's `?briefing=ready` the laptop asks **`?briefing=waits`**: `200`
-with no body while a briefing waits, `204` otherwise — whether it waits
-without her line spoken, so it can be asked every few minutes at no cost in
-speech.
-
-**The recording keeps the name and type the laptop gave it.** A laptop's
-browser engine records WebM, not the charm's Ogg, and the transcriber reads
-the format off the file, so the door passes both through rather than naming
-the file itself.
-
-**The door refuses before it works**, as the charm's does: a wrong key is a
-401; without `STT_URL`, `STT_KEY` and `TTS_KEY` a 503 naming them; no
-recording, an empty one or one past `FILE_MAX` a 400, and so is a chart that
-is not an image the API reads, or too large. **`EUGENIA_LAPTOP_SECRET` is
-optional and its own** — unset, the door is shut, and a lost laptop is cut off
-without touching the charm.
-
-On a Mac, `sox`, `ffmpeg` and `screencapture` stand in for it — the same pipe
-as the charm's above, with the form in place of the body:
+On a Mac, `sox`, `ffmpeg`, `curl`, `screencapture` and Node stand in for it —
+record, make it WebM, post it, and play the voice frames of what streams back:
 
 ```sh
 rec -r 16000 -c 1 -b 16 ask.wav      # talk, then Ctrl-C
@@ -2206,20 +2093,23 @@ ffmpeg -loglevel error -i ask.wav -c:a libopus -b:a 24k ask.webm
 screencapture -x chart.png           # optional: what she looks at
 curl -sN -H "x-laptop-key: $EUGENIA_LAPTOP_SECRET" \
      -F "voice=@ask.webm;type=audio/webm" -F "chart=@chart.png;type=image/png" \
-     "https://<project>.supabase.co/functions/v1/doji-eugenia" | node -e '…' | play …
+     "https://<project>.supabase.co/functions/v1/doji-eugenia" |
+  node -e 'let b=Buffer.alloc(0);process.stdin.on("data",d=>{b=Buffer.concat([b,d]);
+    while(b.length>=4&&b.length>=4+b.readUIntBE(1,3)){const n=b.readUIntBE(1,3);
+    if(!b[0])process.stdout.write(b.subarray(4,4+n));b=b.subarray(4+n)}})' |
+  play -t raw -r 24000 -e signed -b 16 -c 1 -
 ```
 
 **The app is `laptop/`**, an Electron app for the Mac, built and published by
-`.github/workflows/laptop.yml` as the charm's firmware is by its own. It has a
+`.github/workflows/laptop.yml`. It has a
 Dock icon, Doji's, and an icon in the menu bar, her face cropped close and its
 black made clear by the face's own rule (`laptop/art.mjs`), which also carries
 the briefing's dot; the two hold the same menu. Electron hides the Dock icon
 or shows it again each time a window's desktops are set; hers is told to leave
-it. **Her face floats over TradingView**: the charm's render with its black
-made clear, and the charm's drawing over it at the charm's own coordinates —
-eyes, highlight, smile, thought dots, the listening ring — which
-`agree.test.mjs` holds to `charm/main/face.c` and `palette.h`. What the laptop
-adds is a body: **she breathes** (about 1.5% over 4.6 seconds, from her base)
+it. **Her face floats over TradingView**: her render with its black made
+clear, and her drawing over it — eyes, highlight, smile, thought dots, the
+listening ring — in a 466-pixel square scaled to the window, in Doji's
+colours, which `agree.test.mjs` holds to `index.html`'s tokens. Then a body: **she breathes** (about 1.5% over 4.6 seconds, from her base)
 **and floats** (a few pixels over 3.3 seconds, a rhythm that never falls into
 step with the breath), **looks at the cursor** when it comes near, **leans
 in** to listen, **sways** while she thinks and **gives with the loud moments**
@@ -2259,8 +2149,8 @@ hears and does keeps its own clock while her drawing waits on a desktop out of
 sight.
 
 **One gesture does everything**: the talk key, ⌥Space unless he chose ⌃⌥Space
-in her menu, or a click on her. At rest she listens — the charm's two rising
-notes say when to start, and the ring swells with his voice, so he sees she
+in her menu, or a click on her. At rest she listens — two rising notes say
+when to start, and the ring swells with his voice, so he sees she
 hears him; again, and the two notes fall, she thinks, then speaks, the mouth
 following her voice; again while she thinks or speaks, and she stops — the
 door keeps the turn, so the copy and the memory still land. **Shift with the
@@ -2274,8 +2164,7 @@ screen the cursor is on — TradingView's window title is his to set, and no
 source documents it — with her own window kept out of every capture it can be;
 a question whose chart could not be captured is not asked, and she says why.
 The microphone is opened at the press and closed with the recording, so macOS
-shows it in use only while she listens. As on the charm, a recording he never
-spoke into is let go at thirty seconds, and the last thirty of a five-minute
+shows it in use only while she listens. A recording he never spoke into is let go at thirty seconds, and the last thirty of a five-minute
 recording are ticked and empty the ring; a press shorter than 0.4 seconds is
 one he took back. The recording's bitrate keeps it well inside `FILE_MAX`. A
 key another app holds registers as nothing, so she says so, and the menu
@@ -2290,26 +2179,22 @@ is a gap, and every join can click. From the queue a late part is one pause,
 never a stammer, at the cost of a pause before her first word too short to
 notice.
 
-**The briefing is the charm's**: an emerald dot beside her and a dot by her
+**The briefing is a dot**: an emerald dot beside her and a dot by her
 menu-bar icon while one waits — a click on the dot or *Hear the briefing*
 plays it, and the dot goes once it has come to its end, so one that fails —
 the line gone, her door's error — waits to be heard again. Whether one waits
 is her door's to say (`?briefing=waits`, every five minutes, and at once when
-the Mac wakes), so the dot goes when he hears it on the charm, at midnight in
-New York, and stays gone after a restart. Clicked in the minutes before the
-laptop next asks, a briefing that is no longer there is nothing to play, not a
-failure: her door's `204`, as the charm takes it. The ready line is not
-played; the dot is the news.
+the Mac wakes), so the dot goes at midnight in New York, and stays gone after
+a restart. Clicked in the minutes before the laptop next asks, a briefing that
+is no longer there is nothing to play, not a failure: her door's `204`. The dot
+is the news.
 
-**Gladys's journal is the charm's**, asked of Gladys's door rather than
-hers (*Gladys — the Telegram journal*): what waits every minute — oftener
-than the charm can afford, since the laptop is awake and online whenever he
-trades on it — and at once when the Mac wakes. A trade that came in ticks, as
-on the charm, and its questions take her place once she is idle; a
-conversation is never interrupted. **The screens are the charm's**, drawn at `journal.c`'s own
-coordinates and colours on its round screen, in Doji's typeface, Hanken
-Grotesk, copied in from `charm/art/` at the weights the charm's fonts are cut
-at: the setup split down the middle, **B&R** left and **S&R** right; then
+**Gladys's journal comes with her**, asked of Gladys's door rather than
+hers (*Gladys — the Telegram journal*): what waits every minute — the laptop
+is awake and online whenever he trades on it — and at once when the Mac
+wakes. A trade that came in ticks, and its questions take her place once she
+is idle; a conversation is never interrupted. **The screens are drawn on her
+round square**, in Doji's typeface, Hanken Grotesk, kept beside her: the setup split down the middle, **B&R** left and **S&R** right; then
 **RULES**, **SL** and **TP**, no on the left and yes on the right, each half
 brightening when clicked; four dots at the top; done, the dots fill, the tick
 draws in and the ring sweeps round, brighter when every answer was a yes.
@@ -2324,14 +2209,12 @@ own grammar (`laptop/journal.mjs`, read by Gladys's own `parseCallback` in
 question or the next trade follows without a pause. An answer her door did
 not take leaves the question to be clicked again, and the line above her head
 says why. A minute without a click, the questions give way to her, the trade
-still waiting; the talk key on them closes them and she listens, as PWR does
-on the charm; answered in Telegram while they are up, they follow what is
+still waiting; the talk key on them closes them and she listens; answered in Telegram while they are up, they follow what is
 left. The journal crosses over her face rather than cutting in. **While a
-trade waits**, the charm's sleep-screen mark sits beside her — a near-white
-ring, with a dark edge since his chart may be light, the briefing's dot inside
+trade waits**, a mark sits beside her — a near-white ring, with a dark edge since his chart may be light, the briefing's dot inside
 it when both wait — and the menu bar carries the same shapes, `○`, `•` or `◉`.
-A click on her takes what waits first, the journal then the briefing, as the
-charm does on waking; *Journal the trade* in her menu does the same. An answer
+A click on her takes what waits first, the journal then the briefing;
+*Journal the trade* in her menu does the same. An answer
 is never raced: no look at what waits starts while one is out, and a look one
 overtook is dropped, since it read the row before the answer was written.
 
@@ -2359,7 +2242,7 @@ form, which a right key is refused with a `400` for, or a `503` at a door
 short of its vendors; Gladys's with what waits, a `200` for a right key —
 and kept encrypted by the Keychain, each in its own file. Hers kept and
 Gladys's never given, the window asks for Gladys's next, and at launch it
-asks for whichever is missing, as the charm's setup asks for both; *Her key…*
+asks for whichever is missing; *Her key…*
 and *Gladys's key…* in her menu change either. The app's own menu holds
 the Edit menu ⌘V pastes them through. The keys and the doors live in the main
 process alone; the page that draws her has neither, asks for nothing but what
@@ -2429,9 +2312,7 @@ copy run from the repository has no `build.txt` and never offers one.
 macOS asks for at build time. Nothing is drawn larger than the icon is, so the
 largest Retina size, which would be 1024, is left to macOS to scale.
 
-To work on it, `npm ci` and `npm start` in `laptop/` — the render and the
-typeface are copied in from `charm/art/`, the one copy of each in the
-repository. `spaces.node` is built
+To work on it, `npm ci` and `npm start` in `laptop/`. `spaces.node` is built
 only by `npm run package`, so a copy started this way shows on every desktop.
 
 **To check on the Mac first**, which no suite and no Linux run can. A change
@@ -3387,9 +3268,7 @@ Three things outside the SQL, none of which fails loudly:
   supabase secrets set STT_MODEL=whisper-1     # optional, the default
   supabase secrets set TTS_KEY=<key>
   supabase secrets set EMBED_KEY=<key>
-  supabase secrets set EUGENIA_CHARM_SECRET=$(openssl rand -hex 32)   # her charm, which needs STT and TTS
   supabase secrets set EUGENIA_LAPTOP_SECRET=$(openssl rand -hex 32)  # her face on the laptop, which needs STT and TTS
-  supabase secrets set GLADYS_CHARM_SECRET=$(openssl rand -hex 32)    # Gladys's charm
   supabase secrets set GLADYS_LAPTOP_SECRET=$(openssl rand -hex 32)   # Gladys's journal on the laptop
   ```
 
@@ -3574,7 +3453,7 @@ said read badly. `MODELS` is keyed on the caller's label, the string
 **Her replies run in fast mode** (`FAST`, keyed the same way): the same Opus
 writing up to 2.5× faster at twice the rate, `speed: "fast"` under the
 `fast-mode-2026-02-01` beta. A reply is one turn whichever way it came —
-Telegram, the charm or the laptop — and it is the one he waits on: in October's thirty days
+Telegram or the laptop — and it is the one he waits on: in October's thirty days
 62 replies cost $11.95 and took 20.4 s each before a word was spoken, and he
 chose speed over the price. Fast mode is a research preview with its own rate
 limit, so a fast request refused for any reason is sent once more at the
@@ -3720,353 +3599,6 @@ plan you entered with. A loss inside your rules was a good trade; a win that bro
 one was a bad trade that paid. Blunt, once, about the trade rather than about you.
 **Never the fact alone**: the verdict is not optional, and the critic adds a
 missing one and may not cut it for length. A trade still open gets no verdict.
-
----
-
-## The charms
-
-A Waveshare **ESP32-S3-Touch-AMOLED-1.75C** — a 466 × 466 round AMOLED (CO5300)
-with touch (CST9217), two microphones (ES7210), a speaker (ES8311), a power
-chip (AXP2101), a motion sensor (QMI8658), 16 MB of flash and 8 MB of PSRAM —
-in a hand-sized case on his keyring, carrying **both bots**: **Eugenia**,
-whose face it shows, and **Gladys's journal**, whose questions it asks without
-a face of their own — Gladys herself stays in Telegram. A second board is a
-spare; the same firmware goes on any.
-
-**The firmware is `charm/`, an ESP-IDF project**, built by
-`.github/workflows/charm.yml` in Espressif's ESP-IDF v5.5.4 image (pinned by
-digest) whenever `charm/` changes. The board's support package
-(`waveshare/esp32_s3_touch_amoled_1_75c`) and LVGL 9.5 come from Espressif's
-component registry, at the versions Waveshare's own examples for this board use,
-with Espressif's audio codecs for the Opus a recording is encoded in. Her
-screen is started from the package's parts rather than its `bsp_display_start`,
-which draws into PSRAM: the SPI driver will not send from there, so it copies
-each whole draw into internal RAM first, which a board running Wi-Fi seldom has
-free, and the panel stays white. She draws a few rows at a time in internal
-RAM, sent as they are (`light` in `charm/main/main.c`). Her task's stack, the
-Opus encoder's, is in PSRAM, since in internal RAM it leaves the codecs too
-little and the board package aborts as her speaker starts; deep sleep, which
-suspends the cache PSRAM is read through, is entered from a small task of its
-own (`charm/main/sleep.c`). The versions every build uses are the ones
-`charm/dependencies.lock` names, and the workflow fails a build that resolved
-any other, so a new release reaches the firmware only by a commit that changes
-the lock.
-The download is **`charm-full.bin`**, one image written at `0x0`: plug the
-board in by USB-C and flash it from Chrome with Espressif's web flasher, or with
-`esptool.py write_flash 0x0 charm-full.bin`. Not `charm.bin`, which is
-ESP-IDF's name for the app alone; the workflow fails a build whose image is
-smaller than the first app slot's offset plus the app. Nothing secret is in it.
-
-**After the first flash she updates herself.** Every build is stamped with the
-commit it was made from, and a build of `main` is also published, the app
-alone, to a public Storage bucket, `charm`, which the workflow makes on first
-use with the repository's `SUPABASE_URL` and `SB_SECRET_KEY` secrets. Once a
-night, in the 03:00 hour in New York and off a low battery, an errand reads the
-newest image's description from its first bytes — a low battery leaves the
-look to a later errand in that hour — and when its version is not
-hers, the rest is written into her other app slot (`charm/partitions.csv`
-gives her two of 7 MB) and she wakes into it at once, quietly. **A new app is
-kept only once it has proved itself** (`prove` in `charm/main/main.c`): the
-first thing every waking of it does is start her screen, draw the sleep screen
-whole and reach her Wi-Fi, under a task watchdog armed to reset her if any of it
-hangs. Any reset before it is kept — a crash, a frozen screen, a waking with no
-network — has the bootloader start the app that was (`charm/main/ota.c`), so a
-build that cannot do the basics never stays on her past one waking. **An
-update reaches her the day it is built**, not only at the night's look: the
-workflow writes the version beside the image (`charm/version`), Gladys's door
-hands it to her in every answer (`app`), and the first errand that sees one
-she has not run fetches it. A version that was on her and failed its proof is
-never fetched again (`ota_offered`, asked of the bootloader's record, not the
-network), so a broken build is tried once, not every five minutes.
-
-**Each waking he uses reports itself** (`report` in `charm/main/main.c`), as
-she goes back to sleep, and so does a new app's proof: one line posted to her
-door's `?report=1`, filed in `eugenia_runs` under the caller `charm` with the
-line as its `detail` — the app, what woke her and which pins did (`pins`, the
-motion sensor's GPIO21 among them) and why the chip last reset, the
-lifts seen and not seen since the last report (counted through sleep, so a
-lift that lit nothing is still told), when she was lit and first listened in ms
-from boot, internal RAM when lit and at its lowest, the Wi-Fi signal, and how
-long she was up. Online only, one try of five seconds, never a reason to stay
-awake. So the board is read without a cable:
-
-```sql
-select at, detail from eugenia_runs where caller = 'charm' order by at desc limit 20;
-```
-Only a power-on chimes, so neither an update nor the setup's restart wakes
-anyone.
-
-**A face is a render plus a drawing.** Eugenia's render is a still 466 × 466
-image, embedded as the RGB565 bytes the screen draws (`charm/tools/art.py` makes
-them from `charm/art/eugenia.png`), so nothing is decoded at boot. Her eyes,
-highlight and smile are drawn live on top, where the drawing of her face over
-the render puts them, her head leaning ten degrees. Then they move: blinks,
-glances, the mouth following the loudness of what plays; thinking, she looks up
-and away from one side to the other under three thought dots; when
-something goes wrong, her eyes go uneven and her smile turns down; going to
-sleep, her eyes close slowly. Nothing else moves. Only the face's own patch is
-redrawn, and only on a frame where something in it moved, so a face at rest
-costs nothing and the chip is left to her voice. While she listens, Doji's
-emeralds stand still round the rim, redrawing the full screen once as they come
-and once as they go; the ring emptying while PWR is held is the only thing that
-redraws it on every frame. **Nothing flashes between screens**: whatever
-comes up first is the only thing seen, so no face shows for a moment before the
-journal's questions or after them. Her state — a low battery, no internet — is
-never an expression on her face; it is a mark on the sleep screen.
-
-**The sleep screen is black but for its marks**, still, so they stay on the
-panel while the chip sleeps. With no marks at all the panel is held in reset
-instead: the same black, without the panel running to show it. Low on the screen, **one mark for what waits**:
-an emerald dot with a glow while a briefing does, a white ring while a trade
-does, and the dot inside the ring when both do — one place and one size each,
-so nothing moves or shrinks when the other arrives, and shape tells them apart
-at a glance. At the top, a small battery when she is at 15% or below and off the
-cable, and the **no-internet mark** when her last look for a network found
-none, side by side when both. On the cable, the charge as a ring round the rim
-with its percent. Every mark but that ring wanders a few pixels each time she
-sleeps, the percent included, so one left all night is not left on the same
-pixels — though the briefing's dot wanders less than its own width, so its
-middle stays lit wherever it lands. **Woken without internet** — the last errand
-found none — she stays on that screen rather than waking to a face that cannot
-answer: she tries the network for eight seconds, wakes properly if it answers,
-and otherwise sleeps again with the mark still up.
-
-**The setup is the only way anything gets onto a board**. With no Wi-Fi network or without both keys — a board fresh from
-flashing — or after BOOT is held for five seconds, she becomes her own Wi-Fi
-network, named for her address like *Charm-4F2A* and **locked with a password
-made up for that setup**, and shows a **QR code** carrying both, centred on her
-screen with the name under it and her page's address under that (*Open
-192.168.4.1*). A phone's camera joins it in one tap, and the page opens by
-itself: her DHCP tells the phone to ask her for every name and where her page
-is (option 114, which newer phones open at once), every name the phone asks
-for resolves to the charm, and every page but its own redirects there. A phone
-that joins and does not open it is sent to it by that address in its browser,
-no rescanning. The page (`charm/main/setup.html`) is
-set in Doji's typeface, which the charm serves herself
-(`charm/main/setup.woff2`, made by `charm/tools/fonts.sh`) since the phone has
-no internet while it is on her network, and it is built for a phone: thumb-sized
-buttons, the main one at the bottom, the keyboard's return key saying what it
-does, no auto-correct on passwords or keys, and every result read out to a
-screen reader. It asks for **her Wi-Fi networks** — the ones in range, each with
-its signal and a lock when it has a password, the phone's hotspot recognised by
-its name and offered first so she has internet anywhere, a scan again on
-request, and "Other network" for one that is hidden or not in range — and **the
-two keys**, `EUGENIA_CHARM_SECRET` and `GLADYS_CHARM_SECRET`. **Each is tried
-before it is saved**: a network by joining it, a key by asking its door —
-Eugenia's with an empty recording, which a right key is refused with a `400`
-for, Gladys's with what waits — while her screen shows a spinner, then a tick or
-a cross. While she tests a network her radio moves to its channel, so the phone
-can drop off her network for a moment; the page says it is reconnecting and
-carries on by itself. A phone that does not find its way back, not knowing
-her password to rejoin, has the code again: whenever no phone is on her
-network, her screen shows the QR code rather than the step it was on, since
-the password is in nothing else. Coming back later, the page shows what she
-has: her networks in the order she tries them, each with Remove behind a second tap, a
-way to add one, and Replace for either key, checked before the old one goes. She
-keeps four networks: a fifth is refused until one is removed, never swapped in
-silently. Finishing ends on "All set", since the page cannot close itself.
-Everything is kept in her own flash (NVS, namespace `charm`), and finishing
-restarts her as herself. So does ten minutes with no phone on her network, once
-she is set up: BOOT held in a pocket does not leave her network and her code
-up until the battery is gone. A board never set up has nothing else to be, and
-waits. The addresses of the two doors are the repository's —
-in `charm/main/net.h`, which `agree.test.mjs` reads with every other caller —
-and only the keys are secret, so a lost charm is cut off by changing them in
-Supabase.
-
-**Switched on**, she comes up as Eugenia, her face alive at 75% brightness,
-and chimes, as only a power-on does; joins her Wi-Fi and sets her clock to New
-York, clock changes included, since the briefing is 08:00 there all year. The
-first serial line names the flash size, the PSRAM the chip actually has and
-what woke it.
-
-**She lives in short waking spells: lift to look, press to talk.** Awake, she
-feels about once a second whether she is **held up to look**, which keeps her
-awake, or **has been put down** — lying still at any angle, since on a table
-she sits propped on her keyring, or face down — which, with nothing playing,
-puts her to sleep eight seconds after she was put down or finished speaking,
-whichever is later (`lift_hold` in `charm/main/lift.c`). A finger on the screen
-counts as held. Anything else, a pocket or a hand at his side, leaves it to
-thirty seconds without a press. Then her eyes close, her speaker and
-microphones are switched off — the codecs live on the board's power, which
-the chip's sleep does not take away — and the chip goes into deep sleep,
-where it wakes as if switched on again: **lifted to look**, on a tap
-on the screen, PWR, the BOOT button, or a time. A lift is the motion sensor's:
-armed before every sleep, on GPIO21 (Waveshare's schematic for the 1.75C), it
-wakes the chip on a movement, which then watches it settle for up to a second
-and a half, a pair of readings 150 ms apart at a time, and lights her the moment
-a pair has the screen tilted up toward him and held still (`charm/main/lift.c`),
-so a lift still moving when it woke her is not mistaken for a swing — and only
-once she has left where she lay as she was armed (`lift_moved`), since lying
-face up and still on a table is that same pair, and on the board the sensor
-woke her there with nobody near; a swing on the keyring or a bump in a pocket sends her
-straight back to sleep without lighting the screen, and rests the sensor for
-twenty seconds, so a keyring swinging all day cannot keep waking her. What shows
-first is decided before the screen lights: **a trade waiting puts its questions
-up straight from the dark**, with no face before them. The journal ends on the
-dark and she goes back to sleep, unless a briefing waits too; then Eugenia comes
-up from black and reads it at once (`?briefing=today`), as she does whenever she
-wakes with a briefing waiting. **Woken by PWR**, she listens first instead,
-since a press means he wants to talk, and a waiting briefing is read after her
-answer. **The conversation comes first; a trade waits for it to end.** A trade
-that waits, or comes in while they talk — Gladys's door is asked after each
-answer — is never put between her words, nor before a waiting briefing. **With a
-trade waiting, the conversation is over when he stops**: held up to look and
-quiet for eight seconds after her last word (`QUIET_MS`), her eyes close to the
-dark and the trade's questions come up from it, then she sleeps, so walking away
-from them holds; put down, or thirty seconds without being held up, she sleeps
-with the trade under its ring, and its questions come up from the dark at the
-next lift. **PWR while the questions are up closes them** and she listens, the
-trade waiting again until the conversation is over — on waking too, where the
-press puts a waiting briefing after her answer. **Put down while she thinks, she
-finishes**: nothing reads the motion sensor while she listens, thinks or speaks,
-so setting her on the table to listen costs nothing, and a waiting briefing is
-still read after her answer, since he is near. The panel's reset and select pins
-and the touch controller's reset are held through sleep, so the sleep screen
-needs no chip awake to stay up and a tap can still wake her. **Each waking joins
-her Wi-Fi in the background**, the network she was last on first, asked directly
-on its own channel and access point so no scan is needed, then each saved one in
-turn; nothing waits for it but the moment something must be sent. A network
-that is there but does not let her in is asked again until its time is up,
-since one unanswered handshake would otherwise cost the whole waking; one
-that is not there is not. Leaving an attempt that failed is never taken for
-the next network refusing her. Awake, the radio's power save is off, and her
-sockets take a 64 KB window (`charm/sdkconfig.defaults`): her voice streams in
-at 48 KB a second, which lwIP's default window of 5.7 KB passes only on a
-round trip under 120 ms, and the power save holds her packets at the access
-point until its next beacon.
-
-**Asleep, she runs errands in the dark** every five minutes, day and night,
-and on the cable every two so the charge stays current (`charm/main/errand.c`).
-An errand that finds no network makes the next one later — ten minutes, then
-twenty, then every half hour — since until one answers there is nothing to ask.
-Over the weekend, from an hour after the Friday close (a trade's row can trail
-it) to the Sunday open, nothing new can come in for Gladys, so unless a trade
-already waits — its ring cleared by a journal in Telegram, on the laptop or in
-the app — she asks every half
-hour and wakes at the open. No errand is ever an hour from the last, so the
-night's look for an update keeps its hour, and a lift or a press tries the
-network whenever it comes. She asks Gladys's door
-what waits — a soft double tick when a trade waits that did not before — and in
-the briefing's hours, from five past 08:00 on a weekday or 17:00 on a Sunday
-through the hour of the last retry (`retryDue`), Eugenia's `?briefing=ready`.
-When it has landed, her face lights and she says so, then sleeps with her dot
-up and asks no more that day. The screen is started only when its marks must
-change, so most errands never touch it. The briefing's hours are a copy of the
-server's (`charm/main/briefing.c`), held by `agree.test.mjs`, and the compiled
-watch is driven against the server's own functions by `test/charm.test.mjs`.
-
-**PWR is the talk button.** A press, and **two quick rising notes** say she is
-listening — from sleep the press that wakes her is enough, and she listens even
-while she is still joining her Wi-Fi, the recording waiting for it, not him —
-but not once her Wi-Fi has given up, when the press takes her to the sleep
-screen and its no-internet mark rather than recording words that cannot go. The
-ring shows round the rim while she listens. **His pauses are his own**:
-nothing ends his turn but the next press, so he can stop to think as long as he
-needs; **two falling notes** say his words are on their way. A press with
-nothing said for thirty seconds is dropped quietly. **A turn runs to five
-minutes**, a soft tick half a minute before the end; the recording is encoded as
-he speaks — Opus at 24 kbit/s, 24 kHz mono, her voice's own rate so the
-codecs are never reopened between his words and hers, in an Ogg file built in memory
-(`charm/main/ogg.c`), one packet a page, about 1.3 MB for the
-whole five — and goes to her door with her battery, the cable and her volume in
-its headers, and the battery line asked for once a charge when she is low. Asked
-to speak up or down, she sets the volume before she answers, and keeps it, as
-the dial does. Each door keeps one connection for the whole waking, so only
-the first request pays for a TLS handshake, about a second; a connection her
-door has closed since is tried once more afresh, and the journal's answers,
-the look at what waits after each of her answers and every later turn go
-straight out. The answer is read out of its frames (`charm/main/frames.c`) and
-played as it streams in (*The charm — her voice on his keyring*): her face
-thinks through the silence and speaks when her voice starts, since the silence
-is exact zeros. A press while she thinks or speaks cuts her off at once — she
-looks for it every tenth of a second while nothing arrives, not only when the
-next beat of silence does; the copy in Telegram is the whole of it. The screen is not for talking: a tap on it answers
-a journal question, and asleep wakes her to look. Losing the network sends her
-back to the sleep screen, where the no-internet mark says why — her voice
-breaking off with it, since an answer that stops short of its end is read as
-cut, not finished; with the network up, a door that answers with an error,
-refuses her key, cannot be reached or breaks off her answer shows her confused
-for four seconds.
-
-**The journal asks what waits**, through Gladys's door, and while a
-trade waits the questions take the whole screen: the setup
-split down the middle, **B&R** on the left and **S&R** on the right; then
-**RULES**, **SL** and **TP**, each one word on a screen whose left half is no
-and right half yes — a cool sea-blue and a warm jade, Doji's emeralds
-rather than a win's teal and a loss's red, each brightening when tapped. Four
-dots at the top say what is answered. A tap on a half sends that one answer at
-once, in a tap's own grammar (*Her charm journals a trade on its own screen*),
-and her door answers with what waits next, so the next trade follows without a
-pause. Done, the journal's own screen: the four dots fill, a tick draws itself
-in and the ring sweeps round once — the tick light emerald and the ring at full
-strength when every answer was a yes. An answer her door does not take, the
-network still up, leaves the question where it was to be tapped again — the
-screen not moving on is the sign it was not saved. Whatever ends it — done, a
-minute without a tap, PWR, nothing waiting after all because it was journaled
-elsewhere, the network gone — the journal gives way to the dark: the sleep screen is put
-up under it before it leaves. Taps, not swipes: a swipe moves
-the whole screen, which this chip may not draw smoothly. The words are Doji's
-typeface, Hanken Grotesk, made into the charm's four fonts by
-`charm/tools/fonts.sh` with only the letters they use.
-
-**A finger round the rim is the volume**: one full turn from silent to
-loudest. It comes up only for a slide: a press at least 160 px from the centre
-arms it, and it takes hold once the finger has gone 25 degrees round the rim
-without leaving it, so a touch at the edge or a slide across it never brings it
-up, and the volume moves only from there. The screen dims, and
-round the rim a faint track, the level in Doji's light emerald, a white knob at
-its end, and the number under *VOLUME*; it goes a moment after the finger lifts,
-and the volume is saved in her flash with the rest. It appears and goes at once,
-the only two frames that redraw the whole screen: a turn redraws only the
-stretch of rim it moved and the number, so the knob keeps up with the finger,
-and the speaker is told only when the number changes.
-
-**PWR also switches her on and off**, and **BOOT held for five seconds opens
-the setup**. PWR belongs to the power chip, an AXP2101 (`charm/main/power.c`):
-off, a press switches the board on, and she wakes with her eyes opening and
-the chime. It also reaches the chip, high while pressed, on GPIO3, so a press
-wakes her from sleep and the charm reads the button itself: shorter than
-0.6 s it is the talk button, and held three seconds — a quiet ring emptying
-round the rim as it is, over her face or the sleep screen — she closes her
-eyes and switches the board off through the power chip. The chip's own
-switch-off is set to its longest, ten seconds, so the goodnight always comes
-first, and holding PWR that long is the way out of a charm that has hung. A
-battery too low for her radio switches her off the same way: its voltage
-sagging resets the chip, and rather than wake into the radio and reset again,
-off the cable she switches the board off, and PWR switches it on again.
-BOOT is not the talk button: the chip reads it at start to choose its
-programming mode, and a press at the wrong moment would choose it.
-
-**To check on the real board first**: that the panel keeps the sleep screen
-while the chip sleeps, that the touch controller wakes it (the BOOT button
-always does), that the power chip's registers are where Waveshare's example and
-the datasheet put them (the switch-off, the cable and the battery), that the
-motion sensor's wake-on-motion is set as its datasheet has it and which way its
-z axis faces the screen, the readings `lift.c` judges a lift by and tells a
-hand from a table by, that the
-Storage API takes the secret key the workflow publishes with, that her own
-leaving of a network reports `WIFI_REASON_ASSOC_LEAVE`, that a phone stays on
-her setup network while she joins another — the two share one radio, so her
-own moves to the other's channel — whether a full-screen swipe is smooth
-enough to replace the journal's taps, that the Opus encoder keeps up with the
-microphones and five minutes of it fit the room `talk.c` gives the file, and
-how much of her stack a turn of talking leaves, against the 40 KB Espressif's
-codec README asks for an encoder (the serial log says after each). How long a
-battery lasts, and what two things save of it: the panel held in reset under
-an empty sleep screen, and that it shows black while held; the codecs switched
-off before sleep, and that the speaker's amplifier, enabled on GPIO46 and left
-floating in sleep, is quiet. That a battery run down resets her as a brownout
-and so switches her off, and whether a cable alone switches her back on. How
-long a press from sleep takes to reach the listening notes: the serial log's
-`lit` and `listening` lines are timestamped from boot, and the board package's
-panel start alone waits 1.2 s. How much internal RAM is left once she is lit,
-and in how large a piece, which the `lit` line says. That a phone opens her
-setup page by itself from the code, as her DHCP's option 114 asks of it. How
-she is judged held or put down, which the serial log says at each change with
-the reading. That the emeralds read on the panel as they
-were chosen on a screen: the ring, the journal's halves, the dial, the sleep
-marks and her blob, where a dark green in RGB565 may band or go muddy.
 
 ---
 
@@ -4323,23 +3855,17 @@ the jobs, and `agree.test.mjs` holds that count against `schema.sql`.
    Connect TradingView (see **TradingView**), then walk the history door once
    from a year back — see **Applying her schema**.
 8. Run `supabase/verify.sql`. Nothing is set up until it agrees.
-9. For the charm, when it is wanted:
-   - `EUGENIA_CHARM_SECRET` and `GLADYS_CHARM_SECRET` in Edge Function
-     secrets, and `STT_KEY`, `STT_URL` and `TTS_KEY` with them, since her door
-     answers `503` without a voice; and `SUPABASE_URL` and `SB_SECRET_KEY` as
-     repository secrets, which the charm and laptop workflows publish with.
-   - Download `charm-full.bin` from a run of Actions → charm and write it at
-     `0x0` (*The charms*); she comes up as her own Wi-Fi network with a QR code,
-     and the setup page asks for her networks and the two keys. Every build of
-     `main` after that reaches her by herself.
-10. For the laptop, when it is wanted — its certificate is the workflow's to
+9. For the laptop, when it is wanted — its certificate is the workflow's to
    make:
    - **Room for the app** in Storage: the project's upload limit (Project
      Settings → Storage) must pass the zipped app, about 130 megabytes;
      the workflow's bucket allows three hundred.
    - `EUGENIA_LAPTOP_SECRET` and `GLADYS_LAPTOP_SECRET` in Edge Function
      secrets, long random values kept somewhere he can copy them from: the
-     app asks for each once.
+     app asks for each once. `STT_KEY`, `STT_URL` and `TTS_KEY` with them,
+     since her door answers `503` without a voice; and `SUPABASE_URL` and
+     `SB_SECRET_KEY` as repository secrets, which the laptop workflow
+     publishes with.
    - Run Actions → laptop on `main`, download
      `https://<project>.supabase.co/storage/v1/object/public/laptop/Eugenia.zip`,
      put Eugenia in Applications, open it, *Open Anyway* once, paste the two
@@ -4462,11 +3988,10 @@ home-screen shortcut and every bookmark open `/`.
 | `test/fold.test.mjs` | the pure logic of all five Edge Functions, `_shared` and `adherence.ts`: a real `get_deals` capture folded and cross-checked against the real email for the trade they share; the poller's fold, windows, balance and plan rules; the email boundary and its three outcomes; Gladys's grammar, rendering and settling, with the two redraws agreeing on every before-state; Eugenia's schedules walked hour by hour, her renderings, gates, voice fallback and tool loop driven through `ask()`; every one of the twelve rules in both directions; and the TradingView sign-in and folds |
 | `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load — past one page — save and soft delete, the scratch rule and aggregates, the money split and averages, the week boundary, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the snapshot, the offline boot, and the watch card |
 | `test/golden.test.mjs` | the snapshot: the real page on fixed fixtures and a frozen clock, every derived value and every panel's markup compared against `test/golden.json`, plus `Dates.session` swept across the four DST changeovers; and `test/golden-fold.json`, everything the folds return off the real captures — the rows the poller writes through its two windows, the email parsed and bounded, the calendar folded, and Eugenia's rule verdicts, day standings and stats over that week, with what she is told about each. Regenerate with `GOLDEN=write npm test`, deliberately, in the commit that changes behaviour — never to make a red run go away |
-| `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the charm driven end to end through the real turn — the reply read as the charm reads its frames, silence first, the recording transcribed as the Ogg it is, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, its headers in her turn and the volume she set sent ahead of her voice and nowhere else, the battery line spoken after her answer and neither copied nor stored, a wordless recording answered on the charm alone, and the door refusing a missing vendor, an empty recording and a wrong key; and the briefing on the charm, her ready line then today's briefing read as `pcm` in frames, the right day's briefing asked for, a `204` while none is stored, the briefing heard once spoken whole and every question answered `204` after, its ready line and speech that broke off heard never, and `?briefing=waits` answered with nothing to play; and the laptop through the same turn — the recording transcribed under the name and type it sent, the chart reaching her turn as the image he showed and named in the copy, no image and no chart named when he showed none, her turn told nothing of a charm, the door refusing a missing vendor, a missing, empty or oversized recording, a chart she cannot read or too large, a body that is not a form, a wrong key and the charm's, shut while its secret is unset with the charm's still open, and the briefing answered as on the charm; and Gladys's charm told what waits oldest first and a week back, its answer writing exactly one of the four columns, an edit, a stray column and a malformed body refused, and the door shut without its secret; and the laptop told the same and answering the same on a key of its own, neither key opening the other's header, shut without its secret; and between the functions, every door Eugenia reads but the quote — the calendar, the market, its weeks, the rate odds, the wires, futures volume, the flows, his charts and the bars her calls are scored on — served by the real `doji-tradingview` and poller handlers off stubbed vendors, and read by her as she reads it |
-| `test/charm.test.mjs` | the charm's pure C — `charm/main/briefing.c`, `charm/main/errand.c`, `charm/main/lift.c`, `charm/main/dns.c`, `charm/main/ogg.c` and `charm/main/frames.c` — compiled on the machine running the suite and driven in the zone the charm reads its clock in, out of `charm/main/net.c`: the briefing watch against `briefDue` and `retryDue` every five minutes of both weeks the clocks change in, an announced briefing not asked for again until the next day, and waiting until New York's midnight and no longer, on the server's own day, never before the clock is set, the wait between errands longer for each that found no network and never an hour, and over the weekend, every five minutes of both weeks the clocks change in against `marketOpen`, half-hourly with the open woken for unless a trade waits, a lift judged on readings, held and put down told apart, the setup's answer to a name, with and without the EDNS record a phone may add, a recording's Ogg file page by page against the specification's CRC, and her answer read out of `charmFrame`'s own bytes however the reads fall; and the firmware's names, the other of the two scope questions in C — every static, macro and enum constant a file declares used in it, every function a header declares called from another file, every non-static function in a header — since the ESP-IDF build refuses a name declared nowhere and only warns of one used nowhere |
+| `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the laptop driven end to end through the real turn — the reply read as its framer reads its frames, voice alone, silence first, the recording transcribed under the name and type it sent, no image when he showed none, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, the chart reaching her turn as the image he showed and named in the copy, a wordless recording answered on the laptop alone, and the door refusing a missing vendor, a missing, empty or oversized recording, a chart she cannot read or too large, a body that is not a form and a wrong key, and shut while its secret is unset; and the briefing on the laptop, today's briefing read as `pcm` in frames, the right day's briefing asked for, a `204` while none is stored, the briefing heard once spoken whole and every question answered `204` after, speech that broke off heard never, and `?briefing=waits` answered with nothing to play; and Gladys's laptop told what waits oldest first and a week back, its answer writing exactly one of the four columns, an edit, a stray column and a malformed body refused, a wrong key refused and the door shut without its secret; and between the functions, every door Eugenia reads but the quote — the calendar, the market, its weeks, the rate odds, the wires, futures volume, the flows, his charts and the bars her calls are scored on — served by the real `doji-tradingview` and poller handlers off stubbed vendors, and read by her as she reads it |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions, the app and the laptop as three programs — with one planted defect per question proving the check can fail |
-| `test/laptop.test.mjs` | the laptop's pure half: her frames read back whole off `charmFrame`'s own bytes however the reads cut them — inside a header, at every frame's edges, a few bytes at a time — and her voice read as 16-bit samples across a frame that ends mid-sample, silence as exact zeros; her voice played from its queue by a simulated speaker while it arrives slower than she speaks and then faster, and through a stall followed by uneven parts — no silence inside her voice but the stall's one, every sample once and in order, begun after the lead, and an answer shorter than the lead played whole; her window kept where he left it while a screen shows her, on a second screen too, and brought home when none does; every half of every journal question read by Gladys's own `parseCallback` as the answer it means, and the question a trade is asked first over every way it can lack them, a no never asked again; and the update's swap run in a scratch folder under a path with a space and an apostrophe, `ditto`, `open` and `codesign` stood in for: the new app put in place and opened, and the old one kept and reopened when the download will not unpack, holds no app, is signed by a stranger, or will not move into place |
+| `test/laptop.test.mjs` | the laptop's pure half: her frames read back whole off `laptopFrame`'s own bytes however the reads cut them — inside a header, at every frame's edges, a few bytes at a time — and her voice read as 16-bit samples across a frame that ends mid-sample, silence as exact zeros; her voice played from its queue by a simulated speaker while it arrives slower than she speaks and then faster, and through a stall followed by uneven parts — no silence inside her voice but the stall's one, every sample once and in order, begun after the lead, and an answer shorter than the lead played whole; her window kept where he left it while a screen shows her, on a second screen too, and brought home when none does; every half of every journal question read by Gladys's own `parseCallback` as the answer it means, and the question a trade is asked first over every way it can lack them, a no never asked again; and the update's swap run in a scratch folder under a path with a space and an apostrophe, `ditto`, `open` and `codesign` stood in for: the new app put in place and opened, and the old one kept and reopened when the download will not unpack, holds no app, is signed by a stranger, or will not move into place |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, `syncPepperstone`'s three outcomes, and a run that finds nothing reaching for no label |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |
@@ -4480,10 +4005,7 @@ the upserts, the Telegram sends, the model call — is tested for what it decide
 and through the doors `serve.test.mjs` drives, for what it sends; where a
 decision lives deeper than a test can reach, `agree.test.mjs` reads its source.
 Gmail itself, behind the Apps Script stubs. What Supabase's own `pg_net`,
-`pg_cron` and Vault do, behind `test/db`'s stand-ins. The charm's firmware beyond its
-pure C: the charm workflow's build compiles the rest, and only the board shows
-what it does — **To check on the real board first** in **The charms** is that
-list. The laptop beyond its pure half and what `agree.test.mjs` reads: the
+`pg_cron` and Vault do, behind `test/db`'s stand-ins. The laptop beyond its pure half and what `agree.test.mjs` reads: the
 window, the keys, the microphone, the capture, the sound, the signature and the
 update are the Mac's to show — **To check on the Mac first** in *The laptop*.
 

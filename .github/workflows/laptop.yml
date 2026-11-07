@@ -1,7 +1,7 @@
 # Builds Eugenia's laptop app, the Mac app in laptop/, and keeps it as a
 # download: Eugenia.zip, the app for Apple silicon. A build of main is also
 # published for the app to update itself from, to a public Storage bucket, its
-# version the commit — as the charm's firmware is.
+# version the commit.
 #
 # Signed with a certificate of its own, never Apple's: macOS keeps the
 # microphone and screen permissions for an app whose signer is the same from
@@ -14,8 +14,6 @@ on:
   push:
     paths:
       - 'laptop/**'
-      - 'charm/art/eugenia.png'
-      - 'charm/art/HankenGrotesk.ttf'
       - 'icon-512.png'
       - '.github/workflows/laptop.yml'
   workflow_dispatch:
