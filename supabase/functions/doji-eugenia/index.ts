@@ -46,7 +46,7 @@ import { journalStats, statsList } from "./journal.ts";
 import { foldStructure, READINGS, GRID, ADR_SESSIONS, type Structure, type Turn, type Shape } from "./structure.ts";
 import {
   env, secretMatches, json, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY, why, marketOpen, CHARTS,
-  type Candle, type Period,
+  FED_DECISION, type Candle, type Period,
 } from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("EUGENIA_BOT_TOKEN");
@@ -847,16 +847,19 @@ interface TvEvent {
 
    Abroad, what she asked for, by kind rather than by rating, which would miss
    some of it: TradingView rates China's reserves low and a dozen surveys high.
-   The central banks of the euro area, Britain and Japan; each economy's
-   headline inflation; China's reserves. None of it counts for R-19 or R-20,
-   which are about US releases. */
+   The central banks of the euro area, Britain and Japan, less the money supply
+   and reserves the same change rated medium beside them; each economy's
+   headline inflation, by its title, since Britain's core MoM is rated high
+   too; China's reserves. None of it counts for R-19 or R-20, which are about
+   US releases. */
 const BANKS = ['EU', 'GB', 'JP'];
-const NOISE = /^(USDA|WASDE) |Rig Count|Ethanol|^(Car|Truck) Sales$|^MBA (?!30-Year Mortgage Rate$)/;
+const NOISE = /^(USDA|WASDE) |Rig Count|Ethanol|^(Car|Truck) Sales$|^MBA (?!30-Year Mortgage Rate$)|Money Supply|Broad Money|Reserves$/;
 
 export function wanted(e: TvEvent): boolean {
-  if (e.country === HOME) return e.timed && e.importance !== 'low' && e.category !== 'bnd' && !NOISE.test(e.title);
-  if (e.category === 'mny' && BANKS.includes(e.country)) return e.importance !== 'low';
-  if (e.category === 'prce') return e.importance === 'high';
+  if (e.country === HOME) return e.timed && e.importance !== 'low' && e.category !== 'bnd' &&
+    !NOISE.test(e.title);
+  if (e.category === 'mny' && BANKS.includes(e.country)) return e.importance !== 'low' && !NOISE.test(e.title);
+  if (e.category === 'prce') return e.importance === 'high' && /^Inflation Rate YoY/.test(e.title);
   return e.country === 'CN' && e.title === 'Foreign Exchange Reserves';
 }
 
@@ -968,13 +971,28 @@ export function historyWeeks(start: string, now: number): string[] | null {
    thirty calendar reads a minute, so a refused week is asked again once after
    a pause, and a second refusal ends the walk with its last row naming where
    to resume. Exported with the pause as a parameter so the sequence is
-   driven. */
+   driven.
+
+   A week already marked filed is not walked again. A row is keyed on
+   TradingView's id, and when its ids changed on 3 November every week behind
+   it came back under new ones, so walking a filed week files each release
+   twice. A walk that cannot read the marks does not start. */
 const HISTORY_PAUSE_MS = 35_000;
 
 export async function postHistory(start: string, pause = HISTORY_PAUSE_MS): Promise<Response> {
   const weeks = historyWeeks(start, Date.now());
   if (!weeks) return json({ ok: false, error: "history takes a date, YYYY-MM-DD" }, 400);
-  for (const week of weeks) {
+  let marked: { week: string }[];
+  try {
+    marked = await readRows<{ week: string }>('Weeks', `calendar_weeks?select=week&week=gte.${weeks[0]}` +
+      `&week=lte.${weeks.at(-1)}&order=week.desc&limit=${HISTORY_WEEKS}`);
+  } catch (err) {
+    const detail = `${why(err)}, so nothing was walked`;
+    await recordRun({ caller: 'calendar week', ok: false, detail });
+    return json({ ok: false, error: detail }, 503);
+  }
+  const filedWeeks = new Set(marked.map(m => m.week));
+  for (const week of weeks.filter(w => !filedWeeks.has(w))) {
     if (await filedWeek(week)) continue;
     await new Promise(r => setTimeout(r, pause));
     if (!await filedWeek(week)) break;
@@ -1017,7 +1035,7 @@ const RELEASES_TOOL = {
     "and the prior, and what gold did fifteen and sixty minutes on where that is on file — " +
     "and a count of how many came in above, below or on the consensus. " +
     "Name the release whole, as the calendar lists it, without the period in brackets: " +
-    "'Core Inflation Rate MoM', 'Non Farm Payrolls', 'Interest Rate' for the Fed's decision. One " +
+    `'Core Inflation Rate MoM', 'Non Farm Payrolls', '${FED_DECISION}' for the Fed's decision. One ` +
     "from abroad starts with its country's code: 'EU Inflation Rate YoY Flash'. Use it " +
     "when how a release has run against expectations changes what you say about the " +
     "next one, and quote that history from here, never from a search.",

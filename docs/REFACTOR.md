@@ -1164,8 +1164,8 @@ rename each time costs more than telling shared tickers apart.
 key on the series and its minute would have caught every one. But tickers are
 shared within a minute (the BoE's decision and its votes), are null for some
 releases, and a key change is a schema change on a live table. A change of ids
-is rare and one-off: the duplicates were deleted by hand, and the README warns
-the history door off the weeks before it.
+is rare and one-off: the duplicates were deleted by hand, and the history
+door walks only the weeks not yet marked filed, so it cannot file them again.
 **Revisit if:** TradingView changes its ids again.
 
 ### R-159 — the Fed's own calendar beside TradingView's
@@ -1177,6 +1177,17 @@ horizon on 7 November. A reader of federalreserve.gov is a new host, a new door
 and a second writer to `eugenia_calendar`.
 **Revisit if:** the 9 December decision is not on the calendar by 1 December, or
 he wants the Chair's speeches back.
+
+### R-160 — the calendar door's window cut below a month
+**Why refused:** `calendarWindow` allows 31 days, and on 7 November a month
+across all eight economies was refused: TradingView's tool answers at most
+1 MB, and that month came to 1.7 MB. Nothing scheduled asks for that much —
+the filing reads a few days, the history walk and the Sunday week one week,
+and the rate odds a month of high-rated US events alone, since a month of
+every US event comes to about the limit itself — so only a request made by
+hand meets it, and the refusal names the size.
+**Revisit if:** a scheduled read starts asking for more than two weeks of every
+economy, or the refusal is ever met by one.
 
 ---
 

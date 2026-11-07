@@ -181,3 +181,11 @@ export const CHARTS = [
   { period: "M_5",  name: "5m",    ms: 300_000,    hours: 12 },
 ] as const;
 export type Period = typeof CHARTS[number]["period"];
+
+/* ─── The Fed's decision, as TradingView's calendar names it ───────────────
+   Plain "Interest Rate" since its ids changed on 3 November. doji-tradingview
+   finds the meetings by it and doji-eugenia names it to her as the release to
+   ask get_releases for, so a rename reaching one and not the other would check
+   the odds against no meeting, or send her after a history she cannot find.
+   ───────────────────────────────────────────────────────────────────────── */
+export const FED_DECISION = "Interest Rate";

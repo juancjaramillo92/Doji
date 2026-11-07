@@ -6305,6 +6305,18 @@ test('the long doors answer inside READ_MS', () => {
   }
 });
 
+/* THE MEETING CHECK READS THE HIGH-RATED MONTH. Since TradingView's ids changed,
+   a month of every US event comes to about the 1 MB its tool may answer, and a
+   refused read is caught and leaves the check nothing to compare: odds priced
+   against a moved meeting, said with confidence. The decision is rated high, so
+   asking for high only costs the check nothing. A network read nothing drives,
+   so the call is read. */
+test('the rate odds\' meeting check asks for high-rated events only', () => {
+  const body = uncomment(bodyOf(source('supabase/functions/doji-tradingview/index.ts'), 'export async function readRates('));
+  assert.match(body, /"mcp-tv-get-economic-calendar",\s*\{ countries: "US", min_importance: 1,/,
+    'the meeting check asks for every US event, a month of which TradingView may refuse as too large');
+});
+
 /* EVERY MARKET READ SHE GOES WITHOUT IS A ROW, and the set is the one READ_MS
    bounds, found the same way — by what each function addresses — and held
    against a declaration, so a new read arriving without the meter fails. The

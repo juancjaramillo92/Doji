@@ -1090,9 +1090,12 @@ move since now, and `odds` for the two outcomes either side. An unsolvable
 meeting is named in `unread`. The dates are `FOMC`, the Fed's published decision
 days; a test fails half a year before the table runs out and checks every date
 is a Wednesday, and the last date is never priced. Each read also asks the
-calendar for the month's rate decisions, and one the table does not hold refuses
-the whole answer. `decisions` finds them by TradingView's title for one since
-its ids changed on 3 November, plain *Interest Rate*; a title it missed would
+calendar for the month's high-rated US events, the rate decisions among them,
+since a month of every US event comes to about the 1 MB TradingView's tool may
+answer, and one the table does not hold refuses the whole answer. `decisions`
+finds them by TradingView's title for one since its ids changed on 3 November,
+plain *Interest Rate*, held once as `FED_DECISION` in `_shared/edge.ts`, which
+also names it to her in `get_releases`'s description; a title it missed would
 leave the check nothing to compare and let every answer through. **A year of
 meetings, because the path is the number for gold**: the next meeting says what
 the Fed does now, and how much is priced by a year out says how far the market
@@ -1178,11 +1181,14 @@ the reason: from 18 to 21 October whole passes were recorded as a parse error
 that kept eleven characters of what TradingView said.
 `test/fixtures/tradingview-calendar.json` is eight events from the 1 October
 calendar probe, one per shape the fold must handle.
-`test/fixtures/tradingview-abroad.json` is every kind of event TradingView listed
-for the seven economies abroad from 7 September to 4 November, read on 5 October
-— 459 kinds, 862 events, each with its country, rating, category and title — so
-what is filed from abroad is judged against the whole catalogue. It predates
-the 3 November change of ids; `tradingview-home.json`, the US catalogue, follows it.
+`test/fixtures/tradingview-abroad.json` is every kind of event TradingView
+listed for the seven economies abroad from 20 October to 14 November, after its
+ids changed, read on 7 November in two windows — 349 kinds, 364 events, each
+with its country, rating, category and title, with the ECB's and the BoJ's
+October meetings, the BoE's November one and the month-end inflation readings
+among them — so what is filed from abroad is judged against the whole catalogue;
+`tradingview-home.json` is the US catalogue's counterpart. A month across all
+eight economies is refused: the answer passes the 1 MB a tool may return.
 
 **`?probe=` is fixed: nothing in the request reaches a tool.** It picks one from
 the table below, every argument is written in the function, and each call's
@@ -1625,21 +1631,21 @@ lists no speeches: not the Fed's, not the ECB's or the BoJ's.
 
 **From abroad, what she asked for and nothing else** (`wanted`): the central
 banks of the euro area, Britain and Japan (`mny` at medium or above — the
-decisions and the votes beside them, and since the change of ids the money
-supply and reserves TradingView now rates medium too); headline inflation in
-all seven (`prce` rated high); and China's reserves. By kind rather than by
-rating, since the rating would miss some of it: TradingView rates China's
-reserves low and a dozen surveys high. About five events a week, out of more
-than 100 listed. TradingView's calendar has listed no government bond auction
-abroad since its ids changed, in November or in December. China's gold
-imports are not on TradingView's calendar. A row from abroad carries its country
-at the head of its name (*FR Inflation Rate YoY Prel (Sep)*), because three
-economies publish that title in one hour. **None of it is one of his**: R-19
-reads `country=eq.US` (`HOME`, beside
-`HIGH` in `adherence.ts`), and a list that carries a line from abroad tells her
-so once. The rolling list and the Sunday week carry it; the week takes only what
-is rated high, so abroad that is the central banks' decisions and headline
-inflation.
+decisions and the votes beside them, less the money supply and reserves
+TradingView rates medium beside them, which `NOISE` names); headline inflation
+in all seven (`prce` rated high, and by its title, *Inflation Rate YoY*, since
+Britain's core inflation MoM is rated high too); and China's reserves. By kind
+rather than by rating, since the rating would miss some of it: TradingView rates
+China's reserves low and a dozen surveys high. About four events a week, out of
+about ninety listed. TradingView's calendar has listed no government bond
+auction abroad since its ids changed. China's gold imports are not on
+TradingView's calendar. A row from abroad carries its country at the head of its
+name (*FR Inflation Rate YoY Prel (Sep)*), because three economies publish that
+title in one hour. **None of it is one of his**: R-19 reads `country=eq.US`
+(`HOME`, beside `HIGH` in `adherence.ts`), and a list that carries a line from
+abroad tells her so once. The rolling list and the Sunday week carry it; the
+week takes only what is rated high, so abroad that is the central banks'
+decisions and headline inflation.
 
 **The briefing files before it reads, and a quarter-hourly job files on its
 own** — `doji-eugenia-calendar`, on `?calendar=1` — so an actual lands within
@@ -1833,13 +1839,15 @@ writes the rows first and the mark after:
 
 - **the nightly pass** files the current week;
 - **the history door**, `?history=YYYY-MM-DD` on `doji-eugenia`, walks every
-  week from that date, up to two years a run, back to TradingView's 2003. It
-  answers first and works behind the 200, so its result is one `eugenia_runs`
-  row per week under `calendar week`. A refused week is asked again once after a
-  pause; refused twice, the walk stops and its last row names where to resume.
-  **Do not walk it over weeks before 3 November 2026**: TradingView now serves
-  them under its new ids, and every release already filed would be filed again
-  beside itself, since a row is keyed on the id.
+  week from that date not yet marked in `calendar_weeks`, up to two years a run,
+  back to TradingView's 2003. It answers first and works behind the 200, so its
+  result is one `eugenia_runs` row per week under `calendar week`. A refused
+  week is asked again once after a pause; refused twice, the walk stops and its
+  last row names where to resume. **A filed week is never walked again**: a row
+  is keyed on TradingView's id, and when its ids changed on 3 November 2026
+  every week behind it came back under new ones, so a second walk would file
+  each release beside itself. A walk that cannot read the marks writes its row
+  and does not start; to file a week again, delete its mark first.
 
 **A week the read did not reach is not covered either.** `check_rules` reads
 releases newest first, bounded at five hundred over up to a year, so a full read

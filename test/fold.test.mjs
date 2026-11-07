@@ -3624,8 +3624,10 @@ test('a figure TradingView has not published is left out of the row, never sent 
 
 /* ─── Abroad, what she asked for ─────────────────────────────────────────────
    Judged against every kind of event TradingView listed for the seven
-   economies over two months, so the selection is held against the whole
-   catalogue rather than the examples someone thought of.
+   economies over four weeks after its ids changed on 3 November, so the
+   selection is held against the whole catalogue rather than the examples
+   someone thought of. Those four weeks hold the ECB's and the BoJ's October
+   meetings, the BoE's November one, and the month-end inflation readings.
    ─────────────────────────────────────────────────────────────────────────── */
 
 const ABROAD = JSON.parse(readFileSync(
@@ -3634,21 +3636,21 @@ const ABROAD = JSON.parse(readFileSync(
 test('abroad, the central banks, headline inflation and China\'s reserves are filed, and nothing else', () => {
   const kept = {};
   for (const k of ABROAD.filter(k => wanted({ ...k, timed: true }))) (kept[k.country] ??= []).push(k.title);
-  assert.deepEqual(kept.EU, ['Deposit Facility Rate', 'ECB Interest Rate Decision', 'ECB Press Conference',
-    'Inflation Rate YoY Flash', 'ECB General Council Meeting', 'ECB Monetary Policy Meeting Accounts',
-    'ECB Nagel Speech', 'ECB President Lagarde Speech']);
-  assert.deepEqual(kept.JP, ['BoJ Interest Rate Decision', 'Inflation Rate YoY', 'BoJ Gov Ueda Speech',
-    'BoJ Koeda Speech', 'BoJ Monetary Policy Meeting Minutes', 'BoJ Quarterly Outlook Report',
-    'BoJ Summary of Opinions']);
-  assert.deepEqual(kept.CN, ['Inflation Rate YoY', 'Foreign Exchange Reserves'],
+  // The decisions, without the money supply and reserves rated medium beside them.
+  assert.deepEqual(kept.EU, ['Deposit Facility Rate', 'ECB Interest Rate Decision', 'Inflation Rate YoY Flash'],
+    'the ECB is filed with its M3, or without its decision');
+  assert.deepEqual(kept.JP, ['Interest Rate', 'Inflation Rate YoY'], "the BoJ is filed with Japan's money supply");
+  assert.deepEqual(kept.GB, ['Interest Rate', 'BoE MPC Vote Cut', 'BoE MPC Vote Hike', 'BoE MPC Vote Unchanged',
+    'Inflation Rate YoY'], "the BoE is filed with M4 or reserves, or Britain's core inflation as its headline");
+  assert.deepEqual(kept.CN, ['Foreign Exchange Reserves', 'Inflation Rate YoY'],
     'China is filed past the lowest bar she set for it');
-  assert.deepEqual(kept.GB, ['BoE Interest Rate Decision', 'Inflation Rate YoY',
-    'BoE MPC Vote Cut', 'BoE MPC Vote Hike', 'BoE MPC Vote Unchanged', 'MPC Meeting Minutes']);
-  for (const c of ['DE', 'FR', 'IT']) assert.deepEqual(kept[c], ['Inflation Rate YoY Prel'], `${c} files a survey`);
+  for (const c of ['DE', 'FR', 'IT']) {
+    assert.deepEqual(kept[c], ['Inflation Rate YoY Prel'], `${c}'s headline inflation is not filed, or a survey is`);
+  }
 
-  // About five a week, out of nine hundred events in two months.
+  // About four a week, out of three hundred and sixty in four weeks.
   const events = ABROAD.filter(k => wanted({ ...k, timed: true })).reduce((n, k) => n + k.n, 0);
-  assert.equal(events, 45);
+  assert.equal(events, 15);
 });
 
 /* ─── At home, releases rated medium or above, less the named noise ─────────
@@ -3814,6 +3816,7 @@ test('the history asks a refused week again once, and a second refusal ends the 
         return new Response(JSON.stringify({ ok: true, events: [] }), { status: 200 });
       }
       if (u.includes('eugenia_runs')) runs.push(...JSON.parse(init.body));
+      if (u.includes('calendar_weeks') && !init.method) return new Response('[]', { status: 200 });
       return new Response('', { status: 201 });
     };
     await postHistory('2026-09-06', 0);
@@ -3823,6 +3826,42 @@ test('the history asks a refused week again once, and a second refusal ends the 
   assert.deepEqual(runs.map(r => r.ok), [true, false, true, false, false],
     'an attempt went unrecorded — both outcomes are a row');
   assert.match(runs.at(-1).detail, /^2026-09-20: /, 'the last row does not name the week to resume from');
+});
+
+/* A FILED WEEK IS NEVER WALKED AGAIN. When TradingView's ids changed on
+   3 November every week behind it came back under new ones, and a row is keyed
+   on the id, so a walk over a filed week files each release twice. The marks
+   are read first, and a walk that cannot read them does not start. */
+test('the history walks only the weeks not yet filed, and none when it cannot tell', async () => {
+  const walk = async (marks) => {
+    const reads = [], runs = [];
+    let asked = '';
+    await stubbed(async () => {
+      globalThis.fetch = async (url, init = {}) => {
+        const u = String(url);
+        if (u.includes('doji-tradingview')) {
+          reads.push(u.match(/from=([\d-]+)/)[1]);
+          return new Response(JSON.stringify({ ok: true, events: [] }), { status: 200 });
+        }
+        if (u.includes('eugenia_runs')) runs.push(...JSON.parse(init.body));
+        if (u.includes('calendar_weeks') && !init.method) { asked = u; return marks(); }
+        return new Response('', { status: 201 });
+      };
+      await postHistory('2026-09-06', 0);
+    });
+    return { reads, runs, asked };
+  };
+  const some = await walk(() => new Response(JSON.stringify([{ week: '2026-09-20' }, { week: '2026-09-06' }]), { status: 200 }));
+  assert.ok(some.reads.length >= 2, 'the walk read nothing at all');
+  assert.ok(!some.reads.includes('2026-09-06') && !some.reads.includes('2026-09-20'),
+    'a week already filed was walked again, and every release in it filed twice under its new id');
+  assert.equal(some.reads[0], '2026-09-13', 'the first week not yet filed was not the first walked');
+  assert.match(some.asked, /week=gte\.2026-09-06&week=lte\.\d{4}-\d{2}-\d{2}&order=week\.desc&limit=\d+/,
+    "the marks are not read across the walk's own weeks, newest first under a limit");
+  const blind = await walk(() => new Response(JSON.stringify({ message: 'relation does not exist' }), { status: 404 }));
+  assert.deepEqual(blind.reads, [], 'the walk started though it could not tell which weeks were filed');
+  assert.deepEqual(blind.runs.map(r => [r.caller, r.ok]), [['calendar week', false]],
+    'a walk refused for want of its marks leaves no row');
 });
 
 test('a calendar TradingView refused is an error, not an empty day', async () => {
