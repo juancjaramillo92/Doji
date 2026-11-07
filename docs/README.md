@@ -3516,21 +3516,13 @@ hour of the turn before them, six within five minutes — so eight a week wrote
 again a prefix the hour would still have held, and `CHAT_TOOLS` takes the hour.
 So it is `1h` for `CHAT_TOOLS` and `5m` for the rest.
 
-**Effort is a message, so one array is one prefix.** The effort at the top of a
-request renders ahead of the tools and the system prompt, and the briefing at
-`high` once read nothing the replies at `medium` wrote, paying 2× for a copy of
-the same prefix. On Opus every request now sends one top-level effort,
-`BASE_EFFORT`, and the caller's own as an effort-only system message at the
-head of the conversation (`effortMessages`, beta
-`mid-conversation-output-config-2026-07-01`, a header beside the fallback one),
-which changes effort without touching what is cached before it. Each caller
-still runs at its own effort and `eugenia_runs.effort` records that one. Sonnet's
-one caller, `trim`, has its own array and keeps its effort at the top. **Whether
-it worked is one morning's rows**: the first reply after a briefing should read
-the hour's prefix (`cached`) rather than write it (`wrote_1h`). The message is
-sent and never stored, so it is not a role a turn may have. `cached` counts
-reads; `wrote_1h` and `wrote_5m` count writes, kept apart because their rates
-differ.
+**Each request carries its caller's effort at the top**, the one
+`eugenia_runs.effort` records. Whether a change of effort splits a cached prefix
+is the model's to decide, and here it decides nothing: no tool array carries
+two Opus callers at one speed and two efforts. The briefings and the replies
+share `CHAT_TOOLS`, and speed parts them but for a reply whose fast request was
+refused. `cached` counts reads; `wrote_1h` and `wrote_5m` count writes, kept
+apart because their rates differ.
 
 **Inside a turn the conversation is cached too, at five minutes.** The loop marks
 the newest `tool_result` block, and the mark *moves* rather than accumulating — a
@@ -3539,8 +3531,8 @@ comes first in the request, as `system` renders ahead of `messages`.
 
 **The critic is handed an empty tool array, the cheaper option as well as the
 stricter.** Sharing the briefing's array was tried and measured: the critic
-wrote 23,309 tokens and read none, because it also differs in effort, which
-invalidates the tools and system caches. `REFACTOR.md` R-15 has the figures.
+wrote 23,309 tokens and read none. `REFACTOR.md` R-15 has the figures, and why
+effort, the cause it names, is in doubt.
 
 ### What she is watching, on the dashboard
 
