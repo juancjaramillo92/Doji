@@ -46,7 +46,7 @@ import { journalStats, statsList } from "./journal.ts";
 import { foldStructure, READINGS, GRID, ADR_SESSIONS, type Structure, type Turn, type Shape } from "./structure.ts";
 import {
   env, secretMatches, json, nyClock, nyDate, telegram, sbHeaders, SB_URL, SB_KEY, why, marketOpen, CHARTS,
-  type Candle, type Period,
+  FED_DECISION, type Candle, type Period,
 } from "../_shared/edge.ts";
 
 const BOT_TOKEN      = env("EUGENIA_BOT_TOKEN");
@@ -854,7 +854,8 @@ const BANKS = ['EU', 'GB', 'JP'];
 const NOISE = /^(USDA|WASDE) |Rig Count|Ethanol|^(Car|Truck) Sales$|^MBA (?!30-Year Mortgage Rate$)/;
 
 export function wanted(e: TvEvent): boolean {
-  if (e.country === HOME) return e.timed && e.importance !== 'low' && e.category !== 'bnd' && !NOISE.test(e.title);
+  if (e.country === HOME) return e.timed && e.importance !== 'low' && e.category !== 'bnd' &&
+    !NOISE.test(e.title);
   if (e.category === 'mny' && BANKS.includes(e.country)) return e.importance !== 'low';
   if (e.category === 'prce') return e.importance === 'high';
   return e.country === 'CN' && e.title === 'Foreign Exchange Reserves';
@@ -1017,7 +1018,7 @@ const RELEASES_TOOL = {
     "and the prior, and what gold did fifteen and sixty minutes on where that is on file — " +
     "and a count of how many came in above, below or on the consensus. " +
     "Name the release whole, as the calendar lists it, without the period in brackets: " +
-    "'Core Inflation Rate MoM', 'Non Farm Payrolls', 'Interest Rate' for the Fed's decision. One " +
+    `'Core Inflation Rate MoM', 'Non Farm Payrolls', '${FED_DECISION}' for the Fed's decision. One ` +
     "from abroad starts with its country's code: 'EU Inflation Rate YoY Flash'. Use it " +
     "when how a release has run against expectations changes what you say about the " +
     "next one, and quote that history from here, never from a search.",

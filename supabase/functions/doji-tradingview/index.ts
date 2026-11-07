@@ -27,7 +27,7 @@
 // Deploy:  supabase functions deploy doji-tradingview --no-verify-jwt
 // Secrets: DOJI_CRON_SECRET, SB_SECRET_KEY
 // ═══════════════════════════════════════════════════════════════════════════
-import { env, secretMatches, json, sbHeaders, mcpInit, parseSse, nyDate, SB_URL, SB_KEY, why } from "../_shared/edge.ts";
+import { env, secretMatches, json, sbHeaders, mcpInit, parseSse, nyDate, SB_URL, SB_KEY, why, FED_DECISION } from "../_shared/edge.ts";
 
 const TV_URL = "https://mcp.tradingview.com/mcp";
 
@@ -768,13 +768,12 @@ export function foldRates(prices: Record<string, number>, today: string, meeting
   return { meetings: priced, unread };
 }
 
-/* The Fed's decisions on a calendar read, as New York dates. Since its ids
-   changed on 3 November TradingView calls one "Interest Rate"; the rate on
-   reserve balances, set in the same minute, is not one. A title this misses
-   leaves `unlisted` no meeting to compare, and the check passes whatever the
-   Fed does, so the match is driven against the capture. */
+/* The Fed's decisions on a calendar read, as New York dates, matched whole:
+   the rate on reserve balances, set in the same minute, is not one. A title
+   this misses leaves `unlisted` no meeting to compare, and the check passes
+   whatever the Fed does, so the match is driven against the capture. */
 export function decisions(events: { title: string; at: string }[]): string[] {
-  return events.filter(e => e.title === "Interest Rate").map(e => nyDate(new Date(e.at)));
+  return events.filter(e => e.title === FED_DECISION).map(e => nyDate(new Date(e.at)));
 }
 
 /* A decision the calendar lists and the table lacks. Only this direction
