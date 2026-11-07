@@ -21,7 +21,7 @@ import { execSync } from 'node:child_process';
 import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
-import { readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
+import { wanted, readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
          READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_CONFIRMS, CALL_STEPS, CALL_MAX, RR_MIN, CONFIRM_MS, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, readsDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH, REVIEW } from '../supabase/functions/doji-eugenia/prompt.ts';
@@ -30,6 +30,7 @@ import { BE, SESSIONS, MARKETS, resultOf, counts, money, averages, sessionAt, se
   from '../supabase/functions/doji-eugenia/journal.ts';
 import { GRID, CANDLES } from '../supabase/functions/doji-eugenia/structure.ts';
 import { FITS } from '../supabase/functions/doji-tradingview/index.ts';
+const ABROAD_KINDS = JSON.parse(readFileSync(new URL('./fixtures/tradingview-abroad.json', import.meta.url), 'utf8')).kinds;
 import { HOME, FULL_STOP, TO_BREAK_EVEN, TARGET_MIN, TARGET_MAX, checkRules } from '../supabase/functions/doji-eugenia/adherence.ts';
 
 // A repository file, read once however many tests ask for it.
@@ -3508,13 +3509,17 @@ test('the economies the calendar is asked for are the ones calendarRows keeps', 
   assert.match(uncomment(bodyOf(tv, 'Deno.serve(async')), /countries: CALENDAR_COUNTRIES/,
     'the calendar door asks for something other than the declared economies');
 
-  const lists = EUGENIA_TS.match(/const BANKS = \[[^\]]*\], AUCTIONS = \[[^\]]*\];/);
-  assert.ok(lists, 'doji-eugenia no longer declares the central banks and auctions it keeps');
-  const kept = new Set([...(lists[0] + bodyOf(EUGENIA_TS, 'export function wanted('))
+  const lists = EUGENIA_TS.match(/const BANKS = \[[^\]]*\];/);
+  assert.ok(lists, 'doji-eugenia no longer declares the central banks it keeps');
+  const named = new Set([...(lists[0] + bodyOf(EUGENIA_TS, 'export function wanted('))
     .matchAll(/'([A-Z]{2})'/g)].map(m => m[1]));
-  kept.add(HOME);
+  assert.deepEqual([...named].filter(c => !asked[1].split(',').includes(c)), [],
+    'calendarRows keeps an economy the calendar is never asked for');
+  // Kept is what wanted keeps of the captured catalogue, since a rule that
+  // names no country keeps every economy that publishes its kind.
+  const kept = new Set([HOME, ...ABROAD_KINDS.filter(k => wanted({ ...k, timed: true })).map(k => k.country)]);
   assert.deepEqual([...kept].sort(), asked[1].split(',').sort(),
-    'the calendar is asked for an economy nothing keeps, or keeps one it never asks for');
+    'the calendar is asked for an economy nothing keeps');
 });
 
 test('only US releases are counted', () => {

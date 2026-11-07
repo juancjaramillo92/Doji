@@ -847,21 +847,17 @@ interface TvEvent {
    rig count, car and truck sales, and the mortgage series beside the 30-year.
 
    Abroad, what she asked for, by kind rather than by rating, which would miss
-   most of it: TradingView rates the ECB's president medium, every bond auction
-   and China's reserves low, and a dozen surveys high. The central banks of the
-   euro area, Britain and Japan; each economy's headline inflation; government
-   bond auctions in Germany, France, Italy and Britain, less the bills, which it
-   names in months; China's reserves. An auction is kept though TradingView
-   files some under `Calendar`, the marker's indicator, at their own minute.
-   None of it counts for R-19 or R-20, which are about US releases. */
-const BANKS = ['EU', 'GB', 'JP'], AUCTIONS = ['DE', 'FR', 'IT', 'GB'];
+   some of it: TradingView rates China's reserves low and a dozen surveys high.
+   The central banks of the euro area, Britain and Japan; each economy's
+   headline inflation; China's reserves. None of it counts for R-19 or R-20,
+   which are about US releases. */
+const BANKS = ['EU', 'GB', 'JP'];
 const NOISE = /^(USDA|WASDE) |Rig Count|Ethanol|^(Car|Truck) Sales$|^MBA (?!30-Year Mortgage Rate$)/;
 
 export function wanted(e: TvEvent): boolean {
   if (e.country === HOME) return e.timed && e.importance !== 'low' && e.category !== 'bnd' && !NOISE.test(e.title);
   if (e.category === 'mny' && BANKS.includes(e.country)) return e.importance !== 'low';
   if (e.category === 'prce') return e.importance === 'high';
-  if (AUCTIONS.includes(e.country)) return /Auction|Tender|Syndication/.test(e.title) && !/Month/.test(e.title);
   return e.country === 'CN' && e.title === 'Foreign Exchange Reserves';
 }
 

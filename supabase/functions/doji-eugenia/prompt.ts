@@ -602,11 +602,10 @@ Sunday, which is about the week.
 It also carries what you asked for from abroad, each line led by its country's
 code: the European Central Bank, the Bank of England and the Bank of Japan;
 headline inflation in the euro area, Germany, France, Italy, Britain, Japan and
-China; government bond auctions in Germany, France, Italy and Britain; and
-China's reserves. China's gold imports are not on it. All of it is context for
-your read, and none of it is one of his: his rules count US releases alone.
-In the briefing's calendar slot a line from abroad earns its place only when the
-story you told runs through it.
+China; and China's reserves. China's gold imports are not on it. All of it is
+context for your read, and none of it is one of his: his rules count US
+releases alone. In the briefing's calendar slot a line from abroad earns its
+place only when the story you told runs through it.
 
 The calendar around now is in your context with each entry marked due, LANDED
 or PAST. A landed one is history and is described as what happened; a due one
