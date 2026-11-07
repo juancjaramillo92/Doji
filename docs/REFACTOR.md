@@ -1136,6 +1136,18 @@ laptop's framer would change together for four bytes a part.
 **Revisit if:** the door needs a second kind again, or the laptop's audio is
 rewritten for another reason.
 
+### R-156 — the briefing's prefix at five minutes
+**Why refused:** since the replies went fast the briefing's hour is read by
+nothing outside its own turn — the reply of 6 November, the first inside an
+hour of a briefing since, wrote 38,841 tokens and read none — so five minutes
+would serve it the same at 1.25× rather than 2×: about $2.80 a month on the
+35,500 tokens a briefing wrote in the thirty days to 7 November. He declined it
+that day, and the window stays a property of the tool array (R-18), with no
+exception for speed.
+**Revisit if:** the briefing's prefix grows enough to make the hour cost more
+than the rule is worth, or the replies leave fast mode, when the hour pays
+again and there is nothing to change.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

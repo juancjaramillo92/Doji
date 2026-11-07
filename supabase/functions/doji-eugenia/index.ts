@@ -2047,10 +2047,9 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
          rides here. The window is a property of the tool ARRAY, where the key
          starts: each array is its own prefix. The chat array keeps the hour
          because fourteen of a week's eighteen replies came within an hour of the
-         turn before, six within five minutes. The briefing shares that array
-         but not the prefix: a reply runs fast, and speed is part of the key.
-         Everything else is five minutes, which the rounds within a turn keep
-         alive. `ttl` is a plain field, not a beta. */
+         turn before, six within five minutes. Everything else is five
+         minutes, which the rounds within a turn keep alive. `ttl` is a plain
+         field, not a beta. */
       system: [{ type: "text", text: SYSTEM + ALWAYS,
                  cache_control: { type: "ephemeral",
                                   ttl: tools === CHAT_TOOLS ? "1h" : "5m" } }],

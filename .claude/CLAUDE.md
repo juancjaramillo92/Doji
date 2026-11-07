@@ -442,8 +442,8 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   `strict: true`.
 - **Effort is per caller**; nothing runs `low`. On Opus it rides as an
   effort-only system message (`effortMessages`) under one top-level
-  `BASE_EFFORT`, so callers on one array share one cached prefix; the message is
-  sent, never stored.
+  `BASE_EFFORT`, so callers on one array at one speed share one cached prefix;
+  the message is sent, never stored.
 - **`MAX_ROUNDS` is a backstop** at ten, and `TURN_MS` its twin for time — one
   signal per turn, at `pace_line`'s share. `rounds` and `model` are columns; a
   successful turn's `detail` is its client-tool tally. Read `rounds` before
