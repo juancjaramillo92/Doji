@@ -2006,21 +2006,6 @@ export const modelFor = (label: string): string => MODELS[label] ?? OPUS;
    replies no longer read the prefix the briefing writes. */
 const FAST = new Set(['reply']);
 
-/* One effort at the top of every Opus request, and the caller's own as an
-   effort-only system message at the head of `messages`. The top-level effort
-   renders ahead of the tools and the system prompt, so two callers on one
-   array at two efforts each wrote their own copy of the same prefix: the
-   briefing at `high` read nothing the replies at `medium` wrote (R-15). Said
-   as a message, the effort changes nothing before it, and every caller on an
-   array shares one prefix. A beta, so a header, and with Opus alone, as
-   `fallbacks` is. */
-export const BASE_EFFORT: Effort = 'high';
-
-export const effortMessages = (messages: any[], effort: Effort, model: string): any[] =>
-  model === OPUS && effort !== BASE_EFFORT
-    ? [{ role: "system", content: [], output_config: { effort } }, ...messages]
-    : messages;
-
 async function call(messages: any[], effort: Effort, tools: unknown[],
                     model: string, signal: AbortSignal, container: string | undefined,
                     fast: boolean): Promise<any> {
@@ -2035,7 +2020,7 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
       // decline there costs nothing a fallback would save. The header and the
       // field go together.
       ...(model === OPUS
-          ? { "anthropic-beta": "server-side-fallback-2026-07-01,mid-conversation-output-config-2026-07-01" +
+          ? { "anthropic-beta": "server-side-fallback-2026-07-01" +
                                 (fast ? ",fast-mode-2026-02-01" : "") }
           : {}),
       "content-type": "application/json",
@@ -2047,18 +2032,17 @@ async function call(messages: any[], effort: Effort, tools: unknown[],
          rides here. The window is a property of the tool ARRAY, where the key
          starts: each array is its own prefix. The chat array keeps the hour
          because fourteen of a week's eighteen replies came within an hour of the
-         turn before, six within five minutes. The briefing shares that array
-         but not the prefix: a reply runs fast, and speed is part of the key.
-         Everything else is five minutes, which the rounds within a turn keep
-         alive. `ttl` is a plain field, not a beta. */
+         turn before, six within five minutes. Everything else is five
+         minutes, which the rounds within a turn keep alive. `ttl` is a plain
+         field, not a beta. */
       system: [{ type: "text", text: SYSTEM + ALWAYS,
                  cache_control: { type: "ephemeral",
                                   ttl: tools === CHAT_TOOLS ? "1h" : "5m" } }],
-      messages: effortMessages(messages, effort, model),
+      messages,
       // Server tools need no loop here; the rest are executed below.
       tools,
       thinking: { type: "adaptive" },
-      output_config: { effort: model === OPUS ? BASE_EFFORT : effort },
+      output_config: { effort },
       // A decline would otherwise cost the briefing and a retry's searches.
       // `fallbacks: "default"` re-runs on another model inside this call,
       // routed by refusal category; a decline before output is not billed.

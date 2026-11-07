@@ -42,7 +42,7 @@ import {
   VOICE_TROUBLE,
   positionsList, isOpen, healthLine, sweepLine, serve, parseChannel, sayAloud, postSpeak,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock, portraitBlock, NOTES, recordBlock, recordList, recordQuery,
-  callProblem, expiryOf, scoreCall, callsList, lossesList, reactionOf, fileReactions, effortMessages, BASE_EFFORT,
+  callProblem, expiryOf, scoreCall, callsList, lossesList, reactionOf, fileReactions,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock, alertsList,
@@ -7140,21 +7140,4 @@ test('a graded case fails on what she wrote and on what the judge found', async 
   const result = await EVAL.grade(c, EVAL.PROMPTS, async () => ({ text: answers.shift(), usage: {} }));
   assert.ok(result.failed.some(f => /rate cut odds/.test(f)), 'the pattern did not fail a cut in a hike week');
   assert.ok(result.failed.some(f => /says cut/.test(f)), 'the judge\'s verdict was dropped');
-});
-
-/* ─── Effort as a message ────────────────────────────────────────────────────
-   On Opus the caller's effort rides at the head of the conversation, so the
-   effort at the top — which renders ahead of the cached prefix — is one value
-   for every caller. Not on Sonnet, whose one caller has its own array. */
-test('the caller\'s effort rides as a message on Opus, and the top stays one value', () => {
-  const turns = [{ role: 'user', content: 'hello' }];
-  const opus = 'claude-opus-5-5', sonnet = 'claude-sonnet-5-5';
-  assert.equal(BASE_EFFORT, 'high');
-  assert.deepEqual(effortMessages(turns, 'medium', opus),
-    [{ role: 'system', content: [], output_config: { effort: 'medium' } }, ...turns],
-    'a medium caller on Opus no longer says its effort as a message');
-  assert.deepEqual(effortMessages(turns, 'high', opus), turns,
-    'a caller at the top effort is sent a message saying so, which changes nothing but the bytes');
-  assert.deepEqual(effortMessages(turns, 'medium', sonnet), turns,
-    'Sonnet is sent the effort message its caller was never measured with');
 });
