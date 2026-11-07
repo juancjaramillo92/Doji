@@ -976,21 +976,15 @@ export function historyWeeks(start: string, now: number): string[] | null {
    A week already marked filed is not walked again. A row is keyed on
    TradingView's id, and when its ids changed on 3 November every week behind
    it came back under new ones, so walking a filed week files each release
-   twice. A walk that cannot read the marks does not start. */
+   twice. A walk that cannot read the marks does not start: the read throws,
+   and the door fails as any job does, with its row and its apology. */
 const HISTORY_PAUSE_MS = 35_000;
 
 export async function postHistory(start: string, pause = HISTORY_PAUSE_MS): Promise<Response> {
   const weeks = historyWeeks(start, Date.now());
   if (!weeks) return json({ ok: false, error: "history takes a date, YYYY-MM-DD" }, 400);
-  let marked: Set<string>;
-  try {
-    marked = new Set((await readRows<{ week: string }>('Weeks', `calendar_weeks?select=week&week=gte.${weeks[0]}` +
-      `&week=lte.${weeks.at(-1)}&order=week.desc&limit=${HISTORY_WEEKS}`)).map(m => m.week));
-  } catch (err) {
-    const detail = `${why(err)}, so nothing was walked`;
-    await recordRun({ caller: 'calendar week', ok: false, detail });
-    return json({ ok: false, error: detail }, 503);
-  }
+  const marked = new Set((await readRows<{ week: string }>('Weeks', `calendar_weeks?select=week` +
+    `&week=gte.${weeks[0]}&week=lte.${weeks.at(-1)}&order=week.desc&limit=${HISTORY_WEEKS}`)).map(m => m.week));
   for (const week of weeks.filter(w => !marked.has(w))) {
     if (await filedWeek(week)) continue;
     await new Promise(r => setTimeout(r, pause));
@@ -3974,7 +3968,8 @@ export async function positionsBlock(): Promise<string> {
 
 /* The apology names the job. Every failure once said "No briefing", so a
    nightly pass that died — whose symptom is a memory that stops growing — sent
-   him looking for a missing message. A map, so the words can be enumerated. */
+   him looking for a missing message. A map, so the words can be enumerated,
+   and every job that can reach jobFailed has its own: a test finds them. */
 export const APOLOGY: Record<string, string> = {
   briefing:     "No briefing, jefe — something broke on my side.",
   consolidate:  "My nightly tidy-up broke, jefe. I may not have kept what today was worth keeping.",
@@ -3983,9 +3978,9 @@ export const APOLOGY: Record<string, string> = {
   speak:        "Your briefing is written, jefe, but I could not send it. Ask me for it.",
   review:       "Your weekly review broke on my side, jefe. Ask me and I will go through your week.",
   reply:        "Something broke on my side, jefe. Try again in a moment.",
+  calendar:     "I could not file the calendar, jefe, so its times and figures may be behind.",
+  history:      "The calendar's history walk broke, jefe. The weeks it reached are filed.",
 };
-
-export const apologyFor = (job: string) => APOLOGY[job] ?? APOLOGY.briefing;
 
 /* The scheduled half. The hourly job asks dueNow what this hour owes; the
    calendar and the repair doors each name theirs with a flag.
@@ -4001,6 +3996,7 @@ async function postScheduled(url: URL): Promise<Response> {
     // one, and the market, its weeks and his charts read ahead after it, as
     // TradingView's budget allows; none of them throws.
     if (url.searchParams.get("calendar") === "1") {
+      job = 'calendar';
       await filed();
       const { market, rates } = readsDue(new Date());
       await Promise.all([market && storeMarket(), rates && storeRates(), storeTrend(), storeStructure(),
@@ -4052,7 +4048,7 @@ async function jobFailed(job: string, err: unknown): Promise<Response> {
 
   await tg("sendMessage", {
     chat_id: CHAT_ID,
-    text: `${apologyFor(job)}\n\n${reason.slice(0, 600)}`,
+    text: `${APOLOGY[job]}\n\n${reason.slice(0, 600)}`,
   }).catch(() => {});
   return json({ ok: false, error: reason, job }, 500);
 }

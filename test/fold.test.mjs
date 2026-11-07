@@ -36,7 +36,7 @@ import {
   notesList, channelsList, searchList, readStrategy, dayQuery, repliedQuery, spokenQuery,
   spokenBriefing, ask,
   consolidateRetryDue, thesisLine, portraitLine, loopsList, calendarList, keepDraft, TRIM_MOST,
-  parseFeedback, feedbackKeyboard, stamped, apologyFor, APOLOGY, LOOP_KINDS,
+  parseFeedback, feedbackKeyboard, stamped, APOLOGY, LOOP_KINDS,
   quoteWindow, quoteLine, ROLL_HOUR,
   foldVectors, EMBED_DIMS,
   VOICE_TROUBLE,
@@ -3847,7 +3847,7 @@ test('the history walks only the weeks not yet filed, and none when it cannot te
         if (u.includes('calendar_weeks') && !init.method) { asked = u; return marks(); }
         return new Response('', { status: 201 });
       };
-      await postHistory('2026-09-06', 0);
+      await postHistory('2026-09-06', 0).catch(err => runs.push({ thrown: String(err) }));
     });
     return { reads, runs, asked };
   };
@@ -3860,8 +3860,8 @@ test('the history walks only the weeks not yet filed, and none when it cannot te
     "the marks are not read across the walk's own weeks, newest first under a limit");
   const blind = await walk(() => new Response(JSON.stringify({ message: 'relation does not exist' }), { status: 404 }));
   assert.deepEqual(blind.reads, [], 'the walk started though it could not tell which weeks were filed');
-  assert.deepEqual(blind.runs.map(r => [r.caller, r.ok]), [['calendar week', false]],
-    'a walk refused for want of its marks leaves no row');
+  assert.deepEqual(blind.runs.map(r => Object.keys(r)), [['thrown']],
+    'a walk refused for want of its marks does not reach jobFailed, which writes its row and its apology');
 });
 
 test('a calendar TradingView refused is an error, not an empty day', async () => {
@@ -5401,14 +5401,12 @@ test('withClock stamps a picture turn as well as a typed one', () => {
 test('the apology names the job that actually died', () => {
   /* EACH JOB NAMES ITS OWN FAILURE. A consolidation that dies reads as her memory
      not growing, not as a missing briefing. */
-  assert.match(apologyFor('briefing'), /No briefing/);
-  assert.match(apologyFor('consolidate'), /nightly/);
-  assert.match(apologyFor('trade'), /position/);
+  assert.match(APOLOGY.briefing, /No briefing/);
+  assert.match(APOLOGY.consolidate, /nightly/);
+  assert.match(APOLOGY.trade, /position/);
   // Every job says something different, or the map is not doing anything.
   const said = Object.values(APOLOGY);
   assert.equal(new Set(said).size, said.length, 'two jobs share an apology');
-  // An unnamed job still gets an answer rather than "undefined".
-  assert.equal(apologyFor('something new'), APOLOGY.briefing);
 });
 
 test('the audit he asks for carries everything she keeps', () => {

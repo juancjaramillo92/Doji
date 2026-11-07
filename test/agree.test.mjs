@@ -21,7 +21,7 @@ import { execSync } from 'node:child_process';
 import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
-import { wanted, readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
+import { APOLOGY, wanted, readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
          READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_CONFIRMS, CALL_STEPS, CALL_MAX, RR_MIN, CONFIRM_MS, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, readsDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH, REVIEW } from '../supabase/functions/doji-eugenia/prompt.ts';
@@ -2271,6 +2271,21 @@ test('a scheduled job that dies records it, and records it before it apologises'
   assert.ok(row < msg,
     'the row is written after the apology, so the case it exists for — a ' +
     'Telegram that is refusing — is still the case that leaves no trace');
+});
+
+/* EVERY JOB THAT CAN DIE HAS ITS OWN APOLOGY. jobFailed sends APOLOGY[job], and a
+   job with no entry would send "undefined" — or, as it once did through a
+   fallback, the briefing's "No briefing" for the calendar or the history walk.
+   The jobs are found where they are named, so a new one arrives already asked. */
+test('every job jobFailed can be handed has an apology of its own', () => {
+  const src = uncomment(source('supabase/functions/doji-eugenia/index.ts'));
+  const jobs = new Set([...src.matchAll(/\bjob = '(\w+)'/g), ...src.matchAll(/jobFailed\('(\w+)'/g)].map(m => m[1]));
+  assert.ok(jobs.size >= 6, `only ${jobs.size} jobs found — the reader has gone blind`);
+  assert.deepEqual([...jobs].filter(j => !(j in APOLOGY)), [],
+    'a job that dies would send him an apology that is not its own, or none');
+  // A branch that names no job dies as the briefing: the calendar's once did.
+  assert.match(src, /searchParams\.get\("calendar"\) === "1"\) \{\s*job = 'calendar';/,
+    'the calendar door names no job, so a failure there says "No briefing"');
 });
 
 test('every answer dueNow can give is dispatched by postScheduled', () => {
