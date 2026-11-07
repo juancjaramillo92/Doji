@@ -1,22 +1,20 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // GLADYS — the journal bot  ·  Supabase Edge Function (Deno)
 // ───────────────────────────────────────────────────────────────────────────
-// One function, four callers, told apart by the secret they present:
+// One function, three callers, told apart by the secret they present:
 //
 //   x-doji-key                        its triggers — a position opened, post
 //                                     the message; its answers moved, redraw it.
 //   x-telegram-bot-api-secret-token   Telegram — a button was tapped, write the
 //                                     column and redraw the message.
-//   x-charm-key                       her charm — what waits for its journal,
-//                                     and an answer given on its screen.
-//   x-laptop-key                      Eugenia's laptop — the same, on its own
-//                                     key, so a lost laptop is cut off alone.
+//   x-laptop-key                      Eugenia's laptop — what waits for its
+//                                     journal, and an answer given on it.
 //
 // One file, because the halves share the keyboard, the message and the
 // callback_data grammar. A tap names its column through COLUMNS, the same four
 // names as Data.OWNED, so no broker column is reachable from a button. A tap
 // carries its whole state in callback_data, so the tap path holds no session.
-// An answer written in the app, or on the charm or the laptop, has none of
+// An answer written in the app or on the laptop has none of
 // that, so the message id is kept on the row, in tg_message_id — on neither
 // list, so nothing else can name it.
 //
@@ -40,8 +38,8 @@
 //           allowed_updates = ["callback_query"] — a tap is her whole
 //           vocabulary.
 // Secrets:  GLADYS_BOT_TOKEN, TELEGRAM_CHAT_ID, GLADYS_WEBHOOK_SECRET,
-//           DOJI_CRON_SECRET, SB_SECRET_KEY; GLADYS_CHARM_SECRET and
-//           GLADYS_LAPTOP_SECRET, optional — unset, that door is shut
+//           DOJI_CRON_SECRET, SB_SECRET_KEY; GLADYS_LAPTOP_SECRET,
+//           optional — unset, the laptop's door is shut
 // ═══════════════════════════════════════════════════════════════════════════
 
 import {
@@ -55,12 +53,11 @@ const BOT_TOKEN      = env("GLADYS_BOT_TOKEN");
 const CHAT_ID        = env("TELEGRAM_CHAT_ID");
 const WEBHOOK_SECRET = env("GLADYS_WEBHOOK_SECRET");
 const CRON_SECRET    = env("DOJI_CRON_SECRET");
-const CHARM_SECRET   = env("GLADYS_CHARM_SECRET");
 const LAPTOP_SECRET  = env("GLADYS_LAPTOP_SECRET");
 
 /* ─── The journal vocabulary ───────────────────────────────────────────────
-   One of five copies — CONFIG.SETUPS, trades_setup_check, the charm's and the
-   laptop's are the others — and agree.test.mjs reads all five.
+   One of four copies — CONFIG.SETUPS, trades_setup_check and the laptop's
+   are the others — and agree.test.mjs reads all four.
    ───────────────────────────────────────────────────────────────────────── */
 export const SETUPS: readonly string[] = ['Break & Retest', 'Support & Resistance'];
 
@@ -280,10 +277,10 @@ async function postOpen(row: Row): Promise<Response> {
   return json({ ok: true, id: row.id });
 }
 
-/* An answer written outside Telegram — the app, the charm, the laptop or the
-   SQL editor. Decided off
-   the before-state, as a tap is, so the redraw a tap's own trigger sets off
-   agrees with the tap's and comes back `message is not modified`. Decided any
+/* An answer written outside Telegram — the app, the laptop or the SQL
+   editor. Decided off the before-state, as a tap is, so the redraw a tap's
+   own trigger sets off agrees with the tap's and comes back `message is not
+   modified`. Decided any
    other way, a reopened form shuts under the correction being made in it. */
 async function postAnswer(row: Row, messageId: number, before: Answers): Promise<Response> {
   const replaced = await redraw(row, CHAT_ID, messageId, answered(before));
@@ -342,12 +339,11 @@ async function handleTap(req: Request): Promise<Response> {
   }
 }
 
-/* ─── The charm half: he journals on her screen ───────────────────────────
-   Her charm sleeps, wakes every few minutes to ask what waits, and shows a ring
-   while anything does. An answer from it is a tap in a tap's own grammar, so
+/* ─── The laptop half: he journals beside her face ────────────────────────
+   The laptop asks every few minutes what waits, and shows a ring while
+   anything does. An answer from it is a tap in a tap's own grammar, so
    parseCallback is the one boundary for both and no other column is reachable.
    The trigger then redraws the Telegram message, as it does for the app.
-   The laptop asks the same, on a key of its own.
    ───────────────────────────────────────────────────────────────────────── */
 
 /* A week back, oldest first, so trades are journalled in the order he took
@@ -356,32 +352,20 @@ async function handleTap(req: Request): Promise<Response> {
 const WAITING_DAYS = 7;
 const WAITING_MAX = 20;
 
-/* With it, the newest app the charm workflow published, as the version it
-   writes beside the image: the charm asks this door every few minutes, so an
-   update reaches her that day rather than at the night's look. Read beside
-   the trades, and null when it cannot be read in APP_MS, which costs only the
-   early update, never the answer. */
-const APP_VERSION_URL = `${SB_URL}/storage/v1/object/public/charm/version`;
-const APP_MS = 3000;
-
 async function waiting(): Promise<Response> {
   const since = new Date(Date.now() - WAITING_DAYS * 86_400_000).toISOString();
-  const [res, app] = await Promise.all([
-    fetch(`${SB_URL}/rest/v1/trades?select=${SELECT}&deleted=is.false` +
-      `&entry_time=gte.${encodeURIComponent(since)}` +
-      `&or=(setup.is.null,followed_rules.is.null,followed_sl.is.null,followed_tp.is.null)` +
-      `&order=entry_time.desc&limit=${WAITING_MAX}`, { headers: sbHeaders() }),
-    fetch(APP_VERSION_URL, { signal: AbortSignal.timeout(APP_MS) })
-      .then(read => read.ok ? read.text() : null).catch(() => null),
-  ]);
+  const res = await fetch(`${SB_URL}/rest/v1/trades?select=${SELECT}&deleted=is.false` +
+    `&entry_time=gte.${encodeURIComponent(since)}` +
+    `&or=(setup.is.null,followed_rules.is.null,followed_sl.is.null,followed_tp.is.null)` +
+    `&order=entry_time.desc&limit=${WAITING_MAX}`, { headers: sbHeaders() });
   if (!res.ok) throw new Error(`Read failed (HTTP ${res.status}): ${await res.text()}`);
   const rows: Row[] = (await res.json()).reverse();
-  return json({ ok: true, waiting: rows.length, trade: rows[0] ?? null, app });
+  return json({ ok: true, waiting: rows.length, trade: rows[0] ?? null });
 }
 
 // Answers only: [Edit] and [Done] belong to the Telegram form. Answered with
-// what waits after it, so the device moves on without a second request.
-async function charmAnswer(req: Request): Promise<Response> {
+// what waits after it, so the laptop moves on without a second request.
+async function laptopAnswer(req: Request): Promise<Response> {
   const tap = parseCallback(String((await req.json().catch(() => null))?.data ?? ""));
   if (!tap || tap.action !== 'answer' || !tap.column) {
     return json({ ok: false, error: "not an answer" }, 400);
@@ -396,7 +380,6 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
   // Authorisation first, and the header picks the half.
   const fromTelegram = req.headers.get("x-telegram-bot-api-secret-token");
   const fromDatabase = req.headers.get("x-doji-key");
-  const fromCharm    = req.headers.get("x-charm-key");
   const fromLaptop   = req.headers.get("x-laptop-key");
 
   if (!BOT_TOKEN || !CHAT_ID || !WEBHOOK_SECRET || !CRON_SECRET || !SB_KEY) {
@@ -411,8 +394,8 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
     if (secretMatches(fromDatabase, CRON_SECRET)) {
       return await fromTrigger(req);
     }
-    if (secretMatches(fromCharm, CHARM_SECRET) || secretMatches(fromLaptop, LAPTOP_SECRET)) {
-      return req.method === "POST" ? await charmAnswer(req) : await waiting();
+    if (secretMatches(fromLaptop, LAPTOP_SECRET)) {
+      return req.method === "POST" ? await laptopAnswer(req) : await waiting();
     }
     return json({ ok: false, error: "unauthorized" }, 401);
   } catch (err) {
