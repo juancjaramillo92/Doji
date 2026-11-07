@@ -1193,8 +1193,8 @@ economy, or the refusal is ever met by one.
 **Why refused:** every job's failure goes to `jobFailed`, which writes its row
 and sends him that job's apology. The history door has no apology, so
 `apologyFor` would send the briefing's, "No briefing, jefe", for a door he
-opened by hand. `postHistory` writes the `calendar week` row itself and answers
-503, as `filedWeek` does for a week it could not file.
+opened by hand. `postHistory` writes the `calendar week` row itself, as
+`filedWeek` does for a week it could not file, and answers 503.
 **Revisit if:** the history door gets an apology of its own, or moves onto a
 schedule where he would not be the one reading its answer.
 
