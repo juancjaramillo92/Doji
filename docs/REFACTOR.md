@@ -92,6 +92,13 @@ That the same morning's release looks read theirs four times over
 (`wrote_1h` 21,466 then 0, 0, 0, 0) is what rules out a broken cache and leaves
 effort as the cause.
 
+**And effort is in doubt.** On 4, 6, 12 and 13 October, every reply inside the
+hour after a briefing, with no reply between, wrote none of the hour's prefix
+and read 29,000 to 61,000 tokens of cache — a caller at `medium` reading what
+one at `high` wrote, on the same array, with effort at the top of both
+requests. Something else may have split the critic's; the cache diagnostics of
+R-54 would name it if the move is ever made again.
+
 **Revisit if:** the critic's effort is ever raised to the briefing's — then the
 prefix is genuinely shared and the array is worth revisiting in the same pass.
 Not before, and never on the argument alone: the numbers above took one morning
@@ -102,14 +109,6 @@ earn its time and cost if the critic were letting rule breaks through, and in
 October 2026 it had revised every briefing since its verdicts were first
 recorded — all six, by 1 to 11 per cent. Ask `eugenia_runs` for `critic
 verdict` rows before reopening it on that ground.
-
-**Since October 2026 effort is a message on Opus** (README, *What a turn
-cost*): the top of every request carries one effort and the caller's own rides
-inside the conversation, so the effort difference that decided this is gone
-from the prefix. What still keeps the critic off the briefing's prefix is its
-array alone. Moving it — the briefing's array with `tool_choice: none` — is the
-next measurement, made by itself, with the critic's `wrote_1h` and `cached` read
-the morning after. Not before the effort change has its own morning of rows.
 
 **And the shape to carry away:** the request field that broke this was not the
 one the change touched. A cache key spans every field that renders ahead of the
@@ -429,10 +428,10 @@ comes from a handed block rather than a page.
 **Deferred, not refused.** Both are documented for Opus 5.5. The first gives
 handed context operator authority over web text, but the README records that
 shape as never exercised here, and a 400 kills every reply. The second would
-say where a prefix broke, but effort as a message (R-15) tests the one place a
-break is known.
-**Revisit if:** that measurement leaves an unexplained write, or a page's
-text is seen steering a reply.
+say where a prefix broke, and no two callers now expect to share one: the one
+break left unexplained is R-15's, and only making that move again would put it
+to the diagnostics.
+**Revisit if:** R-15 is reopened, or a page's text is seen steering a reply.
 
 ### R-55 — compaction, context editing, the memory tool, the batch API
 **Why refused:** each solves a problem she does not have. Her windows are twelve
