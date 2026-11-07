@@ -30,11 +30,13 @@ import { BUNDLE, swapScript } from '../laptop/update.mjs';
 
 const bytes = (n, seed) => Uint8Array.from({ length: n }, (_, i) => (i * 31 + seed) & 255);
 
-/* A stream as the door sends one: silence first, then her voice in parts
-   of every awkward length — empty, one byte, odd, and one past 65,535, which
-   needs the length's third byte. */
+/* A stream as the door sends one: silence first, a frame of a kind the
+   laptop does not know, then her voice in parts of every awkward length —
+   empty, one byte, odd, and one past 65,535, which needs the length's third
+   byte. */
 const SENT = [
   [FRAME.voice, new Uint8Array(4800)],
+  [FRAME.voice + 1, Uint8Array.of(80)],
   [FRAME.voice, bytes(0, 1)],
   [FRAME.voice, bytes(1, 2)],
   [FRAME.voice, bytes(4801, 3)],

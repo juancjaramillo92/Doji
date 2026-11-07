@@ -340,8 +340,8 @@ async function handleTap(req: Request): Promise<Response> {
 }
 
 /* ─── The laptop half: he journals beside her face ────────────────────────
-   The laptop asks every few minutes what waits, and shows a ring while
-   anything does. An answer from it is a tap in a tap's own grammar, so
+   The laptop asks every minute what waits, and shows a ring while anything
+   does. An answer from it is a tap in a tap's own grammar, so
    parseCallback is the one boundary for both and no other column is reachable.
    The trigger then redraws the Telegram message, as it does for the app.
    ───────────────────────────────────────────────────────────────────────── */

@@ -1721,7 +1721,7 @@ test('every file that names the Supabase project names the same one', () => {
     `the project is split across refs: ${[...new Set(found)].join(', ')}`);
 });
 
-/* A budget over the whole speech stream runs for as long as she speaks, and
+/* A budget over the whole speech stream bounds how long she may speak, and
    SPEAK_MS on the stream cut a long briefing off mid-sentence. It bounds the
    vendor's start of each part, and is cleared once the vendor answers. */
 test('her voice to the laptop is bounded while the vendor starts, not while she speaks', () => {

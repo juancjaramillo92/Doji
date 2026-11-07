@@ -1124,6 +1124,14 @@ is a downgrade of the packager.
 **Revisit if:** a report reaches what ships, or a packager release carries the
 fix.
 
+### R-155 — the frame's kind byte dropped, now voice is its only kind
+**Why refused:** the laptop reads frames in the build he has installed, and an
+update is offered, never taken unasked. A door that answered raw `pcm` would
+play noise on every laptop until he took one, and `laptopFrame` and the
+laptop's framer would change together for four bytes a part.
+**Revisit if:** the door needs a second kind again, or the laptop's audio is
+rewritten for another reason.
+
 ---
 
 ## 3 · THE NEXT STEP — DECIDED

@@ -4888,10 +4888,10 @@ function background(work: Promise<unknown>) {
    ───────────────────────────────────────────────────────────────────────── */
 const LAPTOP_SECRET = env("EUGENIA_LAPTOP_SECRET");
 
-/* A recording heard, answered as a turn of the conversation. Never throws:
-   whatever happens, the laptop has something to say. The copy and the write
-   go after it has her words, which are what he is waiting on, and the pair is
-   stored whether or not the copy lands. */
+/* A recording heard, answered as a turn of the conversation: whatever the
+   transcriber or the turn does, the laptop has something to say. The copy and
+   the write go after it has her words, which are what he is waiting on, and
+   the pair is stored whether or not the copy lands. */
 async function hearLaptop(voice: File, chart: File | null): Promise<string> {
   const blocks = chart ? [{
     type: "image",
@@ -4914,8 +4914,10 @@ async function hearLaptop(voice: File, chart: File | null): Promise<string> {
    little-endian, mono. The parts of a long answer join end to end, where each
    part of a file format would carry its own header. It arrives in frames — a
    kind byte, three bytes of length, then that many bytes — as the laptop's
-   framer reads them. Exported so that framer can be fed these exact bytes in
-   a test. */
+   framer reads them; voice is the one kind, and the format stays whole
+   because an installed laptop reads it until he takes an update
+   (REFACTOR.md R-155). Exported so that framer can be fed these exact bytes
+   in a test. */
 export const FRAME = { voice: 0 } as const;
 
 export function laptopFrame(kind: number, bytes: Uint8Array): Uint8Array {
@@ -4940,9 +4942,8 @@ const BEAT_MS = 15_000;
    ends the audio; the copy in Telegram is the whole of it.
 
    SPEAK_MS bounds each part's wait for the vendor to start answering, not its
-   reading: the laptop takes the voice as fast as it plays it, so a budget on
-   the whole stream runs at the pace of speech, and cut a long briefing off
-   mid-sentence. Once she speaks, the laptop's own hanging up and the worker's
+   reading: a budget on the whole stream bounds how long she may speak, and
+   cut a long briefing off mid-sentence. Once she speaks, the laptop's own hanging up and the worker's
    wall clock are the bounds. */
 async function* laptopAudio(words: Promise<string>): AsyncGenerator<Uint8Array, boolean> {
   let said: string | null = null;
