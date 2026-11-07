@@ -1035,7 +1035,7 @@ descriptions are dropped, since she would pay for each on every request.
 and ten-year yields, the ten-year real yield and breakeven, silver, US crude,
 the S&P 500, the VIX and gold's volatility index (GVZ) — and abroad the German,
 French, Italian, UK and Japanese ten-year yields and EUR/USD, what the
-calendar's auctions and central banks are read against: France and Italy each
+calendar's central banks are read against: France and Italy each
 against Germany is what lenders charge for the doubt, and the euro is more than
 half the dollar index. And the offshore yuan (`FX:USDCNH`), what China's buying
 is paid in, since Shanghai's own price reads nothing usable (`?probe=china`). The quote batch refused on every probe with the scanners'
@@ -1623,13 +1623,13 @@ against, every kind TradingView listed from 2 to 14 November. The new calendar
 lists no speeches: not the Fed's, not the ECB's or the BoJ's.
 
 **From abroad, what she asked for and nothing else** (`wanted`): the central
-banks of the euro area, Britain and Japan (`mny` at medium or above — decisions,
-minutes, the president's and the governor's speeches); headline inflation in all
-seven (`prce` rated high); government bond auctions in Germany, France, Italy and
-Britain, less the bills, which TradingView names in months; and China's reserves.
-By kind rather than by rating, since the rating would miss most of it: TradingView
-rates Lagarde medium and every auction and China's reserves low, and rates a dozen
-surveys high. About 12 events a week, out of more than 100 listed. China's gold
+banks of the euro area, Britain and Japan (`mny` at medium or above — the
+decisions and the votes beside them); headline inflation in all seven (`prce`
+rated high); and China's reserves. By kind rather than by rating, since the
+rating would miss some of it: TradingView rates China's reserves low and a dozen
+surveys high. About five events a week, out of more than 100 listed. The bond
+auctions in Germany, France, Italy and Britain she once asked for are not on
+the calendar since its ids changed, in November or in December. China's gold
 imports are not on TradingView's calendar. A row from abroad carries its country
 at the head of its name (*FR Inflation Rate YoY Prel (Sep)*), because three
 economies publish that title in one hour. **None of it is one of his**: R-19
@@ -1683,16 +1683,20 @@ the calendar reaches a day or a week, while the table holds every release the
 filing and the history door have reached, each with its consensus and its
 actual — how core inflation has run against the forecast for a year, out of her
 reach. `get_releases` takes a release as the calendar names it, less its period,
-matched on the start of the name, so a release from abroad, which leads with its
-country's code, never answers for one at home. It reads the newest twenty-four
+matched whole, with or without its period: a match on the start of the name
+read *Interest Rate on Reserve Balances* into the Fed's decisions and *Core
+Inflation Rate* into both the MoM and the YoY. A release from abroad, which
+leads with its country's code, never answers for one at home. It reads the newest twenty-four
 prints in the months asked (`RELEASE_PRINTS`; 1 to 120, two years by default),
 newest first under the limit and told oldest first, and a full read says how far
 back it reaches. **The tally is counted in code** (`printsList`): above, below
 or on the consensus, and a pair in different units or with no consensus counted
 apart rather than guessed. Above and below are arithmetic, and the list says so,
 since a higher unemployment rate is above consensus too. What she named goes out
-as a value: `*` is taken out and one put back at the end, and the rest is
-`encodeURIComponent`. In `CHAT_TOOLS`, so the briefing and a reply can both read
+as a value: `*` is taken out, every other character is escaped into a literal
+of the `imatch` pattern, and the whole is `encodeURIComponent`. A release
+TradingView renamed when its ids changed on 3 November reads as one series only
+once its older rows carry the new name. In `CHAT_TOOLS`, so the briefing and a reply can both read
 it.
 
 **And what gold did on each print** (`fileReactions`, at the nightly pass,

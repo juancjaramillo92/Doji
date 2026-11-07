@@ -3631,10 +3631,9 @@ test('a figure TradingView has not published is left out of the row, never sent 
 const ABROAD = JSON.parse(readFileSync(
   new URL('./fixtures/tradingview-abroad.json', import.meta.url), 'utf8')).kinds;
 
-test('abroad, the central banks, headline inflation, bond auctions and China\'s reserves are filed, and nothing else', () => {
+test('abroad, the central banks, headline inflation and China\'s reserves are filed, and nothing else', () => {
   const kept = {};
   for (const k of ABROAD.filter(k => wanted({ ...k, timed: true }))) (kept[k.country] ??= []).push(k.title);
-  const auctions = (titles) => titles.filter(t => /Auction|Tender|Syndication/.test(t));
   assert.deepEqual(kept.EU, ['Deposit Facility Rate', 'ECB Interest Rate Decision', 'ECB Press Conference',
     'Inflation Rate YoY Flash', 'ECB General Council Meeting', 'ECB Monetary Policy Meeting Accounts',
     'ECB Nagel Speech', 'ECB President Lagarde Speech']);
@@ -3643,25 +3642,13 @@ test('abroad, the central banks, headline inflation, bond auctions and China\'s 
     'BoJ Summary of Opinions']);
   assert.deepEqual(kept.CN, ['Inflation Rate YoY', 'Foreign Exchange Reserves'],
     'China is filed past the lowest bar she set for it');
-  assert.deepEqual(kept.GB.filter(t => !auctions([t]).length), ['BoE Interest Rate Decision', 'Inflation Rate YoY',
+  assert.deepEqual(kept.GB, ['BoE Interest Rate Decision', 'Inflation Rate YoY',
     'BoE MPC Vote Cut', 'BoE MPC Vote Hike', 'BoE MPC Vote Unchanged', 'MPC Meeting Minutes']);
-  for (const c of ['DE', 'FR', 'IT']) {
-    assert.deepEqual(kept[c].filter(t => !auctions([t]).length), ['Inflation Rate YoY Prel'], `${c} files a survey`);
-  }
+  for (const c of ['DE', 'FR', 'IT']) assert.deepEqual(kept[c], ['Inflation Rate YoY Prel'], `${c} files a survey`);
 
-  /* EVERY GOVERNMENT BOND AUCTION IN THE FOUR, AND NO BILL. TradingView files
-     them under three categories, some under the marker's `Calendar`, and names
-     every bill in months. */
-  const listed = (c) => auctions(ABROAD.filter(k => k.country === c).map(k => k.title));
-  for (const c of ['DE', 'FR', 'IT', 'GB']) {
-    assert.deepEqual(auctions(kept[c]), listed(c).filter(t => !/Month/.test(t)), `${c} drops a bond auction or files a bill`);
-    assert.ok(auctions(kept[c]).length >= 8, `${c} files ${auctions(kept[c]).length} auctions — the reader has gone blind`);
-  }
-  assert.ok(!kept.JP.some(t => /Auction/.test(t)), "Japan's auctions are filed, and she asked for its bank and its inflation");
-
-  // Her own measure: a hundred events in two months, out of nine hundred.
+  // Her own measure, out of nine hundred events in two months.
   const events = ABROAD.filter(k => wanted({ ...k, timed: true })).reduce((n, k) => n + k.n, 0);
-  assert.equal(events, 103);
+  assert.equal(events, 45);
 });
 
 /* ─── At home, releases rated medium or above, less the named noise ─────────
@@ -3699,12 +3686,12 @@ test('a release from abroad is filed under its country, and led by it', () => {
     category: 'prce', importance: 'high', timed: true, period: 'Sep',
     consensus: null, prior: null, actual: null, ticker: null, ...extra });
   const rows = calendarRows([event('FR', 'Inflation Rate YoY Prel'), event('IT', 'Inflation Rate YoY Prel'),
-    event('DE', '15/20/30-Year Bund Auction', { category: 'gov', importance: 'low', timed: false, period: null })],
+    event('CN', 'Foreign Exchange Reserves', { category: 'mny', importance: 'low', period: null })],
     0, Infinity);
-  // Three countries publish this title in one hour.
+  // Two countries publish this title in one hour.
   assert.deepEqual(rows.map(r => r.name),
-    ['FR Inflation Rate YoY Prel (Sep)', 'IT Inflation Rate YoY Prel (Sep)', 'DE 15/20/30-Year Bund Auction']);
-  assert.deepEqual(rows.map(r => r.country), ['FR', 'IT', 'DE']);
+    ['FR Inflation Rate YoY Prel (Sep)', 'IT Inflation Rate YoY Prel (Sep)', 'CN Foreign Exchange Reserves']);
+  assert.deepEqual(rows.map(r => r.country), ['FR', 'IT', 'CN']);
   // At home the marker is still not a release, however it is rated.
   assert.equal(calendarRows([event(HOME, 'Summit', { category: 'gov', timed: false })], 0, Infinity).length, 0);
 });
@@ -5240,8 +5227,19 @@ test('the night files gold\'s move on the day\'s home prints, once, and says how
 test('the prints read is bounded, newest first, and takes what she named as a value, never a pattern', () => {
   const now = Date.parse('2026-10-15T12:00:00Z');
   const q = printsQuery(releaseName('  Core *Inflation Rate MoM '), 6, now);
-  // Her wildcard is taken out; the one at the end is the code's.
-  assert.match(q, /&name=ilike\.Core%20Inflation%20Rate%20MoM\*&/);
+  // Her wildcard is taken out, and the name is matched whole.
+  const whole = new RegExp(decodeURIComponent(q.match(/&name=imatch\.([^&]*)&/)[1]), 'i');
+  assert.deepEqual(['Core Inflation Rate MoM (Sep)', 'Core Inflation Rate MoM (Oct. 2026)', 'core inflation rate mom',
+    'Core Inflation Rate MoM Final (Sep)', 'Core Inflation Rate YoY (Sep)', 'EU Core Inflation Rate MoM (Sep)']
+    .filter(n => whole.test(n)), ['Core Inflation Rate MoM (Sep)', 'Core Inflation Rate MoM (Oct. 2026)',
+    'core inflation rate mom'], 'a release is read past its own name, or not under its period');
+  // The Fed's decision is not the rate on reserves set beside it, and a
+  // bracket that belongs to the name is a literal, not a group.
+  const fed = new RegExp(decodeURIComponent(printsQuery('Interest Rate', 6, now).match(/&name=imatch\.([^&]*)&/)[1]), 'i');
+  assert.ok(fed.test('Interest Rate (Oct. 2026)') && !fed.test('Interest Rate on Reserve Balances (Oct. 2026)'));
+  const crop = new RegExp(decodeURIComponent(printsQuery('WASDE Corn Ending Stocks (New Crop)', 6, now)
+    .match(/&name=imatch\.([^&]*)&/)[1]), 'i');
+  assert.ok(crop.test('WASDE Corn Ending Stocks (New Crop) (Nov. 2026)') && !crop.test('WASDE Corn Ending Stocks Xnew CropX'));
   assert.match(q, /&actual=not\.is\.null&at=gte\.2026-04-15T12:00:00\.000Z&at=lte\.2026-10-15T12:00:00\.000Z/);
   assert.match(q, new RegExp(`&order=at\\.desc&limit=${RELEASE_PRINTS}$`));
   // Clamped: nothing past ten years, nothing under a month, a default for nonsense.
@@ -5251,7 +5249,7 @@ test('the prints read is bounded, newest first, and takes what she named as a va
   assert.equal(releaseName('**'), '');
   assert.equal(releaseName('x'.repeat(200)).length, 80);
   // An ampersand she typed cannot open a second filter.
-  assert.match(printsQuery('A&order=id.asc', 12, now), /name=ilike\.A%26order%3Did\.asc\*/);
+  assert.match(printsQuery('A&order=id.asc', 12, now), /name=imatch\.%5EA%26order%3Did%5C\.asc/);
 });
 
 test('a calendar line from another day names the day, and today stays bare', () => {
