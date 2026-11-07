@@ -969,13 +969,28 @@ export function historyWeeks(start: string, now: number): string[] | null {
    thirty calendar reads a minute, so a refused week is asked again once after
    a pause, and a second refusal ends the walk with its last row naming where
    to resume. Exported with the pause as a parameter so the sequence is
-   driven. */
+   driven.
+
+   A week already marked filed is not walked again. A row is keyed on
+   TradingView's id, and when its ids changed on 3 November every week behind
+   it came back under new ones, so walking a filed week files each release
+   twice. A walk that cannot read the marks does not start. */
 const HISTORY_PAUSE_MS = 35_000;
 
 export async function postHistory(start: string, pause = HISTORY_PAUSE_MS): Promise<Response> {
   const weeks = historyWeeks(start, Date.now());
   if (!weeks) return json({ ok: false, error: "history takes a date, YYYY-MM-DD" }, 400);
-  for (const week of weeks) {
+  let marked: { week: string }[];
+  try {
+    marked = await readRows<{ week: string }>('Weeks', `calendar_weeks?select=week&week=gte.${weeks[0]}` +
+      `&week=lte.${weeks.at(-1)}&order=week.desc&limit=${HISTORY_WEEKS}`);
+  } catch (err) {
+    const detail = `${why(err)}, so nothing was walked`;
+    await recordRun({ caller: 'calendar week', ok: false, detail });
+    return json({ ok: false, error: detail }, 503);
+  }
+  const filedWeeks = new Set(marked.map(m => m.week));
+  for (const week of weeks.filter(w => !filedWeeks.has(w))) {
     if (await filedWeek(week)) continue;
     await new Promise(r => setTimeout(r, pause));
     if (!await filedWeek(week)) break;

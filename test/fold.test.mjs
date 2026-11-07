@@ -3814,6 +3814,7 @@ test('the history asks a refused week again once, and a second refusal ends the 
         return new Response(JSON.stringify({ ok: true, events: [] }), { status: 200 });
       }
       if (u.includes('eugenia_runs')) runs.push(...JSON.parse(init.body));
+      if (u.includes('calendar_weeks') && !init.method) return new Response('[]', { status: 200 });
       return new Response('', { status: 201 });
     };
     await postHistory('2026-09-06', 0);
@@ -3823,6 +3824,42 @@ test('the history asks a refused week again once, and a second refusal ends the 
   assert.deepEqual(runs.map(r => r.ok), [true, false, true, false, false],
     'an attempt went unrecorded — both outcomes are a row');
   assert.match(runs.at(-1).detail, /^2026-09-20: /, 'the last row does not name the week to resume from');
+});
+
+/* A FILED WEEK IS NEVER WALKED AGAIN. When TradingView's ids changed on
+   3 November every week behind it came back under new ones, and a row is keyed
+   on the id, so a walk over a filed week files each release twice. The marks
+   are read first, and a walk that cannot read them does not start. */
+test('the history walks only the weeks not yet filed, and none when it cannot tell', async () => {
+  const walk = async (marks) => {
+    const reads = [], runs = [];
+    let asked = '';
+    await stubbed(async () => {
+      globalThis.fetch = async (url, init = {}) => {
+        const u = String(url);
+        if (u.includes('doji-tradingview')) {
+          reads.push(u.match(/from=([\d-]+)/)[1]);
+          return new Response(JSON.stringify({ ok: true, events: [] }), { status: 200 });
+        }
+        if (u.includes('eugenia_runs')) runs.push(...JSON.parse(init.body));
+        if (u.includes('calendar_weeks') && !init.method) { asked = u; return marks(); }
+        return new Response('', { status: 201 });
+      };
+      await postHistory('2026-09-06', 0);
+    });
+    return { reads, runs, asked };
+  };
+  const some = await walk(() => new Response(JSON.stringify([{ week: '2026-09-20' }, { week: '2026-09-06' }]), { status: 200 }));
+  assert.ok(some.reads.length >= 2, 'the walk read nothing at all');
+  assert.ok(!some.reads.includes('2026-09-06') && !some.reads.includes('2026-09-20'),
+    'a week already filed was walked again, and every release in it filed twice under its new id');
+  assert.equal(some.reads[0], '2026-09-13', 'the first week not yet filed was not the first walked');
+  assert.match(some.asked, /week=gte\.2026-09-06&week=lte\.\d{4}-\d{2}-\d{2}&order=week\.desc&limit=\d+/,
+    "the marks are not read across the walk's own weeks, newest first under a limit");
+  const blind = await walk(() => new Response(JSON.stringify({ message: 'relation does not exist' }), { status: 404 }));
+  assert.deepEqual(blind.reads, [], 'the walk started though it could not tell which weeks were filed');
+  assert.deepEqual(blind.runs.map(r => [r.caller, r.ok]), [['calendar week', false]],
+    'a walk refused for want of its marks leaves no row');
 });
 
 test('a calendar TradingView refused is an error, not an empty day', async () => {

@@ -1164,8 +1164,8 @@ rename each time costs more than telling shared tickers apart.
 key on the series and its minute would have caught every one. But tickers are
 shared within a minute (the BoE's decision and its votes), are null for some
 releases, and a key change is a schema change on a live table. A change of ids
-is rare and one-off: the duplicates were deleted by hand, and the README warns
-the history door off the weeks before it.
+is rare and one-off: the duplicates were deleted by hand, and the history
+door walks only the weeks not yet marked filed, so it cannot file them again.
 **Revisit if:** TradingView changes its ids again.
 
 ### R-159 — the Fed's own calendar beside TradingView's

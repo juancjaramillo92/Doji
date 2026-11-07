@@ -1834,13 +1834,15 @@ writes the rows first and the mark after:
 
 - **the nightly pass** files the current week;
 - **the history door**, `?history=YYYY-MM-DD` on `doji-eugenia`, walks every
-  week from that date, up to two years a run, back to TradingView's 2003. It
-  answers first and works behind the 200, so its result is one `eugenia_runs`
-  row per week under `calendar week`. A refused week is asked again once after a
-  pause; refused twice, the walk stops and its last row names where to resume.
-  **Do not walk it over weeks before 3 November 2026**: TradingView now serves
-  them under its new ids, and every release already filed would be filed again
-  beside itself, since a row is keyed on the id.
+  week from that date not yet marked in `calendar_weeks`, up to two years a run,
+  back to TradingView's 2003. It answers first and works behind the 200, so its
+  result is one `eugenia_runs` row per week under `calendar week`. A refused
+  week is asked again once after a pause; refused twice, the walk stops and its
+  last row names where to resume. **A filed week is never walked again**: a row
+  is keyed on TradingView's id, and when its ids changed on 3 November 2026
+  every week behind it came back under new ones, so a second walk would file
+  each release beside itself. A walk that cannot read the marks writes its row
+  and does not start; to file a week again, delete its mark first.
 
 **A week the read did not reach is not covered either.** `check_rules` reads
 releases newest first, bounded at five hundred over up to a year, so a full read
