@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    DOJI — the copies that have to agree
    ───────────────────────────────────────────────────────────────────────────
-   Four runtimes and no build step, so some facts live in more than one file.
+   Six runtimes and no build step, so some facts live in more than one file.
    Copies are not the problem; copies NOTHING CAN COMPARE are. A test asserting
    each copy against a literal typed beside it lets an editor change a list and
    its own test in one pass, green. So every copy here is read out of its file

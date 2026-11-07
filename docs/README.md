@@ -391,7 +391,8 @@ nothing can go stale and a backfilled fill corrects itself. There is no override
 
 ## Facts that live in more than one file
 
-Four runtimes, five languages and no build step, so some things cannot be
+Six runtimes — the browser, Deno, Postgres, Apps Script, Node for the scripts
+and Electron — and no build step between them, so some things cannot be
 single-sourced at run time:
 
 | The fact | Where its copies live |

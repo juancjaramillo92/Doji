@@ -9,6 +9,10 @@ says what is pending.
 
 Where it disagrees with the README, the README wins and you say so.
 
+A number is never reused or reassigned. An entry whose subject is gone is
+deleted and its number left unused, since commits, pull requests and other
+files cite entries by number.
+
 ---
 
 ## 1 · WHAT NO TEST REACHES
