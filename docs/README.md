@@ -1582,7 +1582,8 @@ briefing on the writer's clock, and reviews his week: how he followed
 the rules a row can check, his own answers — how often he marked his rules
 broken and how many he left blank, the one record of entering on the touch —
 what he committed to and whether he kept it, one thing to keep and one to
-change, and her own calls in a sentence. Process, never P&L as the measure,
+change, each a moment of the week he can find in his journal and what he does
+when it comes again, and her own calls in a sentence. Process, never P&L as the measure,
 and nothing about where price goes next week, which is the briefing above it;
 no hello, since the briefing has said it.
 Under 250 words, with what to cut first named beside the count — figures from
