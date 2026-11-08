@@ -2273,17 +2273,16 @@ test('a scheduled job that dies records it, and records it before it apologises'
     'Telegram that is refusing — is still the case that leaves no trace');
 });
 
-/* EVERY JOB THAT CAN DIE HAS ITS OWN APOLOGY. jobFailed sends APOLOGY[job], and a
-   job with no entry would send "undefined" — or, as it once did through a
-   fallback, the briefing's "No briefing" for the calendar or the history walk.
-   The jobs are found where they are named, so a new one arrives already asked. */
+/* EVERY JOB THAT CAN DIE HAS ITS OWN APOLOGY. jobFailed sends APOLOGY[job], so a
+   job with no entry would send him "undefined". The jobs are found where they
+   are named, so a new one arrives already asked. */
 test('every job jobFailed can be handed has an apology of its own', () => {
   const src = uncomment(source('supabase/functions/doji-eugenia/index.ts'));
   const jobs = new Set([...src.matchAll(/\bjob = '(\w+)'/g), ...src.matchAll(/jobFailed\('(\w+)'/g)].map(m => m[1]));
   assert.ok(jobs.size >= 6, `only ${jobs.size} jobs found — the reader has gone blind`);
   assert.deepEqual([...jobs].filter(j => !(j in APOLOGY)), [],
     'a job that dies would send him an apology that is not its own, or none');
-  // A branch that names no job dies as the briefing: the calendar's once did.
+  // A branch that names no job dies as postScheduled's default, the briefing.
   assert.match(src, /searchParams\.get\("calendar"\) === "1"\) \{\s*job = 'calendar';/,
     'the calendar door names no job, so a failure there says "No briefing"');
 });
