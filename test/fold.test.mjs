@@ -3835,7 +3835,7 @@ test('the history asks a refused week again once, and a second refusal ends the 
 test('the history walks only the weeks not yet filed, and none when it cannot tell', async () => {
   const walk = async (marks) => {
     const reads = [], runs = [];
-    let asked = '';
+    let asked = '', thrown = null;
     await stubbed(async () => {
       globalThis.fetch = async (url, init = {}) => {
         const u = String(url);
@@ -3847,9 +3847,9 @@ test('the history walks only the weeks not yet filed, and none when it cannot te
         if (u.includes('calendar_weeks') && !init.method) { asked = u; return marks(); }
         return new Response('', { status: 201 });
       };
-      await postHistory('2026-09-06', 0).catch(err => runs.push({ thrown: String(err) }));
+      await postHistory('2026-09-06', 0).catch(err => { thrown = String(err); });
     });
-    return { reads, runs, asked };
+    return { reads, runs, asked, thrown };
   };
   const some = await walk(() => new Response(JSON.stringify([{ week: '2026-09-20' }, { week: '2026-09-06' }]), { status: 200 }));
   assert.ok(some.reads.length >= 2, 'the walk read nothing at all');
@@ -3860,8 +3860,9 @@ test('the history walks only the weeks not yet filed, and none when it cannot te
     "the marks are not read across the walk's own weeks, newest first under a limit");
   const blind = await walk(() => new Response(JSON.stringify({ message: 'relation does not exist' }), { status: 404 }));
   assert.deepEqual(blind.reads, [], 'the walk started though it could not tell which weeks were filed');
-  assert.deepEqual(blind.runs.map(r => Object.keys(r)), [['thrown']],
+  assert.match(blind.thrown ?? '', /Weeks read failed \(HTTP 404\)/,
     'a walk refused for want of its marks does not reach jobFailed, which writes its row and its apology');
+  assert.deepEqual(blind.runs, [], 'the walk writes a row of its own beside the one jobFailed writes');
 });
 
 test('a calendar TradingView refused is an error, not an empty day', async () => {
