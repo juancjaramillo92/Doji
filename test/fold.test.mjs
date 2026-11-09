@@ -5079,6 +5079,12 @@ test('her calls say how they ended, what they made, and which still stands', () 
     'a condition filed as a sentence reads "if Price … above it.."');
   assert.match(callsList([{ ...CALL, condition: 'If FOMC holds, a retest of 4,000' }], now), /, if FOMC holds, a retest of 4,000\./,
     'a condition opening on "If" or an acronym is mangled');
+  const labelled = callsList([{ ...CALL, condition: "Break & Retest sell: price retests Monday's 3937.42 low and a " +
+                                                    "15-minute candle closes back below it." }], now);
+  assert.match(labelled, /, if price retests Monday's 3937\.42 low and a 15-minute candle closes back below it\.$/m,
+    'a condition opening on its setup\'s name reads "if break & Retest sell: price…"');
+  assert.match(callsList([{ ...CALL, condition: 'Price holds 4,000 into the close: a retest' }], now),
+    /, if price holds 4,000 into the close: a retest\./, 'a condition with a level before its colon is cut as a label');
   assert.doesNotMatch(out, /Of the \d+ lost/, 'a count of steps when no loss has been explained');
   const why = callsList([
     { ...CALL, id: 2, expires_at: '2026-10-13T21:00:00Z', outcome: 'lost', result: -15, misread: 'level', lesson: 'the quarter had broken' },
