@@ -252,9 +252,10 @@ function bind() {
 }
 
 /* Her menu: in the menu bar, what he does with her, where she is, how she is
-   set up and how she is mended, each its own group; on her Dock icon, the
-   first two alone — the Dock is where she is reached, and macOS adds Quit
-   there itself. The menu-bar icon carries no mark: what waits shows on her. */
+   set up, how she is mended and which she is, each its own group; on her Dock
+   icon, what he does with her and Bring her here alone — the Dock is where she
+   is reached, and macOS adds Quit there itself. The menu-bar icon carries no
+   mark: what waits shows on her. */
 function menu() {
   if (!tray) return;
   const name = talkKey(), accelerator = KEYS[name];
@@ -369,12 +370,13 @@ async function look() {
   return chart.thumbnail.toJPEG(85);
 }
 
-/* The briefing: a dot beside her while one waits for him. Her door says whether one does — today's, landed, and not yet heard
-   whole — so the dot goes at midnight in New York, and stays gone after a
-   restart. Asked as ?briefing=waits, whose answer has no voice in it: the
-   dot is the news. An answer that is
-   neither leaves the dot as it was, and so does one asked before a briefing
-   heard here ended, since it read the door before the door knew.
+/* The briefing: a dot beside her while one waits for him. Her door says
+   whether one does — today's, landed, and not yet heard whole — so the dot
+   goes at midnight in New York, and stays gone after a restart. Asked as
+   ?briefing=waits, whose answer has no voice in it: the dot is the news. An
+   answer that is neither leaves the dot as it was, and so does one asked
+   before a briefing heard here ended, since it read the door before the door
+   knew.
 
    The dot goes once the briefing has come to its end: a
    briefing that failed — the line gone, her door's error — leaves it up, to

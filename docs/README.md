@@ -2140,9 +2140,9 @@ Dock icon, Doji's, and an icon in the menu bar, her face cropped close and its
 black made clear by the face's own rule (`laptop/art.mjs`), which also carries
 the briefing's dot. The menu bar's icon holds her whole menu and carries no
 mark — what waits shows on her; the Dock's holds what he does with her and
-*Bring her here*, the Dock being where she is reached. Electron hides the Dock icon
-or shows it again each time a window's desktops are set; hers is told to leave
-it. **Her face floats over TradingView**: her render with its black made
+*Bring her here*, the Dock being where she is reached. Electron hides the Dock
+icon or shows it again each time a window's desktops are set; hers is told to
+leave it. **Her face floats over TradingView**: her render with its black made
 clear, and her drawing over it — eyes, highlight, smile, thought dots, the
 listening ring — in a 466-pixel square scaled to the window, in Doji's
 colours, whose copies of the app's tokens `agree.test.mjs` holds to
@@ -2218,14 +2218,14 @@ is a gap, and every join can click. From the queue a late part is one pause,
 never a stammer, at the cost of a pause before her first word too short to
 notice.
 
-**The briefing is a dot**: an emerald dot beside her while one waits — a click on the dot or *Hear the briefing*
-plays it, and the dot goes once it has come to its end, so one that fails —
-the line gone, her door's error — waits to be heard again. Whether one waits
-is her door's to say (`?briefing=waits`, every five minutes, and at once when
-the Mac wakes), so the dot goes at midnight in New York, and stays gone after
-a restart. Clicked in the minutes before the laptop next asks, a briefing that
-is no longer there is nothing to play, not a failure: her door's `204`. The dot
-is the news.
+**The briefing is a dot**: an emerald dot beside her while one waits — a click
+on the dot or *Hear the briefing* plays it, and the dot goes once it has come
+to its end, so one that fails — the line gone, her door's error — waits to be
+heard again. Whether one waits is her door's to say (`?briefing=waits`, every
+five minutes, and at once when the Mac wakes), so the dot goes at midnight in
+New York, and stays gone after a restart. Clicked in the minutes before the
+laptop next asks, a briefing that is no longer there is nothing to play, not a
+failure: her door's `204`. The dot is the news.
 
 **Gladys's journal comes with her**, asked of Gladys's door rather than
 hers (*Gladys — the Telegram journal*): what waits every minute — the laptop
@@ -2369,10 +2369,10 @@ capture, the sound, the signature or the update — adds its line here.
   shows while one waits, on his own chart's colours; a click on the chart
   in the instant the questions come up goes to the chart, and once they are
   gone the chart takes clicks where they were.
-- **Her menu**: the menu-bar icon bare whatever waits; its menu in four
-  groups with *Keys ▸ Eugenia…* and *Gladys…* opening the key window under
-  each name; her Dock icon's menu the actions and *Bring her here*, with
-  macOS's own Quit.
+- **Her menu**: the menu-bar icon bare whatever waits; its menu split by
+  separators, with *Keys ▸ Eugenia…* and *Gladys…* opening the key window
+  under each name; her Dock icon's menu the four actions and *Bring her
+  here*, with macOS's own Quit.
 
 ### Whether it landed
 
