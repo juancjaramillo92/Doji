@@ -1191,6 +1191,27 @@ economy, or the refusal is ever met by one.
 
 ---
 
+### R-161 — a mark in the menu bar for what waits
+**Why refused:** the menu-bar icon once carried `•`, `○` or `◉` beside it for
+the briefing, a trade or both. He asked for it bare: the marks beside her
+say the same, and *Hear the briefing* and *Journal the trade* in the menu still
+light when one waits.
+**Revisit if:** he works with her hidden, where nothing else would say a
+trade is waiting.
+
+### R-162 — her menu in title case
+**Why refused:** every item is sentence case — *Talk key*, *Start with the
+Mac*, *Restart her* — and the README cites them so. Title case is macOS's
+convention, but changing it is every label and every citation for nothing
+she does differently. The key window's heading follows the menu.
+**Revisit if:** he asks for it.
+
+### R-163 — looking for an update sooner than daily
+**Deferred.** She looks at launch and once a day, so a build published while
+she runs waits for *Restart her* or the next day. Looking each time the menu
+opens, or hourly, would show it sooner for one more request to the bucket.
+**Revisit if:** the wait for *Update her* proves a nuisance.
+
 ## 3 · THE NEXT STEP — DECIDED
 
 The step the owner calls *Raptor 3* was reviewed with him in October 2026,
