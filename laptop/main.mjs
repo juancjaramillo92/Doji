@@ -252,13 +252,13 @@ function bind() {
 }
 
 /* Her menu, in the menu bar and on her Dock icon alike: the menu bar's
-   icon carries the marks of what waits, the Dock's is where an app is looked
-   for. The marks are the ones beside her — a dot for the briefing, a ring
-   for a trade, the dot inside the ring for both. */
+   icon carries the ring beside her while a trade waits, the Dock's is where
+   an app is looked for. The briefing's dot stays on her alone: the menu
+   bar is for what asks something of him. */
 function menu() {
   if (!tray) return;
   const name = talkKey(), accelerator = KEYS[name];
-  tray.setTitle(pending.waiting ? (briefingWaits ? '◉' : '○') : briefingWaits ? '•' : '');
+  tray.setTitle(pending.waiting ? '○' : '');
   const items = () => [
     { label: 'Talk to her', accelerator, registerAccelerator: false, click: () => send('press', false) },
     { label: 'Show her the chart', accelerator: `Shift+${accelerator}`, registerAccelerator: false, click: () => send('press', true) },
@@ -276,8 +276,8 @@ function menu() {
     ...(taken ? [{ label: `${name} is taken by another app`, enabled: false }] : []),
     { label: 'Start with the Mac', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin,
       click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }) },
-    { label: 'Her key…', click: () => askForKey('eugenia') },
-    { label: 'Gladys\'s key…', click: () => askForKey('gladys') },
+    { label: 'Eugenia Key…', click: () => askForKey('eugenia') },
+    { label: 'Gladys Key…', click: () => askForKey('gladys') },
     { label: 'Restart her', click: () => { app.relaunch(); app.exit(0); } },
     { label: 'Copy her log', click: () => clipboard.writeText([`Eugenia ${BUILD ?? 'from the repository'}`, ...log].join('\n')) },
     { type: 'separator' },

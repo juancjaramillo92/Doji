@@ -2251,8 +2251,9 @@ still waiting; the talk key on them closes them and she listens; answered in
 Telegram while they are up, they follow what is left. The journal crosses over
 her face rather than cutting in. **While a trade waits**, a mark sits beside
 her — a near-white ring, with a dark edge since his chart may be light, the
-briefing's dot inside it when both wait — and the menu bar carries the same
-shapes, `○`, `•` or `◉`.
+briefing's dot inside it when both wait — and the menu bar carries the ring,
+`○`, beside her icon. The briefing's dot stays on her alone: the menu bar is
+for what asks something of him.
 A click on her takes what waits first, the journal then the briefing;
 *Journal the trade* in her menu does the same. An answer is never raced: no
 look at what waits starts while one is out, and a look one
@@ -2282,8 +2283,8 @@ form, which a right key is refused with a `400` for, or a `503` at a door
 short of its vendors; Gladys's with what waits, a `200` for a right key —
 and kept encrypted by the Keychain, each in its own file. Hers kept and
 Gladys's never given, the window asks for Gladys's next, and at launch it
-asks for whichever is missing; *Her key…*
-and *Gladys's key…* in her menu change either. The app's own menu holds
+asks for whichever is missing; *Eugenia Key…*
+and *Gladys Key…* in her menu change either. The app's own menu holds
 the Edit menu ⌘V pastes them through. The keys and the doors live in the main
 process alone; the page that draws her has neither, asks for nothing but what
 `preload.cjs` names, opens no window and navigates nowhere. Each page is
@@ -2369,6 +2370,9 @@ capture, the sound, the signature or the update — adds its line here.
   `○` show while one waits, on his own chart's colours; a click on the chart
   in the instant the questions come up goes to the chart, and once they are
   gone the chart takes clicks where they were.
+- **Her menu bar icon**: bare while the briefing waits, `○` beside it while
+  a trade does; *Eugenia Key…* and *Gladys Key…* open the key window under
+  the same name.
 
 ### Whether it landed
 
