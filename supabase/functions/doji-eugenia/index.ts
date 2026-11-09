@@ -2988,8 +2988,13 @@ export function callsQuery(now = Date.now()): string {
     `&made_at=gte.${new Date(now - RECORD_DAYS * 86_400_000).toISOString()}&order=id.desc&limit=60`;
 }
 
+/* A condition sometimes opens on its setup's name, "Break & Retest: price comes
+   back to 4115", which after our "if" read "if break & Retest: price…" on 9
+   November. Words before a colon with no figure in them are that label; a
+   condition that names its level before a colon keeps it. */
 const callLine = (c: Call) =>
-  `${c.direction} ${c.entry}, stop ${c.stop}, target ${c.target}, if ${clause(c.condition)}`;
+  `${c.direction} ${c.entry}, stop ${c.stop}, target ${c.target}, ` +
+  `if ${clause(c.condition.trim().replace(/^[A-Z][^:.\d]*:\s+/, ''))}`;
 
 export function callsList(rows: Call[], now = Date.now(), to = "Your"): string {
   if (!rows.length) return "";
