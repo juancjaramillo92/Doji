@@ -251,41 +251,47 @@ function bind() {
   menu();
 }
 
-/* Her menu, in the menu bar and on her Dock icon alike: the menu bar's
-   icon carries the marks of what waits, the Dock's is where an app is looked
-   for. The marks are the ones beside her — a dot for the briefing, a ring
-   for a trade, the dot inside the ring for both. */
+/* Her menu: in the menu bar, what he does with her, where she is, how she is
+   set up and how she is mended, each its own group; on her Dock icon, the
+   first two alone — the Dock is where she is reached, and macOS adds Quit
+   there itself. The menu-bar icon carries no mark: what waits shows on her. */
 function menu() {
   if (!tray) return;
   const name = talkKey(), accelerator = KEYS[name];
-  tray.setTitle(pending.waiting ? (briefingWaits ? '◉' : '○') : briefingWaits ? '•' : '');
-  const items = () => [
+  const reach = () => [
     { label: 'Talk to her', accelerator, registerAccelerator: false, click: () => send('press', false) },
     { label: 'Show her the chart', accelerator: `Shift+${accelerator}`, registerAccelerator: false, click: () => send('press', true) },
     { label: 'Hear the briefing', enabled: briefingWaits, click: () => send('briefing-now') },
     { label: 'Journal the trade', enabled: pending.waiting > 0, click: () => send('journal-now') },
     { type: 'separator' },
     { label: 'Bring her here', click: bringHere },
+  ];
+  tray.setContextMenu(Menu.buildFromTemplate([
+    ...reach(),
     ...(settings.hidden ? [] : [{ label: 'Hide her', click: hideHer }]),
     { label: 'Size', submenu: Object.keys(SIZES).map(size => ({
       label: size, type: 'radio', checked: (settings.size ?? 'Medium') === size, click: () => resize(size),
     })) },
+    { type: 'separator' },
     { label: 'Talk key', submenu: Object.keys(KEYS).map(choice => ({
       label: choice, type: 'radio', checked: name === choice, click: () => { settings.key = choice; save(); bind(); },
     })) },
     ...(taken ? [{ label: `${name} is taken by another app`, enabled: false }] : []),
+    { label: 'Keys', submenu: [
+      { label: 'Eugenia…', click: () => askForKey('eugenia') },
+      { label: 'Gladys…', click: () => askForKey('gladys') },
+    ] },
     { label: 'Start with the Mac', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin,
       click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }) },
-    { label: 'Her key…', click: () => askForKey('eugenia') },
-    { label: 'Gladys\'s key…', click: () => askForKey('gladys') },
+    { type: 'separator' },
     { label: 'Restart her', click: () => { app.relaunch(); app.exit(0); } },
     { label: 'Copy her log', click: () => clipboard.writeText([`Eugenia ${BUILD ?? 'from the repository'}`, ...log].join('\n')) },
     { type: 'separator' },
     ...(offered ? [{ label: updating ? 'Updating…' : 'Update her', enabled: !updating, click: update }] : []),
     { label: `Version ${BUILD ?? 'from the repository'}`, enabled: false },
-  ];
-  tray.setContextMenu(Menu.buildFromTemplate([...items(), { label: 'Quit', role: 'quit' }]));
-  app.dock?.setMenu(Menu.buildFromTemplate(items()));
+    { label: 'Quit', role: 'quit' },
+  ]));
+  app.dock?.setMenu(Menu.buildFromTemplate(reach()));
 }
 
 /* ─── Her door ──────────────────────────────────────────────────────────────
@@ -363,8 +369,7 @@ async function look() {
   return chart.thumbnail.toJPEG(85);
 }
 
-/* The briefing: a dot beside her and in the menu bar while one waits for
-   him. Her door says whether one does — today's, landed, and not yet heard
+/* The briefing: a dot beside her while one waits for him. Her door says whether one does — today's, landed, and not yet heard
    whole — so the dot goes at midnight in New York, and stays gone after a
    restart. Asked as ?briefing=waits, whose answer has no voice in it: the
    dot is the news. An answer that is

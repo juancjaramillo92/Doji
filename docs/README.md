@@ -2138,7 +2138,9 @@ curl -sN -H "x-laptop-key: $EUGENIA_LAPTOP_SECRET" \
 `.github/workflows/laptop.yml`. It has a
 Dock icon, Doji's, and an icon in the menu bar, her face cropped close and its
 black made clear by the face's own rule (`laptop/art.mjs`), which also carries
-the briefing's dot; the two hold the same menu. Electron hides the Dock icon
+the briefing's dot. The menu bar's icon holds her whole menu and carries no
+mark — what waits shows on her; the Dock's holds what he does with her and
+*Bring her here*, the Dock being where she is reached. Electron hides the Dock icon
 or shows it again each time a window's desktops are set; hers is told to leave
 it. **Her face floats over TradingView**: her render with its black made
 clear, and her drawing over it — eyes, highlight, smile, thought dots, the
@@ -2216,8 +2218,7 @@ is a gap, and every join can click. From the queue a late part is one pause,
 never a stammer, at the cost of a pause before her first word too short to
 notice.
 
-**The briefing is a dot**: an emerald dot beside her and a dot by her
-menu-bar icon while one waits — a click on the dot or *Hear the briefing*
+**The briefing is a dot**: an emerald dot beside her while one waits — a click on the dot or *Hear the briefing*
 plays it, and the dot goes once it has come to its end, so one that fails —
 the line gone, her door's error — waits to be heard again. Whether one waits
 is her door's to say (`?briefing=waits`, every five minutes, and at once when
@@ -2251,8 +2252,7 @@ still waiting; the talk key on them closes them and she listens; answered in
 Telegram while they are up, they follow what is left. The journal crosses over
 her face rather than cutting in. **While a trade waits**, a mark sits beside
 her — a near-white ring, with a dark edge since his chart may be light, the
-briefing's dot inside it when both wait — and the menu bar carries the same
-shapes, `○`, `•` or `◉`.
+briefing's dot inside it when both wait.
 A click on her takes what waits first, the journal then the briefing;
 *Journal the trade* in her menu does the same. An answer is never raced: no
 look at what waits starts while one is out, and a look one
@@ -2282,8 +2282,8 @@ form, which a right key is refused with a `400` for, or a `503` at a door
 short of its vendors; Gladys's with what waits, a `200` for a right key —
 and kept encrypted by the Keychain, each in its own file. Hers kept and
 Gladys's never given, the window asks for Gladys's next, and at launch it
-asks for whichever is missing; *Her key…*
-and *Gladys's key…* in her menu change either. The app's own menu holds
+asks for whichever is missing; *Keys ▸ Eugenia…*
+and *Gladys…* in her menu change either. The app's own menu holds
 the Edit menu ⌘V pastes them through. The keys and the doors live in the main
 process alone; the page that draws her has neither, asks for nothing but what
 `preload.cjs` names, opens no window and navigates nowhere. Each page is
@@ -2365,10 +2365,14 @@ capture, the sound, the signature or the update — adds its line here.
   in place and opens it.
 - **The journal**: a trade opened comes up as its questions with the tick,
   in Hanken Grotesk rather than a fallback face; a click on either half
-  answers on her window without TradingView losing its place; the ring and
-  `○` show while one waits, on his own chart's colours; a click on the chart
+  answers on her window without TradingView losing its place; the ring
+  shows while one waits, on his own chart's colours; a click on the chart
   in the instant the questions come up goes to the chart, and once they are
   gone the chart takes clicks where they were.
+- **Her menu**: the menu-bar icon bare whatever waits; its menu in four
+  groups with *Keys ▸ Eugenia…* and *Gladys…* opening the key window under
+  each name; her Dock icon's menu the actions and *Bring her here*, with
+  macOS's own Quit.
 
 ### Whether it landed
 
