@@ -2580,7 +2580,11 @@ you.
   an entry): its entry counts only once a 5m candle — built from the minute
   bars five minutes at a time, and opened after the call — has reached the level
   and closed beyond it, so a touch of the entry before that candle closes is
-  never a fill. Calls filed before `confirm` existed are scored on the touch. On the
+  never a fill. **When that candle closed is filed** (`confirmed_at`) whether or
+  not the entry was touched after it, because `untriggered` alone cannot tell a
+  setup that never came from one that came and left without her; her record
+  counts the second apart, since it says her entry asked for more than your
+  rule does — you enter on the close. Calls filed before `confirm` existed are scored on the touch. On the
   bar that filled her only the stop counts; a bar touching both is a loss; the
   +$20 that moves the stop must come on a bar after the fill, and the move
   starts on the bar after that, since a bar's high and low cannot say which
@@ -2599,7 +2603,8 @@ you.
   your rules a trade can do everything right and lose. A count of losses says
   how often; the step says where her reading of a chart is weak. The PATCH is
   filtered on a lost call not yet explained, so a retry never re-files one.
-- **Her calls' record** — a month of outcomes, what the triggered ones made an
+- **Her calls' record** — a month of outcomes, how many of the untriggered had
+  their close and were left behind by the entry, what the triggered ones made an
   ounce, the losses counted by the step they failed on, the newest losses with
   what she misread, and any call still standing — goes where her read record
   goes. A call still on at its roll is said as that, never as `open`, which

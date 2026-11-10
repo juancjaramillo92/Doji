@@ -1705,7 +1705,11 @@ async function makeCall(direction: unknown, entry: unknown, stop: unknown, targe
    it — built from the minute bars five minutes at a time, as his chart draws it —
    has reached the level and closed beyond it, and fills on the first touch of
    the entry after that candle closed: a touch before it is the trade R-07
-   forbids. A call filed before `confirm` existed is scored on the touch alone.
+   forbids. When that candle closed is kept whether or not the entry was then
+   touched: untriggered alone cannot tell a setup that never came from one
+   that came and left without her, and only the second says her entry asked
+   for more than his rule does — he enters on the close. A call filed before
+   `confirm` existed is scored on the touch alone.
    A call whose session the bars do not reach is `unread`, never a guess.
    ───────────────────────────────────────────────────────────────────────── */
 export const CALL_OUTCOMES = ['won', 'lost', 'scratch', 'open', 'untriggered', 'unread'] as const;
@@ -1714,26 +1718,30 @@ export type Call = { id: number; made_at: string; expires_at: string; direction:
                      entry: number; stop: number; target: number; condition: string;
                      confirm: string | null; level: number | null;
                      outcome: string | null; result: number | null;
+                     confirmed_at?: string | null;
                      closed_at?: string | null; misread?: string | null; lesson?: string | null };
-export type Score = { outcome: typeof CALL_OUTCOMES[number]; triggered_at: string | null;
+export type Score = { outcome: typeof CALL_OUTCOMES[number]; confirmed_at: string | null; triggered_at: string | null;
                       closed_at: string | null; closed_price: number | null; result: number | null };
 
 export function scoreCall(c: Call, candles: Candle[], from: number): Score {
   const made = Date.parse(c.made_at), ends = Date.parse(c.expires_at);
   const none = { triggered_at: null, closed_at: null, closed_price: null, result: null };
   // The market was open somewhere between the call and the first bar served.
-  for (let h = made; h < from; h += 3_600_000) if (marketOpen(new Date(h))) return { outcome: 'unread', ...none };
+  for (let h = made; h < from; h += 3_600_000) {
+    if (marketOpen(new Date(h))) return { outcome: 'unread', confirmed_at: null, ...none };
+  }
 
   const start = Math.ceil(made / 60_000) * 60_000;
   const bars = candles.filter(b => b.t >= start && b.t + 60_000 <= ends);
   const buy = c.direction === 'buy';
   const live = c.confirm === 'close' ? confirmedAt(bars, buy, Number(c.level), start) : start;
+  const confirmed_at = c.confirm === 'close' && live !== null ? new Date(live).toISOString() : null;
   const at = live === null ? -1 : bars.findIndex(b => b.t >= live && b.low <= c.entry && c.entry <= b.high);
-  if (at < 0) return { outcome: 'untriggered', ...none };
+  if (at < 0) return { outcome: 'untriggered', confirmed_at, ...none };
 
   const gain = (p: number) => Math.round((buy ? p - c.entry : c.entry - p) * 100) / 100;
   const close = (b: Candle, price: number, outcome: Score['outcome']): Score => ({
-    outcome, triggered_at: new Date(bars[at].t).toISOString(),
+    outcome, confirmed_at, triggered_at: new Date(bars[at].t).toISOString(),
     closed_at: new Date(b.t + 60_000).toISOString(), closed_price: price, result: gain(price),
   });
   let stop = c.stop;
@@ -3003,6 +3011,9 @@ export function callsList(rows: Call[], now = Date.now(), to = "Your"): string {
   const traded = scored.filter(c => c.result !== null);
   const net = Math.round(traded.reduce((sum, c) => sum + Number(c.result), 0) * 100) / 100;
   const standing = rows.filter(c => !c.outcome && Date.parse(c.expires_at) > now);
+  // The setup came and the entry asked for more: the candle closed beyond the
+  // level and price never came back to where she said she would be filled.
+  const left = scored.filter(c => c.outcome === 'untriggered' && c.confirmed_at).length;
   const losses = scored.filter(c => c.outcome === 'lost');
   const lost = losses.slice(0, RECORD_MISSES);
   const explained = losses.filter(c => c.misread);
@@ -3014,6 +3025,8 @@ export function callsList(rows: Call[], now = Date.now(), to = "Your"): string {
     `${rows.length} made; ${CALL_OUTCOMES.map(o =>
       `${by(o)} ${o === 'open' ? "still on at the 17:00 roll and marked at its close" : o}`).join(", ")}` +
     (rows.length > scored.length + standing.length ? `, ${rows.length - scored.length - standing.length} not yet scored` : "") + `.` +
+    (left ? ` Of the ${by('untriggered')} untriggered, ${left} had the five-minute close ${left === 1 ? "it" : "they"} waited for ` +
+      `and price never came back to the entry.` : "") +
     (traded.length ? ` The ${traded.length} that triggered made ${net >= 0 ? "+" : "-"}$${Math.abs(net).toFixed(2)} an ounce.` : "") +
     (standing.length ? `\nStanding until the 17:00 roll: ${standing.map(callLine).join("; ")}.` : "") +
     (explained.length ? `\nOf the ${losses.length} lost, ` + CALL_STEPS.map(x =>

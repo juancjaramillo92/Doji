@@ -765,6 +765,12 @@ alter table public.eugenia_calls add column if not exists confirm text
   constraint eugenia_calls_confirm_check check (confirm in ('close', 'market'));
 alter table public.eugenia_calls add column if not exists level numeric;
 
+-- When the 5m candle a waiting call waits for closed, filed by the scoring
+-- whether or not the entry was touched after it: an untriggered call carrying
+-- one had its setup and was left behind by its entry. Null on a call at the
+-- market, and on one whose candle never came.
+alter table public.eugenia_calls add column if not exists confirmed_at timestamptz;
+
 -- Why a lost call lost, filed at the nightly pass: the step of his sequence
 -- her reading of the chart got wrong, or `none` for a call that kept every
 -- step, and the sentence saying what she misread. Null until it is filed.

@@ -5029,13 +5029,20 @@ test('a call waiting on a close fills only after a 5m candle closes beyond its l
   // 13:00–13:04 is one candle, its last minute at 13:04.
   const reach = minute(2, { low: 3999, high: 4003, close: 4001 });
   const closes = minute(4, { low: 4001, high: 4006, close: 4005 });
-  assert.equal(score([reach, closes, minute(6, { low: 4010 })]).outcome, 'untriggered',
-    'price never came back to the entry after the candle closed');
+  const left = score([reach, closes, minute(6, { low: 4010 })]);
+  assert.equal(left.outcome, 'untriggered', 'price never came back to the entry after the candle closed');
+  // The setup came and left without her, which is not the setup never coming.
+  assert.equal(left.confirmed_at, '2026-10-14T13:05:00.000Z',
+    'a call whose candle closed and whose entry was never touched reads as one whose setup never came');
   const won = score([reach, closes, minute(6, { low: 4001.5, high: 4004 }), minute(7, { high: 4033 })]);
-  assert.deepEqual([won.outcome, won.triggered_at], ['won', '2026-10-14T13:06:00.000Z']);
-  assert.equal(score([minute(2, { low: 3999, high: 4003, close: 4001 }), minute(4, { low: 3990, close: 3995 }),
-                      minute(6, { low: 4001 }), minute(7, { high: 4033 })]).outcome, 'untriggered',
+  assert.deepEqual([won.outcome, won.confirmed_at, won.triggered_at],
+    ['won', '2026-10-14T13:05:00.000Z', '2026-10-14T13:06:00.000Z']);
+  const failed = score([minute(2, { low: 3999, high: 4003, close: 4001 }), minute(4, { low: 3990, close: 3995 }),
+                        minute(6, { low: 4001 }), minute(7, { high: 4033 })]);
+  assert.deepEqual([failed.outcome, failed.confirmed_at], ['untriggered', null],
     'a candle that reached the level and closed back below it was read as the confirmation');
+  assert.equal(scoreCall({ ...CALL, confirm: 'market' }, [minute(1, { low: 3999 }), minute(2, { high: 4031 })], FROM).confirmed_at,
+    null, 'a call at the market was filed with a candle it never waited for');
   assert.equal(score([minute(6, { low: 4003, close: 4005 }), minute(7, { low: 4001, high: 4033 })]).outcome,
     'untriggered', 'a candle that never reached the level was read as the confirmation');
   const early = score([reach, minute(3, { low: 4001, high: 4002 }), closes, minute(6, { high: 4033, low: 4004 })]);
@@ -5070,6 +5077,14 @@ test('her calls say how they ended, what they made, and which still stands', () 
   assert.match(rolled, /1 still on at the 17:00 roll and marked at its close/);
   assert.doesNotMatch(rolled, /\d open\b|not yet scored/, 'a call marked at its roll reads as left unscored');
   assert.match(out, /The 2 that triggered made \+\$15\.00 an ounce/);
+  assert.doesNotMatch(out, /never came back to the entry/, 'an untriggered call with no close filed reads as left behind');
+  const behind = callsList([
+    { ...CALL, id: 2, expires_at: '2026-10-13T21:00:00Z', outcome: 'untriggered', confirmed_at: '2026-10-13T14:05:00Z' },
+    { ...CALL, id: 1, expires_at: '2026-10-12T21:00:00Z', outcome: 'untriggered' },
+    { ...CALL, id: 0, expires_at: '2026-10-09T21:00:00Z', outcome: 'won', result: 30, confirmed_at: '2026-10-09T14:05:00Z' },
+  ], now);
+  assert.match(behind, /Of the 2 untriggered, 1 had the five-minute close it waited for and price never came back to the entry\./,
+    'a setup that came and left without her is counted with the ones that never came');
   assert.match(out, /Standing until the 17:00 roll: buy 4000, stop 3985, target 4030, if a retest of 4,000/,
     'the call still standing is not named, so she would make a second');
   assert.match(out, /The latest lost:\n· 13 Oct: buy 4000/);
