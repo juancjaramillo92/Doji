@@ -2619,22 +2619,51 @@ month for a verdict. The replay asks her, under her real system prompt and at
 the briefing's effort, for the call she would have filed on each of the last
 N weekdays, handed her map as it stood at 08:00 New York (the poller's
 `?replay=N`), and puts the answer through `callProblem` and `scoreCall`
-exactly as `make_call` and the pass would. **The technical half only**:
-nothing kept says what the market around gold or the calendar read on a past
-morning, so she is told she has her map and nothing else. **Never a morning
-the model can remember**: it read the world up to June 2026, a call on a day
-it read about is a test with the answer in it, and `CLEAN_FROM` stops the
-walk there. It changes nothing; a change to her chart reading is judged by
-two runs over the same days, before and after.
+exactly as `make_call` and the pass would. **Never a morning the model can
+remember**: it read the world up to June 2026, a call on a day it read about
+is a test with the answer in it, and `CLEAN_FROM` stops the walk there. It
+changes nothing; a change to her chart reading is judged by two runs over the
+same days, before and after. Four things make its tally mean something:
+
+- **His rules with nobody reading them** (`baseline`, every run, no model).
+  Each session is also traded by the first five-minute candle after 08:00 to
+  reach a mark on her map — a level or a quarter — and close off it, entered
+  on that close as R-07 enters, $20 stop, $30 target, through `scoreCall`. A
+  candle closing above one mark and below another names no side and is passed
+  over. Her tally says what her calls made; the distance between it and this
+  line is what her reading added to rules that would have traded anyway.
+- **Asked more than once** (`--runs N`). The model does not answer twice the
+  same way, so one asking cannot tell a reading from a draw. The run counts the
+  mornings she took the same side every time, and the mornings she bought on
+  one asking and sold on another: a call that flips on the same map is noise,
+  whatever it made.
+- **The whole morning, not the map alone** (`--inputs`, which needs
+  `SB_SECRET_KEY`). `eugenia_inputs` has kept the whole message each briefing
+  was asked since 22 October 2026. With the flag each morning that has one is
+  asked twice, on her map alone and on that message with no tools, and the two
+  tallies stand side by side: whether the market around gold, the calendar and
+  the Fed's odds make her calls better is measured nowhere else. An input is
+  scored from the minute it was kept, the first of its New York day; a morning
+  with none is asked neither way. She cannot search in it, so it is the
+  briefing's call without the briefing's research.
+- **On another model** (`--model <id>`). The same mornings under another model
+  is what a change to `MODELS` rests on. `CLEAN_FROM` is not moved for it, so
+  check what that model read; the cost is stated only for a model whose rate
+  `eval.mjs` keeps.
+
+The tally also says how many untriggered calls had their close and no fill
+after it, as her live record does.
 
 ```sh
 SUPABASE_URL=… DOJI_CRON_SECRET=… ANTHROPIC_API_KEY=… \
-  node --experimental-strip-types scripts/replay.mjs --days 21
+  node --experimental-strip-types scripts/replay.mjs --days 21 \
+    [--runs 3] [--model <id>] [--inputs]
 ```
 
-Or **Actions → replay → Run workflow**, with the number of days. About $0.12
-to $0.25 a day replayed with her prompt cached, so a month is a few dollars;
-the run states its cost.
+Or **Actions → replay → Run workflow**, with the number of days and the same
+three options. About $0.12 to $0.25 an asking with her prompt cached, so a
+month asked once is a few dollars, times `--runs`, and more than twice that
+with `--inputs`, whose message is longer; the run states its cost.
 
 Her reads stay what they were — a view on the news, judged by the test she
 stated and never by price. A call is the one thing of hers price judges.

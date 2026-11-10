@@ -10,6 +10,16 @@ on:
       days:
         description: Weekdays back to replay, newest first
         default: "21"
+      runs:
+        description: Times each morning is asked, to see whether she answers the same way twice
+        default: "1"
+      model:
+        description: A model id to ask in place of hers, or empty for hers
+        default: ""
+      inputs:
+        description: Also ask each morning on the whole message its briefing was handed
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -28,11 +38,20 @@ jobs:
           node-version-file: package.json
 
       # No install step: the script and the folds it imports use nothing but
-      # fetch. The cron secret opens the poller's ?replay=N door.
+      # fetch. The cron secret opens the poller's ?replay=N door, and the
+      # service key reads eugenia_inputs when the whole morning is asked for.
       - name: Ask her for the call she would have made, and score it
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           DOJI_CRON_SECRET: ${{ secrets.DOJI_CRON_SECRET }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SB_SECRET_KEY: ${{ secrets.SB_SECRET_KEY }}
           DAYS: ${{ inputs.days }}
-        run: node --experimental-strip-types scripts/replay.mjs --days "$DAYS"
+          RUNS: ${{ inputs.runs }}
+          MODEL: ${{ inputs.model }}
+          INPUTS: ${{ inputs.inputs }}
+        run: |
+          set -- --days "$DAYS" --runs "$RUNS"
+          if [ -n "$MODEL" ]; then set -- "$@" --model "$MODEL"; fi
+          if [ "$INPUTS" = true ]; then set -- "$@" --inputs; fi
+          node --experimental-strip-types scripts/replay.mjs "$@"

@@ -69,7 +69,7 @@ import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts
 import { backup, readAll, TABLES } from '../scripts/backup.mjs';
 import { lastRun, stale } from '../scripts/health.mjs';
 import { score, table, readingsGrid, NEAR, HOLD, holdOf, holds, holdTable } from '../scripts/calibrate.mjs';
-import { replayed, tally, request as replayRequest, CLEAN_FROM } from '../scripts/replay.mjs';
+import { replayed, tally, baseline, agreement, inputsByDay, request as replayRequest, CLEAN_FROM } from '../scripts/replay.mjs';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -1197,13 +1197,65 @@ test('a replayed answer is refused, scored or no call, as the live path would ha
                            level: 4000, why: 'x' }, served);
   assert.equal(waits.outcome, 'untriggered', 'a replayed call waiting on a close was filled on the touch');
   assert.match(tally([won, waits, { outcome: 'none' }, { outcome: 'refused' }]),
-    /^4 sessions: 1 no call, 1 off his rules, 1 won, 0 lost, 0 scratch, 0 open, 1 untriggered, 0 unread; the 1 that triggered made \+\$30\.00 an ounce\.$/);
+    /^4 sessions: 1 no call, 1 off his rules, 1 won, 0 lost, 0 scratch, 0 open, 1 untriggered, 0 unread \(1 with the close and no fill after it\); the 1 that triggered made \+\$30\.00 an ounce\.$/);
+  assert.doesNotMatch(tally([won, { outcome: 'untriggered', confirmed_at: null }]), /with the close/,
+    'a call whose candle never came is counted as left behind by its entry');
   const asked = replayRequest(served);
   assert.equal(asked.output_config.effort, 'high', "the replay asks at another effort than the briefing's");
   assert.ok(asked.system[0].text.startsWith(SYSTEM), 'the replay is not asked under her system prompt');
   assert.match(asked.messages[0].content, /no news, no calendar[\s\S]*This is YOUR map/,
     'the replay does not say she has her map and nothing else');
   assert.ok(CLEAN_FROM >= '2026-07-01', 'the replay walks into months the model may have read about');
+  // The same mornings under another model, and with the morning's whole message.
+  assert.equal(replayRequest(served, 'another-model').model, 'another-model', 'the replay ignores the model it was asked for');
+  const whole = replayRequest(served, undefined, "Today's briefing, please.\n\nThe calendar: CPI 08:30");
+  assert.match(whole.messages[0].content, /no tools here[\s\S]*THE MORNING:\n\nToday's briefing, please\.\n\nThe calendar: CPI 08:30$/,
+    'the whole morning is not handed over as it was kept');
+  assert.doesNotMatch(whole.messages[0].content, /map and nothing else|no news, no calendar/,
+    'she is handed the calendar and told she has none');
+  // A briefing run late saw a later morning, and is scored from there.
+  const late = replayed({ call: true, direction: 'buy', entry: 4000, stop: 3985, target: 4030, confirm: 'market', why: 'x' },
+                        served, Date.parse('2026-10-14T13:02:00Z'));
+  assert.equal(late.outcome, 'untriggered', 'a call was filled by a bar that printed before she was asked');
+});
+
+/* HIS RULES WITH NOBODY READING, which her tally is read against: the first 5m
+   candle to reach a mark and close off it, entered on its close. */
+test('the baseline takes the first five-minute close off a mark, on his stop and target', () => {
+  const at = Date.parse('2026-10-14T12:00:00Z');
+  const marks = [...foldStructure(MAP_CHARTS, at).levels, ...foldStructure(MAP_CHARTS, at).grid].map(m => m.price).sort((a, b) => a - b);
+  const m = marks[0], bar = (n, o) => ({ t: at + n * 60_000, open: m + 5, high: m + 6, low: m + 4, close: m + 5, ...o });
+  const reach = bar(5, { low: m - 1, high: m + 3, close: m + 2 });
+  const served = (bars) => ({ at, charts: MAP_CHARTS, missing: [], bars });
+  const won = baseline(served([bar(0), reach, bar(10, { open: m + 2, low: m + 1, high: m + 3 }), bar(11, { high: m + 33 })]));
+  assert.deepEqual([won.outcome, won.result, won.call.direction, won.call.entry, won.call.stop, won.call.target, won.call.made_at],
+    ['won', 30, 'buy', m + 2, m - 18, m + 32, '2026-10-14T12:10:00.000Z']);
+  assert.equal(baseline(served([bar(5, { high: m + 1, low: m - 3, close: m - 2 }), bar(10, { open: m - 2, high: m - 1, low: m - 3 }),
+                                bar(11, { high: m + 19, low: m - 3 })])).outcome, 'lost', 'a close below a mark was not sold');
+  assert.equal(baseline(served([bar(0), bar(10)])).outcome, 'none', 'a candle that reached no mark was traded');
+  assert.equal(baseline(served([{ ...reach, t: at - 60_000 }, bar(10)])).outcome, 'none',
+    'a candle that opened before 08:00 was read as the signal');
+  // Above one mark and below the next is no side.
+  assert.equal(baseline(served([bar(5, { low: m - 1, high: marks[1] + 1, close: (m + marks[1]) / 2 })])).outcome, 'none',
+    'a candle closing between two marks it reached was given a side');
+});
+
+test('asked more than once, the replay counts the mornings she flipped', () => {
+  const buy = { outcome: 'won', call: { direction: 'buy' } }, sell = { outcome: 'lost', call: { direction: 'sell' } };
+  const none = { outcome: 'none' };
+  assert.equal(agreement([[buy, buy, buy], [buy, sell, buy], [none, none, none], [buy, none, buy]]),
+    'Asked 3 times a morning: the same side every time on 2 of 4, a buy on one asking and a sell on another on 1.');
+});
+
+test('a morning is replayed from the first input kept that New York day', () => {
+  const by = inputsByDay([
+    { at: '2026-10-28T00:30:00+00:00', asked: 'asked again on the evening of the 27th' },
+    { at: '2026-10-28T12:00:04+00:00', asked: 'the morning of the 28th' },
+    { at: '2026-10-28T15:00:00+00:00', asked: 'forced later on the 28th' },
+  ]);
+  assert.equal(by.get('2026-10-28').asked, 'the morning of the 28th',
+    'an evening asking, already tomorrow in UTC, was read as the next morning');
+  assert.equal(by.get('2026-10-27').asked, 'asked again on the evening of the 27th');
 });
 
 /* WHETHER A MARK HOLDS, every doubt against the map, and the chance it is
