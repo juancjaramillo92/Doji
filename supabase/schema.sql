@@ -765,6 +765,18 @@ alter table public.eugenia_calls add column if not exists confirm text
   constraint eugenia_calls_confirm_check check (confirm in ('close', 'market'));
 alter table public.eugenia_calls add column if not exists level numeric;
 
+-- Why a lost call lost, filed at the nightly pass: the step of his sequence
+-- her reading of the chart got wrong, or `none` for a call that kept every
+-- step, and the sentence saying what she misread. Null until it is filed.
+alter table public.eugenia_calls add column if not exists misread text
+  constraint eugenia_calls_misread_check check (misread in ('bias', 'level', 'candle', 'none'));
+alter table public.eugenia_calls add column if not exists lesson text
+  constraint eugenia_calls_lesson_length check (char_length(lesson) between 1 and 200);
+
+-- Added after the columns above, and kept below them: a re-run appends a new
+-- column to the live table, so one written higher up would sit in a different
+-- place there than in a fresh apply.
+
 -- When the 5m candle a waiting call waits for closed, filed by the scoring
 -- whether or not the entry was touched after it: an untriggered call carrying
 -- one had its setup and was left behind by its entry. Null on a call at the
@@ -785,14 +797,6 @@ alter table public.eugenia_calls add column if not exists withdrawn_at timestamp
 alter table public.eugenia_calls add column if not exists withdrawn text
   constraint eugenia_calls_withdrawn_length check (char_length(withdrawn) between 1 and 200);
 alter table public.eugenia_calls add column if not exists spared numeric;
-
--- Why a lost call lost, filed at the nightly pass: the step of his sequence
--- her reading of the chart got wrong, or `none` for a call that kept every
--- step, and the sentence saying what she misread. Null until it is filed.
-alter table public.eugenia_calls add column if not exists misread text
-  constraint eugenia_calls_misread_check check (misread in ('bias', 'level', 'candle', 'none'));
-alter table public.eugenia_calls add column if not exists lesson text
-  constraint eugenia_calls_lesson_length check (char_length(lesson) between 1 and 200);
 
 alter table public.eugenia_calls enable row level security;
 
