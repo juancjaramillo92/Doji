@@ -35,7 +35,7 @@ import {
   chunk, TG_LIMIT, tradesQuery, openOnUser, nowBlock, withClock, dateTurns,
   notesList, channelsList, searchList, readStrategy, dayQuery, repliedQuery, spokenQuery,
   spokenBriefing, ask,
-  consolidateRetryDue, thesisLine, portraitLine, loopsList, calendarList, keepDraft, TRIM_MOST,
+  consolidateRetryDue, thesisLine, portraitLine, craftLine, lifetimeList, LESSONS, CRAFT_MAX, loopsList, calendarList, keepDraft, TRIM_MOST,
   parseFeedback, feedbackKeyboard, stamped, APOLOGY, LOOP_KINDS,
   quoteWindow, quoteLine, ROLL_HOUR,
   foldVectors, EMBED_DIMS,
@@ -4957,6 +4957,45 @@ test('the story carries the day it last moved, and an absent one says nothing', 
   assert.equal(thesisLine(null), '');
 });
 
+/* WHAT HER RECORD HAS TAUGHT HER, and the whole record it is counted from: a
+   month's window forgets, and a lesson she cannot count is not one. */
+test('what her record has taught her carries the day it last moved, and an absent one says nothing', () => {
+  const line = craftLine({ craft: 'I side with the 1H when the bigger charts disagree.', moved_on: '2026-03-12' });
+  assert.match(line, /What your record has taught you \(last moved 12 Mar\):\nI side with the 1H/);
+  assert.equal(craftLine(null), '');
+});
+
+test('her whole record is counted the ways a lesson would be cut, with every lesson she wrote', () => {
+  const call = (o) => ({ id: 1, made_at: '2026-08-04T13:00:00Z', expires_at: '2026-08-04T21:00:00Z', direction: 'buy',
+    entry: 4000, stop: 3985, target: 4030, condition: 'a retest', confirm: 'close', level: 4000, outcome: null, result: null, ...o });
+  const read = (o) => ({ given_on: '2026-09-01', reading: 'r', test: 't', verdict: 'held', evidence: null,
+    firmness: 'firm', lesson: null, channel: 'dollar', ...o });
+  const out = lifetimeList([
+    call({ outcome: 'won', result: 30 }),
+    call({ outcome: 'lost', result: -15, misread: 'bias', lesson: 'the 4H had already printed a lower high' }),
+    call({ outcome: 'lost', result: -17, direction: 'sell', misread: 'none' }),
+    call({ outcome: 'scratch', result: 0, direction: 'sell', confirm: 'market' }),
+    call({ outcome: 'untriggered', withdrawn_at: '2026-08-04T14:00:00Z', spared: -15 }),
+    call({ outcome: 'untriggered' }),
+    call({}),
+  ], [read({}), read({ verdict: 'wrong', firmness: 'light', given_on: '2026-10-02', lesson: 'I took the dollar as leading' })]);
+  assert.match(out, /Calls: 6 scored\. 1 won, 2 lost, 1 scratch, 0 open, 2 untriggered, 0 unread\./,
+    'a call not yet scored is counted, or one outcome is dropped');
+  assert.match(out, /Buys 1 won and 1 lost of 2 triggered, \+\$15\.00 an ounce; sells 0 won and 1 lost of 2 triggered, -\$17\.00 an ounce/);
+  assert.match(out, /waiting on a close 1 won and 2 lost of 3 triggered, -\$2\.00 an ounce; at the market 0 won and 0 lost of 1 triggered, \+\$0\.00 an ounce\./);
+  assert.match(out, /Of the losses explained, 1 misread the bias, 0 misread the level, 0 misread the candle, 1 kept every step\./);
+  assert.match(out, /The 1 you withdrew that would have triggered would have made -\$15\.00 an ounce\./);
+  assert.match(out, /Reads: 1 held, 1 proved wrong, 0 untested; said lightly, 0 held, 1 proved wrong, 0 untested; said firmly, 1 held, 0 proved wrong, 0 untested\./);
+  assert.match(out, /the dollar 1 of 2\./);
+  // Newest first, whichever table it came from.
+  assert.match(out, /newest first:\n· 2 Oct, a read through the dollar: I took the dollar as leading\n· 4 Aug, a buy call, misread the bias: the 4H had already printed a lower high$/);
+  const many = lifetimeList(Array.from({ length: LESSONS + 5 }, (_, i) =>
+    call({ outcome: 'lost', result: -15, misread: 'level', lesson: `lesson ${i}` })), []);
+  assert.equal(many.match(/^· /gm).length, LESSONS, 'the lessons shown are not bounded');
+  assert.doesNotMatch(many, /Reads:/, 'a record with no read says a line about them');
+  assert.equal(lifetimeList([], []), '');
+});
+
 test('how she reads him carries the day it last moved, and an absent one says nothing', () => {
   const line = portraitLine({ portrait: 'He cuts winners before the target.', moved_on: '2026-03-12' });
   assert.match(line, /cuts winners/);
@@ -5858,7 +5897,8 @@ test('a story or portrait cut at its ceiling is saved and said to be cut', async
       Object.assign(sent, body);
       return new Response(JSON.stringify([{ id: 'current' }]), { status: 200 });
     };
-    for (const [tool, field, max] of [['set_thesis', 'thesis', THESIS_MAX], ['set_portrait', 'portrait', PORTRAIT_MAX]]) {
+    for (const [tool, field, max] of [['set_thesis', 'thesis', THESIS_MAX], ['set_portrait', 'portrait', PORTRAIT_MAX],
+                                      ['set_craft', 'craft', CRAFT_MAX]]) {
       const said = await serve(tool, { [field]: 'a'.repeat(max - 2) + ' rarely with inflation or jobs.' });
       assert.equal(sent[field].length, max, `${tool} saved past what the table accepts`);
       assert.match(said, new RegExp(`cut at ${max} characters, so it now ends "…a+ r"\\. Write it again, shorter\\.`),
@@ -6886,6 +6926,7 @@ const TOOL_CALLS = [
   ['get_alerts',    {}],
   ['set_thesis',    { thesis: 'a reading' }],
   ['set_portrait',  { portrait: 'a reading of him' }],
+  ['set_craft',     { craft: 'a reading of her own record' }],
   ['open_loop',     { kind: 'question', body: 'a question' }],
   ['close_loop',    { id: 1, resolution: 'answered' }],
   ['record_read',   { reading: 'a read', test: 'the two-year falls', verdict: 'untested', evidence: 'no close',

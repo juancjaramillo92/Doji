@@ -21,7 +21,7 @@ import { execSync } from 'node:child_process';
 import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
-import { APOLOGY, wanted, readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, NOTES, READ_VERDICTS, READ_MAX,
+import { APOLOGY, wanted, readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, CRAFT_MAX, NOTES, READ_VERDICTS, READ_MAX,
          READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_CONFIRMS, CALL_STEPS, CALL_MAX, RR_MIN, CONFIRM_MS, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, readsDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH, REVIEW } from '../supabase/functions/doji-eugenia/prompt.ts';
@@ -2961,6 +2961,21 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
   assert.ok(!reaches(reads('postTradeEvent'), 'callsBlock'),
     'the trade look is handed her calls — her own trade beside his, seconds after his fill');
 
+  /* AND WHAT HER RECORD HAS TAUGHT HER, wherever she makes a call, gives a
+     read or judges one: without it a lesson lasts the month its record is
+     shown for. The whole record it is counted from goes to the pass alone:
+     it is a year of her trades, and nothing that speaks to him needs it. */
+  for (const fn of ['postBriefing', 'converse', 'postConsolidation', 'postCallLook']) {
+    assert.ok(reaches(reads(fn), 'craftBlock'),
+      `${fn} never gets craftBlock() into the message it sends — what she learnt from her own record is gone there`);
+  }
+  assert.ok(!reaches(reads('postTradeEvent'), 'craftBlock'),
+    'the trade look is handed what her record has taught her, beside a loss of his');
+  assert.ok(reaches(reads('postConsolidation'), 'lifetimeBlock'),
+    'the pass moves what her record has taught her without the record it is counted from');
+  assert.equal([...EUGENIA_TS.matchAll(/(?<!function )lifetimeBlock\(\)/g)].length, 1,
+    'her whole record is handed to a path other than the nightly pass');
+
   /* AND THE CONVERSATION WINDOW, ON EVERYTHING THAT SPEAKS: without it she says
      again what she said, and a repetition reads as emphasis. Hardest on the
      trade look, whose R-19/R-20 line fires on the print the briefing most likely
@@ -3790,6 +3805,31 @@ test('a read is judged by the test she stated, never by where price went', () =>
   assert.match(system, /Never cite it to him as a reason to believe a read/,
     'her record may be offered to him as a reason to trade on her read');
   assert.match(system, /never give a read to improve it, and never hold one back to protect it/);
+});
+
+test('what her record has taught her is one number on both sides of the wire, and written at night alone', () => {
+  const declared = SCHEMA_SQL.match(/eugenia_craft_length check \(char_length\(craft\) between 1 and (\d+)\)/);
+  assert.ok(declared, 'schema.sql no longer bounds what her record has taught her');
+  assert.equal(CRAFT_MAX, Number(declared[1]),
+    'index.ts truncates it at a different length than the table accepts — a 400 on a write she reports as saved');
+  /* NIGHTLY ONLY, AND COUNTED. Written mid-conversation it would move on one
+     call; written without the whole record it is what she remembers, which is
+     the month. And it is about how she reads, so the two prompts hold it off
+     price and off him. */
+  const list = (set) => EUGENIA_TS.match(new RegExp(`const ${set}(?:: unknown\\[\\])? = \\[([\\s\\S]*?)\\];`))?.[1] ?? '';
+  assert.match(list('CONSOLIDATE_TOOLS'), /CRAFT_TOOL/, 'the pass cannot write what her record has taught her');
+  for (const set of ['CHAT_TOOLS', 'TRADE_TOOLS', 'REVIEW_TOOLS', 'CRITIC_TOOLS', 'LOOK_TOOLS']) {
+    assert.doesNotMatch(list(set), /CRAFT_TOOL/, `${set} offers set_craft, a lesson drawn from one day`);
+  }
+  const consolidate = CONSOLIDATE.replace(/\s+/g, ' ');
+  assert.match(consolidate, /counted in the whole record, three times at least/,
+    'the pass may keep a lesson her record does not count');
+  assert.match(consolidate, /nothing about him, nothing about today's market, no level, and never which way price goes/,
+    'what her record has taught her may hold a level, a forecast or a line about him');
+  assert.match(consolidate, /Take a line out when the whole record stops supporting it/,
+    'a lesson the record no longer supports stays for good');
+  assert.match(SYSTEM.replace(/\s+/g, ' '), /WHAT YOUR RECORD HAS TAUGHT YOU[^.]*\.[\s\S]*never cite it to him as a reason to believe you/,
+    'SYSTEM no longer says what the paragraph is, or lets her offer it to him as a reason');
 });
 
 test('the portrait budget is one number on both sides of the wire', () => {

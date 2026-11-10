@@ -1388,6 +1388,59 @@ async function setPortrait(portrait: unknown): Promise<string> {
   }
 }
 
+/* ─── What her record has taught her ───────────────────────────────────────
+   The portrait's twin, about herself. Her record and her calls are handed to
+   her a month at a time, with the three newest lessons, so what she learnt in
+   August about her own reading is gone by October and she makes the mistake
+   again. One paragraph carries it, and the nightly pass moves it with her
+   whole record in front of it, counted in code (lifetimeList): a lesson she
+   remembers and cannot count is not kept. Nightly only, for the thesis's
+   reason. It is about how she reads, so it holds no level and nothing about
+   where price goes, and it never reaches the trade look.
+   ───────────────────────────────────────────────────────────────────────── */
+export const CRAFT_MAX = 800;
+
+const CRAFT_TOOL = {
+  name: "set_craft",
+  description:
+    "Rewrite what your own record has taught you about reading gold and trading his " +
+    "rules. At the nightly pass and nowhere else. It is handed back to you with every " +
+    "briefing, reply and look at a call, so a lesson outlives the month its record is " +
+    "shown for. MOVE it rather than replacing it: most nights nothing in it changes. " +
+    "Each thing in it is counted in your whole record, three times at least, and says " +
+    "what you do and what to do in its place. Never anything about him, about today's " +
+    "market, a level, or where price goes.",
+  input_schema: {
+    type: "object",
+    properties: {
+      craft: { type: "string", description: `What your record has taught you, at most ${CRAFT_MAX} characters.` },
+    },
+    required: ["craft"],
+    additionalProperties: false,
+  },
+} as const;
+
+async function setCraft(craft: unknown): Promise<string> {
+  const text = String(craft ?? "").trim();
+  if (!text) return "Nothing to write.";
+  const kept = text.slice(0, CRAFT_MAX);
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/eugenia_craft?id=eq.current`, {
+      method: "PATCH", headers: sbHeaders("return=representation"),
+      body: JSON.stringify({ craft: kept, moved_on: nyDate(new Date()), updated_at: new Date().toISOString() }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // Empty means the seed row is missing, as with setThesis.
+    if ((await res.json()).length === 0) {
+      return "There is no craft row — schema.sql has not been applied, so nothing was saved. Say nothing about this to him.";
+    }
+    return kept.length < text.length ? cutAt(CRAFT_MAX, kept) : "Updated.";
+  } catch (err) {
+    console.error("doji-eugenia: craft not written —", why(err));
+    return UNSAVED;
+  }
+}
+
 /* ─── What she flagged, and what she asked ─────────────────────────────────
    Threads she flagged or questions she put to him, handed back until they
    close — without them, follow-through depended on the turn still being inside
@@ -2090,7 +2143,7 @@ const CHAT_TOOLS = [
   RELEASES_TOOL,
   ALERTS_TOOL,
 ];
-const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, PORTRAIT_TOOL, CLOSE_TOOL,
+const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, PORTRAIT_TOOL, CRAFT_TOOL, CLOSE_TOOL,
                            RECORD_TOOL, EXPLAIN_TOOL, CHECK_TOOL, STATS_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
 // The look is handed everything it judges on, and may do one thing.
@@ -2233,6 +2286,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case ALERTS_TOOL.name:   return (await alertsBlock()).trim();
     case THESIS_TOOL.name:   return await setThesis(input.thesis);
     case PORTRAIT_TOOL.name: return await setPortrait(input.portrait);
+    case CRAFT_TOOL.name:    return await setCraft(input.craft);
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
     case CLOSE_TOOL.name:    return await closeLoop(input.id, input.resolution);
     case CALL_TOOL.name:     return await makeCall(input.direction, input.entry, input.stop, input.target,
@@ -2823,7 +2877,7 @@ type Channel = { channel: string; state: string; evidence: string | null; moved_
 export function notesList(told: Note[], noticed: Note[], channels: Channel[],
                           loops: Loop[] = [], story: Thesis | null = null,
                           promised: Note[] = [], portrait: Portrait | null = null,
-                          record: Read[] = [], calls: Call[] = []): string {
+                          record: Read[] = [], calls: Call[] = [], craft: Craft | null = null): string {
   const list = (ns: Note[]) => inWindow(ns).map(noteLine).join("\n");
   const missed = misses(record);
   // Not loopsList, which is written to her about her own threads.
@@ -2849,6 +2903,9 @@ export function notesList(told: Note[], noticed: Note[], channels: Channel[],
         `where price went: ${tally(record)}.` + (missed ? `\nThe latest I got wrong:\n${missed}` : "")
       : "",
     callsList(calls, Date.now(), "My").trim(),
+    craft
+      ? `What my record has taught me${craft.moved_on ? `, last moved ${civilDay(craft.moved_on)}` : ""}:\n${craft.craft}`
+      : "",
     `Where you stand on each channel:\n${channelsList(channels)}`,
   ].filter(Boolean).join("\n\n");
 }
@@ -3185,6 +3242,90 @@ export async function callsBlock(): Promise<string> {
     return callsList(await readRows<Call>('Calls', callsQuery()));
   } catch (err) {
     console.error("doji-eugenia: calls unavailable —", why(err));
+    return "";
+  }
+}
+
+/* What her record has taught her, read and dated as the portrait is. */
+type Craft = { craft: string; moved_on: string | null };
+
+async function readCraft(): Promise<Craft | null> {
+  const [row] = await readRows<Craft>('Craft', `eugenia_craft?select=craft,moved_on&id=eq.current&limit=1`);
+  return row ?? null;
+}
+
+export function craftLine(row: Craft | null): string {
+  if (!row) return "";
+  const since = row.moved_on ? ` (last moved ${civilDay(row.moved_on)})` : "";
+  return `\n\nWhat your record has taught you${since}:\n${row.craft}`;
+}
+
+export async function craftBlock(): Promise<string> {
+  try {
+    return craftLine(await readCraft());
+  } catch (err) {
+    console.error("doji-eugenia: craft unavailable —", why(err));
+    return "";
+  }
+}
+
+/* Her whole record, for the pass that moves the paragraph above: every call
+   and read she has filed, counted here because a count she works out of four
+   hundred rows is the arithmetic a model does worst, and split the ways a
+   lesson would be: by side, by how the entry went live, by the step a loss
+   failed on, by channel and firmness. Then every lesson sentence she has
+   written, newest first, since those are what recur. Never handed to a path
+   that speaks to him: it is a year of her trades beside one morning of his. */
+// A thousand sessions is four years of calls; the reads run a few a week.
+const LIFETIME_ROWS = 1000;
+// The lesson sentences shown: enough to see one said three times.
+export const LESSONS = 30;
+
+const dollars = (n: number) => `${n >= 0 ? "+" : "-"}$${Math.abs(n).toFixed(2)}`;
+
+export function lifetimeList(calls: Call[], reads: Read[]): string {
+  if (!calls.length && !reads.length) return "";
+  const scored = calls.filter(c => c.outcome);
+  const traded = scored.filter(c => c.result !== null);
+  const cut = (name: string, rows: Call[]) => {
+    const net = Math.round(rows.reduce((sum, c) => sum + Number(c.result), 0) * 100) / 100;
+    return `${name} ${rows.filter(c => c.outcome === 'won').length} won and ` +
+      `${rows.filter(c => c.outcome === 'lost').length} lost of ${rows.length} triggered, ${dollars(net)} an ounce`;
+  };
+  const lost = scored.filter(c => c.outcome === 'lost' && c.misread);
+  const pulled = scored.filter(c => c.outcome === 'untriggered' && c.withdrawn_at && c.spared != null);
+  const lessons = [
+    ...calls.filter(c => c.lesson).map(c => ({ on: nyDate(new Date(c.made_at)),
+      line: `a ${c.direction} call, misread the ${c.misread}: ${c.lesson}` })),
+    ...reads.filter(r => r.lesson).map(r => ({ on: r.given_on,
+      line: `a read${r.channel ? ` through ${CHANNELS.find(([id]) => id === r.channel)?.[1] ?? r.channel}` : ""}: ${r.lesson}` })),
+  ].sort((a, b) => b.on.localeCompare(a.on)).slice(0, LESSONS);
+  return `\n\nYour whole record, every call and read you have filed, counted:` +
+    (scored.length
+      ? `\nCalls: ${scored.length} scored. ` + CALL_OUTCOMES.map(o => `${scored.filter(c => c.outcome === o).length} ${o}`).join(", ") + `. ` +
+        [cut("Buys", traded.filter(c => c.direction === 'buy')), cut("sells", traded.filter(c => c.direction === 'sell')),
+         cut("waiting on a close", traded.filter(c => c.confirm === 'close')),
+         cut("at the market", traded.filter(c => c.confirm !== 'close'))].join("; ") + `.` +
+        (lost.length ? ` Of the losses explained, ` + CALL_STEPS.map(x =>
+          `${lost.filter(c => c.misread === x).length} ${x === 'none' ? "kept every step" : `misread the ${x}`}`).join(", ") + `.` : "") +
+        (pulled.length ? ` The ${pulled.length} you withdrew that would have triggered would have made ` +
+          `${dollars(Math.round(pulled.reduce((sum, c) => sum + Number(c.spared), 0) * 100) / 100)} an ounce.` : "")
+      : "") +
+    (reads.length ? `\nReads: ${tally(reads)}.` + byChannel(reads) : "") +
+    (lessons.length ? `\nEvery lesson you have filed, newest first:\n` +
+      lessons.map(l => `· ${civilDay(l.on)}, ${l.line}`).join("\n") : "");
+}
+
+export async function lifetimeBlock(): Promise<string> {
+  try {
+    const [calls, reads] = await Promise.all([
+      readRows<Call>('Calls', `eugenia_calls?select=*&order=id.desc&limit=${LIFETIME_ROWS}`),
+      readRows<Read>('Reads', `eugenia_reads?select=given_on,reading,test,verdict,evidence,firmness,lesson,channel` +
+                              `&order=id.desc&limit=${LIFETIME_ROWS}`),
+    ]);
+    return lifetimeList(calls, reads);
+  } catch (err) {
+    console.error("doji-eugenia: whole record unavailable —", why(err));
     return "";
   }
 }
@@ -4337,12 +4478,12 @@ async function postBriefing(due: Brief): Promise<Response> {
   await (due === 'sunday' ? filedWeek(weekOf(new Date())) : filed());
   // Every read at once: independent and small, so the batch costs its slowest.
   const [price, chart, around, rates, crowd, held, traded, notes, portrait, channels, trades, breaches, story, health,
-         loops, calendar, desk, record, calls] =
+         loops, calendar, desk, record, calls, craft] =
     await Promise.all([
       marketBlock(), structureBlock(), aroundBlock(), ratesBlock(), due === 'sunday' ? positioningBlock() : "",
       due === 'sunday' ? flowsBlock() : "", volumeBlock(), notesBlock(), portraitBlock(), channelsBlock(), tradesBlock(), breachesBlock(), thesisBlock(),
       healthBlock(), loopsBlock(), due === 'sunday' ? weekBlock() : calendarBlock(), positionsBlock(), recordBlock(),
-      callsBlock(),
+      callsBlock(), craftBlock(),
     ]);
 
   const asked = (due === 'sunday'
@@ -4351,7 +4492,7 @@ async function postBriefing(due: Brief): Promise<Response> {
     // `health` first: if the journal stopped, everything after it may be
     // missing rows.
     + health + price + chart + around + rates + crowd + held + traded + notes + portrait + channels + trades + breaches
-    + story + loops + calendar + desk + record + calls;
+    + story + loops + calendar + desk + record + calls + craft;
 
   await keepInput(`${due} briefing`, asked);
   const draft = await ask([...await recent(), { role: 'user', content: asked }],
@@ -4568,15 +4709,15 @@ async function postConsolidation(): Promise<Response> {
   // And her map of his charts as the day closed, with the calls that lost,
   // since a loss is explained by what printed after it.
   const [notes, portrait, channels, trades, story, loops, calendar, verdicts, desk, record, calls, around, rates,
-         losses, chart] =
+         losses, chart, craft, lifetime] =
     await Promise.all([
       notesBlock(), portraitBlock(), channelsBlock(), tradesBlock(),
       thesisBlock(), loopsBlock(), calendarBlock(), feedbackBlock(), positionsBlock(), recordBlock(),
-      callsBlock(), aroundBlock(), ratesBlock(), lossesBlock(), structureBlock(),
+      callsBlock(), aroundBlock(), ratesBlock(), lossesBlock(), structureBlock(), craftBlock(), lifetimeBlock(),
     ]);
 
   const asked = CONSOLIDATE + notes + portrait + channels + trades + story + loops + calendar +
-    verdicts + desk + record + around + rates + calls + losses + chart +
+    verdicts + desk + record + around + rates + calls + losses + chart + craft + lifetime +
     `\n\nThe day, oldest first:\n\n` +
     day.map(t => `${t.role === 'user' ? 'him' : 'you'}: ${t.content}`).join("\n\n");
 
@@ -4727,15 +4868,15 @@ export async function postCallLook(now = Date.now()): Promise<void> {
     if (!(await claimed.json()).length) return;
 
     const day = nyDate(new Date(now));
-    const [history, notes, quote, chart, calendar, around, rates, story, rows] = await Promise.all([
+    const [history, notes, quote, chart, calendar, around, rates, story, craft, rows] = await Promise.all([
       recent(), notesBlock(), marketBlock(), structureBlock(), calendarBlock(), aroundBlock(), ratesBlock(),
-      thesisBlock(), readDesk(day),
+      thesisBlock(), craftBlock(), readDesk(day),
     ]);
     const open = rows.filter(isOpen);
     const desk = positionsList(open, dayStanding(rows, day));
     const draft = await ask(
       [...history, { role: 'user', content: `${LOOK}\n\nYour call, made ${nyTime(call.made_at)} ET: ${callLine(call)}.` +
-        quote + chart + calendar + around + rates + story + desk + notes }],
+        quote + chart + calendar + around + rates + story + desk + craft + notes }],
       'medium', 'call look', LOOK_TOOLS, LOOK_MS);
 
     const [after] = await readRows<Call>('Calls', `eugenia_calls?select=withdrawn_at&id=eq.${call.id}&limit=1`);
@@ -4893,9 +5034,9 @@ async function handleFeedback(query: any): Promise<void> {
    ───────────────────────────────────────────────────────────────────────── */
 async function converse(text: string, blocks: any[],
                         quoting: Promise<string | null>): Promise<{ asked: string; answer: string }> {
-  const [history, notes, portrait, channels, story, loops, calendar, desk, record, calls, quoted] = await Promise.all([
+  const [history, notes, portrait, channels, story, loops, calendar, desk, record, calls, craft, quoted] = await Promise.all([
     recent(), notesBlock(), portraitBlock(), channelsBlock(), thesisBlock(), loopsBlock(),
-    calendarBlock(), positionsBlock(), recordBlock(), callsBlock(), quoting,
+    calendarBlock(), positionsBlock(), recordBlock(), callsBlock(), craftBlock(), quoting,
   ]);
   // A marker with the opening words is stored, so the nightly pass knows
   // which message "too long" was about; the quote itself is not.
@@ -4913,7 +5054,7 @@ async function converse(text: string, blocks: any[],
     `to be heard: plain sentences, no headings, and nothing that only works ` +
     `on a page. Lead with the answer and say only what decides it.`;
   const context = asked + about + aloud + notes + portrait + channels + story + loops + calendar + desk + record +
-    calls;
+    calls + craft;
   const draft = await ask(
     [...history, {
       role: 'user',
@@ -4999,12 +5140,12 @@ async function handleMessage(update: any): Promise<void> {
     if (text.trim().toLowerCase() === '/notes') {
       try {
         // Everything she keeps that he cannot otherwise see, in one message.
-        const [told, noticed, channels, loops, story, promised, portrait, record, calls] = await Promise.all([
+        const [told, noticed, channels, loops, story, promised, portrait, record, calls, craft] = await Promise.all([
           readNotes('instruction'), readNotes('fact'), readChannels(), readLoops(), readThesis(),
           readNotes('commitment'), readPortrait(), readRows<Read>('Reads', recordQuery()),
-          readRows<Call>('Calls', callsQuery()),
+          readRows<Call>('Calls', callsQuery()), readCraft(),
         ]);
-        await say(notesList(told, noticed, channels, loops, story, promised, portrait, record, calls));
+        await say(notesList(told, noticed, channels, loops, story, promised, portrait, record, calls, craft));
       } catch (err) {
         console.error("doji-eugenia: notes unavailable —", why(err));
         await say("I cannot read my notes just now, jefe.");
