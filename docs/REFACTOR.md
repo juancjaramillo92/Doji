@@ -1212,6 +1212,34 @@ she runs waits for *Restart her* or the next day. Looking each time the menu
 opens, or hourly, would show it sooner for one more request to the bucket.
 **Revisit if:** the wait for *Update her* proves a nuisance.
 
+### R-164 — the spread in the scoring of her calls
+**Why refused, 10 November 2026, when he asked whether it was worth doing.** `scoreCall` reads one price series.
+If the broker's bars are the bid, as cTrader's normally are, a sell's stop and
+target are each scored one spread kinder than a real fill, which is cents on a
+$20 stop and more only around a print. Which side the bars are was not
+confirmed, and a correction resting on a guess is worse than none.
+**Revisit if:** her sells score visibly better than her buys over a replay of
+sixty sessions or more; the first step then is `?bars=raw` beside `?market=1`
+in the same minute, which says which side the bars are.
+
+### R-165 — an entry confirmed by her read at the look
+**Why refused:** R-07 confirms *by close or by read*, and her calls have only
+the close. The look that wakes her runs on the quarter-hourly job, so a
+five-minute candle is usually closed, and the entry filled, before she could
+read it; a confirmation filed after the fact is a call made with the answer in
+it. The look may withdraw and nothing else.
+**Revisit if:** something wakes her within a minute of price reaching a level
+— an alert of his, relayed — and the replay shows her withdrawals earning
+their look.
+
+### R-166 — `withdraw_call` in a conversation
+**Why refused:** asked whether she still likes her call, she can say she would
+no longer take it and cannot file that. Offering the tool in `CHAT_TOOLS` makes
+a withdrawal something a question can prompt, at any moment, as many times as
+he asks, which is the hindsight the once-a-call look exists to keep out.
+**Revisit if:** he asks about a standing call and acts on an answer her record
+never shows.
+
 ## 3 · THE NEXT STEP — DECIDED
 
 The step the owner calls *Raptor 3* was reviewed with him in October 2026,

@@ -34,7 +34,7 @@
 //           EMBED_KEY, and EUGENIA_LAPTOP_SECRET, which, unset, shuts the
 //           laptop's door
 // ═══════════════════════════════════════════════════════════════════════════
-import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, TRADE_EVENT, REVIEW, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
+import { SYSTEM, CONSOLIDATE, CRITIC, TRIM, TRADE_EVENT, LOOK, REVIEW, CHANNELS, CHANNEL_STATES } from "./prompt.ts";
 import { ALWAYS, SECTIONS, VERSION } from "./strategy.ts";
 // Pure and imported, so the parts that decide are testable.
 import {
@@ -1704,7 +1704,7 @@ async function makeCall(direction: unknown, entry: unknown, stop: unknown, targe
                               not_before: held?.toISOString() ?? null }]),
     });
     if (res.status === 409) {
-      return "You already made this session's call, and it stands until the 17:00 roll. Say that rather than making another.";
+      return "You already made this session's call: one a session, standing or withdrawn. Say that rather than making another.";
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return `Filed: ${direction} ${e}, stop ${s}, target ${t}` +
@@ -1735,6 +1735,10 @@ async function makeCall(direction: unknown, entry: unknown, stop: unknown, targe
    `not_before` is scored as made at that minute: a candle that opened before
    it is no confirmation and a touch before it no fill.
    A call whose session the bars do not reach is `unread`, never a guess.
+   A call she withdrew is untriggered unless the bar that filled it opened
+   before the withdrawal, when it is scored as it stood: she cannot withdraw a
+   trade she is in. What it would have made left standing is kept as `spared`,
+   so a withdrawal is judged on price like the call it ends.
    ───────────────────────────────────────────────────────────────────────── */
 export const CALL_OUTCOMES = ['won', 'lost', 'scratch', 'open', 'untriggered', 'unread'] as const;
 
@@ -1743,17 +1747,28 @@ export type Call = { id: number; made_at: string; expires_at: string; direction:
                      confirm: string | null; level: number | null; not_before?: string | null;
                      outcome: string | null; result: number | null;
                      confirmed_at?: string | null;
+                     looked_at?: string | null; withdrawn_at?: string | null; withdrawn?: string | null;
+                     spared?: number | null;
                      closed_at?: string | null; misread?: string | null; lesson?: string | null };
 export type Score = { outcome: typeof CALL_OUTCOMES[number]; confirmed_at: string | null; triggered_at: string | null;
-                      closed_at: string | null; closed_price: number | null; result: number | null };
+                      closed_at: string | null; closed_price: number | null; result: number | null;
+                      spared: number | null };
 
 export function scoreCall(c: Call, candles: Candle[], from: number): Score {
   const made = Date.parse(c.made_at), ends = Date.parse(c.expires_at);
   const none = { triggered_at: null, closed_at: null, closed_price: null, result: null };
   // The market was open somewhere between the call and the first bar served.
   for (let h = made; h < from; h += 3_600_000) {
-    if (marketOpen(new Date(h))) return { outcome: 'unread', confirmed_at: null, ...none };
+    if (marketOpen(new Date(h))) return { outcome: 'unread', confirmed_at: null, ...none, spared: null };
   }
+  // Withdrawn in time, the call never traded, and what it would have done is
+  // what the withdrawal spared her or cost her.
+  const pulled = c.withdrawn_at ? Date.parse(c.withdrawn_at) : null;
+  const settle = (s: Omit<Score, 'spared'>): Score =>
+    pulled !== null && (s.triggered_at === null || Date.parse(s.triggered_at) >= pulled)
+      ? { outcome: 'untriggered', ...none, spared: s.result,
+          confirmed_at: s.confirmed_at !== null && Date.parse(s.confirmed_at) <= pulled ? s.confirmed_at : null }
+      : { ...s, spared: null };
 
   const start = Math.max(Math.ceil(made / 60_000) * 60_000, c.not_before ? Date.parse(c.not_before) : 0);
   const bars = candles.filter(b => b.t >= start && b.t + 60_000 <= ends);
@@ -1761,10 +1776,10 @@ export function scoreCall(c: Call, candles: Candle[], from: number): Score {
   const live = c.confirm === 'close' ? confirmedAt(bars, buy, Number(c.level), start) : start;
   const confirmed_at = c.confirm === 'close' && live !== null ? new Date(live).toISOString() : null;
   const at = live === null ? -1 : bars.findIndex(b => b.t >= live && b.low <= c.entry && c.entry <= b.high);
-  if (at < 0) return { outcome: 'untriggered', confirmed_at, ...none };
+  if (at < 0) return settle({ outcome: 'untriggered', confirmed_at, ...none });
 
   const gain = (p: number) => Math.round((buy ? p - c.entry : c.entry - p) * 100) / 100;
-  const close = (b: Candle, price: number, outcome: Score['outcome']): Score => ({
+  const close = (b: Candle, price: number, outcome: Score['outcome']): Score => settle({
     outcome, confirmed_at, triggered_at: new Date(bars[at].t).toISOString(),
     closed_at: new Date(b.t + 60_000).toISOString(), closed_price: price, result: gain(price),
   });
@@ -1946,6 +1961,78 @@ async function explainCall(id: unknown, step: unknown, lesson: unknown): Promise
   }
 }
 
+/* ─── The one look at a call before it can fill ────────────────────────────
+   A call is filed at eight and filled whenever price gets there, by which time
+   a release has landed or the chart it rested on has turned, and nobody was
+   looking. So the quarter-hourly job wakes her once for a call that waits on
+   a close, the first pass that finds price within LOOK_NEAR of its level, and
+   she may do one thing: withdraw it. Nothing else about a call can change
+   after it is filed, or the record stops being of calls made beforehand.
+
+   Withdrawing is scored like calling. scoreCall keeps what the call would
+   have made left standing, so a winner she pulled counts against her and a
+   loser she pulled counts for her, and a call already filled is past
+   withdrawing. `looked_at` is the once: claimed under `is null` before the
+   model is asked, so two passes cannot both wake her, and a look that died is
+   spent rather than repeated every quarter hour.
+   ───────────────────────────────────────────────────────────────────────── */
+// A reading rather than a fact: half a full stop, near enough that the next
+// quarter hour could fill her and far enough that she is asked before it does.
+export const LOOK_NEAR = 10;
+// Past this the kept map says where price was, not where it is: the job
+// stores it seconds before the look, and a read that failed leaves an old one.
+const LOOK_FRESH_MS = 20 * 60_000;
+// Inside the job's worker, after its reads and before the gate.
+const LOOK_MS = 150_000;
+
+/* Whether this pass wakes her, from the call and the price alone. Pure, so
+   each condition is driven both ways. A call held back is not looked at until
+   its time: before it the print has not landed, and the one look would be
+   spent on the morning she already saw. */
+export function lookDue(c: Call, price: number, now: number): boolean {
+  return c.confirm === 'close' && !c.outcome && !c.looked_at && !c.withdrawn_at &&
+    Date.parse(c.expires_at) > now && (!c.not_before || now >= Date.parse(c.not_before)) &&
+    Math.abs(price - Number(c.level)) <= LOOK_NEAR;
+}
+
+const WITHDRAW_TOOL = {
+  name: "withdraw_call",
+  description:
+    "Withdraw your standing call, because something has printed since you made it that " +
+    "takes its reason away. At the look you are woken for and nowhere else. It is scored " +
+    "against what the call would have made left standing, and a call already filled is " +
+    "scored as it stood.",
+  input_schema: {
+    type: "object",
+    properties: {
+      why: { type: "string", description: `What printed, in a sentence of at most ${NOTE_MAX} characters — "the 1H closed under the higher low the bias rested on". Never that price is close, and never that it might lose.` },
+    },
+    required: ["why"],
+    additionalProperties: false,
+  },
+} as const;
+
+/* Never throws, for writeNote's reason. Filtered on a call still standing, so
+   a second withdrawal, or one after the roll, changes nothing and says so. */
+async function withdrawCall(reason: unknown): Promise<string> {
+  const said = String(reason ?? "").trim().slice(0, NOTE_MAX);
+  if (!said) return "A call is withdrawn with what printed, or it stands.";
+  const now = new Date().toISOString();
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/eugenia_calls?outcome=is.null&withdrawn_at=is.null&expires_at=gt.${now}`, {
+        method: "PATCH", headers: sbHeaders("return=representation"),
+        body: JSON.stringify({ withdrawn_at: now, withdrawn: said }),
+      });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!(await res.json()).length) return "There is no standing call to withdraw.";
+    return "Withdrawn.";
+  } catch (err) {
+    console.error("doji-eugenia: call not withdrawn —", why(err));
+    return "That did not file, so the call stands. Reply STANDS.";
+  }
+}
+
 /* ─── Claude ───────────────────────────────────────────────────────────────
    Raw fetch rather than the SDK, like every other outbound call here. Web
    search is what makes a briefing possible at all: a briefing invented from
@@ -2006,6 +2093,8 @@ const CHAT_TOOLS = [
 const CONSOLIDATE_TOOLS = [NOTES_TOOL, CHANNEL_TOOL, SEARCH_TOOL, THESIS_TOOL, PORTRAIT_TOOL, CLOSE_TOOL,
                            RECORD_TOOL, EXPLAIN_TOOL, CHECK_TOOL, STATS_TOOL];
 const TRADE_TOOLS = [STRATEGY_TOOL, TRADES_TOOL];
+// The look is handed everything it judges on, and may do one thing.
+const LOOK_TOOLS = [WITHDRAW_TOOL];
 /* No tools: the gates read a draft and return one. Sharing the briefing's
    array to ride its cache does not work — the array starts the key and the
    effort differs, which invalidates the rest; measured, the critic wrote
@@ -2149,6 +2238,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case CALL_TOOL.name:     return await makeCall(input.direction, input.entry, input.stop, input.target,
                                                input.condition, input.confirm, input.level, input.not_before);
     case EXPLAIN_TOOL.name:  return await explainCall(input.id, input.step, input.lesson);
+    case WITHDRAW_TOOL.name: return await withdrawCall(input.why);
     case RECORD_TOOL.name:   return await recordRead(input.reading, input.test, input.verdict, input.evidence,
                                                  input.firmness, input.lesson, input.channel);
     default:
@@ -3035,7 +3125,12 @@ export function callsList(rows: Call[], now = Date.now(), to = "Your"): string {
   const by = (o: string) => scored.filter(c => c.outcome === o).length;
   const traded = scored.filter(c => c.result !== null);
   const net = Math.round(traded.reduce((sum, c) => sum + Number(c.result), 0) * 100) / 100;
-  const standing = rows.filter(c => !c.outcome && Date.parse(c.expires_at) > now);
+  const live = rows.filter(c => !c.outcome && Date.parse(c.expires_at) > now);
+  const standing = live.filter(c => !c.withdrawn_at);
+  // Withdrawn and scored: what the withdrawals were worth, on price.
+  const pulled = scored.filter(c => c.outcome === 'untriggered' && c.withdrawn_at);
+  const spared = pulled.filter(c => c.spared != null);
+  const kept = Math.round(spared.reduce((sum, c) => sum + Number(c.spared), 0) * 100) / 100;
   // The setup came and the entry asked for more: the candle closed beyond the
   // level and price never came back to where she said she would be filled.
   const left = scored.filter(c => c.outcome === 'untriggered' && c.confirmed_at).length;
@@ -3049,11 +3144,17 @@ export function callsList(rows: Call[], now = Date.now(), to = "Your"): string {
   return `\n\n${to} calls over the last ${RECORD_DAYS} days, scored on price by his rules: ` +
     `${rows.length} made; ${CALL_OUTCOMES.map(o =>
       `${by(o)} ${o === 'open' ? "still on at the 17:00 roll and marked at its close" : o}`).join(", ")}` +
-    (rows.length > scored.length + standing.length ? `, ${rows.length - scored.length - standing.length} not yet scored` : "") + `.` +
+    (rows.length > scored.length + live.length ? `, ${rows.length - scored.length - live.length} not yet scored` : "") + `.` +
     (left ? ` Of the ${by('untriggered')} untriggered, ${left} had the five-minute close ${left === 1 ? "it" : "they"} waited for ` +
       `and price never came back to the entry.` : "") +
+    // No "you": /notes says this list to him as hers.
+    (pulled.length ? ` ${pulled.length} ${pulled.length === 1 ? "was" : "were"} withdrawn before ${pulled.length === 1 ? "it" : "they"} could fill` +
+      (spared.length ? `; left standing, the ${spared.length} that would have triggered would have made ` +
+        `${kept >= 0 ? "+" : "-"}$${Math.abs(kept).toFixed(2)} an ounce.` : `, and none would have triggered.`) : "") +
     (traded.length ? ` The ${traded.length} that triggered made ${net >= 0 ? "+" : "-"}$${Math.abs(net).toFixed(2)} an ounce.` : "") +
     (standing.length ? `\nStanding until the 17:00 roll: ${standing.map(callLine).join("; ")}.` : "") +
+    live.filter(c => c.withdrawn_at).map(c =>
+      `\nWithdrawn at ${nyTime(c.withdrawn_at!)} ET, and this session's one call all the same: ${callLine(c)} — ${c.withdrawn}`).join("") +
     (explained.length ? `\nOf the ${losses.length} lost, ` + CALL_STEPS.map(x =>
       `${explained.filter(c => c.misread === x).length} ${x === 'none' ? "kept every step" : `misread the ${x}`}`).join(", ") +
       (explained.length < losses.length ? `, ${losses.length - explained.length} not yet explained` : "") + "." : "") +
@@ -4044,6 +4145,8 @@ async function postScheduled(url: URL): Promise<Response> {
       const { market, rates } = readsDue(new Date());
       await Promise.all([market && storeMarket(), rates && storeRates(), storeTrend(), storeStructure(),
                          storeFlows(), storePositioning()]);
+      // After the map is stored, since the look is decided on its newest close.
+      await postCallLook();
       return json({ ok: true, filed: true });
     }
 
@@ -4589,6 +4692,75 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
   await sayAloud(said);
   if (unstored) throw new Error(unstored);
   return json({ ok: true, trade: id, said: "sent" });
+}
+
+/* ─── Her standing call, looked at once before it can fill ─────────────────
+   Decided from data before any model call, as the trade look is, so a quarter
+   hour with no call near its level costs two small reads. The withdrawal is
+   read back off the row, never off her words: a reply that says it is off with
+   nothing filed has withdrawn nothing.
+
+   HE IS TOLD ONLY WHEN HE IS FLAT. He heard the call at eight and may be
+   waiting on it, so a withdrawal he never hears is a call he follows alone.
+   But said to a man in a position, "my call is off" is advice about the trade
+   he is in, which nothing she sends may be: then it is filed and not sent,
+   and his next briefing or question finds it in her record. Gated by TRIM,
+   which is handed what he has on and the story, and stored before it is
+   spoken, as a reply is. Never throws: a look that died must not cost the
+   calendar job its answer, and both endings leave a row. */
+export async function postCallLook(now = Date.now()): Promise<void> {
+  try {
+    const [call] = await readRows<Call>('Calls',
+      `eugenia_calls?select=*&outcome=is.null&looked_at=is.null&withdrawn_at=is.null&confirm=eq.close` +
+      `&expires_at=gt.${new Date(now).toISOString()}&order=id.desc&limit=1`);
+    if (!call) return;
+    const kept = await readStored("structure");
+    const price = kept?.answer?.last?.close;
+    if (typeof price !== 'number' || now - Date.parse(kept!.read_at) > LOOK_FRESH_MS) return;
+    if (!lookDue(call, price, now)) return;
+
+    const claimed = await fetch(`${SB_URL}/rest/v1/eugenia_calls?id=eq.${call.id}&looked_at=is.null`, {
+      method: "PATCH", headers: sbHeaders("return=representation"),
+      body: JSON.stringify({ looked_at: new Date(now).toISOString() }),
+    });
+    if (!claimed.ok) throw new Error(`claim: HTTP ${claimed.status}`);
+    if (!(await claimed.json()).length) return;
+
+    const day = nyDate(new Date(now));
+    const [history, notes, quote, chart, calendar, around, rates, story, rows] = await Promise.all([
+      recent(), notesBlock(), marketBlock(), structureBlock(), calendarBlock(), aroundBlock(), ratesBlock(),
+      thesisBlock(), readDesk(day),
+    ]);
+    const open = rows.filter(isOpen);
+    const desk = positionsList(open, dayStanding(rows, day));
+    const draft = await ask(
+      [...history, { role: 'user', content: `${LOOK}\n\nYour call, made ${nyTime(call.made_at)} ET: ${callLine(call)}.` +
+        quote + chart + calendar + around + rates + story + desk + notes }],
+      'medium', 'call look', LOOK_TOOLS, LOOK_MS);
+
+    const [after] = await readRows<Call>('Calls', `eugenia_calls?select=withdrawn_at&id=eq.${call.id}&limit=1`);
+    if (!after?.withdrawn_at) {
+      await recordRun({ caller: 'call look delivered', ok: true, detail: `call ${call.id} stands` });
+      return;
+    }
+    if (open.length) {
+      await recordRun({ caller: 'call look delivered', ok: true,
+                        detail: `call ${call.id} withdrawn, not sent: he holds a position` });
+      return;
+    }
+    const said = await trim(draft, desk, story);
+    const unstored = await remember([{ role: 'user', content: `[call withdrawn]` },
+                                     { role: 'assistant', content: said }])
+      .then(() => null, (err: unknown) => why(err));
+    const how = await sayAloud(said);
+    await recordRun({ caller: 'call look delivered', chars: said.length, ok: !unstored,
+                      detail: unstored ? `sent ${how}, not stored — ${unstored}`.slice(0, 500)
+                                       : `call ${call.id} withdrawn, ${how}` });
+  } catch (err) {
+    const reason = why(err);
+    console.error("doji-eugenia: call look failed —", reason);
+    await recordRun({ caller: 'call look delivered', ok: false, detail: reason.slice(0, 500) });
+  }
 }
 
 /* ─── What he sends that is not typing ─────────────────────────────────────

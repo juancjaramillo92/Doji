@@ -103,7 +103,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 843 tests, eight suites
+npm test      # 846 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -245,6 +245,7 @@ his to do and yours — so nothing open goes unsaid.
 - **A forward level lives in a filed call and nowhere else.** Her calls are paper
   trades on his rules — `callProblem` refuses one off them before `make_call`
   files it — scored on price at night by `scoreCall`, every doubt against her.
+  Nothing about a call changes after it is filed but its withdrawal.
   Both gates keep a filed call whole and never change its numbers; `make_call` is
   in `CHAT_TOOLS` and in no other set. `agree.test.mjs` holds the sentences and
   the sets. `TRADE_EVENT` keeps the flat ban.
@@ -429,6 +430,12 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   `agree.test.mjs`, the one file the symbol check cannot read.
 - **The trade event is exempt from `TRIM`**: it rewrites, and a paraphrased rule
   citation reaching him at the day's limit is how a sentence becomes an order.
+- **The look at a standing call is decided from data, claimed, then asked.**
+  `lookDue` is pure; `looked_at` is claimed under `is null` before the model
+  call, which is the once; the withdrawal is read back off the row, never off
+  her words. `withdraw_call` is in `LOOK_TOOLS` and no other set. A withdrawal
+  is sent only when he is flat, through `TRIM`, and `scoreCall` holds every one
+  against what the call would have made (`spared`).
 - **`APOLOGY` is a word per job**, and a failure reaches him, not the console.
 
 ### The model call
@@ -465,7 +472,7 @@ the calendar, her record, and `strategy.ts`, which she cannot write.
   boot guard, each guarded where used — `agree.test.mjs` makes that cost
   something.
 - **Everything she writes is spoken, with the text as the fallback**, through
-  `sayAloud`; `agree.test.mjs` reads it and counts the four call sites, and
+  `sayAloud`; `agree.test.mjs` reads it and counts the five call sites, and
   `fold.test.mjs` drives the fallback. There is no length cap and the prompt
   states none; `TTS_LIMIT` is a chunk size. The briefing speaks in a second worker
   (`postSpeak`), stored before the hand-off, falling back to speaking itself.

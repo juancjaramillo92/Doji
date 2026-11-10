@@ -776,6 +776,16 @@ alter table public.eugenia_calls add column if not exists confirmed_at timestamp
 -- release. Null on a call live from the minute it was made.
 alter table public.eugenia_calls add column if not exists not_before timestamptz;
 
+-- The one look she gets at a call that waits, when price first comes near its
+-- level: `looked_at` is claimed under `is null`, which is the once. She may
+-- withdraw the call then and nothing else; the scoring keeps in `spared` what
+-- it would have made left standing, so a withdrawal is judged on price too.
+alter table public.eugenia_calls add column if not exists looked_at timestamptz;
+alter table public.eugenia_calls add column if not exists withdrawn_at timestamptz;
+alter table public.eugenia_calls add column if not exists withdrawn text
+  constraint eugenia_calls_withdrawn_length check (char_length(withdrawn) between 1 and 200);
+alter table public.eugenia_calls add column if not exists spared numeric;
+
 -- Why a lost call lost, filed at the nightly pass: the step of his sequence
 -- her reading of the chart got wrong, or `none` for a call that kept every
 -- step, and the sentence saying what she misread. Null until it is filed.

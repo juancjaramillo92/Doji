@@ -2574,6 +2574,34 @@ you.
   and `scoreCall` scores it as made at that minute: a candle that opened before
   it is no confirmation and a touch before it no fill. She says the time with
   the call, and her record names it on a call still standing.
+- **One look before it can fill, and she may withdraw it** (`postCallLook`).
+  A call is filed at eight and filled whenever price gets there, by which time
+  a release has landed or the chart it rested on has turned. So the
+  quarter-hourly job, once its map is stored, wakes her **once** for a call
+  that waits on a close: the first pass that finds the map's newest close
+  within `LOOK_NEAR` ($10) of the call's level (`lookDue`), not before a time
+  the call is held back to, and not off a map older than twenty minutes.
+  `looked_at` is claimed under `is null` before the model is asked, so two
+  passes cannot both wake her and a look that died is spent, not repeated. She
+  is handed the call, the price, her map, the calendar with what has landed,
+  the market around gold, the Fed's odds, the story, what you have on and your
+  notes, and may do one thing with `withdraw_call`: withdraw it, naming what
+  has **printed** since she made it. Price being close is not a reason, and
+  nothing else about a call can change after it is filed. Your decisions of
+  10 November 2026: she can withdraw and nothing more, once a call, and
+  **you are told only when you are flat** — two sentences, through `TRIM`,
+  stored before they are spoken. While you hold a position the withdrawal is
+  filed and not sent, because "my call is off" said to a man in a trade is
+  advice about the trade; your next briefing or question finds it in her
+  record. A withdrawn call is still the session's one call.
+- **A withdrawal is scored like a call** (`scoreCall`). In time, the call is
+  `untriggered` and what it would have made left standing is kept as `spared`;
+  withdrawn inside or after the bar that filled it, it is scored as it stood,
+  since she cannot withdraw a trade she is in. Her record says how many she
+  withdrew and what those calls would have made, so a habit of pulling winners
+  shows as one. The quarter hour is too coarse to confirm an entry by reading
+  a five-minute candle, so R-07's *by read* stays yours: her entries still
+  confirm on the close alone.
 - **Where.** At most one in the briefing, last, when she has one worth making,
   and in a conversation when you ask. Never unasked while you hold a position,
   never in the trade look, and never anything about what to do with a position
@@ -2611,8 +2639,8 @@ you.
   how often; the step says where her reading of a chart is weak. The PATCH is
   filtered on a lost call not yet explained, so a retry never re-files one.
 - **Her calls' record** — a month of outcomes, how many of the untriggered had
-  their close and were left behind by the entry, what the triggered ones made an
-  ounce, the losses counted by the step they failed on, the newest losses with
+  their close and were left behind by the entry, how many she withdrew and what
+  those would have made, what the triggered ones made an ounce, the losses counted by the step they failed on, the newest losses with
   what she misread, and any call still standing — goes where her read record
   goes. A call still on at its roll is said as that, never as `open`, which
   she once read as a scoring that had failed and reported to you. It goes to
@@ -4163,7 +4191,7 @@ one `net.http_post` each.
 | Function | What a holder of the secret can do |
 |---|---|
 | `doji-mcp-sync` | start a read-only poll that was going to run anyway, or read back the deals (`?raw=1`), the broker's tool list (`?tools=1`), the open positions (`?positions=1`), a price (`?market=1`), minute bars (`?bars=raw`), the day's bars for her calls (`?bars=1`), his six charts (`?structure=1`), his charts at his newest entries (`?entries=1`), or a past session as she would have seen it (`?replay=N`). Nothing that places, moves or closes a trade is reachable — see `ALLOWED_TOOLS` |
-| `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code. `?consolidate=1` is the one that does more than spend: it runs the nightly pass, which WRITES memory — notes written and superseded, channel rungs moved, loops closed. `?embed=1` spends at the embedding vendor. `?calendar=1` files the calendar and spends nothing, `?history=` walks the calendar's past weeks on TradingView's daily quota, `?speak=` re-sends today's stored briefing, and a `{trade}` body reaches the trade look |
+| `doji-eugenia` | `?force=1` — run a briefing, about $0.20, with no bound in the code. `?consolidate=1` is the one that does more than spend: it runs the nightly pass, which WRITES memory — notes written and superseded, channel rungs moved, loops closed. `?embed=1` spends at the embedding vendor. `?calendar=1` files the calendar and spends nothing but, at most once a call, her look at a standing call that price has come near, `?history=` walks the calendar's past weeks on TradingView's daily quota, `?speak=` re-sends today's stored briefing, and a `{trade}` body reaches the trade look |
 | `doji-gladys` | post arbitrary text into the trader's own Telegram thread |
 | `doji-tradingview` | `?connect=1` — start a sign-in, which ends the one it replaces until he approves the new one: the market reads stop, and nothing on his account changes. Every read door and `?probe=` spends TradingView's daily quota, the briefing's own |
 

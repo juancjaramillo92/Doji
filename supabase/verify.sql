@@ -438,15 +438,17 @@ from (values
   ('no policy on eugenia_reads',
    (select count(*)::text from pg_policy where polrelid = to_regclass('public.eugenia_reads')),
    '0'),
-  -- make_call writes confirm, level and not_before, the scoring confirmed_at
-  -- and explain_call the last two; missing, every call is a 400 she reports as not
+  -- make_call writes confirm, level and not_before, the look looked_at and
+  -- the two withdrawn columns, the scoring confirmed_at and spared, and
+  -- explain_call lesson and misread; missing, every call is a 400 she reports as not
   -- filed, no call is scored, or every loss goes unexplained.
   ('her calls carry how the entry goes live, when it did and why a loss lost',
    (select coalesce(string_agg(column_name, ',' order by column_name), 'none')
       from information_schema.columns
      where table_schema = 'public' and table_name = 'eugenia_calls'
-       and column_name in ('confirm', 'confirmed_at', 'level', 'lesson', 'misread', 'not_before')),
-   'confirm,confirmed_at,lesson,level,misread,not_before'),
+       and column_name in ('confirm', 'confirmed_at', 'level', 'lesson', 'looked_at', 'misread', 'not_before',
+                           'spared', 'withdrawn', 'withdrawn_at')),
+   'confirm,confirmed_at,lesson,level,looked_at,misread,not_before,spared,withdrawn,withdrawn_at'),
   ('RLS on eugenia_calls',
    (select relrowsecurity::text from pg_class where oid = to_regclass('public.eugenia_calls')),
    'true'),
