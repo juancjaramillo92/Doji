@@ -625,6 +625,30 @@ on conflict (id) do nothing;
 
 alter table public.eugenia_portrait enable row level security;
 
+-- ─── What her record has taught her ────────────────────────────────────────
+-- The portrait's twin, about herself: one row, rewritten at the nightly pass
+-- with her whole record counted in front of it, so a lesson about her own
+-- reading outlives the month its calls and reads are shown for. No app
+-- policy: /notes shows it to him.
+create table if not exists public.eugenia_craft (
+  id         text primary key
+    constraint eugenia_craft_singleton check (id = 'current'),
+
+  craft      text not null
+    constraint eugenia_craft_length check (char_length(craft) between 1 and 800),
+
+  -- A New York civil day written by the function, for eugenia_channels' reason.
+  moved_on   date,
+  updated_at timestamptz not null default now()
+);
+
+-- Seeded, for the portrait's reason.
+insert into public.eugenia_craft (id, craft) values
+  ('current', 'Nothing yet — this is written by the nightly pass once the record holds something seen three times.')
+on conflict (id) do nothing;
+
+alter table public.eugenia_craft enable row level security;
+
 -- ─── What the story and the portrait said before ───────────────────────────
 -- Both are one row rewritten each night, and the portrait shapes every
 -- briefing and reply. A rewrite that loses something true about him is

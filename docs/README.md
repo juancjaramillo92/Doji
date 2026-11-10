@@ -534,10 +534,11 @@ add-on.
 
 **A copy of what exists nowhere else is taken daily, outside Supabase.**
 `scripts/backup.mjs`, run every night by `.github/workflows/backup.yml`, reads
-fifteen tables into one JSON artifact: `trades`, whose journal columns only
+sixteen tables into one JSON artifact: `trades`, whose journal columns only
 you can supply; every stop and target a position carried, which the broker
-keeps none of; and the thirteen of hers with no other source — the channel
-map, notes, turns, thesis, portrait, her record, open loops, calendar,
+keeps none of; and the fourteen of hers with no other source — the channel
+map, notes, turns, thesis, portrait, what her record has taught her, her
+record, open loops, calendar,
 feedback, her calls, what the thesis and the portrait said before each
 rewrite, what each briefing was handed, and what gold did on each print.
 `trades` goes whole, the soft-deleted rows included: a restore without them
@@ -1424,6 +1425,24 @@ pass has nothing to research.
   as the story is, and each thing in it seen more than once, counted with
   `check_rules` and `get_stats` rather than remembered. Nightly-only for the same
   reason.
+- **It moves what her record has taught her.** `set_craft` rewrites one
+  paragraph about her own reading — where it goes wrong and what she does in
+  its place — which is how she **keeps improving past the month her records
+  are shown for**. Her reads and her calls come back to her thirty days at a
+  time with the three newest lessons, so without it a mistake she named in
+  August is one she repeats in October. The pass moves the paragraph with
+  her **whole record** in front of it (`lifetimeBlock`): every call and read
+  she has ever filed, counted in code by side, by how the entry went live, by
+  the step a loss failed on, by channel and firmness, with what her
+  withdrawals would have made, and her thirty newest lesson sentences. Each
+  thing in the paragraph is counted there three times at least, says what she
+  does and what she does in its place, and comes out when the record stops
+  supporting it; nothing about you, today's market, a level or where price
+  goes. It goes where her calls' record goes — the briefing, a reply, the
+  look at a standing call and the pass, never the trade look — and `/notes`
+  shows it to you. The whole record is handed to the pass alone. Unlike the
+  story and the portrait, what it said before is not kept beside it; the daily
+  backup is its history.
 - **It files the day's reads**, each with a verdict on the test she stated —
   *Whether her reads held* below.
 - **It retries at 23:00**, gated on whether tonight's pass already ran, read off
@@ -2747,7 +2766,7 @@ rather than searched for, his rules to hold them to, and a meter on each half.
 
 ### What she remembers
 
-Fourteen tables, separated by how long a thing is true for. A turn rolls over inside
+Fifteen tables, separated by how long a thing is true for. A turn rolls over inside
 a morning; a note about him outlives twenty of those; what he UNDERSTANDS
 outlives both; a thesis and a portrait are only ever current, so each is one row
 rewritten, and what each said before is kept beside it; a loop stays until it
@@ -2760,6 +2779,7 @@ closes; and the calendar and her record are the datasets here that compound.
 | `eugenia_channels` | where he stands on each of the six channels | all 6 rows, always | her `set_channel` tool, nightly |
 | `eugenia_thesis` | the running story the market is trading | 1 row, rewritten | her `set_thesis` tool, nightly |
 | `eugenia_portrait` | how she reads him — what his notes and trades add up to | 1 row, rewritten | her `set_portrait` tool, nightly |
+| `eugenia_craft` | what her own record has taught her about reading gold and trading his rules | 1 row, rewritten | her `set_craft` tool, nightly |
 | `eugenia_reads` | every read she gave, with a verdict on the test she stated | the last 30 days | her `record_read` tool, nightly |
 | `eugenia_loops` | what she flagged and what she asked, until it closes | all open, newest 10 | `open_loop` anywhere, `close_loop` nightly |
 | `eugenia_calendar` | what lands today, and what it printed | a rolling ±day | filed from TradingView by `fileCalendar` |

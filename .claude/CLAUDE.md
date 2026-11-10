@@ -103,7 +103,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 846 tests, eight suites
+npm test      # 849 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -302,6 +302,15 @@ his to do and yours — so nothing open goes unsaid.
 Six lifetimes — turns, notes (three `kind`s, `commitment` held against his
 trades rather than obeyed), channels, the thesis and the portrait, loops — plus
 the calendar, her record, and `strategy.ts`, which she cannot write.
+
+- **What her record has taught her is the portrait's twin, about herself**
+  (`eugenia_craft`, `set_craft`). Her reads and calls come back a month at a
+  time, so a lesson lives only if it is there. Only the nightly pass writes
+  it, with `lifetimeBlock()` — her whole record, counted in code — which goes
+  to the pass and nowhere else. `craftBlock()` goes where her calls' record
+  goes and to the look at a standing call, never the trade look.
+  `agree.test.mjs` reads the reach, the tool set and the sentences that keep
+  it counted, off price and off him.
 
 - **The strategy rides the cached prefix** (summary, index, rules table) and the
   rest is `get_strategy`. It is markdown in a template literal: every backtick is

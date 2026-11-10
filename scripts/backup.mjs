@@ -34,6 +34,7 @@ export const TABLES = [
   ['eugenia_turns',    'id'],
   ['eugenia_thesis',   'id'],
   ['eugenia_portrait', 'id'],
+  ['eugenia_craft',    'id'],
   ['eugenia_reads',    'id'],
   ['eugenia_loops',    'id'],
   ['eugenia_calendar', 'id'],
