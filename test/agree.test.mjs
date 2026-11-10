@@ -2897,7 +2897,7 @@ test('every path that speaks to him reads his notes, the map and his desk', () =
      to all four. A reply is `converse`, the turn every door into the
      conversation shares. */
   const TEACHES = ['postBriefing', 'converse', 'postConsolidation'];
-  const SENDS = ['postBriefing', 'converse', 'postTradeEvent'];
+  const SENDS = ['postBriefing', 'converse', 'postTradeEvent', 'postCallLook'];
 
   const reads = (fn) => uncomment(body(fn));
 
@@ -3894,7 +3894,7 @@ test('no prompt that writes or rewrites may lose the line on price', () => {
   // Several phrasings, so rewording it does not fail and deleting it does.
   const SAYS = /where price goes|what price will do|whether a level holds|what the day will look like|what the rest of the session looks like/i;
 
-  for (const who of ['SYSTEM', 'CRITIC', 'TRIM', 'TRADE_EVENT']) {
+  for (const who of ['SYSTEM', 'CRITIC', 'TRIM', 'TRADE_EVENT', 'LOOK']) {
     assert.ok(bodies[who], `prompt.ts no longer exports ${who}`);
     assert.match(bodies[who], SAYS,
       `${who} no longer says anything about a call on where price goes. That ` +
@@ -4022,9 +4022,37 @@ test('a call is filed before it is said, kept whole by both gates, and never mad
 
   const list = (set) => EUGENIA_TS.match(new RegExp(`const ${set}(?:: unknown\\[\\])? = \\[([\\s\\S]*?)\\];`))?.[1] ?? '';
   assert.match(list('CHAT_TOOLS'), /CALL_TOOL/, 'make_call is not offered where she makes calls');
-  for (const set of ['TRADE_TOOLS', 'CONSOLIDATE_TOOLS', 'CRITIC_TOOLS']) {
+  for (const set of ['TRADE_TOOLS', 'CONSOLIDATE_TOOLS', 'CRITIC_TOOLS', 'LOOK_TOOLS']) {
     assert.doesNotMatch(list(set), /CALL_TOOL/, `${set} offers make_call`);
   }
+
+  /* AND A CALL IS WITHDRAWN AT THE LOOK ALONE. The look is a message she
+     starts, about direction, mid-session, so its prompt carries the flat ban
+     itself, and the bar for withdrawing is something that has printed: a
+     withdrawal on nerves leaves a record that says nothing. The sequence is
+     read where no test's stub could tell it apart: claimed before she is
+     asked, the withdrawal read off the row, and nothing sent past a position. */
+  assert.match(list('LOOK_TOOLS'), /^WITHDRAW_TOOL$/, 'the look may do something other than withdraw');
+  for (const set of ['CHAT_TOOLS', 'TRADE_TOOLS', 'CONSOLIDATE_TOOLS', 'REVIEW_TOOLS', 'CRITIC_TOOLS']) {
+    assert.doesNotMatch(list(set), /WITHDRAW_TOOL/, `${set} offers withdraw_call, outside the one look a call gets`);
+  }
+  assert.match(bodies.LOOK, /say what he should do, with a position or without one, not hold, not cut, not move a stop/,
+    'the look no longer forbids telling him what to do');
+  assert.match(bodies.LOOK, /name a level that is not one of the call you are withdrawing; or make another call/,
+    'the look may offer a new level or a second call beside the one it withdraws');
+  assert.match(bodies.LOOK, /a reason goes only when something has printed since you made it/,
+    'the look may withdraw a call on nothing that has printed');
+  assert.match(bodies.LOOK, /Never withdraw to protect your record/, 'the look may withdraw a call to spare her record');
+  const look = uncomment(bodyOf(EUGENIA_TS, 'async function postCallLook(', 'doji-eugenia no longer has postCallLook()'));
+  const at = (text) => { const i = look.indexOf(text); assert.ok(i > -1, `postCallLook no longer has: ${text}`); return i; };
+  assert.ok(at('if (!lookDue(call, price, now)) return;') < at('&looked_at=is.null`, {') &&
+            at('&looked_at=is.null`, {') < at('await ask('),
+    'the look asks the model before it is decided from data and claimed, so every quarter hour could wake her');
+  assert.match(look, /sbHeaders\("return=representation"\)[\s\S]*?if \(!\(await claimed\.json\(\)\)\.length\) return;/,
+    'the claim does not count the rows it returned, and a PATCH filtered to nothing is a 200');
+  assert.ok(at('if (!after?.withdrawn_at) {') < at('if (open.length) {') && at('if (open.length) {') < at('await trim('),
+    'a withdrawal is sent before the row says there is one, or before asking whether he holds a position');
+  assert.match(look, /'call look', LOOK_TOOLS, LOOK_MS\)/, 'the look is asked with a tool set other than its own');
 
   // A loss is explained once a day is whole, by the pass alone, which is
   // handed the losses and the map it judges them against.
@@ -5383,15 +5411,16 @@ test('the briefing goes out as she wrote it, hello included, and the hello is he
 
 test('every message she writes goes out through sayAloud', () => {
   /* THE HALF THE FUNCTION CANNOT GUARANTEE: a path calling `say` directly works
-     and is silent. Four sites — the briefing's two (the speaking worker and
-     postBriefing's fallback), then the trade event and the reply; the week's
+     and is silent. Five sites — the briefing's two (the speaking worker and
+     postBriefing's fallback), then the trade event, the reply and a call she
+     withdrew; the week's
      review rides the Sunday briefing. `/notes`, the apologies, the short
      operational lines and the copy of a laptop's turn keep `say`
      deliberately — that voice was on the device. */
   const src = source('supabase/functions/doji-eugenia/index.ts');
   const spoken = (src.match(/await sayAloud\(/g) || []).length;
-  assert.equal(spoken, 4,
-    `${spoken} call sites speak where four should — a message she writes that goes ` +
+  assert.equal(spoken, 5,
+    `${spoken} call sites speak where five should — a message she writes that goes ` +
     `out through say() alone arrives correctly and silently`);
 });
 
@@ -6221,8 +6250,8 @@ test('futures volume reaches every briefing and a conversation', () => {
    his FedWatch screen. */
 test('the rate odds reach the briefing and a conversation, said the way FedWatch shows them', () => {
   const brief = bodyOf(EUGENIA_TS, 'async function postBriefing(');
-  assert.equal([...EUGENIA_TS.matchAll(/(?<!function )ratesBlock\(\)/g)].length, 3,
-    'ratesBlock() is called somewhere other than the briefing, get_around and the nightly pass');
+  assert.equal([...EUGENIA_TS.matchAll(/(?<!function )ratesBlock\(\)/g)].length, 4,
+    'ratesBlock() is called somewhere other than the briefing, get_around, the nightly pass and the look at a standing call');
   // The pass reads them as the day closed, to judge a read whose test was the
   // Fed pricing — and hands them over, or every such read files as untested.
   assert.match(uncomment(bodyOf(EUGENIA_TS, 'async function postConsolidation(')),
@@ -6861,6 +6890,7 @@ const SENDS = {
                           'laptopAudio — the voice goes to his laptop, so ' +
                           'Telegram is sent the text as its copy, not a ' +
                           'second voice note of a thing he has just heard' },
+  postCallLook:   { gate: 'trim',     carries: 'said' },
   postTradeEvent: { gate: null,       carries: 'said',
                     why: 'TRIM REWRITES, and this one reaches a man who is ' +
                          'in a position or has just breached his day — the ' +

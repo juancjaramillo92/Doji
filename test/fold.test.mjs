@@ -42,7 +42,7 @@ import {
   VOICE_TROUBLE,
   positionsList, isOpen, healthLine, sweepLine, serve, parseChannel, sayAloud, postSpeak,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock, portraitBlock, NOTES, recordBlock, recordList, recordQuery,
-  callProblem, expiryOf, scoreCall, callsList, lossesList, reactionOf, fileReactions,
+  callProblem, expiryOf, notBefore, lookDue, LOOK_NEAR, postCallLook, scoreCall, callsList, lossesList, reactionOf, fileReactions,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock, alertsList,
@@ -69,7 +69,7 @@ import { ALWAYS, SECTIONS } from '../supabase/functions/doji-eugenia/strategy.ts
 import { backup, readAll, TABLES } from '../scripts/backup.mjs';
 import { lastRun, stale } from '../scripts/health.mjs';
 import { score, table, readingsGrid, NEAR, HOLD, holdOf, holds, holdTable } from '../scripts/calibrate.mjs';
-import { replayed, tally, request as replayRequest, CLEAN_FROM } from '../scripts/replay.mjs';
+import { replayed, tally, baseline, agreement, inputsByDay, request as replayRequest, CLEAN_FROM } from '../scripts/replay.mjs';
 
 const USER = '00000000-0000-0000-0000-000000000001';
 
@@ -1197,13 +1197,65 @@ test('a replayed answer is refused, scored or no call, as the live path would ha
                            level: 4000, why: 'x' }, served);
   assert.equal(waits.outcome, 'untriggered', 'a replayed call waiting on a close was filled on the touch');
   assert.match(tally([won, waits, { outcome: 'none' }, { outcome: 'refused' }]),
-    /^4 sessions: 1 no call, 1 off his rules, 1 won, 0 lost, 0 scratch, 0 open, 1 untriggered, 0 unread; the 1 that triggered made \+\$30\.00 an ounce\.$/);
+    /^4 sessions: 1 no call, 1 off his rules, 1 won, 0 lost, 0 scratch, 0 open, 1 untriggered, 0 unread \(1 with the close and no fill after it\); the 1 that triggered made \+\$30\.00 an ounce\.$/);
+  assert.doesNotMatch(tally([won, { outcome: 'untriggered', confirmed_at: null }]), /with the close/,
+    'a call whose candle never came is counted as left behind by its entry');
   const asked = replayRequest(served);
   assert.equal(asked.output_config.effort, 'high', "the replay asks at another effort than the briefing's");
   assert.ok(asked.system[0].text.startsWith(SYSTEM), 'the replay is not asked under her system prompt');
   assert.match(asked.messages[0].content, /no news, no calendar[\s\S]*This is YOUR map/,
     'the replay does not say she has her map and nothing else');
   assert.ok(CLEAN_FROM >= '2026-07-01', 'the replay walks into months the model may have read about');
+  // The same mornings under another model, and with the morning's whole message.
+  assert.equal(replayRequest(served, 'another-model').model, 'another-model', 'the replay ignores the model it was asked for');
+  const whole = replayRequest(served, undefined, "Today's briefing, please.\n\nThe calendar: CPI 08:30");
+  assert.match(whole.messages[0].content, /no tools here[\s\S]*THE MORNING:\n\nToday's briefing, please\.\n\nThe calendar: CPI 08:30$/,
+    'the whole morning is not handed over as it was kept');
+  assert.doesNotMatch(whole.messages[0].content, /map and nothing else|no news, no calendar/,
+    'she is handed the calendar and told she has none');
+  // A briefing run late saw a later morning, and is scored from there.
+  const late = replayed({ call: true, direction: 'buy', entry: 4000, stop: 3985, target: 4030, confirm: 'market', why: 'x' },
+                        served, Date.parse('2026-10-14T13:02:00Z'));
+  assert.equal(late.outcome, 'untriggered', 'a call was filled by a bar that printed before she was asked');
+});
+
+/* HIS RULES WITH NOBODY READING, which her tally is read against: the first 5m
+   candle to reach a mark and close off it, entered on its close. */
+test('the baseline takes the first five-minute close off a mark, on his stop and target', () => {
+  const at = Date.parse('2026-10-14T12:00:00Z');
+  const marks = [...foldStructure(MAP_CHARTS, at).levels, ...foldStructure(MAP_CHARTS, at).grid].map(m => m.price).sort((a, b) => a - b);
+  const m = marks[0], bar = (n, o) => ({ t: at + n * 60_000, open: m + 5, high: m + 6, low: m + 4, close: m + 5, ...o });
+  const reach = bar(5, { low: m - 1, high: m + 3, close: m + 2 });
+  const served = (bars) => ({ at, charts: MAP_CHARTS, missing: [], bars });
+  const won = baseline(served([bar(0), reach, bar(10, { open: m + 2, low: m + 1, high: m + 3 }), bar(11, { high: m + 33 })]));
+  assert.deepEqual([won.outcome, won.result, won.call.direction, won.call.entry, won.call.stop, won.call.target, won.call.made_at],
+    ['won', 30, 'buy', m + 2, m - 18, m + 32, '2026-10-14T12:10:00.000Z']);
+  assert.equal(baseline(served([bar(5, { high: m + 1, low: m - 3, close: m - 2 }), bar(10, { open: m - 2, high: m - 1, low: m - 3 }),
+                                bar(11, { high: m + 19, low: m - 3 })])).outcome, 'lost', 'a close below a mark was not sold');
+  assert.equal(baseline(served([bar(0), bar(10)])).outcome, 'none', 'a candle that reached no mark was traded');
+  assert.equal(baseline(served([{ ...reach, t: at - 60_000 }, bar(10)])).outcome, 'none',
+    'a candle that opened before 08:00 was read as the signal');
+  // Above one mark and below the next is no side.
+  assert.equal(baseline(served([bar(5, { low: m - 1, high: marks[1] + 1, close: (m + marks[1]) / 2 })])).outcome, 'none',
+    'a candle closing between two marks it reached was given a side');
+});
+
+test('asked more than once, the replay counts the mornings she flipped', () => {
+  const buy = { outcome: 'won', call: { direction: 'buy' } }, sell = { outcome: 'lost', call: { direction: 'sell' } };
+  const none = { outcome: 'none' };
+  assert.equal(agreement([[buy, buy, buy], [buy, sell, buy], [none, none, none], [buy, none, buy]]),
+    'Asked 3 times a morning: the same side every time on 2 of 4, a buy on one asking and a sell on another on 1.');
+});
+
+test('a morning is replayed from the first input kept that New York day', () => {
+  const by = inputsByDay([
+    { at: '2026-10-28T00:30:00+00:00', asked: 'asked again on the evening of the 27th' },
+    { at: '2026-10-28T12:00:04+00:00', asked: 'the morning of the 28th' },
+    { at: '2026-10-28T15:00:00+00:00', asked: 'forced later on the 28th' },
+  ]);
+  assert.equal(by.get('2026-10-28').asked, 'the morning of the 28th',
+    'an evening asking, already tomorrow in UTC, was read as the next morning');
+  assert.equal(by.get('2026-10-27').asked, 'asked again on the evening of the 27th');
 });
 
 /* WHETHER A MARK HOLDS, every doubt against the map, and the chance it is
@@ -4990,6 +5042,17 @@ test('a call lives until the next 17:00 New York roll on a weekday', () => {
   assert.equal(until('2026-11-02T15:00:00Z'), '2026-11-02T22:00:00.000Z', 'the roll is New York\'s 17:00 in winter too');
 });
 
+/* A CALL CAN WAIT OUT A RELEASE: held back to a New York minute, and scored as
+   made then, so the spike a print makes is neither its candle nor its fill. */
+test('a call held back is live from the New York minute it names, and from no time already gone', () => {
+  const at = (made, hhmm) => notBefore(new Date(made), expiryOf(new Date(made)), hhmm)?.toISOString() ?? null;
+  assert.equal(at('2026-10-14T12:00:20Z', '08:40'), '2026-10-14T12:40:00.000Z');
+  assert.equal(at('2026-11-03T13:00:00Z', '08:40'), '2026-11-03T13:40:00.000Z', "the time is New York's in winter too");
+  assert.equal(at('2026-10-14T21:30:00Z', '03:00'), '2026-10-15T07:00:00.000Z', 'an evening call could not wait for the London open, which is tomorrow by the clock and this session by the roll');
+  assert.equal(at('2026-10-14T13:00:00Z', '08:40'), null, 'a time already gone was filed as tomorrow\'s, past the roll');
+  for (const bad of ['8:40', '08:40 ET', 'after CPI', '', 840, null]) assert.equal(at('2026-10-14T12:00:00Z', bad), null, `${bad} was read as a time`);
+});
+
 const CALL = { id: 1, made_at: '2026-10-14T13:00:00Z', expires_at: '2026-10-14T21:00:00Z', direction: 'buy',
                entry: 4000, stop: 3985, target: 4030, condition: 'a retest of 4,000', outcome: null, result: null };
 const minute = (n, o) => ({ t: Date.parse('2026-10-14T13:00:00Z') + n * 60_000, open: 4010, high: 4012, low: 4008, close: 4010, ...o });
@@ -5018,6 +5081,12 @@ test('a call is scored on price, every doubt against her', () => {
     'open', 'a bar after the roll was read into the session');
   const sell = { ...CALL, direction: 'sell', entry: 4020, stop: 4035, target: 3990 };
   assert.equal(score([minute(1, { high: 4021 }), minute(2, { low: 3989 })], sell).outcome, 'won');
+  // Held back to 13:10: the touch at 13:01 is the print's, and no fill.
+  const held = { ...CALL, not_before: '2026-10-14T13:10:00Z' };
+  assert.equal(score([minute(1, { low: 3999 }), minute(2, { high: 4031 })], held).outcome, 'untriggered',
+    'a call held back was filled before the time it waits for');
+  assert.equal(score([minute(1, { low: 3999 }), minute(10, { low: 3999 }), minute(11, { high: 4031 })], held).triggered_at,
+    '2026-10-14T13:10:00.000Z');
 });
 
 /* R-07: the signal is not an entry. A call that waits for a 5m close beyond
@@ -5029,13 +5098,20 @@ test('a call waiting on a close fills only after a 5m candle closes beyond its l
   // 13:00–13:04 is one candle, its last minute at 13:04.
   const reach = minute(2, { low: 3999, high: 4003, close: 4001 });
   const closes = minute(4, { low: 4001, high: 4006, close: 4005 });
-  assert.equal(score([reach, closes, minute(6, { low: 4010 })]).outcome, 'untriggered',
-    'price never came back to the entry after the candle closed');
+  const left = score([reach, closes, minute(6, { low: 4010 })]);
+  assert.equal(left.outcome, 'untriggered', 'price never came back to the entry after the candle closed');
+  // The setup came and left without her, which is not the setup never coming.
+  assert.equal(left.confirmed_at, '2026-10-14T13:05:00.000Z',
+    'a call whose candle closed and whose entry was never touched reads as one whose setup never came');
   const won = score([reach, closes, minute(6, { low: 4001.5, high: 4004 }), minute(7, { high: 4033 })]);
-  assert.deepEqual([won.outcome, won.triggered_at], ['won', '2026-10-14T13:06:00.000Z']);
-  assert.equal(score([minute(2, { low: 3999, high: 4003, close: 4001 }), minute(4, { low: 3990, close: 3995 }),
-                      minute(6, { low: 4001 }), minute(7, { high: 4033 })]).outcome, 'untriggered',
+  assert.deepEqual([won.outcome, won.confirmed_at, won.triggered_at],
+    ['won', '2026-10-14T13:05:00.000Z', '2026-10-14T13:06:00.000Z']);
+  const failed = score([minute(2, { low: 3999, high: 4003, close: 4001 }), minute(4, { low: 3990, close: 3995 }),
+                        minute(6, { low: 4001 }), minute(7, { high: 4033 })]);
+  assert.deepEqual([failed.outcome, failed.confirmed_at], ['untriggered', null],
     'a candle that reached the level and closed back below it was read as the confirmation');
+  assert.equal(scoreCall({ ...CALL, confirm: 'market' }, [minute(1, { low: 3999 }), minute(2, { high: 4031 })], FROM).confirmed_at,
+    null, 'a call at the market was filed with a candle it never waited for');
   assert.equal(score([minute(6, { low: 4003, close: 4005 }), minute(7, { low: 4001, high: 4033 })]).outcome,
     'untriggered', 'a candle that never reached the level was read as the confirmation');
   const early = score([reach, minute(3, { low: 4001, high: 4002 }), closes, minute(6, { high: 4033, low: 4004 })]);
@@ -5043,9 +5119,123 @@ test('a call waiting on a close fills only after a 5m candle closes beyond its l
   assert.equal(scoreCall({ ...waits, made_at: '2026-10-14T13:01:00Z' }, [reach, closes, minute(6, { low: 4001 }),
                minute(7, { high: 4033 })], FROM).outcome, 'untriggered',
     'a candle that opened before the call was read as its confirmation');
+  assert.equal(scoreCall({ ...waits, not_before: '2026-10-14T13:05:00Z' }, [reach, closes, minute(6, { low: 4001.5, high: 4004 }),
+               minute(7, { high: 4033 })], FROM).confirmed_at, null,
+    'a candle that opened before the call was live was read as its confirmation');
   const sell = { ...waits, direction: 'sell', entry: 3998, stop: 4015, target: 3968 };
   assert.equal(scoreCall(sell, [minute(2, { high: 4001, low: 3997, close: 3999 }), minute(4, { high: 3999, low: 3994, close: 3995 }),
                minute(6, { high: 3998.5, low: 3996 }), minute(7, { low: 3967 })], FROM).outcome, 'won');
+});
+
+/* A WITHDRAWAL IS SCORED LIKE A CALL: in time, the call never traded and what
+   it would have made is kept; too late, it is scored as it stood. */
+test('a withdrawn call is untriggered unless it had already filled, and keeps what it would have made', () => {
+  const bars = [minute(1), minute(5, { low: 3999 }), minute(6, { high: 4031 })];
+  const pulled = scoreCall({ ...CALL, withdrawn_at: '2026-10-14T13:03:00Z' }, bars, FROM);
+  assert.deepEqual([pulled.outcome, pulled.result, pulled.triggered_at, pulled.spared], ['untriggered', null, null, 30],
+    'a call withdrawn before it filled was scored as traded, or what it would have made was lost');
+  const lost = scoreCall({ ...CALL, withdrawn_at: '2026-10-14T13:03:00Z' }, [minute(5, { low: 3980 })], FROM);
+  assert.deepEqual([lost.outcome, lost.spared], ['untriggered', -15], 'a loss she withdrew from is not kept as one she was spared');
+  const late = scoreCall({ ...CALL, withdrawn_at: '2026-10-14T13:05:30Z' }, bars, FROM);
+  assert.deepEqual([late.outcome, late.result, late.spared], ['won', 30, null],
+    'a call withdrawn inside the bar that filled it was let out of the trade');
+  assert.equal(scoreCall({ ...CALL, withdrawn_at: '2026-10-14T13:03:00Z' }, [minute(1), minute(5)], FROM).spared, null,
+    'a withdrawal from a call that would never have filled was given a figure');
+  assert.equal(scoreCall(CALL, bars, FROM).spared, null, 'a call never withdrawn carries what a withdrawal spared');
+  // The close it waited for printed after she had gone: not hers to count.
+  const waits = { ...CALL, entry: 4002, stop: 3985, target: 4032, confirm: 'close', level: 4000, withdrawn_at: '2026-10-14T13:03:00Z' };
+  assert.equal(scoreCall(waits, [minute(6, { low: 3999, high: 4003, close: 4001 }), minute(9, { close: 4005 })], FROM).confirmed_at,
+    null, 'a candle that closed after the withdrawal was filed as the close the call had');
+});
+
+/* THE ONE LOOK. Woken once, for a call that waits, when price first comes
+   near its level, and never for anything a look could not change. */
+test('she is woken for a call that waits, once, when price is near its level', () => {
+  const now = Date.parse('2026-10-14T15:00:00Z');
+  const waits = { ...CALL, entry: 4002, stop: 3985, target: 4032, confirm: 'close', level: 4000 };
+  assert.equal(lookDue(waits, 4000 + LOOK_NEAR, now), true);
+  assert.equal(lookDue(waits, 4000 - LOOK_NEAR, now), true);
+  for (const [why, c, price, at] of [
+    ['price is not near the level', waits, 4000 + LOOK_NEAR + 0.01, now],
+    ['she has already looked', { ...waits, looked_at: '2026-10-14T14:00:00Z' }, 4001, now],
+    ['it is withdrawn', { ...waits, withdrawn_at: '2026-10-14T14:00:00Z' }, 4001, now],
+    ['it is scored', { ...waits, outcome: 'lost' }, 4001, now],
+    ['its session is over', waits, 4001, Date.parse(waits.expires_at)],
+    ['it is live at the market', { ...waits, confirm: 'market', level: null }, 4001, now],
+    ['it is still held back', { ...waits, not_before: '2026-10-14T15:30:00Z' }, 4001, now],
+  ]) assert.equal(lookDue(c, price, at), false, `she is woken for a call although ${why}`);
+  assert.equal(lookDue({ ...waits, not_before: '2026-10-14T14:30:00Z' }, 4001, now), true,
+    'a call whose time has come is never looked at');
+});
+
+/* THE SEQUENCE, driven: read, guard, claim, ask, read the row back, and send
+   only to a man who is flat. The withdrawal is read off the row, so the stub
+   keeps one. */
+test('the look asks nothing until price is near, and a withdrawal reaches him only when he is flat', async () => {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
+  const call = { ...CALL, id: 7, entry: 4002, stop: 3985, target: 4032, confirm: 'close', level: 4000,
+                 made_at: new Date(Date.now() - 3600_000).toISOString(), expires_at: new Date(Date.now() + 3600_000).toISOString() };
+  const position = { id: 'PID9', direction: 'BUY', entry_time: new Date().toISOString(), fill_time: null, entry_price: 4000,
+    exit_price: null, pnl: null, open_day: today, setup: null, followed_rules: null, followed_sl: null, followed_tp: null,
+    size_oz: 4, net_pnl: null, planned_sl: null, planned_tp: null, best_price: null };
+  const OFF = 'My call from this morning is off. The 1H closed under the low it rested on.';
+
+  const run = ({ calls = [call], price = 4004, withdraws = false, desk = [], age = 0 }) => {
+    const sent = [];
+    let row = {};
+    return withFetch(async (url, init) => {
+      const u = String(url), method = init?.method ?? 'GET';
+      sent.push(`${method} ${u}`);
+      const ok = (body, status = 200) => new Response(JSON.stringify(body), { status });
+      if (u.includes('eugenia_calls') && method === 'PATCH') { row = { ...row, ...JSON.parse(init.body) }; return ok([row]); }
+      if (u.includes('eugenia_calls') && u.includes('select=withdrawn_at')) return ok([{ withdrawn_at: row.withdrawn_at ?? null }]);
+      if (u.includes('eugenia_calls')) return ok(calls);
+      if (u.includes('eugenia_market')) return ok([{ answer: { last: { close: price } }, read_at: new Date(Date.now() - age).toISOString() }]);
+      if (u.includes('eugenia_trades')) return ok(desk);
+      if (u.includes('anthropic')) {
+        const body = JSON.parse(init.body);
+        const answered = JSON.stringify(body.messages).includes('tool_result');
+        // TRIM is handed no tools, and returns the message as it stands.
+        if (!body.tools.length) return ok({ content: [{ type: 'text', text: OFF }], stop_reason: 'end_turn', usage: {} });
+        if (withdraws && !answered) return ok({ content: [{ type: 'tool_use', id: 't1', name: 'withdraw_call',
+          input: { why: 'the 1H closed under the low it rested on' } }], stop_reason: 'tool_use', usage: {} });
+        return ok({ content: [{ type: 'text', text: withdraws ? OFF : 'STANDS' }], stop_reason: 'end_turn', usage: {} });
+      }
+      // The working dots are a send with no text, and not a message.
+      if (u.includes('api.telegram.org')) {
+        const { text } = JSON.parse(init.body);
+        if (text) sent.push(`said ${text}`);
+        return Response.json({ ok: true });
+      }
+      return ok([], method === 'POST' ? 201 : 200);
+    }, async () => { await postCallLook(); return { sent, row }; });
+  };
+  const asked = (r) => r.sent.some(u => u.includes('anthropic'));
+  const told = (r) => r.sent.filter(u => u.startsWith('said '));
+
+  const none = await run({ calls: [] });
+  assert.ok(!asked(none) && !none.sent.some(u => u.startsWith('PATCH')), 'a quarter hour with no standing call claimed a look or asked the model');
+  const far = await run({ price: 4000 + LOOK_NEAR + 5 });
+  assert.ok(!asked(far) && !far.row.looked_at, 'a call nowhere near its level spent its one look');
+  const stale = await run({ age: 3600_000 });
+  assert.ok(!asked(stale) && !stale.row.looked_at, 'the look was decided on a map an hour old');
+
+  const stands = await run({});
+  assert.ok(asked(stands) && stands.row.looked_at, 'price reached the level and she was never woken');
+  assert.ok(stands.sent.some(u => u.startsWith('PATCH') && u.includes('id=eq.7&looked_at=is.null')),
+    'the look is not claimed under `is null`, so two passes can both wake her');
+  assert.deepEqual([stands.row.withdrawn_at, told(stands)], [undefined, []], 'a call that stands was withdrawn or announced');
+
+  const off = await run({ withdraws: true });
+  assert.ok(off.row.withdrawn_at && off.row.withdrawn, 'she withdrew the call and no row says so');
+  assert.deepEqual(told(off), [`said ${OFF}`], 'he is flat, the call he heard at eight is off, and he was not told');
+  const stored = off.sent.findIndex(u => u.startsWith('POST') && u.includes('eugenia_turns'));
+  assert.ok(stored > -1 && stored < off.sent.findIndex(u => u.startsWith('said ')),
+    'the withdrawal is spoken before it is stored, so a message he sends meanwhile reads a history without it');
+
+  const held = await run({ withdraws: true, desk: [position] });
+  assert.ok(held.row.withdrawn_at, 'a withdrawal while he holds a position was not filed');
+  assert.deepEqual(told(held), [], 'a man in a position was sent "my call is off", which reads as what to do with his trade');
 });
 
 test('a call the bars do not reach is unread, and a weekend is not a gap', () => {
@@ -5070,8 +5260,36 @@ test('her calls say how they ended, what they made, and which still stands', () 
   assert.match(rolled, /1 still on at the 17:00 roll and marked at its close/);
   assert.doesNotMatch(rolled, /\d open\b|not yet scored/, 'a call marked at its roll reads as left unscored');
   assert.match(out, /The 2 that triggered made \+\$15\.00 an ounce/);
+  assert.doesNotMatch(out, /never came back to the entry/, 'an untriggered call with no close filed reads as left behind');
+  const behind = callsList([
+    { ...CALL, id: 2, expires_at: '2026-10-13T21:00:00Z', outcome: 'untriggered', confirmed_at: '2026-10-13T14:05:00Z' },
+    { ...CALL, id: 1, expires_at: '2026-10-12T21:00:00Z', outcome: 'untriggered' },
+    { ...CALL, id: 0, expires_at: '2026-10-09T21:00:00Z', outcome: 'won', result: 30, confirmed_at: '2026-10-09T14:05:00Z' },
+  ], now);
+  assert.match(behind, /Of the 2 untriggered, 1 had the five-minute close it waited for and price never came back to the entry\./,
+    'a setup that came and left without her is counted with the ones that never came');
   assert.match(out, /Standing until the 17:00 roll: buy 4000, stop 3985, target 4030, if a retest of 4,000/,
     'the call still standing is not named, so she would make a second');
+  assert.match(callsList([{ ...CALL, not_before: '2026-10-14T12:40:00Z' }], now), /if a retest of 4,000, not before 08:40 ET\./,
+    'a standing call held back reads as live now');
+  // Withdrawn today: not standing, and still the session's one call.
+  const off = callsList([{ ...CALL, withdrawn_at: '2026-10-14T14:15:00Z', withdrawn: 'the 1H closed under the higher low' }], now);
+  assert.doesNotMatch(off, /Standing until/, 'a withdrawn call is handed to her as standing');
+  assert.match(off, /Withdrawn at 10:15 ET, and this session's one call all the same: buy 4000[^\n]* — the 1H closed under the higher low/);
+  assert.doesNotMatch(off, /not yet scored/, 'a call withdrawn today reads as one the night missed');
+  const worth = callsList([
+    { ...CALL, id: 3, expires_at: '2026-10-13T21:00:00Z', outcome: 'untriggered', withdrawn_at: '2026-10-13T14:00:00Z', spared: -15 },
+    { ...CALL, id: 2, expires_at: '2026-10-12T21:00:00Z', outcome: 'untriggered', withdrawn_at: '2026-10-12T14:00:00Z', spared: 30 },
+    { ...CALL, id: 1, expires_at: '2026-10-09T21:00:00Z', outcome: 'untriggered', withdrawn_at: '2026-10-09T14:00:00Z', spared: null },
+    { ...CALL, id: 0, expires_at: '2026-10-08T21:00:00Z', outcome: 'won', result: 30, withdrawn_at: '2026-10-08T14:00:00Z' },
+  ], now);
+  assert.match(worth, / 3 were withdrawn before they could fill; left standing, the 2 that would have triggered would have made \+\$15\.00 an ounce\./,
+    'her withdrawals are not held against what the calls would have made');
+  assert.match(callsList([{ ...CALL, expires_at: '2026-10-13T21:00:00Z', outcome: 'untriggered', withdrawn_at: '2026-10-13T14:00:00Z', spared: null }], now),
+    / 1 was withdrawn before it could fill, and none would have triggered\./);
+  assert.doesNotMatch(callsList([{ ...CALL, expires_at: '2026-10-13T21:00:00Z', outcome: 'untriggered',
+                                   withdrawn_at: '2026-10-13T14:00:00Z', spared: 30 }], now, 'My'), /\b[Yy]ou(r)?\b/,
+    'her calls, said to him in /notes as hers, call him the one who made them');
   assert.match(out, /The latest lost:\n· 13 Oct: buy 4000/);
   // A condition filed as a sentence of its own sits inside ours after "if".
   const filed = callsList([{ ...CALL, condition: 'Price comes back to 4,000 and a five-minute candle closes back above it.' }], now);
@@ -5138,7 +5356,12 @@ test('a call is filed once a session, and a call off his rules never reaches the
       /^Filed: buy 4000, stop 3985, target 4030, until 17:00 ET/);
     assert.match(await serve('make_call', { direction: 'sell', entry: 4000, stop: 4015, target: 3970, condition: 'at the market', confirm: 'market' }),
       /already made this session's call/, 'a second call in a session is filed or swallowed');
+    assert.match(await serve('make_call', { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market',
+                                            confirm: 'market', not_before: 'after the print' }),
+      /not_before is a New York time[\s\S]*Not filed/);
+    assert.equal(posts.length, 2, 'a call held back to no time at all reached the database');
   });
+  assert.equal(JSON.parse(posts[0].body)[0].not_before, null, 'a call live at once is filed as held back');
   const [row] = JSON.parse(posts[0].body);
   assert.equal(Date.parse(row.expires_at), expiryOf(new Date(row.made_at)).getTime(),
     'the call is filed under a session other than the one expiryOf names');
@@ -6669,6 +6892,7 @@ const TOOL_CALLS = [
                       firmness: 'light', channel: 'dollar' }],
   ['make_call',     { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market', confirm: 'market' }],
   ['explain_call',  { id: 1, step: 'level', lesson: 'the 4,000 quarter had already been traded through twice' }],
+  ['withdraw_call', { why: 'the 1H closed under the higher low the bias rested on' }],
   ['get_releases',  { release: 'Core Inflation Rate MoM', months: 12 }],
 ];
 

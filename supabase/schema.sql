@@ -773,6 +773,31 @@ alter table public.eugenia_calls add column if not exists misread text
 alter table public.eugenia_calls add column if not exists lesson text
   constraint eugenia_calls_lesson_length check (char_length(lesson) between 1 and 200);
 
+-- Added after the columns above, and kept below them: a re-run appends a new
+-- column to the live table, so one written higher up would sit in a different
+-- place there than in a fresh apply.
+
+-- When the 5m candle a waiting call waits for closed, filed by the scoring
+-- whether or not the entry was touched after it: an untriggered call carrying
+-- one had its setup and was left behind by its entry. Null on a call at the
+-- market, and on one whose candle never came.
+alter table public.eugenia_calls add column if not exists confirmed_at timestamptz;
+
+-- The instant a call is held back until, when she gave one: nothing before it
+-- counts, neither the candle nor the fill, which is how a call waits out a
+-- release. Null on a call live from the minute it was made.
+alter table public.eugenia_calls add column if not exists not_before timestamptz;
+
+-- The one look she gets at a call that waits, when price first comes near its
+-- level: `looked_at` is claimed under `is null`, which is the once. She may
+-- withdraw the call then and nothing else; the scoring keeps in `spared` what
+-- it would have made left standing, so a withdrawal is judged on price too.
+alter table public.eugenia_calls add column if not exists looked_at timestamptz;
+alter table public.eugenia_calls add column if not exists withdrawn_at timestamptz;
+alter table public.eugenia_calls add column if not exists withdrawn text
+  constraint eugenia_calls_withdrawn_length check (char_length(withdrawn) between 1 and 200);
+alter table public.eugenia_calls add column if not exists spared numeric;
+
 alter table public.eugenia_calls enable row level security;
 
 -- ─── What gold did on each print ───────────────────────────────────────────
