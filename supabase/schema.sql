@@ -771,6 +771,11 @@ alter table public.eugenia_calls add column if not exists level numeric;
 -- market, and on one whose candle never came.
 alter table public.eugenia_calls add column if not exists confirmed_at timestamptz;
 
+-- The instant a call is held back until, when she gave one: nothing before it
+-- counts, neither the candle nor the fill, which is how a call waits out a
+-- release. Null on a call live from the minute it was made.
+alter table public.eugenia_calls add column if not exists not_before timestamptz;
+
 -- Why a lost call lost, filed at the nightly pass: the step of his sequence
 -- her reading of the chart got wrong, or `none` for a call that kept every
 -- step, and the sentence saying what she misread. Null until it is filed.

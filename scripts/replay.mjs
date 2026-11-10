@@ -58,7 +58,7 @@
 import { SYSTEM } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { foldStructure } from '../supabase/functions/doji-eugenia/structure.ts';
-import { structureList, callProblem, scoreCall, expiryOf, CALL_SIDES, CALL_CONFIRMS, CALL_OUTCOMES, CONFIRM_MS }
+import { structureList, callProblem, scoreCall, expiryOf, notBefore, CALL_SIDES, CALL_CONFIRMS, CALL_OUTCOMES, CONFIRM_MS }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { FULL_STOP, TARGET_MAX } from '../supabase/functions/doji-eugenia/adherence.ts';
 import { claude, costOf, MODEL } from './eval.mjs';
@@ -94,6 +94,7 @@ const ANSWER = {
     condition: { type: 'string' },
     confirm:   { type: 'string', enum: [...CALL_CONFIRMS] },
     level:     { type: 'number' },
+    not_before: { type: 'string' },
     why:       { type: 'string' },
   },
   required: ['call', 'why'],
@@ -125,9 +126,12 @@ export function replayed(answer, served, at = served.at) {
   const level = confirm === 'close' ? answer.level : null;
   const refused = callProblem(direction, entry, stop, target, confirm, level ?? NaN);
   if (refused) return { outcome: 'refused', why: refused };
-  const made = new Date(at);
-  const call = { id: 0, made_at: made.toISOString(), expires_at: expiryOf(new Date(served.at)).toISOString(), direction,
-                 entry, stop, target, condition: answer.condition ?? '', confirm, level, outcome: null, result: null };
+  const made = new Date(at), until = expiryOf(new Date(served.at));
+  const held = answer.not_before == null ? null : notBefore(made, until, answer.not_before);
+  if (answer.not_before != null && !held) return { outcome: 'refused', why: 'not_before is not a time before the roll' };
+  const call = { id: 0, made_at: made.toISOString(), expires_at: until.toISOString(), direction,
+                 entry, stop, target, condition: answer.condition ?? '', confirm, level,
+                 not_before: held?.toISOString() ?? null, outcome: null, result: null };
   return { ...scoreCall(call, served.bars, served.at), call, why: answer.why };
 }
 
@@ -195,7 +199,8 @@ export function inputsByDay(rows) {
 
 const line = (day, r) => `${day}  ${r.outcome.padEnd(11)}` +
   (r.call ? ` ${r.call.direction} ${r.call.entry}, stop ${r.call.stop}, target ${r.call.target}` +
-            (r.call.confirm === 'close' ? `, on a 5m close beyond ${r.call.level}` : ', at the market') : '') +
+            (r.call.confirm === 'close' ? `, on a 5m close beyond ${r.call.level}` : ', at the market') +
+            (r.call.not_before ? `, not before ${r.call.not_before.slice(11, 16)}Z` : '') : '') +
   (r.result !== null && r.result !== undefined ? `  ${r.result >= 0 ? '+' : ''}${r.result}` : '') + `  — ${r.why}`;
 
 async function main(argv) {

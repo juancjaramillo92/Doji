@@ -1607,7 +1607,9 @@ const CALL_TOOL = {
     "back above a level — or 'at the market' for now. `confirm` is how it is scored: " +
     "'close' waits for a five-minute candle that reaches `level` and closes beyond it " +
     "your way, and only then is the entry live; 'market' is live at once. The entry is " +
-    "the price you would be filled at, and it is what is scored.",
+    "the price you would be filled at, and it is what is scored. `not_before` holds the " +
+    "whole call back until a New York time: no candle and no fill before it counts, which " +
+    "is how a call waits out a release.",
   input_schema: {
     type: "object",
     properties: {
@@ -1619,6 +1621,7 @@ const CALL_TOOL = {
       confirm:   { type: "string", enum: CALL_CONFIRMS,
                    description: "'close' when the entry waits for a 5m close beyond the level, 'market' when it does not." },
       level:     { type: "number", description: "With 'close': the level the candle reaches and closes beyond." },
+      not_before: { type: "string", description: "Optional. A New York time before the 17:00 roll, as HH:MM, that nothing about the call is live before." },
     },
     required: ["direction", "entry", "stop", "target", "condition", "confirm"],
     additionalProperties: false,
@@ -1665,10 +1668,22 @@ export function expiryOf(made: Date): Date {
   }
 }
 
+/* The instant a call is held back until: the first minute from `made` on, and
+   before the roll, that New York's clock reads `hhmm`. Null for anything else,
+   a time already gone included. Walked by the minute, for expiryOf's reason. */
+export function notBefore(made: Date, until: Date, hhmm: unknown): Date | null {
+  if (typeof hhmm !== 'string' || !/^\d{2}:\d{2}$/.test(hhmm)) return null;
+  for (let t = Math.ceil(made.getTime() / 60_000) * 60_000; t < until.getTime(); t += 60_000) {
+    if (nyTime(new Date(t).toISOString()) === hhmm) return new Date(t);
+  }
+  return null;
+}
+
 /* Never throws, for writeNote's reason. A second call in a session meets the
    unique index and is told so, not stored. */
 async function makeCall(direction: unknown, entry: unknown, stop: unknown, target: unknown,
-                        condition: unknown, confirm: unknown, level: unknown): Promise<string> {
+                        condition: unknown, confirm: unknown, level: unknown,
+                        not_before: unknown): Promise<string> {
   const [e, s, t, l] = [entry, stop, target, level].map(Number);
   const problem = callProblem(direction, e, s, t, confirm, l);
   if (problem) return `${problem} Not filed; a call off his rules is not one you make.`;
@@ -1676,18 +1691,25 @@ async function makeCall(direction: unknown, entry: unknown, stop: unknown, targe
   if (!when) return "Say what price has to do first, or 'at the market'. Not filed.";
   const made = new Date();
   const until = expiryOf(made);
+  const held = not_before == null ? null : notBefore(made, until, not_before);
+  if (not_before != null && !held) {
+    return "not_before is a New York time between now and the 17:00 roll, as HH:MM. Not filed.";
+  }
   try {
     const res = await fetch(`${SB_URL}/rest/v1/eugenia_calls`, {
       method: "POST", headers: sbHeaders("return=minimal"),
       body: JSON.stringify([{ made_at: made.toISOString(), expires_at: until.toISOString(),
                               direction, entry: e, stop: s, target: t, condition: when,
-                              confirm, level: confirm === 'close' ? l : null }]),
+                              confirm, level: confirm === 'close' ? l : null,
+                              not_before: held?.toISOString() ?? null }]),
     });
     if (res.status === 409) {
       return "You already made this session's call, and it stands until the 17:00 roll. Say that rather than making another.";
     }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return `Filed: ${direction} ${e}, stop ${s}, target ${t}, until ${nyTime(until.toISOString())} ET ${weekday(nyDate(until))}.`;
+    return `Filed: ${direction} ${e}, stop ${s}, target ${t}` +
+      (held ? `, not before ${nyTime(held.toISOString())} ET` : "") +
+      `, until ${nyTime(until.toISOString())} ET ${weekday(nyDate(until))}.`;
   } catch (err) {
     console.error("doji-eugenia: call not filed —", why(err));
     return "That call did not file, so it will not be scored. Do not state it as one.";
@@ -1709,14 +1731,16 @@ async function makeCall(direction: unknown, entry: unknown, stop: unknown, targe
    touched: untriggered alone cannot tell a setup that never came from one
    that came and left without her, and only the second says her entry asked
    for more than his rule does — he enters on the close. A call filed before
-   `confirm` existed is scored on the touch alone.
+   `confirm` existed is scored on the touch alone. A call held back by
+   `not_before` is scored as made at that minute: a candle that opened before
+   it is no confirmation and a touch before it no fill.
    A call whose session the bars do not reach is `unread`, never a guess.
    ───────────────────────────────────────────────────────────────────────── */
 export const CALL_OUTCOMES = ['won', 'lost', 'scratch', 'open', 'untriggered', 'unread'] as const;
 
 export type Call = { id: number; made_at: string; expires_at: string; direction: string;
                      entry: number; stop: number; target: number; condition: string;
-                     confirm: string | null; level: number | null;
+                     confirm: string | null; level: number | null; not_before?: string | null;
                      outcome: string | null; result: number | null;
                      confirmed_at?: string | null;
                      closed_at?: string | null; misread?: string | null; lesson?: string | null };
@@ -1731,7 +1755,7 @@ export function scoreCall(c: Call, candles: Candle[], from: number): Score {
     if (marketOpen(new Date(h))) return { outcome: 'unread', confirmed_at: null, ...none };
   }
 
-  const start = Math.ceil(made / 60_000) * 60_000;
+  const start = Math.max(Math.ceil(made / 60_000) * 60_000, c.not_before ? Date.parse(c.not_before) : 0);
   const bars = candles.filter(b => b.t >= start && b.t + 60_000 <= ends);
   const buy = c.direction === 'buy';
   const live = c.confirm === 'close' ? confirmedAt(bars, buy, Number(c.level), start) : start;
@@ -2123,7 +2147,7 @@ export async function serve(name: string, input: any): Promise<string> {
     case LOOP_TOOL.name:     return await openLoop(input.kind, input.body);
     case CLOSE_TOOL.name:    return await closeLoop(input.id, input.resolution);
     case CALL_TOOL.name:     return await makeCall(input.direction, input.entry, input.stop, input.target,
-                                               input.condition, input.confirm, input.level);
+                                               input.condition, input.confirm, input.level, input.not_before);
     case EXPLAIN_TOOL.name:  return await explainCall(input.id, input.step, input.lesson);
     case RECORD_TOOL.name:   return await recordRead(input.reading, input.test, input.verdict, input.evidence,
                                                  input.firmness, input.lesson, input.channel);
@@ -3002,7 +3026,8 @@ export function callsQuery(now = Date.now()): string {
    condition that names its level before a colon keeps it. */
 const callLine = (c: Call) =>
   `${c.direction} ${c.entry}, stop ${c.stop}, target ${c.target}, ` +
-  `if ${clause(c.condition.trim().replace(/^[A-Z][^:.\d]*:\s+/, ''))}`;
+  `if ${clause(c.condition.trim().replace(/^[A-Z][^:.\d]*:\s+/, ''))}` +
+  (c.not_before ? `, not before ${nyTime(c.not_before)} ET` : "");
 
 export function callsList(rows: Call[], now = Date.now(), to = "Your"): string {
   if (!rows.length) return "";

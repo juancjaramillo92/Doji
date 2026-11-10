@@ -2567,6 +2567,13 @@ you.
   already printed. `make_call` refuses a wait whose level is not between the
   stop and the entry, since the stop is where the idea is wrong beyond it.
   *No call today* is a call too.
+- **A call can wait out a release.** Filed at eight with a release rated high
+  due at half past, a call would be filled by the print's spike, on a candle
+  that says nothing about its level. `not_before` holds the whole call back to
+  a New York time she gives (`notBefore`, a minute before the roll or refused),
+  and `scoreCall` scores it as made at that minute: a candle that opened before
+  it is no confirmation and a touch before it no fill. She says the time with
+  the call, and her record names it on a call still standing.
 - **Where.** At most one in the briefing, last, when she has one worth making,
   and in a conversation when you ask. Never unasked while you hold a position,
   never in the trade look, and never anything about what to do with a position

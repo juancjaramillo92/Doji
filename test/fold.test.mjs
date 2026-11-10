@@ -42,7 +42,7 @@ import {
   VOICE_TROUBLE,
   positionsList, isOpen, healthLine, sweepLine, serve, parseChannel, sayAloud, postSpeak,
   marketBlock, notesBlock, channelsBlock, tradesBlock, thesisBlock, portraitBlock, NOTES, recordBlock, recordList, recordQuery,
-  callProblem, expiryOf, scoreCall, callsList, lossesList, reactionOf, fileReactions,
+  callProblem, expiryOf, notBefore, scoreCall, callsList, lossesList, reactionOf, fileReactions,
   healthBlock, loopsBlock, calendarBlock, positionsBlock, feedbackBlock,
   releasesQuery, weeksQuery, stopsQuery, coveredWeeks, RULE_RELEASES, wanted, calendarRows, fileCalendar, fileWeek, historyWeeks, postHistory,
   aroundList, aroundBlock, headlinesList, headlinesBlock, alertsList,
@@ -5042,6 +5042,17 @@ test('a call lives until the next 17:00 New York roll on a weekday', () => {
   assert.equal(until('2026-11-02T15:00:00Z'), '2026-11-02T22:00:00.000Z', 'the roll is New York\'s 17:00 in winter too');
 });
 
+/* A CALL CAN WAIT OUT A RELEASE: held back to a New York minute, and scored as
+   made then, so the spike a print makes is neither its candle nor its fill. */
+test('a call held back is live from the New York minute it names, and from no time already gone', () => {
+  const at = (made, hhmm) => notBefore(new Date(made), expiryOf(new Date(made)), hhmm)?.toISOString() ?? null;
+  assert.equal(at('2026-10-14T12:00:20Z', '08:40'), '2026-10-14T12:40:00.000Z');
+  assert.equal(at('2026-11-03T13:00:00Z', '08:40'), '2026-11-03T13:40:00.000Z', "the time is New York's in winter too");
+  assert.equal(at('2026-10-14T21:30:00Z', '03:00'), '2026-10-15T07:00:00.000Z', 'an evening call could not wait for the London open, which is tomorrow by the clock and this session by the roll');
+  assert.equal(at('2026-10-14T13:00:00Z', '08:40'), null, 'a time already gone was filed as tomorrow\'s, past the roll');
+  for (const bad of ['8:40', '08:40 ET', 'after CPI', '', 840, null]) assert.equal(at('2026-10-14T12:00:00Z', bad), null, `${bad} was read as a time`);
+});
+
 const CALL = { id: 1, made_at: '2026-10-14T13:00:00Z', expires_at: '2026-10-14T21:00:00Z', direction: 'buy',
                entry: 4000, stop: 3985, target: 4030, condition: 'a retest of 4,000', outcome: null, result: null };
 const minute = (n, o) => ({ t: Date.parse('2026-10-14T13:00:00Z') + n * 60_000, open: 4010, high: 4012, low: 4008, close: 4010, ...o });
@@ -5070,6 +5081,12 @@ test('a call is scored on price, every doubt against her', () => {
     'open', 'a bar after the roll was read into the session');
   const sell = { ...CALL, direction: 'sell', entry: 4020, stop: 4035, target: 3990 };
   assert.equal(score([minute(1, { high: 4021 }), minute(2, { low: 3989 })], sell).outcome, 'won');
+  // Held back to 13:10: the touch at 13:01 is the print's, and no fill.
+  const held = { ...CALL, not_before: '2026-10-14T13:10:00Z' };
+  assert.equal(score([minute(1, { low: 3999 }), minute(2, { high: 4031 })], held).outcome, 'untriggered',
+    'a call held back was filled before the time it waits for');
+  assert.equal(score([minute(1, { low: 3999 }), minute(10, { low: 3999 }), minute(11, { high: 4031 })], held).triggered_at,
+    '2026-10-14T13:10:00.000Z');
 });
 
 /* R-07: the signal is not an entry. A call that waits for a 5m close beyond
@@ -5102,6 +5119,9 @@ test('a call waiting on a close fills only after a 5m candle closes beyond its l
   assert.equal(scoreCall({ ...waits, made_at: '2026-10-14T13:01:00Z' }, [reach, closes, minute(6, { low: 4001 }),
                minute(7, { high: 4033 })], FROM).outcome, 'untriggered',
     'a candle that opened before the call was read as its confirmation');
+  assert.equal(scoreCall({ ...waits, not_before: '2026-10-14T13:05:00Z' }, [reach, closes, minute(6, { low: 4001.5, high: 4004 }),
+               minute(7, { high: 4033 })], FROM).confirmed_at, null,
+    'a candle that opened before the call was live was read as its confirmation');
   const sell = { ...waits, direction: 'sell', entry: 3998, stop: 4015, target: 3968 };
   assert.equal(scoreCall(sell, [minute(2, { high: 4001, low: 3997, close: 3999 }), minute(4, { high: 3999, low: 3994, close: 3995 }),
                minute(6, { high: 3998.5, low: 3996 }), minute(7, { low: 3967 })], FROM).outcome, 'won');
@@ -5139,6 +5159,8 @@ test('her calls say how they ended, what they made, and which still stands', () 
     'a setup that came and left without her is counted with the ones that never came');
   assert.match(out, /Standing until the 17:00 roll: buy 4000, stop 3985, target 4030, if a retest of 4,000/,
     'the call still standing is not named, so she would make a second');
+  assert.match(callsList([{ ...CALL, not_before: '2026-10-14T12:40:00Z' }], now), /if a retest of 4,000, not before 08:40 ET\./,
+    'a standing call held back reads as live now');
   assert.match(out, /The latest lost:\n· 13 Oct: buy 4000/);
   // A condition filed as a sentence of its own sits inside ours after "if".
   const filed = callsList([{ ...CALL, condition: 'Price comes back to 4,000 and a five-minute candle closes back above it.' }], now);
@@ -5205,7 +5227,12 @@ test('a call is filed once a session, and a call off his rules never reaches the
       /^Filed: buy 4000, stop 3985, target 4030, until 17:00 ET/);
     assert.match(await serve('make_call', { direction: 'sell', entry: 4000, stop: 4015, target: 3970, condition: 'at the market', confirm: 'market' }),
       /already made this session's call/, 'a second call in a session is filed or swallowed');
+    assert.match(await serve('make_call', { direction: 'buy', entry: 4000, stop: 3985, target: 4030, condition: 'at the market',
+                                            confirm: 'market', not_before: 'after the print' }),
+      /not_before is a New York time[\s\S]*Not filed/);
+    assert.equal(posts.length, 2, 'a call held back to no time at all reached the database');
   });
+  assert.equal(JSON.parse(posts[0].body)[0].not_before, null, 'a call live at once is filed as held back');
   const [row] = JSON.parse(posts[0].body);
   assert.equal(Date.parse(row.expires_at), expiryOf(new Date(row.made_at)).getTime(),
     'the call is filed under a session other than the one expiryOf names');
