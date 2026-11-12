@@ -16,7 +16,7 @@
 import { FINE, opacity } from './art.mjs';
 import { FLING, marketOpen, settle, sleeps, slide } from './body.mjs';
 import { FRAME, PCM_RATE, sampler } from './frames.mjs';
-import { ASKS, SETUPS, asked, given } from './journal.mjs';
+import { ASKS, SETUPS, asked, given, turned } from './journal.mjs';
 import { ROOM } from './place.mjs';
 
 /* ─── Her face ──────────────────────────────────────────────────────────────
@@ -103,7 +103,7 @@ const LEAN = 0.02, SQUASH = 0.035, LIFT = 4;
 const STIFF = 130, DAMP = 9;
 const GIVE = 4, GIVE_UP = 0.012, BEND_MOST = 26, STRETCH_MOST = 0.12;
 const NOD = 0.6, START = 1.2, LAND = 1.0, STIR = 0.7, WIGGLE = 150;
-// The skin is bent in strips this many rows high.
+// The skin is bent in strips this many rows high, and this many bubbles rise in her while she thinks.
 const STRIP = 3;
 const RISING = 7;
 const FRAME_MS = 33, REST_FRAME_MS = 50;
@@ -185,7 +185,7 @@ let side = 0;                // her square's side, in the window's pixels
 let tucked = null;           // the edge she peeks over while she is tucked away
 let flight = null;           // a throw under way: her box on the screen and its speed
 let asleep = false, market = true, marketAsked = -Infinity;
-let nearAt = performance.now(), movedAt = nearAt;   // when the cursor last came near her, and last moved at all
+let nearAt = performance.now(), movedAt = nearAt;   // when he was last by her — the cursor near, a press, a word of hers — and when he last stirred at all
 let startUntil = 0, startAfter = 0, pleasedUntil = 0, rubbed = 0;
 
 /* The render is drawn on black: its black made clear by art.mjs's rule, and
@@ -223,7 +223,7 @@ function say(reason, ms = SAY_MS) {
   said.textContent = SAY[reason](talkKey);
   said.classList.add('shown');
   sayUntil = performance.now() + ms;
-  nearAt = performance.now();
+  nearAt = movedAt = performance.now();
 }
 const unsay = () => { said.classList.remove('shown'); sayUntil = 0; };
 
@@ -638,7 +638,7 @@ function live() {
     const j = journal;
     if (j.done ? now - j.done >= DONE_MS : j.lit === null && now - j.since >= ASK_MS) mode = 'idle';
   }
-  if (mode === 'idle' && due) journalNow();
+  if (mode === 'idle' && due && !tucked) journalNow();
   if (mode === 'journal' !== card.classList.contains('shown')) {
     card.classList.toggle('shown');
     fit();
@@ -731,7 +731,7 @@ async function press(chart) {
   if (mode === 'thinking' || mode === 'speaking') { window.doji.hush(); silence(); mode = 'idle'; return; }
   if (mode === 'journal') mode = 'idle';
   starting = true;
-  nearAt = performance.now();
+  nearAt = movedAt = performance.now();
   unsay();
   const seen = chart ? window.doji.look() : null;
   await listening(chart);
@@ -757,14 +757,15 @@ function briefing() {
    trade, follows at once; one her door did not take leaves the question
    where it was, to be clicked again, and the line says why. The talk key, or
    a click on her, closes the card and she listens. Answered elsewhere while
-   it is up, it follows what is left. */
+   it is up, it follows what is left. Tucked away, she is half off the screen
+   and the card would be too: it waits until she is brought back. */
 function journalNow() {
   if (mode !== 'idle' || !trade) return false;
   due = false;
   unsay();
   mode = 'journal';
-  nearAt = performance.now();
-  journal = { q: -1, allYes: true, done: 0, opened: performance.now() };
+  nearAt = movedAt = performance.now();
+  journal = { q: -1, allYes: true, done: 0, opened: nearAt };
   ask(trade);
   return true;
 }
@@ -829,7 +830,8 @@ function waitsNow(next, count, inTrade) {
   waiting = count;
   if (mode !== 'journal' || journal.lit !== null || journal.done) return;
   if (!next) mode = 'idle';
-  else ask(next);
+  else if (turned(journal.trade, journal.q, next)) ask(next);
+  else { journal.trade = next; write(); }
 }
 
 /* ─── Her shape, for the mouse ──────────────────────────────────────────────
@@ -899,10 +901,11 @@ addEventListener('mousemove', (e) => {
   pointer = [e.clientX, e.clientY];
   feel();
 });
+// A press on her mid-throw catches her: she is held, and letting go sets her down rather than asking her anything.
 addEventListener('mousedown', (e) => {
   if (!solid) return;
+  held = { x: e.screenX, y: e.screenY, moved: flight !== null, trail: [{ at: e.timeStamp, x: e.screenX, y: e.screenY }] };
   flight = null;
-  held = { x: e.screenX, y: e.screenY, moved: false, trail: [] };
 });
 /* Let go while moving faster than FLING, she is thrown: she slides on and
    comes back off the screen's edges, and where she stops is where he left

@@ -283,7 +283,8 @@ function menu() {
     { label: 'Talk to her', accelerator, registerAccelerator: false, click: () => send('press', false) },
     { label: 'Show her the chart', accelerator: `Shift+${accelerator}`, registerAccelerator: false, click: () => send('press', true) },
     { label: 'Hear the briefing', enabled: briefingWaits, click: () => send('briefing-now') },
-    { label: 'Journal the trade', enabled: pending.waiting > 0, click: () => send('journal-now') },
+    // Tucked away she is half off the screen, and the card would be: she comes back for it.
+    { label: 'Journal the trade', enabled: pending.waiting > 0, click: () => { if (tuckedAt) bringHere(); send('journal-now'); } },
     { type: 'separator' },
     { label: 'Bring her here', click: bringHere },
   ];
@@ -437,8 +438,8 @@ async function hearBriefing() {
 
 /* ─── Gladys's journal ──────────────────────────────────────────────────────
    Asked of her door on the laptop's own key: a GET answers what waits and
-   whether he is in a trade, { waiting, trade, open }, and an answer is a POST in a tap's
-   own grammar, answered with what waits after it, so the page moves on
+   whether he is in a trade, { waiting, trade, open }, and an answer is a
+   POST in a tap's own grammar, answered the same, so the page moves on
    without a second request. The page draws the questions and says which
    half he clicked; the grammar is journal.mjs's. An answer is never raced:
    no look starts while one is out, and a look one overtook is dropped, since

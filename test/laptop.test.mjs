@@ -7,8 +7,10 @@
    fed the door's own bytes, from `laptopFrame`, cut at every place a network
    read can cut them; her voice played from its queue while it arrives late
    and unevenly, as a real stream does; where her window goes when a screen
-   is gone; the journal's answers, read by Gladys's own boundary, and the
-   question a trade is asked first; and the swap an update leaves behind,
+   is gone, and the edge she tucks behind; what her body decides — the
+   spring, a throw, the market's hours, when she sleeps; the journal's
+   answers, read by Gladys's own boundary, the question a trade is asked
+   first, and when the card turns to another; and the swap an update leaves behind,
    run in a scratch folder with macOS's `ditto`, `open` and `codesign` stood
    in for, in every way it can fail.
    The copies the app holds of the doors are agree.test.mjs's; whether she
@@ -26,7 +28,7 @@ import { parseCallback } from '../supabase/functions/doji-gladys/index.ts';
 import { FRAME, LEAD, PCM_RATE, Queue, framer, sampler } from '../laptop/frames.mjs';
 import { marketOpen as pollerOpen } from '../supabase/functions/_shared/edge.ts';
 import { AWAY_MS, DOZE_MS, FLING, marketOpen, settle, sleeps, slide } from '../laptop/body.mjs';
-import { ANSWERS, SETUPS, asked, given, tap } from '../laptop/journal.mjs';
+import { ANSWERS, SETUPS, asked, given, tap, turned } from '../laptop/journal.mjs';
 import { placed, room, tucked, within, ROOM } from '../laptop/place.mjs';
 import { BUNDLE, swapScript } from '../laptop/update.mjs';
 
@@ -365,4 +367,18 @@ test('an answer a trade holds reads back as the half that gave it', () => {
       assert.equal(given({ [column]: value })[q], half, `${column} = ${value}`);
     }
   }
+});
+
+/* The laptop looks every minute at what waits, and the card gives way after a
+   minute unclicked: a look that finds the same question must leave the card's
+   minute running, or it never ends. It turns for another trade, and for this
+   one's question answered elsewhere — not for an answer to a question it is
+   not asking. */
+test('the card turns for another question, and not for a look that finds the same one', () => {
+  const blank = Object.fromEntries(ANSWERS.map(([, column]) => [column, null]));
+  const shown = { id: 'PID1', ...blank };
+  assert.equal(turned(shown, 0, { ...shown }), false, 'the same trade at the same question restarted the card');
+  assert.equal(turned(shown, 0, { ...shown, followed_tp: true }), false, 'an answer to a later question restarted the one being asked');
+  assert.equal(turned(shown, 0, { ...shown, setup: SETUPS[0] }), true, 'its question answered elsewhere, the card kept asking it');
+  assert.equal(turned(shown, 0, { ...shown, id: 'PID2' }), true, 'another trade waiting, the card kept the first');
 });
