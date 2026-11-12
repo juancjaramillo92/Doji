@@ -3,8 +3,8 @@
    Her render and the drawing over it — eyes, highlight, smile — in a
    466-pixel square of her own, scaled to the window. Then the body: she
    breathes and floats a little at rest, bends as she sways and turns, gives
-   on a spring when she is carried and dropped, lights from inside while she
-   listens and fills with bubbles while she thinks. Eyes and mouth are drawn
+   on a spring when she is carried and dropped, and lights from inside while
+   she listens; three dots over her head say she is thinking. Eyes and mouth are drawn
    on the same skin, so they stay on her. She sleeps when there is nothing to
    be awake for. Above her head, a line for what her face alone cannot say,
    and the journal's card when a trade waits for its answers.
@@ -28,7 +28,8 @@ const F = {
   mouth: [244.3, 162.2], mouth_w: 51.0, sag: 9.4, stroke: 3.4,
   tilt: -10.0,
 };
-const FEATURES = '#0d0c0b', SHINE = '#f2f0ec', THROAT = '#1d0e0b';
+const DOTS = [[208, 38, 3.2], [233, 30, 3.8], [258, 38, 3.2]];
+const FEATURES = '#0d0c0b', SHINE = '#f2f0ec', THROAT = '#1d0e0b', THOUGHT = '#ead3b6';
 /* Doji's colours. Those named beside a token are the app's own, copies of
    index.html's, which agree.test.mjs holds them against; the emeralds the
    gradients are made of are her own. */
@@ -101,9 +102,8 @@ const LEAN = 0.02, SQUASH = 0.035, LIFT = 4;
 const STIFF = 130, DAMP = 9;
 const GIVE = 4, GIVE_UP = 0.012, BEND_MOST = 26, STRETCH_MOST = 0.12;
 const NOD = 0.6, START = 1.2, LAND = 1.0, STIR = 0.7, WIGGLE = 150;
-// The skin is bent in strips this many rows high, and this many bubbles rise in her while she thinks.
+// The skin is bent in strips this many rows high.
 const STRIP = 3;
-const RISING = 7;
 const FRAME_MS = 33, REST_FRAME_MS = 50;
 // The cursor within this many of her pixels has her eyes.
 const NEAR = 700;
@@ -334,10 +334,12 @@ function features() {
   }
 }
 
-/* Her skin: the render, bent; then what is inside her, drawn only where she
-   is — the light of his voice while she listens, filling her from her base
-   and draining through a recording's last WARN_LEFT, and bubbles rising
-   while she thinks; then her face, leaning with the glass it is on. */
+/* Her skin: the render, bent; then the light of his voice while she
+   listens, drawn only where she is, filling her from her base and draining
+   through a recording's last WARN_LEFT; then her thought, over her head and
+   leaning with it — nothing is drawn inside her that the render does not
+   hold, since beside its own bubbles, which are still, anything moving
+   reads as laid on; then her face, leaning with the glass it is on. */
 const leans = (y, by) => by * (Math.max(0, BASE - y) / (BASE - CROWN)) ** 2;
 
 function wear(now, by) {
@@ -358,22 +360,14 @@ function wear(now, by) {
     s.fillRect(0, 0, 466, 466);
     s.globalAlpha = 1;
   }
-  if (V.dots > 0.02) {
-    for (let i = 0; i < RISING; i++) {
-      const up = (now / (2600 + 310 * i) + i * 0.37) % 1, y = BASE - 30 - up * 250, r = 3.5 + i * 7 % 5;
-      const x = 150 + i * 61 % 170 + 9 * Math.sin(now / 500 + i * 2.1) + leans(y, by);
-      s.globalAlpha = V.dots * Math.min(1, 5 * up, 5 * (1 - up));
-      s.strokeStyle = SHINE;
-      s.lineWidth = 1.4;
-      s.beginPath();
-      s.arc(x, y, r, 0, 2 * Math.PI);
-      s.stroke();
-      dot(s, x - r * 0.35, y - r * 0.35, r * 0.24, r * 0.24, SHINE);
-    }
-    s.globalAlpha = 1;
-  }
 
   s.globalCompositeOperation = 'source-over';
+  if (V.dots > 0.02) {
+    for (const [i, [x, y, r]] of DOTS.entries()) {
+      const pulse = 0.5 + 0.5 * Math.sin(now / 260 - i * 1.1);
+      dot(s, x + leans(y, by), y - pulse * 2.5, r, r, THOUGHT, V.dots * (0.25 + 0.75 * pulse));
+    }
+  }
   const [mx, my] = F.mouth, rise = (BASE - my) / (BASE - CROWN);
   s.translate(mx + leans(my, by), my);
   s.rotate(2 * by * rise / (BASE - CROWN));
