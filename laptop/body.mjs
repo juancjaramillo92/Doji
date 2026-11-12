@@ -41,9 +41,9 @@ export function marketOpen(now) {
 }
 
 /* She sleeps when there is nothing to be awake for. With the market shut,
-   that is DOZE_MS after the cursor last came near her; with it open, only
-   once the cursor has not moved at all for AWAY_MS — he is working his chart
-   all day far from her, and that is not being away. */
+   that is DOZE_MS after he was last by her; with it open, only once he has
+   not stirred at all for AWAY_MS — he is working his chart all day far from
+   her, and that is not being away. */
 export const DOZE_MS = 20_000, AWAY_MS = 5 * 60_000;
 
 export const sleeps = (open, sinceNear, sinceMoved) => (open ? sinceMoved >= AWAY_MS : sinceNear >= DOZE_MS);
