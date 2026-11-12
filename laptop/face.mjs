@@ -13,7 +13,7 @@
    door and back, and his answers to Gladys's, and owns the keys, the chart
    and the window.
    ═══════════════════════════════════════════════════════════════════════════ */
-import { opacity } from './art.mjs';
+import { FINE, opacity } from './art.mjs';
 import { FLING, marketOpen, settle, sleeps, slide } from './body.mjs';
 import { FRAME, PCM_RATE, sampler } from './frames.mjs';
 import { ASKS, SETUPS, asked, given } from './journal.mjs';
@@ -158,8 +158,8 @@ const card = document.getElementById('card');
 const halves = [...document.getElementById('halves').children];
 const chips = [...document.getElementById('chips').children];
 const g = canvas.getContext('2d');
-// Her skin: the render bent, lit and drawn on, before the body's transform carries all of it.
-const skin = new OffscreenCanvas(466, 466);
+// Her skin: the render bent, lit and drawn on, as fine as the render is, before the body's transform carries all of it.
+const skin = new OffscreenCanvas(466 * FINE, 466 * FINE);
 const s = skin.getContext('2d');
 const still = matchMedia('(prefers-reduced-motion: reduce)');
 for (const [name, color] of Object.entries({ ink: INK, muted: MUTED, ground: GROUND, line: LINE, accent: ACCENT, glow: GLOW })) {
@@ -195,24 +195,28 @@ async function load() {
   const img = new Image();
   img.src = 'eugenia.png';
   await img.decode();
-  const off = new OffscreenCanvas(466, 466);
+  const off = new OffscreenCanvas(img.width, img.height);
   const o = off.getContext('2d');
   o.drawImage(img, 0, 0);
-  const d = o.getImageData(0, 0, 466, 466);
-  alpha = new Uint8Array(466 * 466);
-  shape = { left: 466, top: 466, right: 0, bottom: 0 };
-  for (let i = 0; i < alpha.length; i++) {
-    const p = d.data.subarray(4 * i, 4 * i + 4);
+  const d = o.getImageData(0, 0, img.width, img.height);
+  for (let i = 0; i < d.data.length; i += 4) {
+    const p = d.data.subarray(i, i + 4);
     const a = opacity(p[0], p[1], p[2]);
     if (a > 0) { p[0] /= a; p[1] /= a; p[2] /= a; }
-    p[3] = alpha[i] = 255 * a;
-    if (alpha[i] > 64) {
-      const u = i % 466, v = Math.floor(i / 466);
-      shape = { left: Math.min(shape.left, u), top: Math.min(shape.top, v), right: Math.max(shape.right, u), bottom: Math.max(shape.bottom, v) };
-    }
+    p[3] = 255 * a;
   }
   o.putImageData(d, 0, 0);
   art = off;
+  // Her shape for the mouse, in her own 466 pixels: a click needs no finer.
+  const small = new OffscreenCanvas(466, 466).getContext('2d');
+  small.drawImage(art, 0, 0, 466, 466);
+  alpha = small.getImageData(0, 0, 466, 466).data.filter((_, i) => i % 4 === 3);
+  shape = { left: 466, top: 466, right: 0, bottom: 0 };
+  for (const [i, a] of alpha.entries()) {
+    if (a <= 64) continue;
+    const u = i % 466, v = Math.floor(i / 466);
+    shape = { left: Math.min(shape.left, u), top: Math.min(shape.top, v), right: Math.max(shape.right, u), bottom: Math.max(shape.bottom, v) };
+  }
 }
 
 function say(reason, ms = SAY_MS) {
@@ -339,11 +343,11 @@ function features() {
 const leans = (y, by) => by * (Math.max(0, BASE - y) / (BASE - CROWN)) ** 2;
 
 function wear(now, by) {
-  s.setTransform(1, 0, 0, 1, 0, 0);
+  s.setTransform(FINE, 0, 0, FINE, 0, 0);
   s.globalCompositeOperation = 'source-over';
   s.clearRect(0, 0, 466, 466);
-  if (by === 0) s.drawImage(art, 0, 0);
-  else for (let y = 0; y < 466; y += STRIP) s.drawImage(art, 0, y, 466, STRIP, leans(y, by), y, 466, STRIP);
+  if (by === 0) s.drawImage(art, 0, 0, 466, 466);
+  else for (let y = 0; y < 466; y += STRIP) s.drawImage(art, 0, y * FINE, art.width, STRIP * FINE, leans(y, by), y, 466, STRIP);
 
   s.globalCompositeOperation = 'source-atop';
   if (V.glow > 0.01) {
@@ -511,7 +515,7 @@ function draw(now) {
   g.translate(233, BASE - lift);
   g.scale(sx, sy);
   g.translate(-233, -BASE);
-  g.drawImage(skin, 0, 0);
+  g.drawImage(skin, 0, 0, 466, 466);
   g.restore();
   waits();
   nears();

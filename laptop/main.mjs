@@ -23,7 +23,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
-import { BLOB, opacity } from './art.mjs';
+import { BLOB, FINE, opacity } from './art.mjs';
 import { framer } from './frames.mjs';
 import { tap } from './journal.mjs';
 import { placed, room, tucked, within } from './place.mjs';
@@ -530,7 +530,8 @@ async function settle() {
    only its opacity is set. */
 function trayIcon() {
   const side = 36;
-  const art = nativeImage.createFromPath(join(here, 'eugenia.png')).crop(BLOB).resize({ width: side, height: side, quality: 'best' });
+  const blob = Object.fromEntries(Object.entries(BLOB).map(([edge, at]) => [edge, at * FINE]));
+  const art = nativeImage.createFromPath(join(here, 'eugenia.png')).crop(blob).resize({ width: side, height: side, quality: 'best' });
   const pixels = art.toBitmap();
   for (let i = 0; i < pixels.length; i += 4) pixels[i + 3] = Math.round(255 * opacity(pixels[i], pixels[i + 1], pixels[i + 2]));
   return nativeImage.createFromBitmap(pixels, { width: side, height: side, scaleFactor: 2 });

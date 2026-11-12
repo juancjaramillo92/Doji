@@ -7,7 +7,12 @@ const CLEAR = 48;
 
 export const opacity = (r, g, b) => Math.min(1, Math.max(r, g, b) / CLEAR);
 
-/* A square around her in the render's 466 pixels, for an icon with her
-   filling it: every lit pixel of the render lies between columns 45 and 421
-   and rows 53 and 384, inside it. */
+/* She is measured in a square of 466 pixels, and the render is drawn FINE
+   times as fine as that, so she stays sharp at her largest on a Retina
+   screen. */
+export const FINE = 2;
+
+/* A square around her in her 466 pixels, for an icon with her filling it:
+   every lit pixel of the render lies between columns 45 and 421 and rows 53
+   and 384, inside it. */
 export const BLOB = { x: 43, y: 28, width: 380, height: 380 };

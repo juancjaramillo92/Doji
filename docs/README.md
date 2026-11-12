@@ -2178,7 +2178,8 @@ mark — what waits shows on her; the Dock's holds what he does with her and
 icon or shows it again each time a window's desktops are set; hers is told to
 leave it. **Her face floats over TradingView**: her render with its black made
 clear, and her drawing over it — eyes, highlight, smile — in a 466-pixel
-square scaled to the window, in Doji's colours, whose copies of the app's
+square scaled to the window, the render itself twice as fine as that
+(`FINE`), so she is sharp at her largest on a Retina screen, in Doji's colours, whose copies of the app's
 tokens `agree.test.mjs` holds to `index.html`, with a soft shadow beneath her
 so she sits on the chart. Clicks outside her shape go through to the chart
 beneath. A click on her brings her app to the front, as a click on any app's
