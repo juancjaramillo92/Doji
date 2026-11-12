@@ -292,6 +292,18 @@ test('the laptop knocks with the key, the form and the words her door reads', ()
     'the laptop reads her door\'s 204 as a failure, and a briefing no longer there shows her confused');
   assert.match(LAPTOP_DOOR, /if \(briefing !== null\) return await laptopBriefing\(briefing\);/,
     'the laptop\'s door no longer answers the briefing');
+
+  // And the next print: the one word asked is the one answered, a time as JSON or a 204 for none.
+  const printed = [...new Set([...LAPTOP_MAIN.matchAll(/\?print=(\w+)/g)].map(m => m[1]))];
+  const answered = EUGENIA_TS.match(/if \(which !== '(\w+)'\) \{\s*return json\(\{ ok: false, error: "print is/)?.[1];
+  assert.ok(printed.length && answered, 'the laptop or her door no longer names the print as this test reads it');
+  assert.deepEqual(printed, [answered], 'the laptop asks a ?print= word her door does not answer');
+  assert.match(LAPTOP_DOOR, /if \(print !== null\) return await laptopPrint\(print\);/, 'the laptop\'s door no longer answers the print');
+  const asks = bodyOf(LAPTOP_MAIN, 'async function print(');
+  assert.match(bodyOf(EUGENIA_TS, 'async function laptopPrint('), /return row \? json\(\{ ok: true, at: row\.at \}\) : new Response\(null, \{ status: 204 \}\);/,
+    'laptopPrint no longer answers the instant under `at`, or none with a 204');
+  assert.match(asks, /res\.status === 200 \? Date\.parse\(\(await res\.json\(\)\.catch\(\(\) => \(\{\}\)\)\)\.at\) : NaN/,
+    'the laptop no longer reads the print\'s instant under the key her door answers it by');
 });
 
 /* Each key is proved by asking its door — hers with an empty form, Gladys's

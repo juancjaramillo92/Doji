@@ -505,6 +505,30 @@ test('doji-eugenia: a briefing not stored yet is a 204, and nothing is spoken', 
   assert.deepEqual(calls, [], 'a briefing door it does not open made a request');
 });
 
+/* The next print is its instant and nothing more: the nearest release ahead
+   that is rated high at home, or a 204 while the calendar holds none. */
+test('doji-eugenia: the laptop is told when the next print lands, and nothing else', async () => {
+  const serve = await serving('doji-eugenia');
+  const at = new Date(Date.now() + 600_000).toISOString();
+  respond = (url) => url.includes('/rest/v1/eugenia_calendar?') ? ok([{ at }])
+    : Promise.reject(new Error(`the print door asked something unexpected: ${url}`));
+  const res = await answer(await serve(laptop(undefined, 'laptop', '?print=next')));
+  assert.deepEqual(res, { status: 200, body: { ok: true, at } });
+  assert.equal(calls.length, 1, 'the print door read more than the calendar');
+  const read = decodeURIComponent(calls[0].url);
+  for (const part of ['select=at&', 'importance=eq.high', 'country=eq.US', 'order=at.asc', 'limit=1']) {
+    assert.ok(read.includes(part), `the next print is no longer read with ${part}: ${read}`);
+  }
+  const from = Date.now() - new Date(read.match(/at=gte\.([^&]+)/)[1]);
+  assert.ok(from >= 0 && from < 60_000, `the next print is looked for from ${from} ms ago, not from now`);
+
+  respond = () => ok([]);
+  assert.equal((await serve(laptop(undefined, 'laptop', '?print=next'))).status, 204, 'a calendar with nothing ahead did not answer 204');
+  calls.length = 0;
+  assert.equal((await serve(laptop(undefined, 'laptop', '?print=last'))).status, 400, 'a print door it does not open answered');
+  assert.deepEqual(calls, [], 'a print door it does not open made a request');
+});
+
 /* ─── Gladys's laptop: what waits, and an answer given on it ──────────────
    What waits is read oldest first from a newest-first page; an answer is a
    tap's own grammar, so it can only ever write one of the four columns. */

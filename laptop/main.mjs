@@ -57,7 +57,7 @@ const DOWNLOAD_MS = 10 * 60_000;
    and open the pane. */
 const LOOK_MS = 8_000;
 const PROMPT_MS = 1_500;
-// Whether a briefing waits, asked every few minutes.
+// Whether a briefing waits and when the next print lands, asked every few minutes.
 const BRIEFING_EVERY_MS = 5 * 60_000;
 /* What waits for its journal, asked oftener still: the laptop is awake and online whenever he trades on it, and a trade's
    questions belong to the minute it opened. */
@@ -98,6 +98,7 @@ let asking = null;     // the request in flight, so a press can hush her
 let looking = null;    // the chart being captured since he asked her to look
 let briefingWaits = false;  // as her door last said
 let hearings = 0;      // briefings heard here, so an ask one overtook is dropped
+let printAt = null;    // when the next print his rules are cautious around lands, as her door last said
 let offered = null;    // a newer build than this one
 let pending = { waiting: 0, trade: null, open: false };  // what waits for its journal, and whether he is in a trade, as Gladys's door last said
 let answering = false; // an answer on its way to Gladys's door
@@ -149,7 +150,7 @@ async function tryKey(who, candidate) {
   keys[who] = candidate;
   writeFileSync(kept(KEPT[who]), safeStorage.encryptString(candidate));
   if (who === 'gladys') journal();
-  else briefing();
+  else { briefing(); print(); }
   if (keys.gladys) keyWindow?.close();
   else askForKey('gladys');
   return 'kept';
@@ -413,6 +414,19 @@ async function briefing() {
   menu();
 }
 
+/* The next print his rules are cautious around: her door says when, as
+   ?print=next, and the page draws a mark beside her as it nears. Asked with
+   the briefing. An answer that is neither a time nor none leaves the mark as
+   it was. */
+async function print() {
+  if (!keys.eugenia) return;
+  const res = await fetch(`${DOOR}?print=next`, { headers: { 'x-laptop-key': keys.eugenia }, signal: AbortSignal.timeout(ASK_MS) })
+    .catch(() => null);
+  if (res?.status !== 200 && res?.status !== 204) return;
+  const at = res.status === 200 ? Date.parse((await res.json().catch(() => ({}))).at) : NaN;
+  send('print', printAt = Number.isFinite(at) ? at : null);
+}
+
 async function hearBriefing() {
   if (!await talk('?briefing=today')) return;
   hearings++;
@@ -523,7 +537,7 @@ function trayIcon() {
 }
 
 /* ─── What the pages ask of this half ──────────────────────────────────── */
-ipcMain.handle('ready', () => ({ fresh, micOk, taken, talk: talkKey(), briefing: briefingWaits, ...pending }));
+ipcMain.handle('ready', () => ({ fresh, micOk, taken, talk: talkKey(), briefing: briefingWaits, print: printAt, ...pending }));
 ipcMain.handle('look', async () => {
   const seen = await (looking = look());
   return typeof seen === 'string' ? seen : null;
@@ -586,10 +600,12 @@ app.whenReady().then(async () => {
   else if (!keys.gladys) askForKey('gladys');
   briefing();
   every(briefing, BRIEFING_EVERY_MS);
+  print();
+  every(print, BRIEFING_EVERY_MS);
   journal();
   every(journal, JOURNAL_EVERY_MS);
-  // A Mac that slept missed both: asked at once rather than at their next turn.
-  powerMonitor.on('resume', () => { briefing(); journal(); });
+  // A Mac that slept missed them: asked at once rather than at their next turn.
+  powerMonitor.on('resume', () => { briefing(); print(); journal(); });
   lookForUpdate();
   every(lookForUpdate, UPDATE_EVERY_MS);
   every(() => {

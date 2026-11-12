@@ -37,6 +37,7 @@ const INK    = '#e6ece9';  // --tx
 const MUTED  = '#96a89e';  // --mt2
 const GROUND = '#070c0a';  // --glass
 const LINE   = '#1c2922';  // --bd
+const WARN   = '#d9a441';  // --warn
 const DEEP = '#0e6f5c', GLOW = '#3cc488', TEAL = '#1f9e93';
 const BLINK_EVERY_MS = 4000;
 const LOOK_RANGE = 6;
@@ -115,6 +116,11 @@ const NEAR = 700;
 const SWIFT = 3000, CLOSE = 300, START_MS = 700, STARTLE_EVERY_MS = 4000;
 const RUB = 3, PLEASED_MS = 1600;
 const HINT_AFTER_MS = 1200;
+/* A print his rules are cautious around, within SOON_MS: a ring high beside
+   her, in the app's colour for caution, draining as its minutes go. She
+   glances up at it a moment in every GLANCE_EVERY_MS. */
+const SOON_MS = 15 * 60_000;
+const GLANCE_EVERY_MS = 9000, GLANCE_MS = 900;
 
 /* A recording's ceiling, at the bitrate it is made at, is well inside her
    door's FILE_MAX; agree.test.mjs holds the arithmetic. Shorter than a
@@ -164,6 +170,7 @@ let art, alpha;              // the render with its black made clear, and her sh
 let shape;                   // the box her shape fills, in her pixels: what an edge of the screen turns back
 let mode = 'idle';           // idle · listening · thinking · speaking · confused · journal
 let briefingWaits = false;
+let printAt = null;          // when the next print lands, as her door last said
 let trade = null, waiting = 0;   // the oldest trade waiting for its journal, and how many do
 let calm = false;                // he is in a trade: she keeps still, and her play waits until he is flat
 let due = false;                 // a trade came in: its card comes up once she is idle
@@ -395,6 +402,29 @@ function waits() {
   g.restore();
 }
 
+/* How much of SOON_MS is left before the print, or nothing while it is
+   further off or past. */
+const soon = () => {
+  const left = (printAt - Date.now()) / SOON_MS;
+  return printAt !== null && left > 0 && left <= 1 ? left : 0;
+};
+
+function nears() {
+  const left = soon();
+  if (!left) return;
+  g.save();
+  g.shadowColor = GROUND;
+  g.shadowBlur = 4;
+  g.strokeStyle = WARN;
+  g.lineWidth = 4;
+  g.lineCap = 'round';
+  g.beginPath();
+  g.arc(404, 74, 20, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * left);
+  g.stroke();
+  dot(g, 404, 74, 3.5, 3.5, WARN);
+  g.restore();
+}
+
 /* The face, then the body. Each value eases toward what the mode asks for,
    so nothing jumps between modes. At rest, a cursor near her has her eyes
    and turns her a little; otherwise she glances about. Tucked away, she
@@ -410,6 +440,7 @@ function step(now, dt) {
   if (m === 'confused')  { tSmile = -0.35; tConfused = 1; fixed = [3, -2.5]; }
   if (m === 'journal')   fixed = [over === null ? 0 : over ? 4 : -4, -LOOK_RANGE];
   if (m === 'idle' && tucked) fixed = { left: [LOOK_RANGE, 0], right: [-LOOK_RANGE, 0], bottom: [0, -LOOK_RANGE] }[tucked];
+  if (m === 'idle' && soon() && now % GLANCE_EVERY_MS < GLANCE_MS) fixed = [LOOK_RANGE, -LOOK_RANGE * 0.6];
   if (m === 'idle' && cursor) fixed = cursor;
   if (asleep) { tOpen = 0; tSmile = 0.5; }
   if (pleased) tSmile = 1.3;
@@ -483,6 +514,7 @@ function draw(now) {
   g.drawImage(skin, 0, 0);
   g.restore();
   waits();
+  nears();
 }
 
 /* At rest she is drawn at REST_FRAME_MS, and so she is while the card is
@@ -611,7 +643,7 @@ function live() {
   // The market's hours are asked of the clock once a minute, not at every tick.
   if (now - marketAsked >= 60_000) { market = marketOpen(new Date()); marketAsked = now; }
   const slept = asleep;
-  asleep = mode === 'idle' && !trade && !briefingWaits && !held && !flight && sleeps(market, now - nearAt, now - movedAt);
+  asleep = mode === 'idle' && !trade && !briefingWaits && !soon() && !held && !flight && sleeps(market, now - nearAt, now - movedAt);
   if (slept && !asleep) stretch.v += STIR;
   rubbed *= 0.94;
 
@@ -924,6 +956,7 @@ window.doji.on('journal-now', journalNow);
 window.doji.on('say', (reason, key) => { if (key) talkKey = key; say(reason); });
 window.doji.on('cursor', near);
 window.doji.on('tucked', (edge) => { tucked = edge; });
+window.doji.on('print', (at) => { printAt = at; });
 
 addEventListener('resize', fit);
 fit();
@@ -931,6 +964,7 @@ await Promise.all([load(), document.fonts.load(`800 18px ${TYPE}`), document.fon
 const start = await window.doji.ready();
 talkKey = start.talk;
 briefingWaits = start.briefing;
+printAt = start.print;
 waitsNow(start.trade, start.waiting, start.open);
 if (start.fresh) say('hello', HELLO_MS);
 else if (!start.micOk) say('mic');

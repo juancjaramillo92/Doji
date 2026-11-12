@@ -5,7 +5,7 @@
    CommonJS, because a sandboxed preload cannot be a module. */
 const { contextBridge, ipcRenderer } = require('electron');
 
-const TOLD = ['press', 'frame', 'done', 'trouble', 'briefing', 'briefing-now', 'journal', 'journal-now', 'say', 'cursor', 'tucked'];
+const TOLD = ['press', 'frame', 'done', 'trouble', 'briefing', 'briefing-now', 'journal', 'journal-now', 'say', 'cursor', 'tucked', 'print'];
 
 contextBridge.exposeInMainWorld('doji', location.pathname.endsWith('/key.html') ? {
   key: (candidate) => ipcRenderer.invoke('key', candidate),
