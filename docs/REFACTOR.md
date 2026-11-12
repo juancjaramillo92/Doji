@@ -1307,6 +1307,18 @@ pass, a rub, a carry — which takes no click.
 **Revisit if:** something she does needs a deliberate trigger that no
 movement can give.
 
+### R-174 — her render's own transparency in place of the black made clear
+**Why refused:** his 1024-pixel original came with a transparent background,
+and drawing it as it is would retire `art.mjs`'s rule and take the thin dark
+line off her rim. But the rule does more than cut her out: every dark part
+of the glass inside her is made translucent by it, and that is how she has
+always looked. With the file's own transparency those parts are opaque and
+she is a darker, flatter thing. So the original was laid on black, framed as
+the old render was, and the one rule still clears it for her face and her
+icon.
+**Revisit if:** he wants her redrawn, or the line on her rim shows on his
+charts.
+
 ## 3 · THE NEXT STEP — DECIDED
 
 The step the owner calls *Raptor 3* was reviewed with him in October 2026,

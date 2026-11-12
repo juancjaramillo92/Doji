@@ -19,6 +19,12 @@ export function asked(trade) {
   return { q: q < 0 ? 3 : q, missing };
 }
 
+/* Whether what waits now is another question than the one the card shows:
+   another trade, or this one's question answered elsewhere. Only then does
+   the card turn and its minute begin again — a look that finds the same
+   question must not keep the card up for ever. */
+export const turned = (shown, q, next) => next.id !== shown.id || asked(next).q !== q;
+
 /* What a trade already holds, each answer as the half that gave it — the
    first setup or a no the left, 0 — or null for one not yet given. */
 export const given = (trade) => ANSWERS.map(([, column], q) =>

@@ -103,7 +103,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 857 tests, eight suites
+npm test      # 858 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -504,9 +504,10 @@ says what it does. Three levels of proof, and a change says which it rests on:
   `ditto`, `open` and `codesign` stood in for. A decision that can be pure goes
   in one of these.
 - **Read.** Every copy it holds of the doors or the app — the header, the
-  form, the frames, the briefing's words, the journal's answers, the face's
-  colours, the wait, the update's path and signer — and the level the
-  workflow's check raises its window to, is read out of both by
+  form, the frames, the briefing's words and the print's, the journal's
+  answers and the card's questions, the face's colours, the wait, the
+  update's path and signer — and the level the workflow's check raises its
+  window to, is read out of both by
   `agree.test.mjs`; `types.test.mjs` asks it the two scope questions as its
   own program.
 - **Only the Mac.** The window, the keys, the microphone, the capture, the

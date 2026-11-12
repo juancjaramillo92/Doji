@@ -8,7 +8,8 @@
 //   x-telegram-bot-api-secret-token   Telegram — a button was tapped, write the
 //                                     column and redraw the message.
 //   x-laptop-key                      Eugenia's laptop — what waits for its
-//                                     journal, and an answer given on it.
+//                                     journal and whether he is in a trade,
+//                                     and an answer given on it.
 //
 // One file, because the halves share the keyboard, the message and the
 // callback_data grammar. A tap names its column through COLUMNS, the same four
@@ -341,8 +342,9 @@ async function handleTap(req: Request): Promise<Response> {
 
 /* ─── The laptop half: he journals beside her face ────────────────────────
    The laptop asks every minute what waits, and shows a ring while anything
-   does; and whether he is in a trade, which it keeps her quiet for. An answer from it is a tap in a tap's own grammar, so
-   parseCallback is the one boundary for both and no other column is reachable.
+   does; and whether he is in a trade, which it keeps her quiet for. An
+   answer from it is a tap in a tap's own grammar, so parseCallback is the
+   one boundary for both and no other column is reachable.
    The trigger then redraws the Telegram message, as it does for the app.
    ───────────────────────────────────────────────────────────────────────── */
 
@@ -355,7 +357,7 @@ const WAITING_MAX = 20;
 // Open is both witnesses of a close null, as the app reads it; one row answers whether any is.
 async function waiting(): Promise<Response> {
   const since = new Date(Date.now() - WAITING_DAYS * 86_400_000).toISOString();
-  const read = async (query: string): Promise<Row[]> => {
+  const read = async (query: string): Promise<unknown[]> => {
     const res = await fetch(`${SB_URL}/rest/v1/trades?${query}`, { headers: sbHeaders() });
     if (!res.ok) throw new Error(`Read failed (HTTP ${res.status}): ${await res.text()}`);
     return await res.json();
