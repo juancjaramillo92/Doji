@@ -78,8 +78,6 @@ const DONE_MS = 2600;
    moment he is likeliest to be working it, so a click in its first
    SETTLE_MS was meant for the chart beneath it. */
 const SETTLE_MS = 500;
-// The ring near white: grey on black reads as a smudge.
-const WAITS = '#ecf4ef';
 const TYPE = '"Hanken Grotesk"';
 // The card's em at her 200-point size; it grows and shrinks with her.
 const CARD_EM = 14 / 200;
@@ -116,9 +114,9 @@ const NEAR = 700;
 const SWIFT = 3000, CLOSE = 300, START_MS = 700, STARTLE_EVERY_MS = 4000;
 const RUB = 3, PLEASED_MS = 1600;
 const HINT_AFTER_MS = 1200;
-/* A print his rules are cautious around, within SOON_MS: a ring high beside
+/* A print his rules are cautious around, within SOON_MS: a bar beneath
    her, in the app's colour for caution, draining as its minutes go. She
-   glances up at it a moment in every GLANCE_EVERY_MS. */
+   glances down at it a moment in every GLANCE_EVERY_MS. */
 const SOON_MS = 15 * 60_000;
 const GLANCE_EVERY_MS = 9000, GLANCE_MS = 900;
 
@@ -383,20 +381,16 @@ function wear(now, by) {
   features();
 }
 
-/* What waits, low beside her: a near-white ring for a trade, an emerald dot
-   with a glow for the briefing, the dot inside the ring for both — shape
-   tells them apart. His chart may be light, so the ring has a dark edge. */
+/* What waits, low beside her, both in her emerald: an open ring for a
+   trade, a dot with a glow for the briefing, the dot inside the ring for
+   both — shape tells them apart. */
 function waits() {
   if (trade) {
-    g.save();
-    g.shadowColor = GROUND;
-    g.shadowBlur = 4;
-    g.strokeStyle = WAITS;
+    g.strokeStyle = GLOW;
     g.lineWidth = 3;
     g.beginPath();
     g.arc(404, 404, 25, 0, 2 * Math.PI);
     g.stroke();
-    g.restore();
   }
   if (!briefingWaits) return;
   g.save();
@@ -416,17 +410,15 @@ const soon = () => {
 function nears() {
   const left = soon();
   if (!left) return;
-  g.save();
-  g.shadowColor = GROUND;
-  g.shadowBlur = 4;
-  g.strokeStyle = WARN;
-  g.lineWidth = 4;
+  g.lineWidth = 6;
   g.lineCap = 'round';
-  g.beginPath();
-  g.arc(404, 74, 20, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * left);
-  g.stroke();
-  dot(g, 404, 74, 3.5, 3.5, WARN);
-  g.restore();
+  for (const [color, part] of [[LINE, 1], [WARN, left]]) {
+    g.strokeStyle = color;
+    g.beginPath();
+    g.moveTo(143, 432);
+    g.lineTo(143 + 180 * part, 432);
+    g.stroke();
+  }
 }
 
 /* The face, then the body. Each value eases toward what the mode asks for,
@@ -444,7 +436,7 @@ function step(now, dt) {
   if (m === 'confused')  { tSmile = -0.35; tConfused = 1; fixed = [3, -2.5]; }
   if (m === 'journal')   fixed = [over === null ? 0 : over ? 4 : -4, -LOOK_RANGE];
   if (m === 'idle' && tucked) fixed = { left: [LOOK_RANGE, 0], right: [-LOOK_RANGE, 0], bottom: [0, -LOOK_RANGE] }[tucked];
-  if (m === 'idle' && soon() && now % GLANCE_EVERY_MS < GLANCE_MS) fixed = [LOOK_RANGE, -LOOK_RANGE * 0.6];
+  if (m === 'idle' && soon() && now % GLANCE_EVERY_MS < GLANCE_MS) fixed = [0, LOOK_RANGE];
   if (m === 'idle' && cursor) fixed = cursor;
   if (asleep) { tOpen = 0; tSmile = 0.5; }
   if (pleased) tSmile = 1.3;
