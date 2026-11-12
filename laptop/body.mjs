@@ -1,5 +1,6 @@
-/* What her body decides, pure, so laptop.test.mjs drives it: how she gives and settles, where a throw carries her, and when
-   she sleeps. The page draws what these return. */
+/* What her body decides, pure, so laptop.test.mjs drives it: how she gives
+   and settles, where a throw carries her, and when she sleeps. The page
+   draws what these return. */
 
 /* One spring, toward rest: `s` is where it is and how fast it moves. She is
    glass, so it rings a few times and stops — and stops exactly, or a body
