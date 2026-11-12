@@ -58,7 +58,7 @@
 import { SYSTEM } from '../supabase/functions/doji-eugenia/prompt.ts';
 import { ALWAYS } from '../supabase/functions/doji-eugenia/strategy.ts';
 import { foldStructure } from '../supabase/functions/doji-eugenia/structure.ts';
-import { structureList, callProblem, scoreCall, expiryOf, notBefore, CALL_SIDES, CALL_CONFIRMS, CALL_OUTCOMES, CONFIRM_MS }
+import { structureList, callProblem, scoreCall, expiryOf, notBefore, dollars, CALL_SIDES, CALL_CONFIRMS, CALL_OUTCOMES, CONFIRM_MS }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { FULL_STOP, TARGET_MAX } from '../supabase/functions/doji-eugenia/adherence.ts';
 import { nyDate } from '../supabase/functions/_shared/edge.ts';
@@ -174,7 +174,7 @@ export function tally(rows) {
   return `${rows.length} sessions: ${by('none')} no call, ${by('refused')} off his rules, ` +
     CALL_OUTCOMES.map(o => `${by(o)} ${o}`).join(', ') +
     (left ? ` (${left} with the close and no fill after it)` : '') +
-    (traded.length ? `; the ${traded.length} that triggered made ${net >= 0 ? '+' : '-'}$${Math.abs(net).toFixed(2)} an ounce` : '') + '.';
+    (traded.length ? `; the ${traded.length} that triggered made ${dollars(net)} an ounce` : '') + '.';
 }
 
 /* Whether asking again gets the same answer. `mornings` is each morning's

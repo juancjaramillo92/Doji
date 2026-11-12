@@ -3173,7 +3173,8 @@ export function callsQuery(now = Date.now()): string {
    back to 4115", which after our "if" read "if break & Retest: price…" on 9
    November. Words before a colon with no figure in them are that label; a
    condition that names its level before a colon keeps it. */
-const dollars = (n: number) => `${n >= 0 ? "+" : "-"}$${Math.abs(n).toFixed(2)}`;
+// Signed and to the cent; exported so the replay says a figure as her record does.
+export const dollars = (n: number) => `${n >= 0 ? "+" : "-"}$${Math.abs(n).toFixed(2)}`;
 
 const callLine = (c: Call) =>
   `${c.direction} ${c.entry}, stop ${c.stop}, target ${c.target}, ` +
