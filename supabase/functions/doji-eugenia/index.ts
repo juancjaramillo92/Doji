@@ -11,7 +11,8 @@
 //   x-telegram-bot-api-secret-token   Telegram — he replied, answer him.
 //   x-laptop-key                      her face on his laptop — he spoke to
 //                                     it, with his chart when he shows it,
-//                                     or it asks after the briefing.
+//                                     or it asks after the briefing, or
+//                                     when the next print lands.
 //
 // She owns no column of `trades` and has no write path to it: she reads the
 // journal through eugenia_trades, granted SELECT alone, and writes only her
@@ -5429,9 +5430,9 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       if (!STT_URL || !STT_KEY || !TTS_KEY) {
         return json({ ok: false, error: "the laptop needs STT_URL, STT_KEY and TTS_KEY" }, 503);
       }
-      const briefing = new URL(req.url).searchParams.get("briefing");
+      const asked = new URL(req.url).searchParams;
+      const briefing = asked.get("briefing"), print = asked.get("print");
       if (briefing !== null) return await laptopBriefing(briefing);
-      const print = new URL(req.url).searchParams.get("print");
       if (print !== null) return await laptopPrint(print);
       // A form: the recording as `voice`, and `chart` when he asked her to look.
       const form = await req.formData().catch(() => null);
