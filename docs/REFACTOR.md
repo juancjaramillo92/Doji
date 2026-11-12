@@ -1319,6 +1319,21 @@ icon.
 **Revisit if:** he wants her redrawn, or the line on her rim shows on his
 charts.
 
+### R-175 — what waits shown in her body rather than beside her
+**Why refused:** the ring and the dot read as notifications stuck onto her,
+and each was offered a place in her instead: for a trade, the card's top
+edge peeking over her head, one large bubble held in her for each, or a
+white rim; for the briefing, a slow pulse of her inner light; for a print,
+that light turned amber and draining, or amber bubbles counted down. He
+weighed each and kept the marks. The tab costs room over a chart for as long
+as a trade waits; a held bubble looks wrong in her; a rim says nothing of
+how many; and a mark beside her is read at a glance where a change in her
+has to be noticed. What changed is their colour — both emerald, on his dark
+charts — and the print, a bar beneath her that drains, in place of a wheel
+that read as the trade's progress.
+**Revisit if:** the marks are missed while he works, or a third thing needs
+one and three no longer tell apart by shape.
+
 ## 3 · THE NEXT STEP — DECIDED
 
 The step the owner calls *Raptor 3* was reviewed with him in October 2026,

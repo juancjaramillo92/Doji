@@ -2179,9 +2179,9 @@ icon or shows it again each time a window's desktops are set; hers is told to
 leave it. **Her face floats over TradingView**: her render with its black made
 clear, and her drawing over it — eyes, highlight, smile — in a 466-pixel
 square scaled to the window, the render itself twice as fine as that
-(`FINE`), so she is sharp at her largest on a Retina screen, in Doji's colours, whose copies of the app's
-tokens `agree.test.mjs` holds to `index.html`, with a soft shadow beneath her
-so she sits on the chart. Clicks outside her shape go through to the chart
+(`FINE`), so she is sharp at her largest on a Retina screen, in Doji's
+colours, whose copies of the app's tokens `agree.test.mjs` holds to
+`index.html`, with a soft shadow beneath her so she sits on the chart. Clicks outside her shape go through to the chart
 beneath. A click on her brings her app to the front, as a click on any app's
 window does; the talk key leaves TradingView there. She is the bottom middle
 of her window; the room above her head holds the journal's card and **a line
@@ -2214,12 +2214,13 @@ is set down rather than thrown, and floats half as far. Nothing about her
 says how the trade is going (`REFACTOR.md` R-171).
 
 **She sleeps when there is nothing to be awake for** (`laptop/body.mjs`):
-with gold's market shut, twenty seconds after the cursor last came near her;
-with it open, only once the cursor has not moved at all for five minutes —
-he works his chart all day far from her, and that is not being away. Asleep,
-her eyes are shut and her breath slow and deep. The cursor near her, the
-talk key, a trade or a briefing waiting each wake her, and nothing waits on
-a sleeping face. The market's hours are a copy of the poller's, which
+with gold's market shut, twenty seconds after he was last by her — the
+cursor near, a press, a word of hers; with it open, only once he has not
+stirred at all for five minutes, the cursor still — he works his chart all
+day far from her, and that is not being away. Asleep, her eyes are shut and
+her breath slow and deep. The cursor near her, the talk key, and a trade, a
+briefing or a print's bar waiting each wake her, and nothing waits on a
+sleeping face. The market's hours are a copy of the poller's, which
 `laptop.test.mjs` runs beside it.
 
 Reduce Motion in macOS stops the breathing, the floating and the throw, and
@@ -2251,8 +2252,9 @@ desktop for a moment, is shown, and leaves them all again, which leaves her on
 the one she is on — and so does her Dock icon clicked, or the app opened
 again; at launch she is put on the desktop in front. ***Hide her* tucks her
 away first**: she slides to the nearest edge of her screen that can hide her
-and peeks over it, looking back in, and a click on her — or dragging her out,
-or *Bring her here* — brings her back to where she was. An edge can hide her
+and peeks over it, looking back in; a click on her, or *Bring her here*,
+brings her back to where she was, and dragged out she stays where he leaves
+her. An edge can hide her
 only where the screen ends: not where the Dock or the menu bar sits, which
 would be drawn over her, and not where another display begins, which would
 show the rest of her (`tucked`, in `laptop/place.mjs`). Hidden again from
@@ -2282,9 +2284,9 @@ source documents it — with her own window kept out of every capture it can be;
 a question whose chart could not be captured is not asked, and she says why.
 The microphone is opened at the press and closed with the recording, so macOS
 shows it in use only while she listens. A recording he never spoke into is let
-go at thirty seconds, and the last thirty of a five-minute
-recording are ticked and drain the light from her, top to base; a press shorter than 0.4 seconds is
-one he took back. The recording's bitrate keeps it well inside `FILE_MAX`. A
+go at thirty seconds, and the last thirty of a five-minute recording are
+ticked and drain the light from her, top to base; a press shorter than 0.4
+seconds is one he took back. The recording's bitrate keeps it well inside `FILE_MAX`. A
 key another app holds registers as nothing, so she says so, and the menu
 offers the other.
 
@@ -2345,9 +2347,9 @@ waiting; the talk key, or a click on her, closes it and she listens; answered
 in Telegram while it is up, it follows what is left — and the minute begins
 again only when the card turns to another question (`turned`, in
 `laptop/journal.mjs`), so the laptop's own look at what waits, every minute,
-does not hold the card up for ever. **While a trade waits**, a mark sits beside
-her, in the briefing's own emerald — an open ring, the briefing's dot inside
-it when both wait, so shape tells the two apart.
+does not hold the card up for ever. **While a trade waits**, a mark sits
+beside her, in the briefing's own emerald — an open ring, the briefing's dot
+inside it when both wait, so shape tells the two apart.
 A click on her takes what waits first, the journal then the briefing;
 *Journal the trade* in her menu does the same. An answer is never raced: no
 look at what waits starts while one is out, and a look one
@@ -2387,8 +2389,8 @@ her face is granted the microphone and nothing else: Electron grants any
 permission a page asks for unless told otherwise.
 
 **Her menu's *Copy her log*** puts her last decisions on the clipboard, with
-their times — whether she was kept to one desktop, each time she was brought
-or hidden — for him to paste when something looks wrong, since nothing she
+their times — whether she was kept to one desktop, each time she was brought,
+tucked away or hidden — for him to paste when something looks wrong, since nothing she
 does on the Mac is otherwise seen from here.
 
 **Quitting stops her clocks first.** Her window goes before the process
