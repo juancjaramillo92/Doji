@@ -3096,11 +3096,13 @@ type Read = { given_on: string; reading: string; test: string; verdict: string; 
 
 const RECORD_DAYS = 30;
 const RECORD_MISSES = 3;
+// The Read type's fields, for the month's read and the whole record's alike.
+const READ_COLUMNS = "given_on,reading,test,verdict,evidence,firmness,lesson,channel";
 
 // A read a message at most, so a month is never near the limit; it is there
 // because every read carries one.
 export function recordQuery(now = Date.now()): string {
-  return `eugenia_reads?select=given_on,reading,test,verdict,evidence,firmness,lesson,channel` +
+  return `eugenia_reads?select=${READ_COLUMNS}` +
     `&given_on=gte.${nyDate(new Date(now - RECORD_DAYS * 86_400_000))}&order=id.desc&limit=200`;
 }
 
@@ -3171,6 +3173,8 @@ export function callsQuery(now = Date.now()): string {
    back to 4115", which after our "if" read "if break & Retest: price…" on 9
    November. Words before a colon with no figure in them are that label; a
    condition that names its level before a colon keeps it. */
+const dollars = (n: number) => `${n >= 0 ? "+" : "-"}$${Math.abs(n).toFixed(2)}`;
+
 const callLine = (c: Call) =>
   `${c.direction} ${c.entry}, stop ${c.stop}, target ${c.target}, ` +
   `if ${clause(c.condition.trim().replace(/^[A-Z][^:.\d]*:\s+/, ''))}` +
@@ -3207,11 +3211,12 @@ export function callsList(rows: Call[], now = Date.now(), to = "Your"): string {
     // No "you": /notes says this list to him as hers.
     (pulled.length ? ` ${pulled.length} ${pulled.length === 1 ? "was" : "were"} withdrawn before ${pulled.length === 1 ? "it" : "they"} could fill` +
       (spared.length ? `; left standing, the ${spared.length} that would have triggered would have made ` +
-        `${kept >= 0 ? "+" : "-"}$${Math.abs(kept).toFixed(2)} an ounce.` : `, and none would have triggered.`) : "") +
-    (traded.length ? ` The ${traded.length} that triggered made ${net >= 0 ? "+" : "-"}$${Math.abs(net).toFixed(2)} an ounce.` : "") +
+        `${dollars(kept)} an ounce.` : `, and none would have triggered.`) : "") +
+    (traded.length ? ` The ${traded.length} that triggered made ${dollars(net)} an ounce.` : "") +
     (standing.length ? `\nStanding until the 17:00 roll: ${standing.map(callLine).join("; ")}.` : "") +
-    live.filter(c => c.withdrawn_at).map(c =>
-      `\nWithdrawn at ${nyTime(c.withdrawn_at!)} ET, and this session's one call all the same: ${callLine(c)} — ${c.withdrawn}`).join("") +
+    live.flatMap(c => c.withdrawn_at
+      ? [`\nWithdrawn at ${nyTime(c.withdrawn_at)} ET, and this session's one call all the same: ${callLine(c)} — ${c.withdrawn}`]
+      : []).join("") +
     (explained.length ? `\nOf the ${losses.length} lost, ` + CALL_STEPS.map(x =>
       `${explained.filter(c => c.misread === x).length} ${x === 'none' ? "kept every step" : `misread the ${x}`}`).join(", ") +
       (explained.length < losses.length ? `, ${losses.length - explained.length} not yet explained` : "") + "." : "") +
@@ -3281,8 +3286,6 @@ const LIFETIME_ROWS = 1000;
 // The lesson sentences shown: enough to see one said three times.
 export const LESSONS = 30;
 
-const dollars = (n: number) => `${n >= 0 ? "+" : "-"}$${Math.abs(n).toFixed(2)}`;
-
 export function lifetimeList(calls: Call[], reads: Read[]): string {
   if (!calls.length && !reads.length) return "";
   const scored = calls.filter(c => c.outcome);
@@ -3294,11 +3297,13 @@ export function lifetimeList(calls: Call[], reads: Read[]): string {
   };
   const lost = scored.filter(c => c.outcome === 'lost' && c.misread);
   const pulled = scored.filter(c => c.outcome === 'untriggered' && c.withdrawn_at && c.spared != null);
+  // A read's channel references eugenia_channels, so it is always one of these.
+  const spoken = new Map<string, string>(CHANNELS);
   const lessons = [
     ...calls.filter(c => c.lesson).map(c => ({ on: nyDate(new Date(c.made_at)),
       line: `a ${c.direction} call, misread the ${c.misread}: ${c.lesson}` })),
     ...reads.filter(r => r.lesson).map(r => ({ on: r.given_on,
-      line: `a read${r.channel ? ` through ${CHANNELS.find(([id]) => id === r.channel)?.[1] ?? r.channel}` : ""}: ${r.lesson}` })),
+      line: `a read${r.channel ? ` through ${spoken.get(r.channel)}` : ""}: ${r.lesson}` })),
   ].sort((a, b) => b.on.localeCompare(a.on)).slice(0, LESSONS);
   return `\n\nYour whole record, every call and read you have filed, counted:` +
     (scored.length
@@ -3320,8 +3325,7 @@ export async function lifetimeBlock(): Promise<string> {
   try {
     const [calls, reads] = await Promise.all([
       readRows<Call>('Calls', `eugenia_calls?select=*&order=id.desc&limit=${LIFETIME_ROWS}`),
-      readRows<Read>('Reads', `eugenia_reads?select=given_on,reading,test,verdict,evidence,firmness,lesson,channel` +
-                              `&order=id.desc&limit=${LIFETIME_ROWS}`),
+      readRows<Read>('Reads', `eugenia_reads?select=${READ_COLUMNS}&order=id.desc&limit=${LIFETIME_ROWS}`),
     ]);
     return lifetimeList(calls, reads);
   } catch (err) {
@@ -4849,7 +4853,8 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
    which is handed what he has on and the story, and stored before it is
    spoken, as a reply is. Never throws: a look that died must not cost the
    calendar job its answer, and both endings leave a row. */
-export async function postCallLook(now = Date.now()): Promise<void> {
+export async function postCallLook(): Promise<void> {
+  const now = Date.now();
   try {
     const [call] = await readRows<Call>('Calls',
       `eugenia_calls?select=*&outcome=is.null&looked_at=is.null&withdrawn_at=is.null&confirm=eq.close` +
@@ -4857,7 +4862,7 @@ export async function postCallLook(now = Date.now()): Promise<void> {
     if (!call) return;
     const kept = await readStored("structure");
     const price = kept?.answer?.last?.close;
-    if (typeof price !== 'number' || now - Date.parse(kept!.read_at) > LOOK_FRESH_MS) return;
+    if (!kept || typeof price !== 'number' || now - Date.parse(kept.read_at) > LOOK_FRESH_MS) return;
     if (!lookDue(call, price, now)) return;
 
     const claimed = await fetch(`${SB_URL}/rest/v1/eugenia_calls?id=eq.${call.id}&looked_at=is.null`, {

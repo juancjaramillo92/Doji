@@ -61,6 +61,7 @@ import { foldStructure } from '../supabase/functions/doji-eugenia/structure.ts';
 import { structureList, callProblem, scoreCall, expiryOf, notBefore, CALL_SIDES, CALL_CONFIRMS, CALL_OUTCOMES, CONFIRM_MS }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { FULL_STOP, TARGET_MAX } from '../supabase/functions/doji-eugenia/adherence.ts';
+import { nyDate } from '../supabase/functions/_shared/edge.ts';
 import { claude, costOf, MODEL } from './eval.mjs';
 
 export const CLEAN_FROM = '2026-07-01';
@@ -176,10 +177,6 @@ export function tally(rows) {
     (traded.length ? `; the ${traded.length} that triggered made ${net >= 0 ? '+' : '-'}$${Math.abs(net).toFixed(2)} an ounce` : '') + '.';
 }
 
-// New York's date, which is the session's: a briefing asked again in the
-// evening is already tomorrow in UTC, and would be read as tomorrow's morning.
-const nyDay = (at) => new Date(at).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-
 /* Whether asking again gets the same answer. `mornings` is each morning's
    rows, one an asking; a side is buy, sell, no call or a call off his rules. */
 export function agreement(mornings) {
@@ -189,11 +186,13 @@ export function agreement(mornings) {
     `${sides.filter(s => s.size === 1).length} of ${mornings.length}, a buy on one asking and a sell on another on ${flipped}.`;
 }
 
-/* The first input kept each day, by its date: a morning asked twice was
-   written from the first. Sunday's is about the week and has no 08:00. */
+/* The first input kept each New York day, which is the session's: a morning
+   asked twice was written from the first, and a briefing asked again in the
+   evening is already tomorrow in UTC. Sunday's is about the week and has no
+   08:00. */
 export function inputsByDay(rows) {
   const by = new Map();
-  for (const r of [...rows].sort((a, b) => Date.parse(b.at) - Date.parse(a.at))) by.set(nyDay(r.at), r);
+  for (const r of [...rows].sort((a, b) => Date.parse(b.at) - Date.parse(a.at))) by.set(nyDate(new Date(r.at)), r);
   return by;
 }
 
@@ -219,13 +218,14 @@ async function main(argv) {
     inputs = inputsByDay(await res.json());
   }
   const base = [], usage = [];
-  // One list of mornings a way of asking, each morning the rows of its askings.
-  const asked = { 'her map alone': [], ...(inputs ? { 'the whole morning': [] } : {}) };
+  // Each way a morning is asked, with its mornings: the rows of one morning's askings.
+  const ways = [{ name: 'her map alone', whole: false, mornings: [] },
+                ...(inputs ? [{ name: 'the whole morning', whole: true, mornings: [] }] : [])];
   for (let n = 1; n <= days; n++) {
     const res = await fetch(`${url}/functions/v1/doji-mcp-sync?replay=${n}`, { headers: { 'x-doji-key': secret } });
     if (!res.ok) throw new Error(`replay ${n}: HTTP ${res.status} ${await res.text()}`.slice(0, 300));
     const served = await res.json();
-    const day = nyDay(served.at);
+    const day = nyDate(new Date(served.at));
     if (day < CLEAN_FROM) { console.log(`${day}  stopped: before ${CLEAN_FROM}, a morning the model may remember`); break; }
     if (!served.bars.length) { console.log(`${day}  no session`); continue; }
     if (served.missing.length) console.log(`${day}  not read: ${served.missing.map(m => `${m.period} ${m.error}`).join('; ')}`);
@@ -235,22 +235,22 @@ async function main(argv) {
     const mechanical = baseline(served);
     base.push(mechanical);
     console.log(line(day, mechanical));
-    for (const [way, mornings] of Object.entries(asked)) {
-      const whole = way !== 'her map alone';
+    for (const way of ways) {
       const rows = [];
       for (let i = 0; i < runs; i++) {
-        const sent = await claude(request(served, model, whole ? input.asked : null));
+        const sent = await claude(request(served, model, way.whole ? input.asked : null));
         usage.push(sent.usage);
-        const r = replayed(JSON.parse(sent.text), served, whole ? Math.max(served.at, Date.parse(input.at)) : served.at);
+        const r = replayed(JSON.parse(sent.text), served, way.whole ? Math.max(served.at, Date.parse(input.at)) : served.at);
         rows.push(r);
-        console.log(`${line(day, r)}${inputs ? `  [${way}]` : ''}`);
+        console.log(`${line(day, r)}${inputs ? `  [${way.name}]` : ''}`);
       }
-      mornings.push(rows);
+      way.mornings.push(rows);
     }
   }
   console.log(`\nHis rules with nobody reading — ${tally(base)}`);
-  for (const [way, mornings] of Object.entries(asked)) {
-    console.log(`${model}, ${way} — ${tally(mornings.flat())}` + (runs > 1 && mornings.length ? `\n${agreement(mornings)}` : ''));
+  for (const way of ways) {
+    console.log(`${model}, ${way.name} — ${tally(way.mornings.flat())}` +
+      (runs > 1 && way.mornings.length ? `\n${agreement(way.mornings)}` : ''));
   }
   console.log(Object.values(MODEL).includes(model)
     ? `This run cost about $${costOf(usage).toFixed(2)}.`
