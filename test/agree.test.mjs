@@ -21,7 +21,7 @@ import { execSync } from 'node:child_process';
 import { boot } from './boot.mjs';
 import { SETUPS, COLUMNS } from '../supabase/functions/doji-gladys/index.ts';
 import { ALWAYS, SECTIONS, VERSION } from '../supabase/functions/doji-eugenia/strategy.ts';
-import { APOLOGY, wanted, readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, CRAFT_MAX, NOTES, READ_VERDICTS, READ_MAX,
+import { APOLOGY, wanted, readStrategy, SAID, LOOP_KINDS, THESIS_MAX, PORTRAIT_MAX, CRAFT_MAX, LESSONS, LOOK_NEAR, NOTES, READ_VERDICTS, READ_MAX,
          READ_FIRMNESS, NOTE_MAX, CALL_SIDES, CALL_OUTCOMES, CALL_CONFIRMS, CALL_STEPS, CALL_MAX, RR_MIN, CONFIRM_MS, parseFeedback, feedbackKeyboard, EMBED_DIMS, briefDue, retryDue, readsDue, FRAME }
   from '../supabase/functions/doji-eugenia/index.ts';
 import { CONSOLIDATE, SYSTEM, PITCH, REVIEW } from '../supabase/functions/doji-eugenia/prompt.ts';
@@ -3771,6 +3771,17 @@ test('a call is filed and explained with the vocabularies and lengths the table 
   assert.deepEqual(vocab('misread'), [...CALL_STEPS], 'explain_call files a step the table refuses');
   const lesson = SCHEMA_SQL.match(/eugenia_calls_lesson_length check \(char_length\(lesson\) between 1 and (\d+)\)/);
   assert.equal(NOTE_MAX, Number(lesson?.[1]), 'explain_call truncates a lesson past what the table accepts');
+  const reason = SCHEMA_SQL.match(/eugenia_calls_withdrawn_length check \(char_length\(withdrawn\) between 1 and (\d+)\)/);
+  assert.equal(NOTE_MAX, Number(reason?.[1]), 'withdraw_call truncates a reason past what the table accepts');
+  /* AND THE LOOK'S TWO READINGS, which the README states as figures: how near
+     the level she is woken, and how old a map it may be decided on. */
+  const readme = source('docs/README.md').replace(/\s+/g, ' ');
+  const fresh = EUGENIA_TS.match(/^const LOOK_FRESH_MS = (\d+) \* 60_000;$/m);
+  assert.ok(fresh, 'LOOK_FRESH_MS is no longer a count of minutes this can read');
+  assert.ok(readme.includes(`within \`LOOK_NEAR\` ($${LOOK_NEAR}) of the call's level`),
+    'the README says she is woken at another distance than LOOK_NEAR');
+  assert.ok(readme.includes(`not off a map older than ${fresh[1]} minutes`),
+    'the README says the look is decided on a map of another age than LOOK_FRESH_MS');
   const length = SCHEMA_SQL.match(/eugenia_calls_condition_length check \(char_length\(condition\) between 1 and (\d+)\)/);
   assert.equal(CALL_MAX, Number(length?.[1]), 'make_call truncates a condition past what the table accepts');
 });
@@ -3824,6 +3835,14 @@ test('what her record has taught her is one number on both sides of the wire, an
   const consolidate = CONSOLIDATE.replace(/\s+/g, ' ');
   assert.match(consolidate, /counted in the whole record, three times at least/,
     'the pass may keep a lesson her record does not count');
+  // The bar is said three times, and the count she is handed once.
+  const joined = EUGENIA_TS.replace(/"\s*\+\s*"/g, '');
+  const tool = joined.slice(joined.indexOf('const CRAFT_TOOL'), joined.indexOf('input_schema', joined.indexOf('const CRAFT_TOOL')));
+  const readme = source('docs/README.md').replace(/\s+/g, ' ');
+  assert.match(tool, /three times at least/, "set_craft's description sets another bar than CONSOLIDATE");
+  assert.match(readme, /counted there three times at least/, 'the README sets another bar than CONSOLIDATE');
+  assert.ok(readme.includes(`her ${LESSONS} newest lesson sentences (\`LESSONS\`)`),
+    'the README says another number of lessons than the pass is handed');
   assert.match(consolidate, /nothing about him, nothing about today's market, no level, and never which way price goes/,
     'what her record has taught her may hold a level, a forecast or a line about him');
   assert.match(consolidate, /Take a line out when the whole record stops supporting it/,

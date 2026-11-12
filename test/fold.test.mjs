@@ -5220,7 +5220,7 @@ test('the look asks nothing until price is near, and a withdrawal reaches him on
   const OFF = 'My call from this morning is off. The 1H closed under the low it rested on.';
 
   const run = ({ calls = [call], price = 4004, withdraws = false, desk = [], age = 0 }) => {
-    const sent = [];
+    const sent = [], verdicts = [];
     let row = {};
     return withFetch(async (url, init) => {
       const u = String(url), method = init?.method ?? 'GET';
@@ -5231,6 +5231,10 @@ test('the look asks nothing until price is near, and a withdrawal reaches him on
       if (u.includes('eugenia_calls')) return ok(calls);
       if (u.includes('eugenia_market')) return ok([{ answer: { last: { close: price } }, read_at: new Date(Date.now() - age).toISOString() }]);
       if (u.includes('eugenia_trades')) return ok(desk);
+      if (u.includes('eugenia_runs')) {
+        verdicts.push(...JSON.parse(init.body).filter(r => r.caller === 'call look verdict').map(r => r.detail));
+        return ok({}, 201);
+      }
       if (u.includes('anthropic')) {
         const body = JSON.parse(init.body);
         const answered = JSON.stringify(body.messages).includes('tool_result');
@@ -5247,7 +5251,7 @@ test('the look asks nothing until price is near, and a withdrawal reaches him on
         return Response.json({ ok: true });
       }
       return ok([], method === 'POST' ? 201 : 200);
-    }, async () => { await postCallLook(); return { sent, row }; });
+    }, async () => { await postCallLook(); return { sent, row, verdicts }; });
   };
   const asked = (r) => r.sent.some(u => u.includes('anthropic'));
   const told = (r) => r.sent.filter(u => u.startsWith('said '));
@@ -5256,6 +5260,13 @@ test('the look asks nothing until price is near, and a withdrawal reaches him on
   assert.ok(!asked(none) && !none.sent.some(u => u.startsWith('PATCH')), 'a quarter hour with no standing call claimed a look or asked the model');
   const far = await run({ price: 4000 + LOOK_NEAR + 5 });
   assert.ok(!asked(far) && !far.row.looked_at, 'a call nowhere near its level spent its one look');
+  assert.deepEqual(far.verdicts, [], 'a quarter hour that woke nobody wrote a verdict');
+  // One read finds the session's call and lookDue decides the rest, so the
+  // filter is in one place.
+  assert.ok(far.sent.some(u => /eugenia_calls\?select=\*&outcome=is\.null&expires_at=gt\.[^&]+&order=id\.desc&limit=1$/.test(u)),
+    'the look reads its call under a filter of its own beside lookDue');
+  const looked = await run({ calls: [{ ...call, looked_at: new Date().toISOString() }] });
+  assert.ok(!asked(looked), 'a call already looked at was looked at again');
   const stale = await run({ age: 3600_000 });
   assert.ok(!asked(stale) && !stale.row.looked_at, 'the look was decided on a map an hour old');
 
@@ -5264,10 +5275,12 @@ test('the look asks nothing until price is near, and a withdrawal reaches him on
   assert.ok(stands.sent.some(u => u.startsWith('PATCH') && u.includes('id=eq.7&looked_at=is.null')),
     'the look is not claimed under `is null`, so two passes can both wake her');
   assert.deepEqual([stands.row.withdrawn_at, told(stands)], [undefined, []], 'a call that stands was withdrawn or announced');
+  assert.deepEqual(stands.verdicts, ['call 7 stands'], 'a look that left the call standing left no row saying so');
 
   const off = await run({ withdraws: true });
   assert.ok(off.row.withdrawn_at && off.row.withdrawn, 'she withdrew the call and no row says so');
   assert.deepEqual(told(off), [`said ${OFF}`], 'he is flat, the call he heard at eight is off, and he was not told');
+  assert.match(off.verdicts[0], /^call 7 withdrawn, /, 'a withdrawal he was told of left no row saying how it went out');
   const stored = off.sent.findIndex(u => u.startsWith('POST') && u.includes('eugenia_turns'));
   assert.ok(stored > -1 && stored < off.sent.findIndex(u => u.startsWith('said ')),
     'the withdrawal is spoken before it is stored, so a message he sends meanwhile reads a history without it');
@@ -5275,6 +5288,7 @@ test('the look asks nothing until price is near, and a withdrawal reaches him on
   const held = await run({ withdraws: true, desk: [position] });
   assert.ok(held.row.withdrawn_at, 'a withdrawal while he holds a position was not filed');
   assert.deepEqual(told(held), [], 'a man in a position was sent "my call is off", which reads as what to do with his trade');
+  assert.deepEqual(held.verdicts, ['call 7 withdrawn, not sent: he holds a position']);
 });
 
 test('a call the bars do not reach is unread, and a weekend is not a gap', () => {

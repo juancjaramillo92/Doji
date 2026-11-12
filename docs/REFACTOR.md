@@ -1232,6 +1232,45 @@ it. The look may withdraw and nothing else.
 — an alert of his, relayed — and the replay shows her withdrawals earning
 their look.
 
+### R-167 — one writer and one reader for the three one-row paragraphs
+**Deferred.** `setThesis`, `setPortrait` and `setCraft` are the same PATCH by
+primary key with a different column and ceiling, and each has the same read,
+line and block beside it. A shared writer would take the column, the ceiling
+and the words for a missing row as arguments, three callers each passing all
+three, and the tests that read each function by name would read one. The copy
+is three short functions that have not once disagreed.
+**Revisit if:** a fourth one-row paragraph arrives, or a fix to one of the
+three has to be made to the others.
+
+### R-168 — what her record taught her, kept beside each rewrite
+**Why refused:** the story and the portrait keep what they replace in
+`eugenia_rewrites`, whose `kind` is held by a check constraint. A third kind
+means dropping and re-adding that constraint on the live table, a step by hand
+in `upgrade.sql`, for a paragraph that starts empty and moves a line at a
+time. The daily backup holds each night's copy.
+**Revisit if:** a rewrite loses a lesson the record still supports and nobody
+can say what it replaced.
+
+### R-169 — eval cases for the look and for `set_craft`
+**Deferred.** `scripts/eval.mjs` builds each case as a path asks it and has
+none for `LOOK` or for the paragraph `CONSOLIDATE` now moves. Every case in it
+is a failure this README records or a rule his decision added, written from a
+real message; neither path has run live yet, so a case now would be a guess at
+what goes wrong.
+**Revisit if:** a look withdraws a call on nothing that printed, or the
+paragraph is seen holding a level, a forecast or a line about him — that
+message is the case.
+
+### R-170 — the look's TRIM on the look's clock
+**Deferred, for R-130's reason.** The look asks inside `LOOK_MS`, but the gate
+on its message runs on `TURN_MS`, since `trim` takes no budget. A gate that
+stalled for minutes after the job's reads and the look itself could outlive
+the worker, and a withdrawal filed while he is flat would then never be said.
+TRIM is one short call with no tools, and a budget on `trim` for one caller is
+still the option this file refuses.
+**Revisit if:** a `call look` row shows a withdrawal with no `call look
+verdict` row after it.
+
 ### R-166 — `withdraw_call` in a conversation
 **Why refused:** asked whether she still likes her call, she can say she would
 no longer take it and cannot file that. Offering the tool in `CHAT_TOOLS` makes

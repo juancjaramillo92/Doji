@@ -240,7 +240,7 @@ his to do and yours — so nothing open goes unsaid.
 - **The prohibitions in `prompt.ts` are the product.** Never what to do with a
   position he holds, and nothing about direction unasked while he holds one, are
   enforced by nothing but the sentences, so `agree.test.mjs` reads for them in
-  `SYSTEM`, `CRITIC`, `TRIM` and `TRADE_EVENT`. The gates need them as much as
+  `SYSTEM`, `CRITIC`, `TRIM`, `TRADE_EVENT` and `LOOK`. The gates need them as much as
   the writer: they REWRITE and run last. `CONSOLIDATE` inherits `SYSTEM`.
 - **A forward level lives in a filed call and nowhere else.** Her calls are paper
   trades on his rules — `callProblem` refuses one off them before `make_call`
