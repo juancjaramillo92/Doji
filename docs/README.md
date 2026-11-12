@@ -437,7 +437,9 @@ single-sourced at run time:
 | the **country his rules count** | `HOME` in `adherence.ts`, the default on `eugenia_calendar.country`, and the watch card's `.eq('country', 'US')` — and every rated read but the Sunday week filters on it |
 | the **verdicts a briefing tap may carry** | the keyboard's `callback_data`, `parseFeedback`, the check constraint |
 | how **firmly a read was said** | `READ_FIRMNESS` in `doji-eugenia` and the check constraint on `eugenia_reads.firmness` |
-| her **calls' sides, outcomes, confirmations, steps and lengths** | `CALL_SIDES`, `CALL_OUTCOMES`, `CALL_CONFIRMS`, `CALL_STEPS`, `CALL_MAX` and `NOTE_MAX` in `doji-eugenia`, and the check constraints on `eugenia_calls` |
+| her **calls' sides, outcomes, confirmations, steps and lengths** | `CALL_SIDES`, `CALL_OUTCOMES`, `CALL_CONFIRMS`, `CALL_STEPS`, `CALL_MAX` and `NOTE_MAX` (a lesson's length and a withdrawal's reason) in `doji-eugenia`, and the check constraints on `eugenia_calls` |
+| how **near a call's level she is woken, and off how old a map** | `LOOK_NEAR` and `LOOK_FRESH_MS` in `doji-eugenia`, and the figures *Her own calls* says them in |
+| what her **record has taught her: its length, its lessons and its count** | `CRAFT_MAX` and the check constraint; `LESSONS` and the figure the nightly pass's paragraph says; *three times at least* in `CONSOLIDATE`, in `set_craft`'s description and in that paragraph |
 | the **candle her calls wait for** | `CONFIRM_MS` in `doji-eugenia`, said in words by `make_call`'s description and by `SYSTEM` |
 | the **series gold is correlated against** | `FIT_AGAINST` in `doji-tradingview`, said in words by `SYSTEM`; the windows, `FITS`, are stated only by the block |
 | the **rules her calls are held to** | `FULL_STOP`, `TARGET_MIN`, `TARGET_MAX` and `TO_BREAK_EVEN` in `adherence.ts` and `RR_MIN` in `doji-eugenia`, which `callProblem` and `scoreCall` apply, and the words `SYSTEM` tells her them in |
@@ -1434,7 +1436,7 @@ pass has nothing to research.
   her **whole record** in front of it (`lifetimeBlock`): every call and read
   she has ever filed, counted in code by side, by how the entry went live, by
   the step a loss failed on, by channel and firmness, with what her
-  withdrawals would have made, and her thirty newest lesson sentences. Each
+  withdrawals would have made, and her 30 newest lesson sentences (`LESSONS`). Each
   thing in the paragraph is counted there three times at least, says what she
   does and what she does in its place, and comes out when the record stops
   supporting it; nothing about you, today's market, a level or where price
@@ -2599,7 +2601,7 @@ you.
   quarter-hourly job, once its map is stored, wakes her **once** for a call
   that waits on a close: the first pass that finds the map's newest close
   within `LOOK_NEAR` ($10) of the call's level (`lookDue`), not before a time
-  the call is held back to, and not off a map older than twenty minutes.
+  the call is held back to, and not off a map older than 20 minutes.
   `looked_at` is claimed under `is null` before the model is asked, so two
   passes cannot both wake her and a look that died is spent, not repeated. She
   is handed the call, the price, her map, the calendar with what has landed,
@@ -2871,12 +2873,17 @@ speaking worker's budget are taken only if they are a briefing and its marker
 sharing one instant — otherwise no quote rather than a wrong one.
 
 **Who gets what.** `notesBlock()` reaches **every path** — the briefing, a
-reply, the nightly pass, the week's review and the trade look — and its absence would be silent:
+reply, the nightly pass, the week's review, the trade look and the look at a
+standing call — and its absence would be silent:
 she carries on ignoring an instruction he believes she took. `portraitBlock()`,
 `recordBlock()` and `callsBlock()` go to the briefing, a reply, the pass and the review, and a
 test asserts none reaches the trade look: it lands the moment a loss closes his day,
 where *"he cuts winners early"* reads as an order about the next trade. The portrait is
-its own block so a failed read costs the paragraph and never his instructions. `channelsBlock()`
+its own block so a failed read costs the paragraph and never his instructions.
+`craftBlock()`, what her own record has taught her, goes to the briefing, a
+reply, the pass and the look at a standing call, and never the trade look
+either; `lifetimeBlock()`, the whole record it is counted from, to the pass
+alone. `channelsBlock()`
 goes to the three asked to build a term, since what moves gold runs through a
 channel and a message saying the dollar came off teaches nothing to someone for
 whom the dollar is `unseen`. The conversation window goes to everything that
@@ -2909,7 +2916,9 @@ first seen — and where the day stands against R-11's 4%. **A position opened o
 holds run multi-session, and a bare `open since 09:15 ET` under *right now* reads
 as this morning. Flat and not traded today, it is nothing at all. It goes to
 four paths — the briefing, a reply, the nightly pass and the week's review.
-The trade look is reached *from* the position and already holds its row.
+The trade look is reached *from* the position and already holds its row, and
+the look at a standing call reads the same rows itself (`readDesk`), since
+whether he holds a position is also what decides if a withdrawal is sent.
 
 **What she may do with it is narrower than what she can see, by design.**
 Unprompted it stops anything setup-flavoured while a position is open, and lets
@@ -3347,7 +3356,11 @@ print writes `caller: 'reactions'` for the same bars. The embedding sweep writes
 the lexical one keeps answering; the channel census writes `caller: 'channels'`,
 because a ladder that stopped moving looks like one with no reason to, and a rung
 is read by comparing nights. `caller` is free text, so none needed a
-migration. **`postConsolidation` has exactly one `return`**, and a test counts
+migration. **The look at a standing call writes `caller: 'call look verdict'`**
+for every ending past its claim — the call stands, it was withdrawn and held
+back from him, it was withdrawn and how the message went out, or why the look
+died — because the model's own `call look` row says what it was asked and what
+it called, never what came of it. **`postConsolidation` has exactly one `return`**, and a test counts
 it: a quiet day is a branch, and an early return is how both meters once skipped
 every night nobody spoke. The census stays after the pass, the only thing that
 can move a rung.

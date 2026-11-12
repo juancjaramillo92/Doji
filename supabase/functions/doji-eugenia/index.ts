@@ -4852,13 +4852,16 @@ export async function postTradeEvent(id: string, event: string): Promise<Respons
    and his next briefing or question finds it in her record. Gated by TRIM,
    which is handed what he has on and the story, and stored before it is
    spoken, as a reply is. Never throws: a look that died must not cost the
-   calendar job its answer, and both endings leave a row. */
+   calendar job its answer. Every ending past the claim is a `call look
+   verdict` row — stands, withdrawn and held back from him, withdrawn and how
+   it went out, or the reason it died — since the model's own row says what
+   it was asked and never what came of it. */
 export async function postCallLook(): Promise<void> {
   const now = Date.now();
   try {
+    // The session's call, standing or not: whether it is looked at is lookDue's.
     const [call] = await readRows<Call>('Calls',
-      `eugenia_calls?select=*&outcome=is.null&looked_at=is.null&withdrawn_at=is.null&confirm=eq.close` +
-      `&expires_at=gt.${new Date(now).toISOString()}&order=id.desc&limit=1`);
+      `eugenia_calls?select=*&outcome=is.null&expires_at=gt.${new Date(now).toISOString()}&order=id.desc&limit=1`);
     if (!call) return;
     const kept = await readStored("structure");
     const price = kept?.answer?.last?.close;
@@ -4886,11 +4889,11 @@ export async function postCallLook(): Promise<void> {
 
     const [after] = await readRows<Call>('Calls', `eugenia_calls?select=withdrawn_at&id=eq.${call.id}&limit=1`);
     if (!after?.withdrawn_at) {
-      await recordRun({ caller: 'call look delivered', ok: true, detail: `call ${call.id} stands` });
+      await recordRun({ caller: 'call look verdict', ok: true, detail: `call ${call.id} stands` });
       return;
     }
     if (open.length) {
-      await recordRun({ caller: 'call look delivered', ok: true,
+      await recordRun({ caller: 'call look verdict', ok: true,
                         detail: `call ${call.id} withdrawn, not sent: he holds a position` });
       return;
     }
@@ -4899,13 +4902,13 @@ export async function postCallLook(): Promise<void> {
                                      { role: 'assistant', content: said }])
       .then(() => null, (err: unknown) => why(err));
     const how = await sayAloud(said);
-    await recordRun({ caller: 'call look delivered', chars: said.length, ok: !unstored,
+    await recordRun({ caller: 'call look verdict', chars: said.length, ok: !unstored,
                       detail: unstored ? `sent ${how}, not stored — ${unstored}`.slice(0, 500)
                                        : `call ${call.id} withdrawn, ${how}` });
   } catch (err) {
     const reason = why(err);
     console.error("doji-eugenia: call look failed —", reason);
-    await recordRun({ caller: 'call look delivered', ok: false, detail: reason.slice(0, 500) });
+    await recordRun({ caller: 'call look verdict', ok: false, detail: reason.slice(0, 500) });
   }
 }
 
