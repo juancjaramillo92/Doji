@@ -361,6 +361,14 @@ test('the laptop journals through the door, the keys and the answers Gladys read
     assert.ok(select.includes(f), `the laptop reads the trade's ${f} and her door does not select it`);
   }
   assert.match(LAPTOP_FACE, /window\.doji\.answer\(j\.trade\.id, /, 'the page no longer answers a trade by its id');
+  // The card names the trade from the row her door hands over, and asks in the app's own words.
+  const drawn = [...new Set([...LAPTOP_FACE.matchAll(/\bj\.trade\.(\w+)/g)].map(m => m[1]))];
+  assert.ok(drawn.length >= 4, `the card reads only ${drawn.join(', ')} of the trade — the reader has gone blind`);
+  for (const f of drawn) assert.ok(select.includes(f), `the card draws the trade's ${f} and her door does not select it`);
+  const { ASKS } = await import('../laptop/journal.mjs');
+  const form = Object.fromEntries([...source('index.html').matchAll(/\['(followed_\w+)',\s+'([^']+)',\s+t\.\1\]/g)].map(m => [m[1], m[2]]));
+  assert.equal(Object.keys(form).length, 3, 'journalForm no longer words its three questions as this test reads them');
+  assert.deepEqual(ASKS.slice(1), ANSWERS.slice(1).map(([, column]) => form[column]), 'the card asks a question in other words than the app does');
   const posted = bodyOf(LAPTOP_MAIN, 'async function answer(').match(/JSON\.stringify\(\{ (\w+): tap\(/)?.[1];
   assert.ok(posted, 'answer() no longer posts its answer as this test reads it');
   assert.match(bodyOf(GLADYS_TS, 'async function laptopAnswer('), new RegExp(`\\?\\.${posted}\\b`),

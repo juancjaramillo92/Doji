@@ -26,7 +26,7 @@ import process from 'node:process';
 import { BLOB, opacity } from './art.mjs';
 import { framer } from './frames.mjs';
 import { tap } from './journal.mjs';
-import { placed, room } from './place.mjs';
+import { placed, room, tucked, within } from './place.mjs';
 import { swapScript } from './update.mjs';
 
 const DOOR = 'https://gujhyogvkzjgnrodyuse.supabase.co/functions/v1/doji-eugenia';
@@ -36,7 +36,7 @@ const KEPT = { eugenia: 'key', gladys: 'gladys-key' };
 // Published by laptop.yml from main: the zipped app, and its version after it.
 const UPDATES = 'https://gujhyogvkzjgnrodyuse.supabase.co/storage/v1/object/public/laptop';
 
-// Her side in points; the window is her ROOM around it.
+// Her side in points; the window is the room around her.
 const SIZES = { Small: 140, Medium: 200, Large: 280 };
 /* The talk keys he may choose, by the name the menu shows. Shift added is the
    chart's. Two, because another app can hold the first: the menu says so. */
@@ -103,6 +103,7 @@ let pending = { waiting: 0, trade: null };  // what waits for its journal, as Gl
 let answering = false; // an answer on its way to Gladys's door
 let knocks = 0;        // asks of Gladys's door, so a look an answer overtook is dropped
 let pointed = '';      // where the page was last told the cursor is
+let tuckedAt = null;   // the edge she peeks over, while she is tucked away
 let updating = false;
 const log = [];
 
@@ -119,8 +120,9 @@ const every = (fn, ms) => timers.push(setInterval(fn, ms));
 const talkKey = () => (settings.key in KEYS ? settings.key : '⌥Space');
 
 /* ─── What she keeps on the laptop ─────────────────────────────────────────
-   The window's size and place, the talk key, and the two keys, hers and
-   Gladys's, encrypted by the Keychain. */
+   Her size and her place — her own square's corner, which the window is
+   built around — the talk key, and the two keys, hers and Gladys's, encrypted
+   by the Keychain. */
 function load() {
   fresh = !existsSync(kept('settings.json'));
   try { settings = JSON.parse(readFileSync(kept('settings.json'), 'utf8')); } catch { settings = {}; }
@@ -176,11 +178,9 @@ function askForKey(who) {
    shape go through to the chart — the page says where her shape is. Kept out
    of every capture it can be, so the chart she is shown does not have her in
    it. */
-function bounds() {
-  const { width, height } = room(SIZES[settings.size] ?? SIZES.Medium);
-  return placed({ x: settings.x, y: settings.y, width, height },
-    screen.getAllDisplays().map(d => d.workArea), screen.getPrimaryDisplay().workArea);
-}
+const side = () => SIZES[settings.size] ?? SIZES.Medium;
+const onScreen = (her) => room(placed(her, screen.getAllDisplays().map(d => d.workArea), screen.getPrimaryDisplay().workArea));
+const bounds = () => onScreen({ x: settings.x, y: settings.y, side: side() });
 
 function float() {
   face = new BrowserWindow({
@@ -197,10 +197,13 @@ function float() {
   face.setIgnoreMouseEvents(true, { forward: true });
   face.loadFile(join(here, 'face.html'));
   face.once('ready-to-show', () => { if (!settings.hidden) bringHere(); });
-  // A screen unplugged or rearranged can take her place with it.
+  // A screen unplugged or rearranged can take her place with it, and the edge she was tucked behind.
   for (const change of ['display-removed', 'display-metrics-changed']) {
-    screen.on(change, () => present() && face.setBounds(placed(face.getBounds(),
-      screen.getAllDisplays().map(d => d.workArea), screen.getPrimaryDisplay().workArea)));
+    screen.on(change, () => {
+      if (!present()) return;
+      face.setBounds(tuckedAt ? bounds() : onScreen(within(face.getBounds(), side())));
+      untuck();
+    });
   }
 }
 
@@ -208,6 +211,7 @@ function resize(name) {
   settings.size = name;
   save();
   face.setBounds(bounds());
+  untuck();
   menu();
 }
 
@@ -221,6 +225,8 @@ function resize(name) {
 function bringHere() {
   settings.hidden = false;
   save();
+  if (tuckedAt) face.setBounds(bounds(), true);
+  untuck();
   face.setVisibleOnAllWorkspaces(true, SPACES);
   face.showInactive();
   face.setVisibleOnAllWorkspaces(false, SPACES);
@@ -228,13 +234,26 @@ function bringHere() {
   menu();
 }
 
+/* Hidden, she tucks away first: she slides to the nearest edge of her
+   screen that can hide her and peeks over it, a click away. Hidden again
+   from there, or with no such edge, she is gone until she is brought back. */
 function hideHer() {
+  const display = screen.getDisplayMatching(face.getBounds());
+  const tuck = tuckedAt ? null : tucked(within(face.getBounds(), side()), display,
+    screen.getAllDisplays().filter(d => d.id !== display.id).map(d => d.bounds));
+  if (tuck) {
+    face.setBounds(room(tuck), true);
+    send('tucked', tuckedAt = tuck.edge);
+    return note(`tucked ${tuck.edge}`);
+  }
   settings.hidden = true;
   save();
   face.hide();
   note('hidden');
   menu();
 }
+
+const untuck = () => { if (tuckedAt) send('tucked', tuckedAt = null); };
 
 /* The keys, registered whole or reported: a key another app holds registers
    as nothing, which would read as her not hearing. A press is heard wherever
@@ -521,7 +540,8 @@ ipcMain.on('drag', (_, dx, dy) => {
   const [x, y] = face.getPosition();
   face.setPosition(x + dx, y + dy);
 });
-ipcMain.on('dropped', () => { [settings.x, settings.y] = face.getPosition(); save(); });
+ipcMain.on('dropped', () => { ({ x: settings.x, y: settings.y } = within(face.getBounds(), side())); save(); untuck(); });
+ipcMain.on('bring', bringHere);
 ipcMain.handle('key', (_, candidate) => tryKey(keyFor, String(candidate).trim()));
 
 // Her pages are files and stay files: no window opens from them, and none navigates away.

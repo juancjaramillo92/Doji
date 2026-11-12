@@ -1,22 +1,22 @@
-/* Her face on the laptop, with a body that breathes.
+/* Her face on the laptop, with a body of glass.
    ───────────────────────────────────────────────────────────────────────────
-   Her render and the drawing over it — eyes, highlight, smile, thought dots,
-   the listening ring — in a 466-pixel square of her own, scaled to the
-   window. Then the body: she breathes and floats a little at rest, looks
-   at the cursor when it comes near, leans in to listen, sways while she
-   thinks and gives with the loud moments of her voice. Eyes and mouth ride
-   the same transform, so they stay on her. And a line above her head, for
-   what her face alone cannot say: why something failed, and how to talk.
-   When a trade waits for its journal, the journal's screens take her place,
-   and his clicks answer them.
+   Her render and the drawing over it — eyes, highlight, smile — in a
+   466-pixel square of her own, scaled to the window. Then the body: she
+   breathes and floats a little at rest, bends as she sways and turns, gives
+   on a spring when she is carried and dropped, lights from inside while she
+   listens and fills with bubbles while she thinks. Eyes and mouth are drawn
+   on the same skin, so they stay on her. She sleeps when there is nothing to
+   be awake for. Above her head, a line for what her face alone cannot say,
+   and the journal's card when a trade waits for its answers.
 
    This page records him and plays her; the main process carries both to her
    door and back, and his answers to Gladys's, and owns the keys, the chart
    and the window.
    ═══════════════════════════════════════════════════════════════════════════ */
 import { opacity } from './art.mjs';
+import { FLING, marketOpen, settle, sleeps, slide } from './body.mjs';
 import { FRAME, PCM_RATE, sampler } from './frames.mjs';
-import { asked } from './journal.mjs';
+import { ASKS, SETUPS, asked, given } from './journal.mjs';
 import { ROOM } from './place.mjs';
 
 /* ─── Her face ──────────────────────────────────────────────────────────────
@@ -28,8 +28,7 @@ const F = {
   mouth: [244.3, 162.2], mouth_w: 51.0, sag: 9.4, stroke: 3.4,
   tilt: -10.0,
 };
-const DOTS = [[208, 38, 3.2], [233, 30, 3.8], [258, 38, 3.2]];
-const FEATURES = '#0d0c0b', SHINE = '#f2f0ec', THROAT = '#1d0e0b', THOUGHT = '#ead3b6';
+const FEATURES = '#0d0c0b', SHINE = '#f2f0ec', THROAT = '#1d0e0b';
 /* Doji's colours. Those named beside a token are the app's own, copies of
    index.html's, which agree.test.mjs holds them against; the emeralds the
    gradients are made of are her own. */
@@ -55,14 +54,14 @@ const LISTEN = [[660.0, 0.07], [990.0, 0.11]];
 const SENT = [[990.0, 0.07], [660.0, 0.11]];
 
 /* ─── Gladys's journal ─────────────────────────────────────────────────────
-   The journal's screens, drawn on her round square: each question owns the
-   whole of it, split down the middle, with one word in Doji's typeface. Left
-   is no and right is yes — the setup's halves its two setups — in Doji's
-   emeralds rather than a win's teal and a loss's red, each a gradient from
-   top to bottom that brightens when clicked. Four dots at the top say what
-   is answered; done, they fill, a tick draws itself in and the ring sweeps
-   round once, brighter when every answer was a yes. Unclicked for ASK_MS,
-   the questions give way to her, the trade still waiting. */
+   A card above her head, in Doji's typeface: which trade, the question in
+   the app's words, and its two answers as the card's two halves — left is no
+   and right is yes, the setup's halves its two setups — in Doji's emeralds
+   rather than a win's teal and a loss's red, each brightening when clicked.
+   Four chips along the bottom say what is answered and how. Done, a tick
+   draws itself in, light emerald when every answer was a yes, and she is
+   pleased. Unclicked for ASK_MS, the card gives way, the trade still
+   waiting. */
 const WORDS = ['SETUP', 'RULES', 'SL', 'TP'];
 const SHORT = ['B&R', 'S&R'];
 const HALVES = [
@@ -71,36 +70,49 @@ const HALVES = [
   /* no    */ [['#0a2430', '#0f3340'], ['#1f6f8a', TEAL]],
   /* yes   */ [['#0d2a17', '#153d22'], [ACCENT, '#5fe08a']],
 ];
-const TICK = [[203, 237], [223, 257], [263, 209]];
 const ASK_MS = 60_000;
 const FLASH_MS = 260;
-const FADE_MS = 180;
-const TICK_MS = 420;
-const SWEEP_MS = 700;
 const DONE_MS = 2600;
-/* The laptop's own: the questions come up on their own over his chart, at
-   the moment he is likeliest to be working it, so a click in their first
-   SETTLE_MS was meant for the chart beneath them. */
+/* The laptop's own: the card comes up on its own over his chart, at the
+   moment he is likeliest to be working it, so a click in its first
+   SETTLE_MS was meant for the chart beneath it. */
 const SETTLE_MS = 500;
 // The ring near white: grey on black reads as a smudge.
 const WAITS = '#ecf4ef';
 const TYPE = '"Hanken Grotesk"';
+// The card's em at her 200-point size; it grows and shrinks with her.
+const CARD_EM = 14 / 200;
 
-/* ─── What the laptop adds ─────────────────────────────────────────────────
+/* ─── Her body ──────────────────────────────────────────────────────────────
    Tuned by eye and kept small: she is alive, not busy. The two rhythms differ
    so they never fall into step and repeat like a metronome. She gives from
-   her base, the lowest row of the render. At rest she is drawn at a lower
-   rate, which a breath this slow does not show, and the battery does. */
-const BASE = 381;
+   her base, the lowest row of the render, and bends from it: a bend is so
+   many pixels at her crown, the highest, falling away by the square of the
+   height. At rest she is drawn at a lower rate, which a breath this slow
+   does not show, and the battery does. */
+const BASE = 381, CROWN = 53;
 const BREATH_S = 4.6, BREATH = 0.015;
+const DEEP_S = 7.2, DEEP_BREATH = 0.03, DROOP = 0.03;
 const BOB_S = 3.3, BOB = 2.5;
-const SWAY_S = 2.6, SWAY = 0.026;
+const SWAY_S = 2.6, SWAY = 9, TURN = 5;
 const LEAN = 0.02, SQUASH = 0.035, LIFT = 4;
-// The journal crosses over her rather than cutting in: nothing flashes.
-const CROSS = 12;
+/* The spring she gives on, and how much of a carry goes into it: sideways
+   into the bend, up and down into her height. The kicks are what a moment
+   gives it — a nod as she takes his question, a start, a landing. */
+const STIFF = 130, DAMP = 9;
+const GIVE = 4, GIVE_UP = 0.012, BEND_MOST = 26, STRETCH_MOST = 0.12;
+const NOD = 0.6, START = 1.2, LAND = 1.0, STIR = 0.7, WIGGLE = 150;
+// The skin is bent in strips this many rows high.
+const STRIP = 3;
+const RISING = 7;
 const FRAME_MS = 33, REST_FRAME_MS = 50;
 // The cursor within this many of her pixels has her eyes.
 const NEAR = 700;
+/* Play, kept for a cursor that means it: a pass faster than SWIFT of her
+   pixels a second, close by, makes her start, no oftener than STARTLE_EVERY;
+   RUB of her side travelled over her without a click pleases her. */
+const SWIFT = 3000, CLOSE = 300, START_MS = 700, STARTLE_EVERY_MS = 4000;
+const RUB = 3, PLEASED_MS = 1600;
 const HINT_AFTER_MS = 1200;
 
 /* A recording's ceiling, at the bitrate it is made at, is well inside her
@@ -135,22 +147,37 @@ const SAY_MS = 4500, HELLO_MS = 9000;
 
 const canvas = document.getElementById('her');
 const said = document.getElementById('said');
+const card = document.getElementById('card');
+const halves = [...document.getElementById('halves').children];
+const chips = [...document.getElementById('chips').children];
 const g = canvas.getContext('2d');
+// Her skin: the render bent, lit and drawn on, before the body's transform carries all of it.
+const skin = new OffscreenCanvas(466, 466);
+const s = skin.getContext('2d');
 const still = matchMedia('(prefers-reduced-motion: reduce)');
-Object.assign(said.style, { color: INK, background: `${GROUND}e0`, border: `1px solid ${LINE}` });
+for (const [name, color] of Object.entries({ ink: INK, muted: MUTED, ground: GROUND, line: LINE, accent: ACCENT, glow: GLOW })) {
+  document.body.style.setProperty(`--${name}`, color);
+}
 
 let art, alpha;              // the render with its black made clear, and her shape for clicks
+let shape;                   // the box her shape fills, in her pixels: what an edge of the screen turns back
 let mode = 'idle';           // idle · listening · thinking · speaking · confused · journal
 let briefingWaits = false;
 let trade = null, waiting = 0;   // the oldest trade waiting for its journal, and how many do
-let due = false;                 // a trade came in: its questions come up once she is idle
-let journal = null;              // the questions, up while the mode is: the trade, the question, the half lit, done
+let due = false;                 // a trade came in: its card comes up once she is idle
+let journal = null;              // the card, up while the mode is: the trade, the question, the half lit, done
 let talkKey = '⌥Space';
 let recorder = null, recording = null, ear = null;
 let listen = null;           // the recording under way: when it began, whether he spoke, the tick
 let audio = null;            // her answer playing: its context, its player, and what the player has said
 let confusedUntil = 0, sayUntil = 0;
 let cues = null;             // the context her two-note sounds and the ear share
+let side = 0;                // her square's side, in the window's pixels
+let tucked = null;           // the edge she peeks over while she is tucked away
+let flight = null;           // a throw under way: her box on the screen and its speed
+let asleep = false, open = true, openAsked = -Infinity;
+let nearAt = performance.now(), movedAt = nearAt;   // when the cursor last came near her, and last moved at all
+let startUntil = 0, startAfter = 0, pleasedUntil = 0, rubbed = 0;
 
 /* The render is drawn on black: its black made clear by art.mjs's rule, and
    the edge un-darkened by the same amount, so the glass keeps its colour to
@@ -164,11 +191,16 @@ async function load() {
   o.drawImage(img, 0, 0);
   const d = o.getImageData(0, 0, 466, 466);
   alpha = new Uint8Array(466 * 466);
+  shape = { left: 466, top: 466, right: 0, bottom: 0 };
   for (let i = 0; i < alpha.length; i++) {
     const p = d.data.subarray(4 * i, 4 * i + 4);
     const a = opacity(p[0], p[1], p[2]);
     if (a > 0) { p[0] /= a; p[1] /= a; p[2] /= a; }
     p[3] = alpha[i] = 255 * a;
+    if (alpha[i] > 64) {
+      const u = i % 466, v = Math.floor(i / 466);
+      shape = { left: Math.min(shape.left, u), top: Math.min(shape.top, v), right: Math.max(shape.right, u), bottom: Math.max(shape.bottom, v) };
+    }
   }
   o.putImageData(d, 0, 0);
   art = off;
@@ -178,6 +210,7 @@ function say(reason, ms = SAY_MS) {
   said.textContent = SAY[reason](talkKey);
   said.classList.add('shown');
   sayUntil = performance.now() + ms;
+  nearAt = performance.now();
 }
 const unsay = () => { said.classList.remove('shown'); sayUntil = 0; };
 
@@ -220,90 +253,121 @@ const ease = (v, t, rate, dt) => {
   return Math.abs(t - e) < 0.002 ? t : e;
 };
 
-function dot(cx, cy, rx, ry, color, fade = 1) {
-  g.save();
-  g.globalAlpha *= fade;
-  g.fillStyle = color;
-  g.beginPath();
-  g.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
-  g.fill();
-  g.restore();
+function dot(c, cx, cy, rx, ry, color, fade = 1) {
+  c.save();
+  c.globalAlpha *= fade;
+  c.fillStyle = color;
+  c.beginPath();
+  c.ellipse(cx, cy, rx, ry, 0, 0, 2 * Math.PI);
+  c.fill();
+  c.restore();
 }
 
 /* A smile through its two ends and its lowest point, turned through F.tilt
    with her head. At this size the arc of the circle those points lie on and
-   this curve are the same line. */
-function curve(cx, y, half, sag, width, color) {
-  g.save();
-  g.translate(cx, y);
-  g.rotate(F.tilt * Math.PI / 180);
-  g.strokeStyle = color;
-  g.lineWidth = width;
-  g.lineCap = 'round';
-  g.beginPath();
-  g.moveTo(-half, 0);
-  g.quadraticCurveTo(0, 2 * sag, half, 0);
-  g.stroke();
-  g.restore();
+   this curve are the same line. A sag the other way is an eye shut in
+   pleasure. */
+function curve(cx, y, half, sag, width) {
+  s.save();
+  s.translate(cx, y);
+  s.rotate(F.tilt * Math.PI / 180);
+  s.strokeStyle = FEATURES;
+  s.lineWidth = width;
+  s.lineCap = 'round';
+  s.beginPath();
+  s.moveTo(-half, 0);
+  s.quadraticCurveTo(0, 2 * sag, half, 0);
+  s.stroke();
+  s.restore();
 }
 
 const V = {
-  open: 0, gx: 0, gy: 0, mouth: 0, smile: 1, dots: 0, confused: 0, lid: 1, lean: 0, sway: 0, squash: 0, heard: 0, journal: 0,
+  open: 0, gx: 0, gy: 0, mouth: 0, shape: 0, smile: 1, dots: 0, confused: 0, lid: 1, lean: 0, sway: 0, squash: 0,
+  heard: 0, glow: 0, turn: 0, wide: 0, joy: 0, sleep: 0,
 };
+// What she gives on: the bend, in pixels at her crown, and her height.
+const bend = { x: 0, v: 0 }, stretch = { x: 0, v: 0 };
 const gaze = [0, 0];
-let nextGlance = 0, nextBlink = 0, blinkAt = 0, blinking = false, level = 0, heard = 0;
+let nextGlance = 0, nextBlink = 0, blinkAt = 0, blinking = false, level = 0, bright = 0, heard = 0, breath = 0;
 let cursor = null;           // where the cursor is in her pixels, when it is near
+let over = null;             // the half of the card the cursor is on
 
-function features(now) {
-  const open = V.open * V.lid;
+function features() {
+  const lid = V.open * V.lid, wide = 1 + 0.2 * V.wide;
   for (const [i, eye] of [F.eye_l, F.eye_r].entries()) {
-    const odd = 1 + V.confused * (i ? 0.12 : -0.18);
+    const odd = (1 + V.confused * (i ? 0.12 : -0.18)) * wide;
     const cx = eye[0] + V.gx, cy = eye[1] + V.gy + V.confused * (i ? -1.6 : 1.6);
-    const rx = F.rx * odd, ry = F.ry * odd * open;
-    if (ry < 1.8) { curve(cx, cy, rx * 0.9, 1.2, 2.6, FEATURES); continue; }
-    dot(cx, cy, rx, ry, FEATURES);
-    if (open > 0.45) {
-      const k = open - 0.45 > 0.25 ? 1 : (open - 0.45) * 4;
-      dot(cx + F.hl[0], cy + F.hl[1] * open, F.hl[2], F.hl[2], SHINE, 0.92 * k);
+    const rx = F.rx * odd, ry = F.ry * odd * lid * Math.max(0, 1 - 1.7 * V.joy);
+    if (V.joy > 0.5 && lid > 0.3) { curve(cx, cy + 2, rx * 1.1, -3.2 * V.joy, 2.8); continue; }
+    if (ry < 1.8) { curve(cx, cy, rx * 0.9, 1.2, 2.6); continue; }
+    dot(s, cx, cy, rx, ry, FEATURES);
+    if (lid > 0.45) {
+      const k = lid - 0.45 > 0.25 ? 1 : (lid - 0.45) * 4;
+      dot(s, cx + F.hl[0], cy + F.hl[1] * lid, F.hl[2], F.hl[2], SHINE, 0.92 * k);
     }
   }
 
   const [mx, my] = F.mouth;
   if (V.mouth < 0.06) {
-    curve(mx, my, F.mouth_w / 2, F.sag * V.smile, F.stroke, FEATURES);
+    curve(mx, my, F.mouth_w / 2, F.sag * V.smile, F.stroke);
   } else {
-    const half = F.mouth_w / 2 * 0.86, bottom = my + F.sag * 0.8 + 2 * V.mouth * 12;
-    g.fillStyle = THROAT;
-    g.strokeStyle = FEATURES;
-    g.lineWidth = 2;
-    g.beginPath();
-    g.roundRect(mx - half, my - 1, 2 * half, bottom - my + 1, (bottom - my + 1) / 2);
-    g.fill();
-    g.stroke();
-  }
-
-  if (V.dots > 0.02) {
-    for (const [i, [x, y, r]] of DOTS.entries()) {
-      const pulse = 0.5 + 0.5 * Math.sin(now / 260 - i * 1.1);
-      dot(x, y - pulse * 2.5, r, r, THOUGHT, V.dots * (0.25 + 0.75 * pulse));
-    }
+    // Wide and shallow on a bright sound, narrow and deep on a dark one.
+    const half = F.mouth_w / 2 * (0.7 + 0.32 * V.shape), bottom = my + F.sag * 0.8 + 2 * V.mouth * (14 - 5 * V.shape);
+    s.fillStyle = THROAT;
+    s.strokeStyle = FEATURES;
+    s.lineWidth = 2;
+    s.beginPath();
+    s.roundRect(mx - half, my - 1, 2 * half, bottom - my + 1, (bottom - my + 1) / 2);
+    s.fill();
+    s.stroke();
   }
 }
 
-/* The ring round the rim, Doji's emeralds turning through it, `part`
-   of the way round from the top. */
-function ring(radius, width, part, fade = 1) {
-  const conic = g.createConicGradient(-Math.PI / 2, 233, 233);
-  [DEEP, ACCENT, GLOW, TEAL, DEEP].forEach((c, i) => conic.addColorStop(i / 4, c));
-  g.save();
-  g.globalAlpha *= fade;
-  g.strokeStyle = conic;
-  g.lineWidth = width;
-  g.lineCap = 'round';
-  g.beginPath();
-  g.arc(233, 233, radius, -Math.PI / 2, -Math.PI / 2 + 2 * Math.PI * part);
-  g.stroke();
-  g.restore();
+/* Her skin: the render, bent; then what is inside her, drawn only where she
+   is — the light of his voice while she listens, filling her from her base
+   and draining through a recording's last WARN_LEFT, and bubbles rising
+   while she thinks; then her face, leaning with the glass it is on. */
+const leans = (y, by) => by * (Math.max(0, BASE - y) / (BASE - CROWN)) ** 2;
+
+function wear(now, by) {
+  s.setTransform(1, 0, 0, 1, 0, 0);
+  s.globalCompositeOperation = 'source-over';
+  s.clearRect(0, 0, 466, 466);
+  if (by === 0) s.drawImage(art, 0, 0);
+  else for (let y = 0; y < 466; y += STRIP) s.drawImage(art, 0, y, 466, STRIP, leans(y, by), y, 466, STRIP);
+
+  s.globalCompositeOperation = 'source-atop';
+  if (V.glow > 0.01) {
+    const left = Math.min(1, (RECORD_MS - (now - listen.began)) / WARN_LEFT), line = BASE - left * (BASE - CROWN);
+    const light = s.createLinearGradient(0, line - 16, 0, line + 16);
+    light.addColorStop(0, `${GLOW}00`);
+    light.addColorStop(1, GLOW);
+    s.globalAlpha = V.glow * (0.16 + 0.4 * V.heard);
+    s.fillStyle = light;
+    s.fillRect(0, 0, 466, 466);
+    s.globalAlpha = 1;
+  }
+  if (V.dots > 0.02) {
+    for (let i = 0; i < RISING; i++) {
+      const up = (now / (2600 + 310 * i) + i * 0.37) % 1, y = BASE - 30 - up * 250, r = 3.5 + i * 7 % 5;
+      const x = 150 + i * 61 % 170 + 9 * Math.sin(now / 500 + i * 2.1) + leans(y, by);
+      s.globalAlpha = V.dots * Math.min(1, 5 * up, 5 * (1 - up));
+      s.strokeStyle = SHINE;
+      s.lineWidth = 1.4;
+      s.beginPath();
+      s.arc(x, y, r, 0, 2 * Math.PI);
+      s.stroke();
+      dot(s, x - r * 0.35, y - r * 0.35, r * 0.24, r * 0.24, SHINE);
+    }
+    s.globalAlpha = 1;
+  }
+
+  s.globalCompositeOperation = 'source-over';
+  const [mx, my] = F.mouth, rise = (BASE - my) / (BASE - CROWN);
+  s.translate(mx + leans(my, by), my);
+  s.rotate(2 * by * rise / (BASE - CROWN));
+  s.translate(-mx, -my);
+  features();
 }
 
 /* What waits, low beside her: a near-white ring for a trade, an emerald dot
@@ -325,111 +389,28 @@ function waits() {
   g.save();
   g.shadowColor = ACCENT;
   g.shadowBlur = 22;
-  dot(404, 404, 16, 16, GLOW);
+  dot(g, 404, 404, 16, 16, GLOW);
   g.restore();
-}
-
-/* ─── The journal's screens ─────────────────────────────────────────────────
-   Drawn in her 466 square, on its round screen. */
-function word(text, x, y, size, weight, color, spacing) {
-  g.font = `${weight} ${size}px ${TYPE}`;
-  g.letterSpacing = `${spacing}px`;
-  g.fillStyle = color;
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  // The spacing follows the last letter as well, so the word is centred without it.
-  g.fillText(text, x + spacing / 2, y);
-}
-
-// Answered emerald, this one larger, the rest to come faint.
-function progress(q, missing) {
-  for (let i = 0; i < 4; i++) {
-    const r = i === q ? 5 : 4;
-    dot(233 + (i - 1.5) * 22, 34, r, r, missing[i] ? INK : ACCENT, !missing[i] || i === q ? 1 : 56 / 255);
-  }
-}
-
-function questions(j, now) {
-  g.save();
-  g.globalAlpha = V.journal;
-  g.beginPath();
-  g.arc(233, 233, 233, 0, 2 * Math.PI);
-  g.clip();
-  g.fillStyle = '#000000';
-  g.fillRect(0, 0, 466, 466);
-  if (j.done) finished(now - j.done, j.allYes);
-  else {
-    const setup = j.q === 0;
-    for (const i of [0, 1]) {
-      const [top, bottom] = HALVES[setup ? 0 : 1 + i][j.lit === i ? 1 : 0], x = i ? 235 : 0;
-      const fill = g.createLinearGradient(0, 0, 0, 466);
-      fill.addColorStop(0, top);
-      fill.addColorStop(1, bottom);
-      g.fillStyle = fill;
-      g.fillRect(x, 0, 231, 466);
-      if (setup) word(SHORT[i], x + 231 / 2, 233, 64, 800, j.lit === i ? '#ffffff' : INK, 1);
-    }
-    if (setup) {
-      g.fillStyle = '#000000';
-      g.beginPath();
-      g.roundRect(183, 70, 100, 34, 17);
-      g.fill();
-      word(WORDS[0], 233, 87, 16, 700, MUTED, 2);
-    } else {
-      // The word with room either side, never narrower than the pill's own curve.
-      g.font = `800 64px ${TYPE}`;
-      g.letterSpacing = '2px';
-      const w = Math.max(150, g.measureText(WORDS[j.q]).width - 2 + 64);
-      g.save();
-      g.globalAlpha *= Math.min(1, (now - j.faded) / FADE_MS);
-      g.fillStyle = GROUND;
-      g.strokeStyle = LINE;
-      g.lineWidth = 2;
-      g.beginPath();
-      g.roundRect(233 - w / 2 + 1, 191, w - 2, 86, 43);
-      g.fill();
-      g.stroke();
-      word(WORDS[j.q], 233, 234, 64, 800, INK, 2);
-      g.restore();
-    }
-    progress(j.q, j.missing);
-  }
-  g.restore();
-}
-
-/* The four dots filled, the tick drawn in over TICK_MS in its two strokes,
-   and the ring swept round over SWEEP_MS — the tick light emerald and the
-   ring at full strength when every answer was a yes. */
-function finished(t, allYes) {
-  progress(-1, [false, false, false, false]);
-  const first = Math.hypot(20, 20), second = Math.hypot(40, 48);
-  let drawn = Math.min(1, t / TICK_MS) * (first + second);
-  g.strokeStyle = allYes ? GLOW : INK;
-  g.lineWidth = 9;
-  g.lineCap = 'round';
-  for (let s = 0; s < 2 && drawn > 0; s++) {
-    const len = s ? second : first, k = Math.min(1, drawn / len), [x, y] = TICK[s], [x2, y2] = TICK[s + 1];
-    g.beginPath();
-    g.moveTo(x, y);
-    g.lineTo(x + (x2 - x) * k, y + (y2 - y) * k);
-    g.stroke();
-    drawn -= len;
-  }
-  ring(231, 8, Math.min(1, t / SWEEP_MS), allYes ? 1 : 0.55);
 }
 
 /* The face, then the body. Each value eases toward what the mode asks for,
-   so nothing jumps between modes. At rest, a cursor near her has her eyes;
-   otherwise she glances about. */
+   so nothing jumps between modes. At rest, a cursor near her has her eyes
+   and turns her a little; otherwise she glances about. Tucked away, she
+   looks back at the screen she left; while the card is up, at the card. */
 function step(now, dt) {
   const m = mode;
   let tOpen = 1, tMouth = 0, tSmile = 1, tDots = 0, tConfused = 0, glance = 1, fixed = null;
   const pondering = [Math.floor(now / 1700) % 2 ? -LOOK_RANGE * 0.55 : LOOK_RANGE * 0.9, -LOOK_RANGE];
+  const pleased = now < pleasedUntil;
   if (m === 'listening') { tSmile = 1.1; fixed = [0, -2]; }
   if (m === 'speaking')  { tMouth = level; tSmile = 0.9; glance = 0.4; }
   if (m === 'thinking')  { tOpen = 0.85; tSmile = 0.25; tDots = 1; fixed = pondering; }
   if (m === 'confused')  { tSmile = -0.35; tConfused = 1; fixed = [3, -2.5]; }
+  if (m === 'journal')   fixed = [over === null ? 0 : over ? 4 : -4, -LOOK_RANGE];
+  if (m === 'idle' && tucked) fixed = { left: [LOOK_RANGE, 0], right: [-LOOK_RANGE, 0], bottom: [0, -LOOK_RANGE] }[tucked];
   if (m === 'idle' && cursor) fixed = cursor;
+  if (asleep) { tOpen = 0; tSmile = 0.5; }
+  if (pleased) tSmile = 1.3;
 
   if (fixed) [gaze[0], gaze[1]] = fixed;
   else if (now >= nextGlance) {
@@ -447,10 +428,11 @@ function step(now, dt) {
     if (b >= 160) { blinking = false; nextBlink = now + BLINK_EVERY_MS * (0.6 + Math.random() * 0.8); }
   }
 
-  V.open = ease(V.open, tOpen, 16, dt);
+  V.open = ease(V.open, tOpen, asleep ? 3 : 16, dt);
   V.gx = ease(V.gx, gaze[0], 22, dt);
   V.gy = ease(V.gy, gaze[1], 22, dt);
   V.mouth = ease(V.mouth, tMouth, 28, dt);
+  V.shape = ease(V.shape, m === 'speaking' ? bright : 0.5, 18, dt);
   V.smile = ease(V.smile, tSmile, 10, dt);
   V.dots = ease(V.dots, tDots, 5, dt);
   V.confused = ease(V.confused, tConfused, 8, dt);
@@ -458,44 +440,56 @@ function step(now, dt) {
   V.sway = ease(V.sway, m === 'thinking' ? Math.sin(2 * Math.PI * now / 1000 / SWAY_S) : 0, 4, dt);
   V.squash = ease(V.squash, m === 'speaking' ? level : 0, 14, dt);
   V.heard = ease(V.heard, m === 'listening' ? heard : 0, 18, dt);
-  V.journal = ease(V.journal, m === 'journal' ? 1 : 0, CROSS, dt);
+  V.glow = ease(V.glow, m === 'listening' ? 1 : 0, 8, dt);
+  V.turn = ease(V.turn, m === 'idle' && cursor ? cursor[0] / LOOK_RANGE : 0, 5, dt);
+  V.wide = ease(V.wide, held?.moved || flight || now < startUntil ? 1 : 0, 14, dt);
+  V.joy = ease(V.joy, pleased ? 1 : 0, 12, dt);
+  V.sleep = ease(V.sleep, asleep ? 1 : 0, 1.5, dt);
+  settle(bend, STIFF, DAMP, dt);
+  settle(stretch, STIFF, DAMP, dt);
+  // Asleep she breathes slower and deeper; the breath keeps its place as the pace changes.
+  breath += dt * 2 * Math.PI / (BREATH_S + (DEEP_S - BREATH_S) * V.sleep);
 }
 
 function draw(now) {
   const t = now / 1000, idle = still.matches ? 0 : 1;
-  const breath = idle * Math.sin(2 * Math.PI * t / BREATH_S);
-  const bob = idle * Math.sin(2 * Math.PI * t / BOB_S + 1.3);
-  const sy = 1 + BREATH * breath + LEAN * V.lean - SQUASH * V.squash;
-  const sx = 1 - BREATH * 0.4 * breath + LEAN * V.lean + SQUASH * 0.7 * V.squash;
+  const air = idle * (BREATH + (DEEP_BREATH - BREATH) * V.sleep) * Math.sin(breath);
+  const bob = idle * (1 - V.sleep) * Math.sin(2 * Math.PI * t / BOB_S + 1.3);
+  const up = Math.max(-STRETCH_MOST, Math.min(STRETCH_MOST, stretch.x));
+  const sy = 1 + air + LEAN * V.lean - SQUASH * V.squash - DROOP * V.sleep + up;
+  const sx = 1 - 0.4 * air + LEAN * V.lean + SQUASH * 0.7 * V.squash + 0.5 * DROOP * V.sleep - 0.6 * up;
+  const lift = BOB * bob + LIFT * V.squash;
+  wear(now, Math.max(-BEND_MOST, Math.min(BEND_MOST, SWAY * V.sway + TURN * V.turn + bend.x)));
 
   const k = canvas.width / 466;
   g.setTransform(k, 0, 0, k, 0, 0);
   g.clearRect(0, 0, 466, 466);
-  if (V.journal < 1) {
-    g.save();
-    g.translate(233, BASE - BOB * bob - LIFT * V.squash);
-    g.rotate(SWAY * V.sway);
-    g.scale(sx, sy);
-    g.translate(-233, -BASE);
-    g.drawImage(art, 0, 0);
-    features(now);
-    g.restore();
-    /* The ring swells with his voice, so he sees she hears him, and in a
-       recording's last WARN_LEFT it empties toward the end — inside her
-       square at its widest, or the window's edge cuts it. */
-    if (mode === 'listening') ring(222, 5 + 9 * V.heard, Math.min(1, (RECORD_MS - (now - listen.began)) / WARN_LEFT));
-    waits();
-  }
-  if (V.journal > 0) questions(journal, now);
+  // Her shadow on his chart, drawing in as she rises off it.
+  const shade = g.createRadialGradient(0, 0, 0, 0, 0, 150);
+  shade.addColorStop(0, `${GROUND}66`);
+  shade.addColorStop(1, `${GROUND}00`);
+  g.save();
+  g.translate(233, BASE + 6);
+  g.scale(sx * (1 - lift / 60), 0.11);
+  g.fillStyle = shade;
+  g.fillRect(-150, -150, 300, 300);
+  g.restore();
+  g.save();
+  g.translate(233, BASE - lift);
+  g.scale(sx, sy);
+  g.translate(-233, -BASE);
+  g.drawImage(skin, 0, 0);
+  g.restore();
+  waits();
 }
 
-/* At rest she is drawn at REST_FRAME_MS, and so are the questions while
-   nothing on them moves — up, settled, and not drawing their tick. */
+/* At rest she is drawn at REST_FRAME_MS, and so she is while the card is
+   up — once nothing she gives on is still moving. */
 let last = 0;
 function frame(now) {
   requestAnimationFrame(frame);
-  const settled = mode === 'journal' && V.journal === 1 && !journal.done && now - journal.faded >= FADE_MS;
-  const resting = mode === 'idle' && !cursor || settled;
+  const settled = !held && !flight && !bend.x && !bend.v && !stretch.x && !stretch.v;
+  const resting = settled && (mode === 'idle' && !cursor || mode === 'journal');
   if (now - last < (resting ? REST_FRAME_MS : FRAME_MS)) return;
   const dt = Math.min(0.05, last ? (now - last) / 1000 : 0.033);
   last = now;
@@ -505,14 +499,16 @@ function frame(now) {
 
 /* Her square at the bottom of the room, drawn at the screen's own density —
    which changes when the window moves to another screen, watched for once
-   per density rather than once per resize. */
+   per density rather than once per resize. The card's em follows her side,
+   and the line sits above whichever is beneath it, her head or the card. */
 let density = 0;
 function fit() {
-  const side = Math.round(innerHeight / ROOM.height);
+  side = Math.round(innerHeight / ROOM.height);
   canvas.style.width = canvas.style.height = `${side}px`;
   canvas.width = canvas.height = Math.round(side * devicePixelRatio);
-  // Above the ring, in the room over her head.
-  said.style.bottom = `${side + 2}px`;
+  card.style.fontSize = `${side * CARD_EM}px`;
+  card.style.bottom = `${side + 4}px`;
+  said.style.bottom = `${side + (mode === 'journal' ? card.offsetHeight + 10 : 2)}px`;
   if (devicePixelRatio === density) return;
   density = devicePixelRatio;
   matchMedia(`(resolution: ${devicePixelRatio}dppx)`).addEventListener('change', fit, { once: true });
@@ -562,21 +558,33 @@ function silence() {
 const loudness = (meter) => {
   const wave = new Float32Array(meter.fftSize);
   meter.getFloatTimeDomainData(wave);
-  return Math.min(1, 6 * Math.sqrt(wave.reduce((n, s) => n + s * s, 0) / wave.length));
+  return Math.min(1, 6 * Math.sqrt(wave.reduce((n, v) => n + v * v, 0) / wave.length));
+};
+
+/* How bright her voice is this moment, for the shape of her mouth: how often
+   the wave crosses nothing — seldom on an "oh", often on an "ee" or an "s". */
+const brightness = (meter) => {
+  const wave = new Float32Array(meter.fftSize);
+  meter.getFloatTimeDomainData(wave);
+  let crossed = 0;
+  for (let i = 1; i < wave.length; i++) if (wave[i - 1] < 0 !== wave[i] < 0) crossed++;
+  return Math.min(1, Math.max(0, (crossed / wave.length - 0.03) / 0.2));
 };
 
 /* What she hears and does keeps its own clock; only her drawing waits on the
    screen. A window on a desktop he is not looking at is not drawn, and a
    turn asked from another desktop must still listen, answer and end. Each
    tick: how loud she is, and whether she has started or finished; and how
-   loud he is while she listens — the ring, the silence that lets go, the
-   tick before the end. */
+   loud he is while she listens — the light, the silence that lets go, the
+   tick before the end; then whether she sleeps, where a throw has carried
+   her, and whether the card is up. */
 function live() {
   const now = performance.now();
   level = 0;
   if (audio) {
     if (mode === 'thinking' && audio.voiced) { mode = 'speaking'; unsay(); }
     level = loudness(audio.meter);
+    bright = brightness(audio.meter);
     if (audio.drained) { silence(); mode = 'idle'; }
   }
   heard = 0;
@@ -593,6 +601,25 @@ function live() {
     if (j.done ? now - j.done >= DONE_MS : j.lit === null && now - j.since >= ASK_MS) mode = 'idle';
   }
   if (mode === 'idle' && due) journalNow();
+  if (mode === 'journal' !== card.classList.contains('shown')) {
+    card.classList.toggle('shown');
+    fit();
+  }
+
+  // The market's hours are asked of the clock once a minute, not at every tick.
+  if (now - openAsked >= 60_000) { open = marketOpen(new Date()); openAsked = now; }
+  const slept = asleep;
+  asleep = mode === 'idle' && !trade && !briefingWaits && !held && !flight && sleeps(open, now - nearAt, now - movedAt);
+  if (slept && !asleep) stretch.v += STIR;
+  rubbed *= 0.94;
+
+  if (flight) {
+    const next = slide(flight, { x: screen.availLeft, y: screen.availTop, width: screen.availWidth, height: screen.availHeight }, FRAME_MS / 1000);
+    carry(Math.round(next.x) - Math.round(flight.x), Math.round(next.y) - Math.round(flight.y));
+    if (next.hit) stretch.v -= LAND;
+    flight = next.done ? null : next;
+    if (!flight) window.doji.dropped();
+  }
   if (!held) feel();
   if (sayUntil && now >= sayUntil) unsay();
 }
@@ -634,6 +661,7 @@ async function listening(chart) {
     if (!kept) return;
     if (short) { window.doji.hush(); mode = 'idle'; unsay(); return; }
     mode = 'thinking';
+    stretch.v -= NOD;
     notes(SENT);
     window.doji.ask(new Uint8Array(await new Blob(chunks).arrayBuffer()));
   };
@@ -665,6 +693,7 @@ async function press(chart) {
   if (mode === 'thinking' || mode === 'speaking') { window.doji.hush(); silence(); mode = 'idle'; return; }
   if (mode === 'journal') mode = 'idle';
   starting = true;
+  nearAt = performance.now();
   unsay();
   const seen = chart ? window.doji.look() : null;
   await listening(chart);
@@ -684,45 +713,74 @@ function briefing() {
 
 /* ─── His journal ───────────────────────────────────────────────────────────
    What waits comes from the main process, asked of Gladys's door every
-   minute; a trade that came in ticks, and its questions come up once she is
-   idle — the conversation first. Each answer
-   is sent as he gives it and answered with what waits after it, so the next
-   question, or the next trade, follows at once; one her door did not take
-   leaves the question where it was, to be clicked again, and the line says
-   why. The talk key on them closes them and she listens. Answered elsewhere while they are up, they follow what is left. */
+   minute; a trade that came in ticks, and its card comes up once she is
+   idle — the conversation first. Each answer is sent as he gives it and
+   answered with what waits after it, so the next question, or the next
+   trade, follows at once; one her door did not take leaves the question
+   where it was, to be clicked again, and the line says why. The talk key, or
+   a click on her, closes the card and she listens. Answered elsewhere while
+   it is up, it follows what is left. */
 function journalNow() {
   if (mode !== 'idle' || !trade) return false;
   due = false;
   unsay();
   mode = 'journal';
+  nearAt = performance.now();
   journal = { q: -1, allYes: true, done: 0, opened: performance.now() };
   ask(trade);
   return true;
 }
 
 function ask(next) {
-  const { q, missing } = asked(next), now = performance.now();
-  if (q !== journal.q) journal.faded = now;
-  Object.assign(journal, { trade: next, q, missing, since: now, lit: null });
+  const { q } = asked(next);
+  Object.assign(journal, { trade: next, q, since: performance.now(), lit: null });
+  write();
 }
 
-// A click on a half: lit at once, held FLASH_MS at least, and sent.
+/* The card as the journal stands: the trade as Gladys's message names it,
+   at the hour on his own clock; the question; its halves; and the chips. */
+function write() {
+  const j = journal, setup = j.q === 0;
+  card.classList.toggle('done', Boolean(j.done));
+  card.classList.toggle('all', j.allYes);
+  if (j.done) return;
+  const at = new Date(j.trade.entry_time).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+  document.getElementById('fill').textContent = `${j.trade.direction} ${Number(j.trade.entry_price).toFixed(2)} · ${at}`;
+  document.getElementById('more').textContent = waiting > 1 ? `+${waiting - 1}` : '';
+  document.getElementById('asks').textContent = ASKS[j.q];
+  for (const [i, half] of halves.entries()) {
+    const [top, bottom] = HALVES[setup ? 0 : 1 + i][j.lit === i ? 1 : 0];
+    half.textContent = setup ? SETUPS[i] : i ? 'Yes' : 'No';
+    half.style.background = `linear-gradient(${top}, ${bottom})`;
+  }
+  for (const [q, half] of given(j.trade).entries()) {
+    chips[q].textContent = half === null ? WORDS[q] : `${WORDS[q]} ${q === 0 ? SHORT[half] : half ? '✓' : '✗'}`;
+    chips[q].className = q === j.q ? 'now' : half === null ? '' : 'got';
+  }
+}
+
+// A click on a half of the card: lit at once, held FLASH_MS at least, and sent.
 async function choose(x) {
   const j = journal;
   if (j.lit !== null || j.done || performance.now() - j.opened < SETTLE_MS) return;
-  const side = pixel(x, 0)[0] >= 233 ? 1 : 0;
-  j.lit = side;
-  const [got] = await Promise.all([window.doji.answer(j.trade.id, j.q, side), new Promise(r => setTimeout(r, FLASH_MS))]);
+  const half = x >= innerWidth / 2 ? 1 : 0;
+  j.lit = half;
+  write();
+  const [got] = await Promise.all([window.doji.answer(j.trade.id, j.q, half), new Promise(r => setTimeout(r, FLASH_MS))]);
   if (typeof got !== 'string') ({ trade, waiting } = got);
   if (mode !== 'journal' || journal !== j) return;
   if (typeof got === 'string') {
     j.lit = null;
     j.since = performance.now();
+    write();
     return say(got);
   }
-  j.allYes &&= j.q === 0 || side === 1;
-  if (trade) ask(trade);
-  else j.done = performance.now();
+  j.allYes &&= j.q === 0 || half === 1;
+  if (trade) return ask(trade);
+  j.done = performance.now();
+  pleasedUntil = j.done + DONE_MS;
+  stretch.v += STIR;
+  write();
 }
 
 function waitsNow(next, count) {
@@ -732,27 +790,31 @@ function waitsNow(next, count) {
   waiting = count;
   if (mode !== 'journal' || journal.lit !== null || journal.done) return;
   if (!next) mode = 'idle';
-  else if (next.id !== journal.trade.id || asked(next).q !== journal.q) ask(next);
+  else ask(next);
 }
 
 /* ─── Her shape, for the mouse ──────────────────────────────────────────────
    The window lets clicks through but where she is drawn; the marks of what
-   waits count as her, and the journal's round screen is all hers. A press
-   that moves is a drag, and one that does not is a click: on the journal, an
-   answer; on her, what waits goes first — the journal, then the briefing —
-   and otherwise she listens. Whether the pointer is on her is asked as it
-   moves and as she changes under it — the questions coming up or going, a
-   mark appearing — so a window that takes clicks where she no longer is
-   never catches one meant for the chart. The first time the cursor rests on
-   her, she says how to talk. */
+   waits count as her, and so does the card while it is up. A press that
+   moves is a carry, and one that does not is a click: on the card, an
+   answer; on her, tucked away, it brings her back; otherwise what waits goes
+   first — the journal, then the briefing — and otherwise she listens.
+   Whether the pointer is on her is asked as it moves and as she changes
+   under it — the card coming up or going, a mark appearing — so a window
+   that takes clicks where she no longer is never catches one meant for the
+   chart. The first time the cursor rests on her, she says how to talk. */
 function pixel(x, y) {
   const r = canvas.getBoundingClientRect();
   return [(x - r.left) * 466 / r.width, (y - r.top) * 466 / r.height];
 }
 
+const onCard = (x, y) => {
+  const r = card.getBoundingClientRect();
+  return mode === 'journal' && x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+};
 const on = (x, y) => {
+  if (onCard(x, y)) return true;
   const [u, v] = pixel(x, y).map(Math.round);
-  if (mode === 'journal') return Math.hypot(u - 233, v - 233) < 233;
   if ((trade || briefingWaits) && Math.hypot(u - 404, v - 404) < (trade ? 29 : 22)) return true;
   return u >= 0 && v >= 0 && u < 466 && v < 466 && alpha[v * 466 + u] > 64;
 };
@@ -760,41 +822,91 @@ let solid = false, held = null, hinted = false, hint = 0;
 let pointer = null;          // where the cursor last was, in the window's pixels
 function feel() {
   const now = pointer !== null && on(...pointer);
+  over = pointer !== null && onCard(...pointer) ? Number(pointer[0] >= innerWidth / 2) : null;
+  for (const [i, half] of halves.entries()) half.classList.toggle('over', over === i);
   if (now === solid) return;
   window.doji.solid(solid = now);
   document.body.classList.toggle('hand', solid);
   clearTimeout(hint);
   if (solid && !hinted) hint = setTimeout(() => { if (mode === 'idle' && !sayUntil) { hinted = true; say('hint'); } }, HINT_AFTER_MS);
 }
+
+/* Carried, by his hand or by a throw: the window moves, and she gives the
+   other way, as glass would. */
+function carry(dx, dy) {
+  if (dx || dy) window.doji.drag(dx, dy);
+  bend.v -= dx * GIVE;
+  stretch.v -= dy * GIVE_UP;
+}
+
 addEventListener('mousemove', (e) => {
   if (held) {
     const dx = e.screenX - held.x, dy = e.screenY - held.y;
     if (held.moved || Math.hypot(dx, dy) > 4) {
       held.moved = true;
-      window.doji.drag(dx, dy);
+      carry(dx, dy);
       held.x = e.screenX;
       held.y = e.screenY;
+      held.trail = [...held.trail.filter(p => e.timeStamp - p.at < 100), { at: e.timeStamp, x: e.screenX, y: e.screenY }];
     }
     return;
+  }
+  // Rubbed: the cursor going over and over her, without a press.
+  if (solid && mode === 'idle' && !tucked && (rubbed += Math.hypot(e.movementX, e.movementY)) > RUB * side) {
+    rubbed = 0;
+    pleasedUntil = performance.now() + PLEASED_MS;
+    bend.v += WIGGLE;
   }
   pointer = [e.clientX, e.clientY];
   feel();
 });
-addEventListener('mousedown', (e) => { if (solid) held = { x: e.screenX, y: e.screenY, moved: false }; });
+addEventListener('mousedown', (e) => {
+  if (!solid) return;
+  flight = null;
+  held = { x: e.screenX, y: e.screenY, moved: false, trail: [] };
+});
+/* Let go while moving faster than FLING, she is thrown: she slides on and
+   comes back off the screen's edges, and where she stops is where he left
+   her. Slower, or with Reduce Motion on, she is set down. */
 addEventListener('mouseup', (e) => {
-  if (held?.moved) window.doji.dropped();
-  else if (held) {
-    if (mode === 'journal') choose(e.clientX);
+  if (held?.moved) {
+    const [from] = held.trail, to = held.trail.at(-1), span = (to.at - from.at) / 1000;
+    const vx = span ? (to.x - from.x) / span : 0, vy = span ? (to.y - from.y) / span : 0;
+    if (Math.hypot(vx, vy) > FLING && !still.matches) {
+      const r = canvas.getBoundingClientRect(), k = r.width / 466;
+      flight = {
+        x: screenX + r.left + shape.left * k, y: screenY + r.top + shape.top * k,
+        width: (shape.right - shape.left) * k, height: (shape.bottom - shape.top) * k, vx, vy,
+      };
+    } else {
+      stretch.v -= LAND;
+      window.doji.dropped();
+    }
+  } else if (held) {
+    if (onCard(e.clientX, e.clientY)) choose(e.clientX);
+    else if (tucked) window.doji.bring();
     else if (!journalNow() && !briefing()) press(false);
   }
   held = null;
 });
 
-// The cursor anywhere on the screen, from the main process: near her, it has her eyes.
+/* The cursor anywhere on the screen, from the main process: near her, it has
+   her eyes and wakes her; past her fast and close, it makes her start. */
+let seen = null;
 function near(x, y) {
+  const now = performance.now();
   pointer = [x, y];
   const [u, v] = pixel(x, y), dx = u - 237, dy = v - 140, far = Math.hypot(dx, dy);
   cursor = far < NEAR && far > 1 ? [dx / far * LOOK_RANGE, dy / far * LOOK_RANGE * 0.7] : null;
+  movedAt = now;
+  if (cursor) nearAt = now;
+  const swift = seen ? Math.hypot(u - seen.u, v - seen.v) / (now - seen.at) * 1000 : 0;
+  seen = { u, v, at: now };
+  if (mode === 'idle' && !asleep && !held && far < CLOSE && swift > SWIFT && now >= startAfter) {
+    startUntil = now + START_MS;
+    startAfter = now + STARTLE_EVERY_MS;
+    stretch.v += START;
+  }
 }
 
 window.doji.on('press', press);
@@ -807,10 +919,11 @@ window.doji.on('journal', waitsNow);
 window.doji.on('journal-now', journalNow);
 window.doji.on('say', (reason, key) => { if (key) talkKey = key; say(reason); });
 window.doji.on('cursor', near);
+window.doji.on('tucked', (edge) => { tucked = edge; });
 
 addEventListener('resize', fit);
 fit();
-await Promise.all([load(), document.fonts.load(`800 64px ${TYPE}`), document.fonts.load(`700 16px ${TYPE}`)]);
+await Promise.all([load(), document.fonts.load(`800 18px ${TYPE}`), document.fonts.load(`700 10px ${TYPE}`), document.fonts.load(`600 12px ${TYPE}`)]);
 const start = await window.doji.ready();
 talkKey = start.talk;
 briefingWaits = start.briefing;

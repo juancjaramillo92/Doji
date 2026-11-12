@@ -24,8 +24,10 @@ import { join } from 'node:path';
 import { laptopFrame } from '../supabase/functions/doji-eugenia/index.ts';
 import { parseCallback } from '../supabase/functions/doji-gladys/index.ts';
 import { FRAME, LEAD, PCM_RATE, Queue, framer, sampler } from '../laptop/frames.mjs';
-import { ANSWERS, SETUPS, asked, tap } from '../laptop/journal.mjs';
-import { placed, room, ROOM } from '../laptop/place.mjs';
+import { marketOpen as pollerOpen } from '../supabase/functions/_shared/edge.ts';
+import { AWAY_MS, DOZE_MS, FLING, marketOpen, settle, sleeps, slide } from '../laptop/body.mjs';
+import { ANSWERS, SETUPS, asked, given, tap } from '../laptop/journal.mjs';
+import { placed, room, tucked, within, ROOM } from '../laptop/place.mjs';
 import { BUNDLE, swapScript } from '../laptop/update.mjs';
 
 const bytes = (n, seed) => Uint8Array.from({ length: n }, (_, i) => (i * 31 + seed) & 255);
@@ -90,22 +92,106 @@ test('her voice cut between the two bytes of a sample plays as the whole would',
 test('she stays where he left her while a screen shows her, and comes home when none does', () => {
   const main = { x: 0, y: 25, width: 1512, height: 920 };
   const left = { x: -1920, y: 0, width: 1920, height: 1080 };
-  const { width, height } = room(200);
-  assert.deepEqual([width, height], [Math.round(200 * ROOM.width), Math.round(200 * ROOM.height)]);
-  const corner = { x: 1512 - width - 24, y: 25 + 920 - height - 24, width, height };
-  assert.deepEqual(placed({ x: 300, y: 400, width, height }, [main], main), { x: 300, y: 400, width, height },
+  const side = 200, corner = { x: 1512 - side - 24, y: 25 + 920 - side - 24, side };
+  assert.deepEqual(placed({ x: 300, y: 400, side }, [main], main), { x: 300, y: 400, side },
     'a place on the main screen was not kept');
-  assert.deepEqual(placed({ x: -900, y: 300, width, height }, [main, left], main), { x: -900, y: 300, width, height },
+  assert.deepEqual(placed({ x: -900, y: 300, side }, [main, left], main), { x: -900, y: 300, side },
     'a place on a second screen, left of the main one, was not kept');
-  assert.deepEqual(placed({ x: -900, y: 300, width, height }, [main], main), corner,
+  assert.deepEqual(placed({ x: -900, y: 300, side }, [main], main), corner,
     'a place on a screen since unplugged left her where nothing shows her');
-  assert.deepEqual(placed({ x: undefined, y: undefined, width, height }, [main], main), corner,
+  assert.deepEqual(placed({ x: undefined, y: undefined, side }, [main], main), corner,
     'her first launch did not put her in the corner');
   // Half off an edge is still on the screen her middle is on.
-  assert.deepEqual(placed({ x: 1512 - width / 2 + 10, y: 400, width, height }, [main], main).x, corner.x,
+  assert.deepEqual(placed({ x: 1512 - side / 2 + 10, y: 400, side }, [main], main).x, corner.x,
     'a place with her middle off every screen was kept');
-  assert.equal(placed({ x: 1512 - width / 2 - 10, y: 400, width, height }, [main], main).x, 1512 - width / 2 - 10,
+  assert.equal(placed({ x: 1512 - side / 2 - 10, y: 400, side }, [main], main).x, 1512 - side / 2 - 10,
     'a place with her middle on the screen was moved');
+});
+
+/* The window is the room around her square, she its bottom middle; and her
+   square is read back out of the window exactly, at every size she comes in,
+   or each drop would walk her a pixel. */
+test('her window is built around her square, and her square read back out of it', () => {
+  for (const side of [140, 200, 280, 201]) {
+    const her = { x: 613, y: -40, side }, win = room(her);
+    assert.deepEqual([win.width, win.height], [Math.round(side * ROOM.width), Math.round(side * ROOM.height)]);
+    assert.equal(win.y + win.height, her.y + side, 'she is not at the bottom of her window');
+    assert.ok(Math.abs(win.x + win.width / 2 - (her.x + side / 2)) <= 0.5, 'she is not in the middle of her window');
+    assert.deepEqual(within(win, side), her, `a ${side}-point square does not come back out of its window`);
+  }
+});
+
+/* Tucked away she peeks over the nearest edge that can hide her: one where
+   the screen ends, with no Dock or menu bar on it and no display past it. */
+test('she tucks behind the nearest edge of her screen that hides her, or nowhere', () => {
+  const bounds = { x: 0, y: 0, width: 1512, height: 982 }, side = 200;
+  const bare = { bounds, workArea: { x: 0, y: 25, width: 1512, height: 957 } };
+  const docked = { bounds, workArea: { x: 0, y: 25, width: 1512, height: 887 } };
+  const right = tucked({ x: 1200, y: 300, side }, bare, []);
+  assert.equal(right.edge, 'right', 'near the right edge, she did not tuck behind it');
+  assert.ok(right.x < 1512 && right.x + side > 1512 && right.y === 300, 'tucked right, she is not half past that edge where she was');
+  assert.equal(tucked({ x: 100, y: 300, side }, bare, []).edge, 'left');
+  const down = tucked({ x: 700, y: 700, side }, bare, []);
+  assert.equal(down.edge, 'bottom');
+  assert.ok(down.y < 982 && down.y + side > 982 && down.x === 700, 'tucked down, she is not half below the screen where she was');
+  assert.notEqual(tucked({ x: 700, y: 700, side }, docked, []).edge, 'bottom', 'she tucked behind the Dock, which is drawn over her');
+  const beside = { x: 1512, y: 0, width: 1920, height: 1080 }, below = { x: 0, y: 982, width: 1512, height: 982 };
+  assert.equal(tucked({ x: 1200, y: 300, side }, bare, [beside]).edge, 'bottom', 'she tucked into the display beside hers, which shows the rest of her');
+  assert.equal(tucked({ x: 1200, y: 300, side }, bare, [beside, below]).edge, 'left');
+  const leftOf = { x: -1920, y: 0, width: 1920, height: 1080 };
+  assert.equal(tucked({ x: 700, y: 400, side }, docked, [beside, leftOf]), null, 'with no edge to hide behind, she tucked all the same');
+  // Half off the screen already, she tucks from inside it.
+  assert.equal(tucked({ x: 1450, y: 900, side }, bare, []).y, 982 - side);
+});
+
+/* ─── Her body ──────────────────────────────────────────────────────────── */
+
+test('what she gives on rings down and stops exactly, at any frame rate she is drawn at', () => {
+  for (const dt of [0.016, 0.033, 0.05]) {
+    const s = { x: 0, v: 400 };
+    let most = 0, steps = 0;
+    while ((s.x || s.v) && steps < 5000) { settle(s, 130, 9, dt); most = Math.max(most, Math.abs(s.x)); steps++; }
+    assert.ok(steps < 5000 / (dt / 0.016), `at ${dt}s a frame the spring never came to rest`);
+    assert.ok(most > 10 && most < 60, `at ${dt}s a frame a kick of 400 carried it ${most}`);
+    assert.deepEqual(s, { x: 0, v: 0 });
+  }
+});
+
+test('thrown, she slides on, comes back off the edge of the screen, and stops', () => {
+  const area = { x: 0, y: 25, width: 1512, height: 920 };
+  let box = { x: 1300, y: 500, width: 160, height: 140, vx: 2400, vy: -300 }, hits = 0, steps = 0, furthest = 0;
+  while (!box.done && steps++ < 2000) {
+    box = slide(box, area, 0.033);
+    hits += box.hit;
+    furthest = Math.max(furthest, box.x + box.width - 1512);
+  }
+  assert.ok(box.done && steps < 400, 'a throw never came to rest');
+  assert.equal(hits, 1, `a throw at the right edge turned back ${hits} times`);
+  assert.ok(furthest < 2400 * 0.033, `she went ${furthest} pixels past the edge before turning`);
+  assert.ok(box.x + box.width <= 1512 && box.x > 600, `she came to rest at ${box.x}, not back inside near the edge`);
+  // Let go half off the screen and moving in, she is not turned out again.
+  const back = slide({ x: -80, y: 500, width: 160, height: 140, vx: 1200, vy: 0 }, area, 0.033);
+  assert.ok(!back.hit && back.vx > 0, 'an edge turned her back while she was coming in through it');
+  assert.ok(FLING > 300, 'an ordinary carry is a throw');
+});
+
+/* Gold's week on the laptop is a copy of the poller's: both run over every
+   hour of four weeks, across the autumn change of the clocks. */
+test('she keeps the market\'s hours as the poller does', () => {
+  let shut = 0;
+  for (let h = 0; h < 24 * 28; h++) {
+    const at = new Date(Date.UTC(2026, 9, 18, 0, 30) + h * 3_600_000);
+    assert.equal(marketOpen(at), pollerOpen(at), `${at.toISOString()}: the laptop and the poller disagree on whether gold trades`);
+    shut += !marketOpen(at);
+  }
+  assert.equal(shut, 4 * 48, 'four weekends are not four closes of forty-eight hours');
+});
+
+test('she sleeps when the market is shut and he is not by her, or when he is away', () => {
+  assert.equal(sleeps(false, DOZE_MS, 0), true);
+  assert.equal(sleeps(false, DOZE_MS - 1, 10 * AWAY_MS), false, 'she slept with the cursor only just gone from her');
+  assert.equal(sleeps(true, 10 * AWAY_MS, AWAY_MS - 1), false, 'she slept through his working day, the cursor moving far from her');
+  assert.equal(sleeps(true, 0, AWAY_MS), true);
 });
 
 /* ─── The swap an update leaves behind ──────────────────────────────────── */
@@ -265,5 +351,18 @@ test('a trade is asked first the first of its questions it lacks', () => {
     const { q, missing } = asked(trade);
     assert.deepEqual(missing, ANSWERS.map((_, i) => Boolean(lacks & 1 << i)), `lacking ${lacks.toString(2)}`);
     assert.equal(q, [0, 1, 2].find(i => missing[i]) ?? 3, `lacking ${lacks.toString(2)}, the trade is asked ${ANSWERS[q]?.[0]}`);
+  }
+});
+
+/* The chips say what a trade already holds, each as the half that gave it:
+   every half's answer, as Gladys's boundary writes it, reads back as that
+   half. */
+test('an answer a trade holds reads back as the half that gave it', () => {
+  assert.deepEqual(given(Object.fromEntries(ANSWERS.map(([, column]) => [column, null]))), [null, null, null, null]);
+  for (const [q, [, column]] of ANSWERS.entries()) {
+    for (const half of [0, 1]) {
+      const { value } = parseCallback(tap('PID562780708', q, half));
+      assert.equal(given({ [column]: value })[q], half, `${column} = ${value}`);
+    }
   }
 });

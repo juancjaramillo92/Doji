@@ -1094,8 +1094,13 @@ into `journal.mjs` with the clock passed in, as the queue's did into
 `frames.mjs`, and `laptop.test.mjs` would drive them. That is a refactor of a
 page no suite reads, so nothing would prove it changed nothing but the same
 throwaway run.
-**Revisit if:** the journal's page half changes again, so the move and its
-first test land together.
+The page's half has since become a card above her head; what that change
+decided anew — what a trade already holds, for its chips — went into
+`journal.mjs` as `given`, with its test. The sequence itself was carried over
+line for line, and moving it in the same pass would have been a refactor
+riding a behaviour change.
+**Revisit if:** the sequence itself changes — what comes up when, or what
+lets the card go — so the move and its first test land together.
 
 ### R-148 — a column or table for the heard briefing
 **Why refused:** `eugenia_runs.caller` is free text, a delivered briefing is
@@ -1278,6 +1283,29 @@ a withdrawal something a question can prompt, at any moment, as many times as
 he asks, which is the hindsight the once-a-call look exists to keep out.
 **Revisit if:** he asks about a standing call and acts on an answer her record
 never shows.
+
+### R-171 — her face showing how a trade is going
+**Why refused:** on the laptop she could brighten as an open position gains
+and droop as it loses. That is a view on a position he holds, said without
+a sentence, and it would reach him past both gates, which read only words.
+Her face answers what has already been delivered — a journal finished, a
+trade or a briefing waiting — and the market's hours.
+**Revisit if:** never for an open position; a closed day's result is a fact,
+and could be shown if he asks for it.
+
+### R-172 — her wandering the screen on her own
+**Why refused:** a companion that walks would be charming for a day and in
+the way of a chart he is working for the rest. She moves when he moves her:
+carried, thrown, tucked away.
+**Revisit if:** he asks for it, and then only while the market is shut.
+
+### R-173 — a second meaning for a click on her
+**Why refused:** a double click or a long press would give the new play a
+gesture of its own, and cost the one gesture its certainty: every press would
+wait to learn which it was. Play hangs off the cursor's movement instead — a
+pass, a rub, a carry — which takes no click.
+**Revisit if:** something she does needs a deliberate trigger that no
+movement can give.
 
 ## 3 · THE NEXT STEP — DECIDED
 

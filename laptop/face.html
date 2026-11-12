@@ -8,22 +8,55 @@
   /* Doji's typeface, the journal's. */
   @font-face { font-family: 'Hanken Grotesk'; src: url('HankenGrotesk.ttf'); font-weight: 100 900; }
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; cursor: default; }
-  /* Her square at the bottom of the room, the line above her head. */
+  /* Her square at the bottom of the room; above her head the journal's card, and the line she shows. */
   canvas { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); }
+  #said, #card {
+    position: absolute; left: 50%; transform: translate(-50%, 6px); box-sizing: border-box;
+    color: var(--ink); background: var(--ground); border: 1px solid var(--line);
+    opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none;
+  }
+  #said.shown, #card.shown { opacity: 1; transform: translate(-50%, 0); }
   #said {
-    position: absolute; left: 50%; transform: translate(-50%, 6px);
-    max-width: calc(100% - 12px); box-sizing: border-box; width: max-content;
-    padding: 6px 11px; border-radius: 12px;
+    max-width: calc(100% - 12px); width: max-content; padding: 6px 11px; border-radius: 12px;
     font: 500 12px/1.35 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; text-align: center;
-    opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none;
     -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
   }
-  #said.shown { opacity: 1; transform: translate(-50%, 0); }
+  /* The card is sized in ems, and its em is set from her side, so it grows with her. */
+  #card { width: calc(100% - 12px); padding: .85em; border-radius: 1.3em; font-family: 'Hanken Grotesk'; line-height: 1.2; }
+  #trade { display: flex; justify-content: space-between; gap: .6em; color: var(--muted); font-weight: 600; font-size: .85em; }
+  #trade b { color: var(--ink); font-weight: 700; }
+  #asks { margin: .55em 0 .5em; font-weight: 800; font-size: 1.3em; }
+  #halves { display: flex; gap: .5em; }
+  #halves div {
+    flex: 1; height: 3.6em; border-radius: .9em; display: flex; align-items: center; justify-content: center;
+    text-align: center; font-weight: 800; padding: 0 .4em; filter: brightness(1); transition: filter .12s;
+  }
+  #halves div.over { filter: brightness(1.35); }
+  #halves div.lit { color: #fff; }
+  #chips { display: flex; gap: .4em; margin-top: .6em; font-weight: 700; font-size: .72em; letter-spacing: .06em; }
+  #chips span { flex: 1; text-align: center; padding: .35em 0; border-radius: 1em; border: 1px solid var(--line); color: var(--muted); }
+  #chips span.got { color: var(--ink); border-color: var(--accent); }
+  #chips span.now { color: var(--ink); border-color: var(--ink); }
+  /* Done: the card keeps its size, and the tick draws itself in where the questions were. */
+  #tick { position: absolute; inset: 0; margin: auto; height: 62%; display: none; }
+  #tick path { fill: none; stroke: var(--ink); stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 100; stroke-dashoffset: 100; }
+  #card.done > :not(#tick) { visibility: hidden; }
+  #card.done #tick { display: block; }
+  #card.done #tick path { animation: drawn .42s ease-out forwards; }
+  #card.done.all #tick path { stroke: var(--glow); }
+  @keyframes drawn { to { stroke-dashoffset: 0; } }
   body.hand { cursor: pointer; }
 </style>
 </head>
 <body>
 <div id="said" role="status" aria-live="polite"></div>
+<div id="card">
+  <div id="trade"><b id="fill"></b><span id="more"></span></div>
+  <div id="asks"></div>
+  <div id="halves"><div></div><div></div></div>
+  <div id="chips"><span></span><span></span><span></span><span></span></div>
+  <svg id="tick" viewBox="0 0 100 100"><path pathLength="100" d="M24 52 L42 70 L77 30"/></svg>
+</div>
 <canvas id="her"></canvas>
 <script type="module" src="face.mjs"></script>
 </body>
