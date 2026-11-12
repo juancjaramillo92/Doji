@@ -1285,7 +1285,7 @@ the one value the two bots share, since there is one trader and one chat.
 the `callback_data` grammar.
 
 **The laptop journals a trade beside her face.** It asks every minute what
-waits, and shows a near-white ring beside her while anything does (*The
+waits, and shows an emerald ring beside her while anything does (*The
 laptop — her face over his charts*). A `GET` with
 `x-laptop-key: <GLADYS_LAPTOP_SECRET>` answers `{ waiting, trade, open }`: his trades
 from the last week (`WAITING_DAYS`) with any of the four answers missing, not
@@ -2307,8 +2307,8 @@ laptop next asks, a briefing that is no longer there is nothing to play, not a
 failure: her door's `204`. The dot is the news.
 
 **A print he is cautious around shows as it nears**: in its last fifteen
-minutes a ring sits high beside her, in the app's colour for caution,
-draining as the minutes go, and she glances up at it now and then; it keeps
+minutes a bar sits beneath her, in the app's colour for caution, draining
+as the minutes go, and she glances down at it now and then; it keeps
 her awake, and goes as the print lands. When it lands is her door's to say
 (`?print=next`, asked with the briefing's question and when the Mac wakes).
 It is a clock and nothing else — she says nothing of the print, and nothing
@@ -2346,8 +2346,8 @@ in Telegram while it is up, it follows what is left — and the minute begins
 again only when the card turns to another question (`turned`, in
 `laptop/journal.mjs`), so the laptop's own look at what waits, every minute,
 does not hold the card up for ever. **While a trade waits**, a mark sits beside
-her — a near-white ring, with a dark edge since his chart may be light, the
-briefing's dot inside it when both wait.
+her, in the briefing's own emerald — an open ring, the briefing's dot inside
+it when both wait, so shape tells the two apart.
 A click on her takes what waits first, the journal then the briefing;
 *Journal the trade* in her menu does the same. An answer is never raced: no
 look at what waits starts while one is out, and a look one
@@ -2474,8 +2474,8 @@ capture, the sound, the signature or the update — adds its line here.
   showing, on a Mac with the Dock showing and with it hidden; a click
   brings her back where she was; a second *Hide her* hides her; a trade
   opened while she is tucked ticks and shows no card until she is back.
-- **The print's ring**: in the quarter hour before a high-rated US release
-  it shows beside her and drains, on his own chart's colours, and takes no
+- **The print's bar**: in the quarter hour before a high-rated US release
+  it shows beneath her and drains, on his own chart's colours, and takes no
   click meant for the chart.
 - **Asleep**: with the market shut she sleeps, wakes as the cursor comes
   near, and the talk key wakes her into listening.
