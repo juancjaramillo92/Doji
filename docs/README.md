@@ -86,11 +86,12 @@ package-lock.json                       committed — see Tests
 laptop/                                 Eugenia on the Mac — see The laptop
   main.mjs                              the window, the keys, the menu, her door and Gladys's, the chart, the update
   face.html                             the page her face is drawn on
-  face.mjs                              her face and body, the line over her head, his microphone, her voice, the journal's screens
-  journal.mjs                           Gladys's journal: the four answers, the question asked first, a tap's grammar
+  face.mjs                              her face and body, the line over her head, his microphone, her voice, the journal's card
+  body.mjs                              what her body decides: the spring she gives on, a throw, the market's hours, when she sleeps
+  journal.mjs                           Gladys's journal: the four answers and their questions, the one asked first, what a trade holds, a tap's grammar
   frames.mjs                            her answer, read out of its frames, and the queue her voice plays from
   voice.mjs                             that queue's player, in the audio thread
-  place.mjs                             where her window goes, and the room around her
+  place.mjs                             where she is: her square, the room around it, and the edge she tucks behind
   art.mjs                               the render's black made clear, for her face and her icon
   update.mjs                            the swap an update leaves behind
   spaces.m                              her window kept to one desktop, in the Mac's own code
@@ -417,8 +418,10 @@ single-sourced at run time:
 | what **a door answers another function** | the keys the poller's and `doji-tradingview`'s doors answer with, and the keys Eugenia reads off them — held by `serve.test.mjs` driving her readers off the real handlers, not by a list; the quote by its `Spot` and `Quote` |
 | the **embedding width** | `EMBED_DIMS` in `index.ts`, the two `vector(n)` columns in `schema.sql`, and the cast inside the search |
 | the **journal's own arithmetic** | `index.html`'s `CONFIG.BE`, `resultOf`, `counts`, `money`, `averages` and `Dates.MARKETS`, and `journal.ts`'s port — the band, the session names, the market hours and the SHAPE of the three definitions that part on one case — and both run over the same rows, and every half hour of a year, must answer alike |
-| the **hour cycle** | the nine formatters that ask for an hour — three in `index.html`, one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys`, two in `doji-eugenia` — each stating `hourCycle: 'h23'`, since a locale resolving to h24 renders midnight as 24 and breaks `nyParts` and `nyWall` |
+| the **hour cycle** | the ten formatters that ask for an hour — three in `index.html`, one each in `_shared/edge.ts`, `adherence.ts`, `journal.ts`, `doji-gladys`, `laptop/body.mjs`, two in `doji-eugenia` — each stating `hourCycle: 'h23'`, since a locale resolving to h24 renders midnight as 24 and breaks `nyParts` and `nyWall` |
 | the **largest recording** | `RECORD_MS` at `RECORD_BPS` in `laptop/face.mjs`, at most half of `FILE_MAX` in `doji-eugenia` |
+| **gold's week on the laptop** | `marketOpen` in `laptop/body.mjs`, a copy of `_shared/edge.ts`'s, and `laptop.test.mjs` runs both over every hour of four weeks |
+| the **journal card's words and fields** | `ASKS` in `laptop/journal.mjs`, its three yes-or-no questions against `journalForm`'s in `index.html`; and each field of the trade `laptop/face.mjs` draws, against Gladys's `SELECT` |
 | the **laptop's answer frames and rate** | `FRAME` and `PCM_RATE` in `laptop/frames.mjs`, and the door's, whose bytes `laptop.test.mjs` feeds it |
 | what **the laptop sends her door** | the `x-laptop-` header, the form's fields with their types and names, in `laptop/main.mjs`, against what the laptop's door reads and `IMAGE_TYPES`; and the statuses `tryKey` takes as a key proved, against the door's answers to a right one |
 | how the **laptop's update names her signer** | the `codesign -d -r-` reading and the requirement it holds the new app to in `swapScript` (`laptop/update.mjs`), against the same two commands `.github/workflows/laptop.yml` asks of the real signature, a stranger's beside it refused |
@@ -431,6 +434,7 @@ single-sourced at run time:
 | where the **laptop's update** lives | the two objects `.github/workflows/laptop.yml` writes and the version it stamps, and `UPDATES`, the objects and `build.txt` in `laptop/main.mjs`; the bundle the workflow zips, and `BUNDLE` in `laptop/update.mjs`, which the swap unpacks |
 | the **level her window is raised to** | `setAlwaysOnTop` in `float()` in `laptop/main.mjs`, and the window `.github/workflows/laptop.yml` asks a Mac about, or the check proves a window she is not |
 | what the laptop asks **`?briefing=`** for | the two in `laptop/main.mjs` and the two `laptopBriefing` answers, in both directions |
+| what the laptop asks **`?print=`** for | the one word in `laptop/main.mjs` and the one `laptopPrint` answers, and the key its instant is answered and read under |
 | the **17:00 New York roll** | `marketOpen` in `_shared/edge.ts` and `ROLL_HOUR` in `index.ts` |
 | the **importance a release may carry** | `IMPORTANCE` in `doji-tradingview`, the check constraint, and the rated reads' `importance=eq.high` |
 | the **economies the calendar reads** | `CALENDAR_COUNTRIES` in `doji-tradingview` and the countries `wanted` keeps in `doji-eugenia` |
@@ -1283,11 +1287,13 @@ the `callback_data` grammar.
 **The laptop journals a trade beside her face.** It asks every minute what
 waits, and shows a near-white ring beside her while anything does (*The
 laptop — her face over his charts*). A `GET` with
-`x-laptop-key: <GLADYS_LAPTOP_SECRET>` answers `{ waiting, trade }`: his trades
+`x-laptop-key: <GLADYS_LAPTOP_SECRET>` answers `{ waiting, trade, open }`: his trades
 from the last week (`WAITING_DAYS`) with any of the four answers missing, not
 deleted, oldest first so they are journalled in the order he took them — read
 newest first under `WAITING_MAX` and reversed. The week is the bound: a trade
-left unjournalled would otherwise keep the ring lit for ever. **An answer is a
+left unjournalled would otherwise keep the ring lit for ever. `open` is
+whether he is in a trade — any row with both witnesses of a close null, as
+everywhere — which the laptop keeps her quiet for. **An answer is a
 tap in a tap's own grammar** — a `POST` of `{ "data": "PID562780708|sl|1" }` —
 so `parseCallback` is the one boundary for
 both, and no column but the four is reachable; `[Edit]` and `[Done]` are refused
@@ -2132,6 +2138,13 @@ waiting. From then until midnight in New York every `?briefing=` answers
 Telegram's copy is sent regardless; a briefing heard is one fewer dot, never
 one fewer message.
 
+**The next print is a mark beside her.** With the briefing's question the
+laptop asks **`?print=next`**: `200` and `{ at }`, the instant of the nearest
+release ahead that TradingView rates high at home — the ones his rules are
+cautious around — or `204` while the calendar holds none. The instant and
+nothing more: no name and no figure, since what a print is stays the
+briefing's to say. Any other word is a `400`.
+
 **The door refuses before it works**: a wrong key is a 401 like any other; a
 right key without `STT_URL`, `STT_KEY` and `TTS_KEY` is a 503 naming them,
 since it could neither hear nor speak; no recording, an empty one or one past
@@ -2164,23 +2177,57 @@ mark — what waits shows on her; the Dock's holds what he does with her and
 *Bring her here*, the Dock being where she is reached. Electron hides the Dock
 icon or shows it again each time a window's desktops are set; hers is told to
 leave it. **Her face floats over TradingView**: her render with its black made
-clear, and her drawing over it — eyes, highlight, smile, thought dots, the
-listening ring — in a 466-pixel square scaled to the window, in Doji's
-colours, whose copies of the app's tokens `agree.test.mjs` holds to
-`index.html`. Then a body: **she breathes** (about 1.5% over 4.6 seconds,
-from her base) **and floats** (a few pixels over 3.3 seconds, a rhythm that
-never falls into
-step with the breath), **looks at the cursor** when it comes near, **leans
-in** to listen, **sways** while she thinks and **gives with the loud moments**
-of her voice; eyes and mouth ride the same transform. Reduce Motion in macOS
-stops the breathing and floating and keeps the rest; at rest she is drawn at
-twenty frames a second rather than thirty, which a breath that slow does not
-show, and so are the journal's questions while nothing on them moves. Clicks
-outside her shape go through to the chart beneath, she can be dragged
-anywhere and stays where she is left — written once, when he lets go, rather
-than at every step of the drag. A click on her brings her app to the front, as a click on any app's window does; the talk key leaves
-TradingView there. She is the window's middle; the room above her head holds
-**a line she shows** when her face alone cannot say enough.
+clear, and her drawing over it — eyes, highlight, smile — in a 466-pixel
+square scaled to the window, the render itself twice as fine as that
+(`FINE`), so she is sharp at her largest on a Retina screen, in Doji's colours, whose copies of the app's
+tokens `agree.test.mjs` holds to `index.html`, with a soft shadow beneath her
+so she sits on the chart. Clicks outside her shape go through to the chart
+beneath. A click on her brings her app to the front, as a click on any app's
+window does; the talk key leaves TradingView there. She is the bottom middle
+of her window; the room above her head holds the journal's card and **a line
+she shows** when her face alone cannot say enough.
+
+**Her body is glass, and behaves like it.** **She breathes** (about 1.5% over
+4.6 seconds, from her base) **and floats** (a few pixels over 3.3 seconds, a
+rhythm that never falls into step with the breath). She **bends** rather than
+turns: her render is drawn in strips that lean further the higher they are,
+so she sways from her base while she thinks and **turns a little toward the
+cursor** when it comes near, her eyes on it. Carried, **she gives the other
+way** on a spring and rings down when she is set down; **thrown** — let go
+moving faster than `FLING` — she slides on, slowing, and comes back off the
+edges of the screen she is on, and where she stops is where he left her.
+**She lights from inside** while she listens, brighter with his voice,
+**fills with rising bubbles** while she thinks, **nods** as she takes his
+question, and **gives with the loud moments** of her voice, her mouth wide on
+a bright sound and round on a dark one. Her eyes are part of it: wide while
+she is carried or startled, shut in an arc when she is pleased.
+
+**She plays only with a cursor that means it.** A pass close by her faster
+than `SWIFT` makes her start, no oftener than every few seconds; the cursor
+rubbed over and over her, without a click, pleases her. Neither takes a
+click, so one gesture still does everything. She goes nowhere on her own: a
+companion that wandered across a chart he is working would be in his way.
+**While he is in a trade she keeps still**: Gladys's door says whether he is
+(`open`), and until he is flat she does not start, is not pleased by a rub,
+is set down rather than thrown, and floats half as far. Nothing about her
+says how the trade is going (`REFACTOR.md` R-171).
+
+**She sleeps when there is nothing to be awake for** (`laptop/body.mjs`):
+with gold's market shut, twenty seconds after the cursor last came near her;
+with it open, only once the cursor has not moved at all for five minutes —
+he works his chart all day far from her, and that is not being away. Asleep,
+her eyes are shut and her breath slow and deep. The cursor near her, the
+talk key, a trade or a briefing waiting each wake her, and nothing waits on
+a sleeping face. The market's hours are a copy of the poller's, which
+`laptop.test.mjs` runs beside it.
+
+Reduce Motion in macOS stops the breathing, the floating and the throw, and
+keeps the rest; at rest she is drawn at twenty frames a second rather than
+thirty, which a breath that slow does not show, and so she is while the
+journal's card is up. **She can be dragged anywhere and stays where she is
+left** — her own square's corner, which the window is built around
+(`laptop/place.mjs`), written once, when he lets go or a throw comes to rest,
+rather than at every step.
 
 **She lives on one desktop, as any window does.** He switches desktops all day
 and wants her on TradingView's alone — not even on another while she talks. So
@@ -2201,16 +2248,23 @@ menu bar and the Dock set to hide themselves it looks the same. **Bring her
 here**, in her menu, puts her on the desktop he is on — she joins every
 desktop for a moment, is shown, and leaves them all again, which leaves her on
 the one she is on — and so does her Dock icon clicked, or the app opened
-again; at launch she is put on the desktop in front. *Hide her* hides her
-until she is brought back. A turn asked from another desktop is answered where
+again; at launch she is put on the desktop in front. ***Hide her* tucks her
+away first**: she slides to the nearest edge of her screen that can hide her
+and peeks over it, looking back in, and a click on her — or dragging her out,
+or *Bring her here* — brings her back to where she was. An edge can hide her
+only where the screen ends: not where the Dock or the menu bar sits, which
+would be drawn over her, and not where another display begins, which would
+show the rest of her (`tucked`, in `laptop/place.mjs`). Hidden again from
+there, or with no such edge, she is hidden until she is brought back. The
+talk key works the same wherever she is. A turn asked from another desktop is answered where
 she is: the key works from any app, she does not move for it, and what she
 hears and does keeps its own clock while her drawing waits on a desktop out of
 sight.
 
 **One gesture does everything**: the talk key, ⌥Space unless he chose ⌃⌥Space
 in her menu, or a click on her. At rest she listens — two rising notes say
-when to start, and the ring swells with his voice, so he sees she
-hears him; again, and the two notes fall, she thinks, then speaks, the mouth
+when to start, and the light inside her brightens with his voice, so he sees
+she hears him; again, and the two notes fall, she thinks, then speaks, the mouth
 following her voice; again while she thinks or speaks, and she stops — the
 door keeps the turn, so the copy and the memory still land. **Shift with the
 talk key** is the same with **the chart**, *Looking at your chart…* above her
@@ -2225,7 +2279,7 @@ a question whose chart could not be captured is not asked, and she says why.
 The microphone is opened at the press and closed with the recording, so macOS
 shows it in use only while she listens. A recording he never spoke into is let
 go at thirty seconds, and the last thirty of a five-minute
-recording are ticked and empty the ring; a press shorter than 0.4 seconds is
+recording are ticked and drain the light from her, top to base; a press shorter than 0.4 seconds is
 one he took back. The recording's bitrate keeps it well inside `FILE_MAX`. A
 key another app holds registers as nothing, so she says so, and the menu
 offers the other.
@@ -2248,30 +2302,43 @@ New York, and stays gone after a restart. Clicked in the minutes before the
 laptop next asks, a briefing that is no longer there is nothing to play, not a
 failure: her door's `204`. The dot is the news.
 
+**A print he is cautious around shows as it nears**: in its last fifteen
+minutes a ring sits high beside her, in the app's colour for caution,
+draining as the minutes go, and she glances up at it now and then; it keeps
+her awake, and goes as the print lands. When it lands is her door's to say
+(`?print=next`, asked with the briefing's question and when the Mac wakes).
+It is a clock and nothing else — she says nothing of the print, and nothing
+of his trade.
+
 **Gladys's journal comes with her**, asked of Gladys's door rather than
 hers (*Gladys — the Telegram journal*): what waits every minute — the laptop
 is awake and online whenever he trades on it — and at once when the Mac
-wakes. A trade that came in ticks, and its questions take her place once she
-is idle; a conversation is never interrupted. **The screens are drawn on her
-round square**, in Doji's typeface, Hanken Grotesk, kept beside her: the setup
-split down the middle, **B&R** left and **S&R** right; then
-**RULES**, **SL** and **TP**, no on the left and yes on the right, each half
-brightening when clicked; four dots at the top; done, the dots fill, the tick
-draws in and the ring sweeps round, brighter when every answer was a yes.
-Their first half second takes no click: they come up on their own over his
+wakes. A trade that came in ticks, and its card comes up once she is idle; a
+conversation is never interrupted. **The card sits above her head, and she
+stays**, looking up at it, in Doji's typeface, Hanken Grotesk, kept beside
+her. It says **which trade** — its direction and entry as Gladys's message
+names them, at the hour on his own clock, and how many more wait — and asks
+one question at a time **in the app's own words**, its two answers the
+card's two halves: the two setups by name, then no on the left and yes on
+the right, each brightening under the cursor and when clicked. The whole
+left half of the card is one answer and the whole right the other, so the
+target stays as large as the card. **Four chips along the bottom say what is
+answered and how** — the setup by its short name, a tick or a cross — with
+the question being asked outlined. Done, a tick draws itself in, light
+emerald when every answer was a yes, and she is pleased.
+Its first half second takes no click: it comes up on its own over his
 chart, when he is likeliest to be working it, and a click then was meant for
 the chart. Whether a click is hers is asked again whenever she changes under
-a still cursor — the questions coming or going, a mark appearing — not only
+a still cursor — the card coming or going, a mark appearing — not only
 when the cursor moves, so the window never keeps catching clicks where she no
 longer is. **A click on a half sends that one answer at once**, in a tap's
 own grammar (`laptop/journal.mjs`, read by Gladys's own `parseCallback` in
 `laptop.test.mjs`), and her door answers with what waits next, so the next
 question or the next trade follows without a pause. An answer her door did
-not take leaves the question to be clicked again, and the line above her head
-says why. A minute without a click, the questions give way to her, the trade
-still waiting; the talk key on them closes them and she listens; answered in
-Telegram while they are up, they follow what is left. The journal crosses over
-her face rather than cutting in. **While a trade waits**, a mark sits beside
+not take leaves the question to be clicked again, and the line above the card
+says why. A minute without a click, the card gives way, the trade still
+waiting; the talk key, or a click on her, closes it and she listens; answered
+in Telegram while it is up, it follows what is left. **While a trade waits**, a mark sits beside
 her — a near-white ring, with a dark edge since his chart may be light, the
 briefing's dot inside it when both wait.
 A click on her takes what waits first, the journal then the briefing;
@@ -2384,12 +2451,26 @@ capture, the sound, the signature or the update — adds its line here.
   chart and updates as before, the switches off.
 - **An update held to her signer**: *Update her* still puts the new version
   in place and opens it.
-- **The journal**: a trade opened comes up as its questions with the tick,
-  in Hanken Grotesk rather than a fallback face; a click on either half
-  answers on her window without TradingView losing its place; the ring
-  shows while one waits, on his own chart's colours; a click on the chart
-  in the instant the questions come up goes to the chart, and once they are
-  gone the chart takes clicks where they were.
+- **The journal**: a trade opened comes up as its card with the tick,
+  in Hanken Grotesk rather than a fallback face, readable at each of her
+  three sizes; a click on either half answers on her window without
+  TradingView losing its place; the ring shows while one waits, on his own
+  chart's colours; a click on the chart in the instant the card comes up
+  goes to the chart, and once it is gone the chart takes clicks where it
+  was.
+- **Her body**: carried, she moves with the cursor and gives the other way
+  without the window lagging; thrown, she comes back off the screen's edges
+  — the Dock's and the menu bar's included — and stays where she stops
+  after a restart; after this update she is where he left her, or within a
+  hand's width of it.
+- **Tucked away**: *Hide her* slides her to an edge and leaves her eyes
+  showing, on a Mac with the Dock showing and with it hidden; a click
+  brings her back where she was; a second *Hide her* hides her.
+- **The print's ring**: in the quarter hour before a high-rated US release
+  it shows beside her and drains, on his own chart's colours, and takes no
+  click meant for the chart.
+- **Asleep**: with the market shut she sleeps, wakes as the cursor comes
+  near, and the talk key wakes her into listening.
 - **Her menu**: the menu-bar icon bare whatever waits; its menu split by
   separators, with *Keys ▸ Eugenia…* and *Gladys…* opening the key window
   under each name; her Dock icon's menu the four actions and *Bring her
@@ -4127,10 +4208,10 @@ home-screen shortcut and every bookmark open `/`.
 | `test/fold.test.mjs` | the pure logic of all five Edge Functions, `_shared` and `adherence.ts`: a real `get_deals` capture folded and cross-checked against the real email for the trade they share; the poller's fold, windows, balance and plan rules; the email boundary and its three outcomes; Gladys's grammar, rendering and settling, with the two redraws agreeing on every before-state; Eugenia's schedules walked hour by hour, her renderings, gates, voice fallback and tool loop driven through `ask()`; every one of the twelve rules in both directions; and the TradingView sign-in and folds |
 | `test/app.test.mjs` | `index.html` in jsdom against a recording Supabase stand-in: completeness, load — past one page — save and soft delete, the scratch rule and aggregates, the money split and averages, the week boundary, sessions, the indexes, every render step, the three-state answer in every surface that reads it, the charts' inputs, the snapshot, the offline boot, and the watch card |
 | `test/golden.test.mjs` | the snapshot: the real page on fixed fixtures and a frozen clock, every derived value and every panel's markup compared against `test/golden.json`, plus `Dates.session` swept across the four DST changeovers; and `test/golden-fold.json`, everything the folds return off the real captures — the rows the poller writes through its two windows, the email parsed and bounded, the calendar folded, and Eugenia's rule verdicts, day standings and stats over that week, with what she is told about each. Regenerate with `GOLDEN=write npm test`, deliberately, in the commit that changes behaviour — never to make a red run go away |
-| `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the laptop driven end to end through the real turn — the reply read as its framer reads its frames, voice alone, silence first, the recording transcribed under the name and type it sent, no image when he showed none, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, the chart reaching her turn as the image he showed and named in the copy, a wordless recording answered on the laptop alone, and the door refusing a missing vendor, a missing, empty or oversized recording, a chart she cannot read or too large, a body that is not a form and a wrong key, and shut while its secret is unset; and the briefing on the laptop, today's briefing read as `pcm` in frames, the right day's briefing asked for, a `204` while none is stored, the briefing heard once spoken whole and every question answered `204` after, speech that broke off heard never, and `?briefing=waits` answered with nothing to play; and Gladys's laptop told what waits oldest first and a week back, its answer writing exactly one of the four columns, an edit, a stray column and a malformed body refused, a wrong key refused and the door shut without its secret; and between the functions, every door Eugenia reads but the quote — the calendar, the market, its weeks, the rate odds, the wires, futures volume, the flows, his charts and the bars her calls are scored on — served by the real `doji-tradingview` and poller handlers off stubbed vendors, and read by her as she reads it |
+| `test/serve.test.mjs` | the five request handlers themselves, captured off a stub `Deno.serve` in a process of their own: every door refuses an unloaded secret with a 503 and a wrong key with a 401 before making any request; the email path's write, its three outcomes and the heartbeat on each, the probe left unmarked; Gladys's halves kept apart and a foreign chat refused; the poller's weekend skip marked; TradingView's public paths; Eugenia answering a message, a trade event and the hour before the work, with the work kept; and the laptop driven end to end through the real turn — the reply read as its framer reads its frames, voice alone, silence first, the recording transcribed under the name and type it sent, no image when he showed none, her gated answer read as `pcm` in every part, the copy in Telegram, the exchange stored, the chart reaching her turn as the image he showed and named in the copy, a wordless recording answered on the laptop alone, and the door refusing a missing vendor, a missing, empty or oversized recording, a chart she cannot read or too large, a body that is not a form and a wrong key, and shut while its secret is unset; and the briefing on the laptop, today's briefing read as `pcm` in frames, the right day's briefing asked for, a `204` while none is stored, the briefing heard once spoken whole and every question answered `204` after, speech that broke off heard never, and `?briefing=waits` answered with nothing to play; the next print answered as its instant alone, read from now, high and at home, a `204` with none ahead and another word refused; and Gladys's laptop told what waits oldest first and a week back, and whether he is in a trade, its answer writing exactly one of the four columns, an edit, a stray column and a malformed body refused, a wrong key refused and the door shut without its secret; and between the functions, every door Eugenia reads but the quote — the calendar, the market, its weeks, the rate odds, the wires, futures volume, the flows, his charts and the bars her calls are scored on — served by the real `doji-tradingview` and poller handlers off stubbed vendors, and read by her as she reads it |
 | `test/agree.test.mjs` | every fact in **Facts that live in more than one file**, read out of each file that holds a copy; the call sites no test can drive, read from source; and the censuses — every path that sends, every growing read, every flag, every tool, every poller return — derived from the code and held against a declaration |
 | `test/types.test.mjs` | a name used and declared nowhere, and a name declared and used nowhere, in the Edge Functions, the app and the laptop as three programs — with one planted defect per question proving the check can fail |
-| `test/laptop.test.mjs` | the laptop's pure half: her frames read back whole off `laptopFrame`'s own bytes however the reads cut them — inside a header, at every frame's edges, a few bytes at a time — and her voice read as 16-bit samples across a frame that ends mid-sample, silence as exact zeros; her voice played from its queue by a simulated speaker while it arrives slower than she speaks and then faster, and through a stall followed by uneven parts — no silence inside her voice but the stall's one, every sample once and in order, begun after the lead, and an answer shorter than the lead played whole; her window kept where he left it while a screen shows her, on a second screen too, and brought home when none does; every half of every journal question read by Gladys's own `parseCallback` as the answer it means, and the question a trade is asked first over every way it can lack them, a no never asked again; and the update's swap run in a scratch folder under a path with a space and an apostrophe, `ditto`, `open` and `codesign` stood in for: the new app put in place and opened, and the old one kept and reopened when the download will not unpack, holds no app, is signed by a stranger, or will not move into place |
+| `test/laptop.test.mjs` | the laptop's pure half: her frames read back whole off `laptopFrame`'s own bytes however the reads cut them — inside a header, at every frame's edges, a few bytes at a time — and her voice read as 16-bit samples across a frame that ends mid-sample, silence as exact zeros; her voice played from its queue by a simulated speaker while it arrives slower than she speaks and then faster, and through a stall followed by uneven parts — no silence inside her voice but the stall's one, every sample once and in order, begun after the lead, and an answer shorter than the lead played whole; her square kept where he left it while a screen shows her, on a second screen too, and brought home when none does, her window built around it and her square read back out exactly at every size; the edge she tucks behind, never the Dock's and never one another display lies past; the spring she gives on brought to rest exactly at every frame rate, a throw turned back once at the screen's edge and stopped, gold's week against the poller's own over every hour of four weeks, and when she sleeps; every half of every journal question read by Gladys's own `parseCallback` as the answer it means, each read back off a trade as the half that gave it, and the question a trade is asked first over every way it can lack them, a no never asked again; and the update's swap run in a scratch folder under a path with a space and an apostrophe, `ditto`, `open` and `codesign` stood in for: the new app put in place and opened, and the old one kept and reopened when the download will not unpack, holds no app, is signed by a stranger, or will not move into place |
 | `test/parse.test.mjs` | the Apps Script: `parseAlert_` against a real saved alert and variants in its shape, `syncPepperstone`'s three outcomes, and a run that finds nothing reaching for no label |
 | `test/boot.mjs` | the harness: boots `index.html` in jsdom with the CDN libraries stubbed |
 | `test/gs.mjs` | the harness: evaluates `doji_gmail_sync.gs` with the four Google globals stubbed to record |

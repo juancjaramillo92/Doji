@@ -5362,6 +5362,24 @@ async function laptopBriefing(which: string): Promise<Response> {
   })()), { headers: { "Content-Type": "application/octet-stream" } });
 }
 
+/* The next print, on the laptop: the instant of the next release his rules
+   are cautious around — rated high, at home — as `?print=next`, or a 204
+   while the calendar holds none ahead. The instant and nothing more: the
+   laptop draws a mark as it nears, and what the print is stays the
+   briefing's to say. */
+export function printQuery(now: number): string {
+  return `eugenia_calendar?select=at&importance=eq.${HIGH}&country=eq.${HOME}` +
+         `&at=gte.${new Date(now).toISOString()}&order=at.asc&limit=1`;
+}
+
+async function laptopPrint(which: string): Promise<Response> {
+  if (which !== 'next') {
+    return json({ ok: false, error: "print is next" }, 400);
+  }
+  const [row] = await readRows<{ at: string }>('Next print', printQuery(Date.now()));
+  return row ? json({ ok: true, at: row.at }) : new Response(null, { status: 204 });
+}
+
 // ─── Entry point ───────────────────────────────────────────────────────────
 if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: Request) => {
   const fromTelegram = req.headers.get("x-telegram-bot-api-secret-token");
@@ -5413,6 +5431,8 @@ if ((globalThis as any).Deno?.serve) (globalThis as any).Deno.serve(async (req: 
       }
       const briefing = new URL(req.url).searchParams.get("briefing");
       if (briefing !== null) return await laptopBriefing(briefing);
+      const print = new URL(req.url).searchParams.get("print");
+      if (print !== null) return await laptopPrint(print);
       // A form: the recording as `voice`, and `chart` when he asked her to look.
       const form = await req.formData().catch(() => null);
       const voice = form?.get("voice"), chart = form?.get("chart") ?? null;

@@ -292,6 +292,18 @@ test('the laptop knocks with the key, the form and the words her door reads', ()
     'the laptop reads her door\'s 204 as a failure, and a briefing no longer there shows her confused');
   assert.match(LAPTOP_DOOR, /if \(briefing !== null\) return await laptopBriefing\(briefing\);/,
     'the laptop\'s door no longer answers the briefing');
+
+  // And the next print: the one word asked is the one answered, a time as JSON or a 204 for none.
+  const printed = [...new Set([...LAPTOP_MAIN.matchAll(/\?print=(\w+)/g)].map(m => m[1]))];
+  const answered = EUGENIA_TS.match(/if \(which !== '(\w+)'\) \{\s*return json\(\{ ok: false, error: "print is/)?.[1];
+  assert.ok(printed.length && answered, 'the laptop or her door no longer names the print as this test reads it');
+  assert.deepEqual(printed, [answered], 'the laptop asks a ?print= word her door does not answer');
+  assert.match(LAPTOP_DOOR, /if \(print !== null\) return await laptopPrint\(print\);/, 'the laptop\'s door no longer answers the print');
+  const asks = bodyOf(LAPTOP_MAIN, 'async function print(');
+  assert.match(bodyOf(EUGENIA_TS, 'async function laptopPrint('), /return row \? json\(\{ ok: true, at: row\.at \}\) : new Response\(null, \{ status: 204 \}\);/,
+    'laptopPrint no longer answers the instant under `at`, or none with a 204');
+  assert.match(asks, /res\.status === 200 \? Date\.parse\(\(await res\.json\(\)\.catch\(\(\) => \(\{\}\)\)\)\.at\) : NaN/,
+    'the laptop no longer reads the print\'s instant under the key her door answers it by');
 });
 
 /* Each key is proved by asking its door — hers with an empty form, Gladys's
@@ -352,8 +364,11 @@ test('the laptop journals through the door, the keys and the answers Gladys read
   const answered = bodyOf(GLADYS_TS, 'async function waiting(').match(/return json\(\{ ([^}]+) \}\);/);
   assert.ok(answered, 'waiting() no longer answers as this test reads it');
   const keys = answered[1].split(',').map(k => k.split(':')[0].trim());
-  const read = knocked.match(/const \{ (\w+), (\w+) \} = await res\.json\(\)/)?.slice(1);
-  assert.ok(read, 'gladys() no longer reads her answer as this test reads it');
+  const read = knocked.match(/const \{ ([\w, ]+) \} = await res\.json\(\)/)?.[1].split(', ');
+  assert.ok(read?.length >= 3, 'gladys() no longer reads her answer as this test reads it');
+  // Open is both witnesses of a close null, here as everywhere; either alone has reported closed trades as open.
+  assert.match(bodyOf(GLADYS_TS, 'async function waiting('), /read\(`select=id&deleted=is\.false&exit_price=is\.null&fill_time=is\.null&limit=1`\)/,
+    'Gladys no longer tells the laptop he is in a trade by both witnesses of a close');
   for (const k of read) assert.ok(keys.includes(k), `the laptop reads "${k}" and her door answers ${keys.join(', ')}`);
   const select = GLADYS_TS.match(/const SELECT = "([^"]+)"/)?.[1].split(',');
   assert.ok(select, 'doji-gladys no longer names the columns it selects as this test reads them');
@@ -361,6 +376,14 @@ test('the laptop journals through the door, the keys and the answers Gladys read
     assert.ok(select.includes(f), `the laptop reads the trade's ${f} and her door does not select it`);
   }
   assert.match(LAPTOP_FACE, /window\.doji\.answer\(j\.trade\.id, /, 'the page no longer answers a trade by its id');
+  // The card names the trade from the row her door hands over, and asks in the app's own words.
+  const drawn = [...new Set([...LAPTOP_FACE.matchAll(/\bj\.trade\.(\w+)/g)].map(m => m[1]))];
+  assert.ok(drawn.length >= 4, `the card reads only ${drawn.join(', ')} of the trade — the reader has gone blind`);
+  for (const f of drawn) assert.ok(select.includes(f), `the card draws the trade's ${f} and her door does not select it`);
+  const { ASKS } = await import('../laptop/journal.mjs');
+  const form = Object.fromEntries([...source('index.html').matchAll(/\['(followed_\w+)',\s+'([^']+)',\s+t\.\1\]/g)].map(m => [m[1], m[2]]));
+  assert.equal(Object.keys(form).length, 3, 'journalForm no longer words its three questions as this test reads them');
+  assert.deepEqual(ASKS.slice(1), ANSWERS.slice(1).map(([, column]) => form[column]), 'the card asks a question in other words than the app does');
   const posted = bodyOf(LAPTOP_MAIN, 'async function answer(').match(/JSON\.stringify\(\{ (\w+): tap\(/)?.[1];
   assert.ok(posted, 'answer() no longer posts its answer as this test reads it');
   assert.match(bodyOf(GLADYS_TS, 'async function laptopAnswer('), new RegExp(`\\?\\.${posted}\\b`),

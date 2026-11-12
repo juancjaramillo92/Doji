@@ -103,7 +103,7 @@ can drive, `agree.test.mjs` reads the call.
 
 ```sh
 npm ci        # once — jsdom and typescript, and nothing else
-npm test      # 849 tests, eight suites
+npm test      # 857 tests, eight suites
 npm run test:db   # schema.sql on a real Postgres, the major version Supabase runs
 ```
 
@@ -498,7 +498,8 @@ says what it does. Three levels of proof, and a change says which it rests on:
 
 - **Pure, and driven in `npm test`.** `frames.mjs`, fed `laptopFrame`'s bytes,
   and its `Queue`, played against a stream that arrives late and unevenly;
-  `art.mjs`; `place.mjs`; `journal.mjs`, read by Gladys's own `parseCallback`;
+  `art.mjs`; `place.mjs`; `body.mjs`, its market hours run beside the
+  poller's; `journal.mjs`, read by Gladys's own `parseCallback`;
   and `update.mjs`, whose swap `laptop.test.mjs` runs in a scratch folder with
   `ditto`, `open` and `codesign` stood in for. A decision that can be pure goes
   in one of these.
