@@ -352,8 +352,11 @@ test('the laptop journals through the door, the keys and the answers Gladys read
   const answered = bodyOf(GLADYS_TS, 'async function waiting(').match(/return json\(\{ ([^}]+) \}\);/);
   assert.ok(answered, 'waiting() no longer answers as this test reads it');
   const keys = answered[1].split(',').map(k => k.split(':')[0].trim());
-  const read = knocked.match(/const \{ (\w+), (\w+) \} = await res\.json\(\)/)?.slice(1);
-  assert.ok(read, 'gladys() no longer reads her answer as this test reads it');
+  const read = knocked.match(/const \{ ([\w, ]+) \} = await res\.json\(\)/)?.[1].split(', ');
+  assert.ok(read?.length >= 3, 'gladys() no longer reads her answer as this test reads it');
+  // Open is both witnesses of a close null, here as everywhere; either alone has reported closed trades as open.
+  assert.match(bodyOf(GLADYS_TS, 'async function waiting('), /read\(`select=id&deleted=is\.false&exit_price=is\.null&fill_time=is\.null&limit=1`\)/,
+    'Gladys no longer tells the laptop he is in a trade by both witnesses of a close');
   for (const k of read) assert.ok(keys.includes(k), `the laptop reads "${k}" and her door answers ${keys.join(', ')}`);
   const select = GLADYS_TS.match(/const SELECT = "([^"]+)"/)?.[1].split(',');
   assert.ok(select, 'doji-gladys no longer names the columns it selects as this test reads them');

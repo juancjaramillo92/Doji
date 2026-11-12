@@ -1286,11 +1286,13 @@ the `callback_data` grammar.
 **The laptop journals a trade beside her face.** It asks every minute what
 waits, and shows a near-white ring beside her while anything does (*The
 laptop — her face over his charts*). A `GET` with
-`x-laptop-key: <GLADYS_LAPTOP_SECRET>` answers `{ waiting, trade }`: his trades
+`x-laptop-key: <GLADYS_LAPTOP_SECRET>` answers `{ waiting, trade, open }`: his trades
 from the last week (`WAITING_DAYS`) with any of the four answers missing, not
 deleted, oldest first so they are journalled in the order he took them — read
 newest first under `WAITING_MAX` and reversed. The week is the bound: a trade
-left unjournalled would otherwise keep the ring lit for ever. **An answer is a
+left unjournalled would otherwise keep the ring lit for ever. `open` is
+whether he is in a trade — any row with both witnesses of a close null, as
+everywhere — which the laptop keeps her quiet for. **An answer is a
 tap in a tap's own grammar** — a `POST` of `{ "data": "PID562780708|sl|1" }` —
 so `parseCallback` is the one boundary for
 both, and no column but the four is reachable; `[Edit]` and `[Done]` are refused
@@ -2196,6 +2198,10 @@ than `SWIFT` makes her start, no oftener than every few seconds; the cursor
 rubbed over and over her, without a click, pleases her. Neither takes a
 click, so one gesture still does everything. She goes nowhere on her own: a
 companion that wandered across a chart he is working would be in his way.
+**While he is in a trade she keeps still**: Gladys's door says whether he is
+(`open`), and until he is flat she does not start, is not pleased by a rub,
+is set down rather than thrown, and floats half as far. Nothing about her
+says how the trade is going (`REFACTOR.md` R-171).
 
 **She sleeps when there is nothing to be awake for** (`laptop/body.mjs`):
 with gold's market shut, twenty seconds after the cursor last came near her;

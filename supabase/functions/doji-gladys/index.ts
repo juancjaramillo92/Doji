@@ -341,7 +341,7 @@ async function handleTap(req: Request): Promise<Response> {
 
 /* ─── The laptop half: he journals beside her face ────────────────────────
    The laptop asks every minute what waits, and shows a ring while anything
-   does. An answer from it is a tap in a tap's own grammar, so
+   does; and whether he is in a trade, which it keeps her quiet for. An answer from it is a tap in a tap's own grammar, so
    parseCallback is the one boundary for both and no other column is reachable.
    The trigger then redraws the Telegram message, as it does for the app.
    ───────────────────────────────────────────────────────────────────────── */
@@ -352,15 +352,22 @@ async function handleTap(req: Request): Promise<Response> {
 const WAITING_DAYS = 7;
 const WAITING_MAX = 20;
 
+// Open is both witnesses of a close null, as the app reads it; one row answers whether any is.
 async function waiting(): Promise<Response> {
   const since = new Date(Date.now() - WAITING_DAYS * 86_400_000).toISOString();
-  const res = await fetch(`${SB_URL}/rest/v1/trades?select=${SELECT}&deleted=is.false` +
-    `&entry_time=gte.${encodeURIComponent(since)}` +
-    `&or=(setup.is.null,followed_rules.is.null,followed_sl.is.null,followed_tp.is.null)` +
-    `&order=entry_time.desc&limit=${WAITING_MAX}`, { headers: sbHeaders() });
-  if (!res.ok) throw new Error(`Read failed (HTTP ${res.status}): ${await res.text()}`);
-  const rows: Row[] = (await res.json()).reverse();
-  return json({ ok: true, waiting: rows.length, trade: rows[0] ?? null });
+  const read = async (query: string): Promise<Row[]> => {
+    const res = await fetch(`${SB_URL}/rest/v1/trades?${query}`, { headers: sbHeaders() });
+    if (!res.ok) throw new Error(`Read failed (HTTP ${res.status}): ${await res.text()}`);
+    return await res.json();
+  };
+  const [rows, held] = await Promise.all([
+    read(`select=${SELECT}&deleted=is.false&entry_time=gte.${encodeURIComponent(since)}` +
+         `&or=(setup.is.null,followed_rules.is.null,followed_sl.is.null,followed_tp.is.null)` +
+         `&order=entry_time.desc&limit=${WAITING_MAX}`),
+    read(`select=id&deleted=is.false&exit_price=is.null&fill_time=is.null&limit=1`),
+  ]);
+  rows.reverse();
+  return json({ ok: true, waiting: rows.length, trade: rows[0] ?? null, open: held.length > 0 });
 }
 
 // Answers only: [Edit] and [Done] belong to the Telegram form. Answered with

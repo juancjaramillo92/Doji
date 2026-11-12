@@ -99,7 +99,7 @@ let looking = null;    // the chart being captured since he asked her to look
 let briefingWaits = false;  // as her door last said
 let hearings = 0;      // briefings heard here, so an ask one overtook is dropped
 let offered = null;    // a newer build than this one
-let pending = { waiting: 0, trade: null };  // what waits for its journal, as Gladys's door last said
+let pending = { waiting: 0, trade: null, open: false };  // what waits for its journal, and whether he is in a trade, as Gladys's door last said
 let answering = false; // an answer on its way to Gladys's door
 let knocks = 0;        // asks of Gladys's door, so a look an answer overtook is dropped
 let pointed = '';      // where the page was last told the cursor is
@@ -422,8 +422,8 @@ async function hearBriefing() {
 }
 
 /* ─── Gladys's journal ──────────────────────────────────────────────────────
-   Asked of her door on the laptop's own key: a GET
-   answers what waits, { waiting, trade }, and an answer is a POST in a tap's
+   Asked of her door on the laptop's own key: a GET answers what waits and
+   whether he is in a trade, { waiting, trade, open }, and an answer is a POST in a tap's
    own grammar, answered with what waits after it, so the page moves on
    without a second request. The page draws the questions and says which
    half he clicked; the grammar is journal.mjs's. An answer is never raced:
@@ -443,10 +443,10 @@ async function gladys(body) {
     askForKey('gladys');
     return 'key';
   }
-  const { waiting, trade } = await res.json().catch(() => ({}));
+  const { waiting, trade, open } = await res.json().catch(() => ({}));
   if (!Number.isInteger(waiting)) return 'door';
   if (!body && mine !== knocks) return 'stale';
-  pending = { waiting, trade };
+  pending = { waiting, trade, open: open === true };
   menu();
   return pending;
 }
@@ -454,7 +454,7 @@ async function gladys(body) {
 async function journal() {
   if (!keys.gladys || answering) return;
   const got = await gladys();
-  if (typeof got !== 'string') send('journal', got.trade, got.waiting);
+  if (typeof got !== 'string') send('journal', got.trade, got.waiting, got.open);
 }
 
 async function answer(id, q, half) {

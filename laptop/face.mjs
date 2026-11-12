@@ -108,9 +108,10 @@ const RISING = 7;
 const FRAME_MS = 33, REST_FRAME_MS = 50;
 // The cursor within this many of her pixels has her eyes.
 const NEAR = 700;
-/* Play, kept for a cursor that means it: a pass faster than SWIFT of her
-   pixels a second, close by, makes her start, no oftener than STARTLE_EVERY;
-   RUB of her side travelled over her without a click pleases her. */
+/* Play, kept for a cursor that means it, and for when he is flat: a pass
+   faster than SWIFT of her pixels a second, close by, makes her start, no
+   oftener than STARTLE_EVERY; RUB of her side travelled over her without a
+   click pleases her. */
 const SWIFT = 3000, CLOSE = 300, START_MS = 700, STARTLE_EVERY_MS = 4000;
 const RUB = 3, PLEASED_MS = 1600;
 const HINT_AFTER_MS = 1200;
@@ -164,6 +165,7 @@ let shape;                   // the box her shape fills, in her pixels: what an 
 let mode = 'idle';           // idle · listening · thinking · speaking · confused · journal
 let briefingWaits = false;
 let trade = null, waiting = 0;   // the oldest trade waiting for its journal, and how many do
+let calm = false;                // he is in a trade: she keeps still, and her play waits until he is flat
 let due = false;                 // a trade came in: its card comes up once she is idle
 let journal = null;              // the card, up while the mode is: the trade, the question, the half lit, done
 let talkKey = '⌥Space';
@@ -175,7 +177,7 @@ let cues = null;             // the context her two-note sounds and the ear shar
 let side = 0;                // her square's side, in the window's pixels
 let tucked = null;           // the edge she peeks over while she is tucked away
 let flight = null;           // a throw under way: her box on the screen and its speed
-let asleep = false, open = true, openAsked = -Infinity;
+let asleep = false, market = true, marketAsked = -Infinity;
 let nearAt = performance.now(), movedAt = nearAt;   // when the cursor last came near her, and last moved at all
 let startUntil = 0, startAfter = 0, pleasedUntil = 0, rubbed = 0;
 
@@ -454,7 +456,7 @@ function step(now, dt) {
 function draw(now) {
   const t = now / 1000, idle = still.matches ? 0 : 1;
   const air = idle * (BREATH + (DEEP_BREATH - BREATH) * V.sleep) * Math.sin(breath);
-  const bob = idle * (1 - V.sleep) * Math.sin(2 * Math.PI * t / BOB_S + 1.3);
+  const bob = idle * (1 - V.sleep) * (calm ? 0.5 : 1) * Math.sin(2 * Math.PI * t / BOB_S + 1.3);
   const up = Math.max(-STRETCH_MOST, Math.min(STRETCH_MOST, stretch.x));
   const sy = 1 + air + LEAN * V.lean - SQUASH * V.squash - DROOP * V.sleep + up;
   const sx = 1 - 0.4 * air + LEAN * V.lean + SQUASH * 0.7 * V.squash + 0.5 * DROOP * V.sleep - 0.6 * up;
@@ -607,9 +609,9 @@ function live() {
   }
 
   // The market's hours are asked of the clock once a minute, not at every tick.
-  if (now - openAsked >= 60_000) { open = marketOpen(new Date()); openAsked = now; }
+  if (now - marketAsked >= 60_000) { market = marketOpen(new Date()); marketAsked = now; }
   const slept = asleep;
-  asleep = mode === 'idle' && !trade && !briefingWaits && !held && !flight && sleeps(open, now - nearAt, now - movedAt);
+  asleep = mode === 'idle' && !trade && !briefingWaits && !held && !flight && sleeps(market, now - nearAt, now - movedAt);
   if (slept && !asleep) stretch.v += STIR;
   rubbed *= 0.94;
 
@@ -767,7 +769,7 @@ async function choose(x) {
   j.lit = half;
   write();
   const [got] = await Promise.all([window.doji.answer(j.trade.id, j.q, half), new Promise(r => setTimeout(r, FLASH_MS))]);
-  if (typeof got !== 'string') ({ trade, waiting } = got);
+  if (typeof got !== 'string') ({ trade, waiting, open: calm } = got);
   if (mode !== 'journal' || journal !== j) return;
   if (typeof got === 'string') {
     j.lit = null;
@@ -783,7 +785,8 @@ async function choose(x) {
   write();
 }
 
-function waitsNow(next, count) {
+function waitsNow(next, count, inTrade) {
+  calm = inTrade;
   if (count > waiting) tick();
   due = count > waiting || (due && count > 0);
   trade = next;
@@ -852,7 +855,7 @@ addEventListener('mousemove', (e) => {
     return;
   }
   // Rubbed: the cursor going over and over her, without a press.
-  if (solid && mode === 'idle' && !tucked && (rubbed += Math.hypot(e.movementX, e.movementY)) > RUB * side) {
+  if (solid && mode === 'idle' && !tucked && !calm && (rubbed += Math.hypot(e.movementX, e.movementY)) > RUB * side) {
     rubbed = 0;
     pleasedUntil = performance.now() + PLEASED_MS;
     bend.v += WIGGLE;
@@ -867,12 +870,13 @@ addEventListener('mousedown', (e) => {
 });
 /* Let go while moving faster than FLING, she is thrown: she slides on and
    comes back off the screen's edges, and where she stops is where he left
-   her. Slower, or with Reduce Motion on, she is set down. */
+   her. Slower, with Reduce Motion on, or while he is in a trade, she is set
+   down. */
 addEventListener('mouseup', (e) => {
   if (held?.moved) {
     const [from] = held.trail, to = held.trail.at(-1), span = (to.at - from.at) / 1000;
     const vx = span ? (to.x - from.x) / span : 0, vy = span ? (to.y - from.y) / span : 0;
-    if (Math.hypot(vx, vy) > FLING && !still.matches) {
+    if (Math.hypot(vx, vy) > FLING && !still.matches && !calm) {
       const r = canvas.getBoundingClientRect(), k = r.width / 466;
       flight = {
         x: screenX + r.left + shape.left * k, y: screenY + r.top + shape.top * k,
@@ -902,7 +906,7 @@ function near(x, y) {
   if (cursor) nearAt = now;
   const swift = seen ? Math.hypot(u - seen.u, v - seen.v) / (now - seen.at) * 1000 : 0;
   seen = { u, v, at: now };
-  if (mode === 'idle' && !asleep && !held && far < CLOSE && swift > SWIFT && now >= startAfter) {
+  if (mode === 'idle' && !asleep && !held && !calm && far < CLOSE && swift > SWIFT && now >= startAfter) {
     startUntil = now + START_MS;
     startAfter = now + STARTLE_EVERY_MS;
     stretch.v += START;
@@ -927,7 +931,7 @@ await Promise.all([load(), document.fonts.load(`800 18px ${TYPE}`), document.fon
 const start = await window.doji.ready();
 talkKey = start.talk;
 briefingWaits = start.briefing;
-waitsNow(start.trade, start.waiting);
+waitsNow(start.trade, start.waiting, start.open);
 if (start.fresh) say('hello', HELLO_MS);
 else if (!start.micOk) say('mic');
 else if (start.taken) say('taken');

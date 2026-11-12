@@ -519,12 +519,21 @@ const gladysLaptop = (init = {}, key = 'gladys-laptop') => new Request('https://
 
 test('doji-gladys: the laptop is told what waits, oldest first, a week back at most', async () => {
   const serve = await serving('doji-gladys');
-  respond = (url) => url.includes('/rest/v1/trades?') ? ok([trade('PID2', 1), trade('PID1', 30)]) : pending();
+  let held = [];
+  respond = (url) => url.includes('exit_price=is.null') ? ok(held)
+    : url.includes('/rest/v1/trades?') ? ok([trade('PID2', 1), trade('PID1', 30)]) : pending();
   const res = await answer(await serve(gladysLaptop()));
   assert.equal(res.status, 200);
   assert.equal(res.body.waiting, 2);
   assert.equal(res.body.trade.id, 'PID1', 'the laptop was handed the newer trade first');
-  const read = decodeURIComponent(calls[0].url);
+  assert.equal(res.body.open, false, 'with no trade open, the laptop was told he is in one');
+  held = [{ id: 'PID2' }];
+  assert.equal((await answer(await serve(gladysLaptop()))).body.open, true, 'with a trade open, the laptop was not told');
+  const asked = decodeURIComponent(calls.find(c => c.url.includes('exit_price')).url);
+  for (const part of ['deleted=is.false', 'exit_price=is.null', 'fill_time=is.null', 'limit=1']) {
+    assert.ok(asked.includes(part), `whether he is in a trade is no longer read with ${part}: ${asked}`);
+  }
+  const read = decodeURIComponent(calls.find(c => c.url.includes('or=(')).url);
   for (const part of ['deleted=is.false', 'entry_time=gte.', 'order=entry_time.desc', 'limit=20',
                       'or=(setup.is.null,followed_rules.is.null,followed_sl.is.null,followed_tp.is.null)']) {
     assert.ok(read.includes(part), `what waits is no longer read with ${part}: ${read}`);
@@ -542,7 +551,7 @@ test('doji-gladys: an answer from the laptop writes its one column, then says wh
     return pending();
   };
   const res = await answer(await serve(gladysLaptop({ method: 'POST', body: JSON.stringify({ data: 'PID1|sl|1' }) })));
-  assert.deepEqual(res, { status: 200, body: { ok: true, waiting: 0, trade: null } });
+  assert.deepEqual(res, { status: 200, body: { ok: true, waiting: 0, trade: null, open: false } });
   const writes = calls.filter(c => c.method === 'PATCH');
   assert.equal(writes.length, 1);
   assert.ok(writes[0].url.includes('trades?id=eq.PID1'), writes[0].url);
