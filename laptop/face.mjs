@@ -82,6 +82,12 @@ const SETTLE_MS = 500;
 const TYPE = '"Hanken Grotesk"';
 // The card's em at her 200-point size; it grows and shrinks with her.
 const CARD_EM = 14 / 200;
+/* Where what waits sits, low beside her, and the radius of each mark: the
+   ring and the dot are drawn there and clicked there, so both read this. A
+   click a little past the ring still lands, and further past the dot, whose
+   glow reaches beyond it. */
+const MARK = { x: 404, y: 404, ring: 25, dot: 16 };
+const REACH = { ring: 4, dot: 6 };
 
 /* ─── Her body ──────────────────────────────────────────────────────────────
    Tuned by eye and kept small: she is alive, not busy. The two rhythms differ
@@ -383,14 +389,14 @@ function waits() {
     g.strokeStyle = GLOW;
     g.lineWidth = 3;
     g.beginPath();
-    g.arc(404, 404, 25, 0, 2 * Math.PI);
+    g.arc(MARK.x, MARK.y, MARK.ring, 0, 2 * Math.PI);
     g.stroke();
   }
   if (!briefingWaits) return;
   g.save();
   g.shadowColor = ACCENT;
   g.shadowBlur = 22;
-  dot(g, 404, 404, 16, 16, GLOW);
+  dot(g, MARK.x, MARK.y, MARK.dot, MARK.dot, GLOW);
   g.restore();
 }
 
@@ -842,7 +848,8 @@ const onCard = (x, y) => {
 const on = (x, y) => {
   if (onCard(x, y)) return true;
   const [u, v] = pixel(x, y).map(Math.round);
-  if ((trade || briefingWaits) && Math.hypot(u - 404, v - 404) < (trade ? 29 : 22)) return true;
+  const mark = trade ? 'ring' : 'dot';
+  if ((trade || briefingWaits) && Math.hypot(u - MARK.x, v - MARK.y) < MARK[mark] + REACH[mark]) return true;
   return u >= 0 && v >= 0 && u < 466 && v < 466 && alpha[v * 466 + u] > 64;
 };
 let solid = false, held = null, hinted = false, hint = 0;
