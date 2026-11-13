@@ -2171,9 +2171,8 @@ curl -sN -H "x-laptop-key: $EUGENIA_LAPTOP_SECRET" \
 **The app is `laptop/`**, an Electron app for the Mac, built and published by
 `.github/workflows/laptop.yml`. It has a
 Dock icon, Doji's, and an icon in the menu bar, her face cropped close and its
-black made clear by the face's own rule (`laptop/art.mjs`), which also carries
-the briefing's dot. The menu bar's icon holds her whole menu and carries no
-mark — what waits shows on her; the Dock's holds what he does with her and
+black made clear by the face's own rule (`laptop/art.mjs`). The menu bar's
+icon holds her whole menu and carries no mark — what waits shows on her; the Dock's holds what he does with her and
 *Bring her here*, the Dock being where she is reached. Electron hides the Dock
 icon or shows it again each time a window's desktops are set; hers is told to
 leave it. **Her face floats over TradingView**: her render with its black made
