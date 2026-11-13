@@ -2199,8 +2199,8 @@ edges of the screen she is on, and where she stops is where he left her; a
 press on her mid-throw catches her, and letting go sets her down there.
 **She lights from inside** while she listens, brighter with his voice,
 shows **three dots over her head** while she thinks, **nods** as she takes
-his question, and **gives with the loud moments** of her voice, her mouth wide on
-a bright sound and round on a dark one. Her eyes are part of it: wide while
+his question, and **gives with the loud moments** of her voice, her mouth
+wide on a bright sound and round on a dark one. Her eyes are part of it: wide while
 she is carried or startled, shut in an arc when she is pleased.
 
 **She plays only with a cursor that means it.** A pass close by her faster

@@ -4,10 +4,10 @@
    466-pixel square of her own, scaled to the window. Then the body: she
    breathes and floats a little at rest, bends as she sways and turns, gives
    on a spring when she is carried and dropped, and lights from inside while
-   she listens; three dots over her head say she is thinking. Eyes and mouth are drawn
-   on the same skin, so they stay on her. She sleeps when there is nothing to
-   be awake for. Above her head, a line for what her face alone cannot say,
-   and the journal's card when a trade waits for its answers.
+   she listens; three dots over her head say she is thinking. Eyes and mouth
+   are drawn on the same skin, so they stay on her. She sleeps when there is
+   nothing to be awake for. Above her head, a line for what her face alone
+   cannot say, and the journal's card when a trade waits for its answers.
 
    This page records him and plays her; the main process carries both to her
    door and back, and his answers to Gladys's, and owns the keys, the chart
@@ -337,9 +337,9 @@ function features() {
 /* Her skin: the render, bent; then the light of his voice while she
    listens, drawn only where she is, filling her from her base and draining
    through a recording's last WARN_LEFT; then her thought, over her head and
-   leaning with it — nothing is drawn inside her that the render does not
-   hold, since beside its own bubbles, which are still, anything moving
-   reads as laid on; then her face, leaning with the glass it is on. */
+   leaning with it; then her face, leaning with the glass it is on. Nothing
+   but light moves inside her: the render's own bubbles are still, and
+   beside them a shape that moves reads as laid on the glass. */
 const leans = (y, by) => by * (Math.max(0, BASE - y) / (BASE - CROWN)) ** 2;
 
 function wear(now, by) {

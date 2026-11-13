@@ -1334,6 +1334,20 @@ that read as the trade's progress.
 **Revisit if:** the marks are missed while he works, or a third thing needs
 one and three no longer tell apart by shape.
 
+### R-176 — her drawn in motion by an animator
+**Deferred.** All of her motion is the one render moved by code: bent,
+sprung, lit, and the face drawn over it. What he asked for is character
+animation — her at a little laptop while she thinks — and that is a pose and
+a prop no code can draw on a photographed glass without it reading as laid
+on, as the bubbles once rising in her did. It is an animator's work brought
+in, three ways: a Rive file, its states set by her modes and its inputs fed
+her voice and the cursor, so her eyes and mouth stay live; clips of her
+modelled in glass and rendered in 3D, the most like her and the least alive
+to him; or Lottie, for a flourish and not a character. Rive would be the
+laptop's one new library, and the motion here would mostly give way to it;
+the throw, the tuck, the card and every decision behind her modes stay.
+**Revisit if:** he brings an animator, or the animation itself.
+
 ## 3 · THE NEXT STEP — DECIDED
 
 The step the owner calls *Raptor 3* was reviewed with him in October 2026,
