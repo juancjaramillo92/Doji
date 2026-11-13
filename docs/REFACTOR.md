@@ -1348,6 +1348,29 @@ laptop's one new library, and the motion here would mostly give way to it;
 the throw, the tuck, the card and every decision behind her modes stay.
 **Revisit if:** he brings an animator, or the animation itself.
 
+### R-177 — her window only as large as what it is showing
+**Why refused:** the card stands on one side of her and her window reaches a
+card's width past her on both, with the room over her head it had when the
+card sat there. A window reaching one way only, or one resized as the card
+comes and goes, puts her off its middle: `room` and `within` would need the
+side to read her square back out of the window, and every drop, throw, tuck
+and screen change goes through that pair, which today cannot walk her a
+pixel. The room costs nothing where she is not drawn — clicks go through —
+and one rule, the card on his right always, was refused with it: the corner
+she is first put in is the bottom-right, where it would be cropped as it was
+in his.
+**Revisit if:** a transparent window that size is seen to cost something on
+the Mac — a capture it should be out of, or a click it takes.
+
+### R-178 — the card and the line following her while she is carried
+**Deferred.** Which side the card stands on is asked as it comes up, and
+where the line stands as its words go in. Carried across the screen with
+either showing, she keeps them where they were until the next. Asking again
+on every move would have the card change sides under a cursor that is
+holding her, and a line slide along her as she nears an edge; neither was
+asked for, and no suite drives a carry.
+**Revisit if:** he carries her with a card up and finds it cropped.
+
 ## 3 · THE NEXT STEP — DECIDED
 
 The step the owner calls *Raptor 3* was reviewed with him in October 2026,

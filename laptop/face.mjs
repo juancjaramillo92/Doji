@@ -7,7 +7,8 @@
    she listens; three dots over her head say she is thinking. Eyes and mouth
    are drawn on the same skin, so they stay on her. She sleeps when there is
    nothing to be awake for. Above her head, a line for what her face alone
-   cannot say, and the journal's card when a trade waits for its answers.
+   cannot say; beside her, the journal's card when a trade waits for its
+   answers.
 
    This page records him and plays her; the main process carries both to her
    door and back, and his answers to Gladys's, and owns the keys, the chart
@@ -17,7 +18,7 @@ import { FINE, opacity } from './art.mjs';
 import { FLING, marketOpen, settle, sleeps, slide } from './body.mjs';
 import { FRAME, PCM_RATE, sampler } from './frames.mjs';
 import { ASKS, SETUPS, asked, given, turned } from './journal.mjs';
-import { CARD, ROOM, fitsRight } from './place.mjs';
+import { CARD, ROOM, fitsRight, lineAt } from './place.mjs';
 
 /* ─── Her face ──────────────────────────────────────────────────────────────
    Measured from the drawing of her face over the render, in pixels of her
@@ -225,6 +226,7 @@ async function load() {
 
 function say(reason, ms = SAY_MS) {
   said.textContent = SAY[reason](talkKey);
+  said.style.left = `${lineAt(screenX + innerWidth / 2, said.offsetWidth + 12, { x: screen.availLeft, width: screen.availWidth }) - screenX}px`;
   said.classList.add('shown');
   sayUntil = performance.now() + ms;
   nearAt = movedAt = performance.now();

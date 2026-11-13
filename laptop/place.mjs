@@ -22,6 +22,12 @@ export const within = (win, side) => ({ x: win.x + Math.round((win.width - side)
    each side, so the card fits on the right where the window does. */
 export const fitsRight = (win, area) => win.x + win.width <= area.x + area.width;
 
+/* The line is over her head, and moves along from there only as far as keeps
+   it whole where the screen ends: her middle and the line's width go in, the
+   line's middle comes out. It is never wider than the card, so wherever it
+   lands is inside her window. */
+export const lineAt = (mid, wide, area) => Math.min(Math.max(mid, area.x + wide / 2), area.x + area.width - wide / 2);
+
 /* Where he left her, while that is still on a screen — her middle on any
    display's work area — or else the bottom-right corner of the main one. A
    place saved on a display since unplugged would leave her floating where
