@@ -29,7 +29,7 @@ import { FRAME, LEAD, PCM_RATE, Queue, framer, sampler } from '../laptop/frames.
 import { marketOpen as pollerOpen } from '../supabase/functions/_shared/edge.ts';
 import { AWAY_MS, DOZE_MS, FLING, marketOpen, settle, sleeps, slide } from '../laptop/body.mjs';
 import { ANSWERS, SETUPS, asked, given, tap, turned } from '../laptop/journal.mjs';
-import { placed, room, tucked, within, ROOM } from '../laptop/place.mjs';
+import { fitsRight, placed, room, tucked, within, CARD, ROOM } from '../laptop/place.mjs';
 import { BUNDLE, swapScript } from '../laptop/update.mjs';
 
 const bytes = (n, seed) => Uint8Array.from({ length: n }, (_, i) => (i * 31 + seed) & 255);
@@ -120,6 +120,26 @@ test('her window is built around her square, and her square read back out of it'
     assert.equal(win.y + win.height, her.y + side, 'she is not at the bottom of her window');
     assert.ok(Math.abs(win.x + win.width / 2 - (her.x + side / 2)) <= 0.5, 'she is not in the middle of her window');
     assert.deepEqual(within(win, side), her, `a ${side}-point square does not come back out of its window`);
+  }
+});
+
+/* The card stands on his right of her unless the screen ends before it
+   would: in the corner he keeps her in it is on the right, whole, and in the
+   corner she is first put in — where the right would crop it — on the left. */
+test('the card stands on his right of her, and on his left where the screen ends first', () => {
+  const main = { x: 0, y: 25, width: 1512, height: 920 };
+  for (const side of [140, 200, 280]) {
+    const span = (her) => { const win = room(her); return { win, card: fitsRight(win, main) ? [her.x + side, her.x + side + side * CARD] : [her.x - side * CARD, her.x] }; };
+    const shown = ({ card: [from, to] }) => from >= main.x && to <= main.x + main.width;
+    const left = span({ x: 0, y: 945 - side, side }), first = span(placed({ side }, [main], main));
+    assert.equal(fitsRight(left.win, main), true, 'in the bottom-left corner the card is not on his right');
+    assert.equal(fitsRight(first.win, main), false, 'in the bottom-right corner the card is still on his right');
+    assert.ok(shown(left) && shown(first), `a ${side}-point card is cropped in a corner`);
+    // The last place the right still holds it, and the first it does not.
+    const edge = main.width - Math.round(side * ROOM.width) + Math.round((Math.round(side * ROOM.width) - side) / 2);
+    assert.equal(fitsRight(room({ x: edge, y: 400, side }), main), true);
+    assert.equal(fitsRight(room({ x: edge + 1, y: 400, side }), main), false);
+    assert.ok(shown(span({ x: edge, y: 400, side })) && shown(span({ x: edge + 1, y: 400, side })), 'the card is cropped where it changes sides');
   }
 });
 

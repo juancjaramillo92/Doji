@@ -1094,7 +1094,7 @@ into `journal.mjs` with the clock passed in, as the queue's did into
 `frames.mjs`, and `laptop.test.mjs` would drive them. That is a refactor of a
 page no suite reads, so nothing would prove it changed nothing but the same
 throwaway run.
-The page's half has since become a card above her head; what that change
+The page's half has since become a card beside her; what that change
 decided anew — what a trade already holds, for its chips — went into
 `journal.mjs` as `given`, with its test. The sequence itself was carried over
 line for line, and moving it in the same pass would have been a refactor

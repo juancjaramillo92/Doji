@@ -8,21 +8,24 @@
   /* Doji's typeface, the journal's. */
   @font-face { font-family: 'Hanken Grotesk'; src: url('HankenGrotesk.ttf'); font-weight: 100 900; }
   html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; cursor: default; }
-  /* Her square at the bottom of the room; above her head the journal's card, and the line she shows. */
+  /* Her square at the bottom middle of the room; above her head the line she shows, and beside her the journal's card. */
   canvas { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); }
   #said, #card {
-    position: absolute; left: 50%; transform: translate(-50%, 6px); box-sizing: border-box;
+    position: absolute; box-sizing: border-box;
     color: var(--ink); background: var(--ground); border: 1px solid var(--line);
     opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none;
   }
-  #said.shown, #card.shown { opacity: 1; transform: translate(-50%, 0); }
+  #said.shown { opacity: 1; transform: translate(-50%, 0); }
   #said {
-    max-width: calc(100% - 12px); width: max-content; padding: 6px 11px; border-radius: 12px;
+    left: 50%; transform: translate(-50%, 6px); width: max-content; padding: 6px 11px; border-radius: 12px;
     font: 500 12px/1.35 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; text-align: center;
     -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
   }
-  /* The card is sized in ems, and its em is set from her side, so it grows with her. */
-  #card { width: calc(100% - 12px); padding: .85em; border-radius: 1.3em; font-family: 'Hanken Grotesk'; line-height: 1.2; }
+  /* The card is sized in ems, and its em is set from her side, so it grows with her. Its middle is level with
+     hers, whatever its height, and it comes out from her on whichever side it stands. */
+  #card { padding: .85em; border-radius: 1.3em; font-family: 'Hanken Grotesk'; line-height: 1.2; transform: translate(-6px, 50%); }
+  #card.left { transform: translate(6px, 50%); }
+  #card.shown { opacity: 1; transform: translate(0, 50%); }
   #trade { display: flex; justify-content: space-between; gap: .6em; color: var(--muted); font-weight: 600; font-size: .85em; }
   #trade b { color: var(--ink); font-weight: 700; }
   #asks { margin: .55em 0 .5em; font-weight: 800; font-size: 1.3em; }

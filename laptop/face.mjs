@@ -17,7 +17,7 @@ import { FINE, opacity } from './art.mjs';
 import { FLING, marketOpen, settle, sleeps, slide } from './body.mjs';
 import { FRAME, PCM_RATE, sampler } from './frames.mjs';
 import { ASKS, SETUPS, asked, given, turned } from './journal.mjs';
-import { ROOM } from './place.mjs';
+import { CARD, ROOM, fitsRight } from './place.mjs';
 
 /* ─── Her face ──────────────────────────────────────────────────────────────
    Measured from the drawing of her face over the render, in pixels of her
@@ -56,7 +56,7 @@ const LISTEN = [[660.0, 0.07], [990.0, 0.11]];
 const SENT = [[990.0, 0.07], [660.0, 0.11]];
 
 /* ─── Gladys's journal ─────────────────────────────────────────────────────
-   A card above her head, in Doji's typeface: which trade, the question in
+   A card beside her, in Doji's typeface: which trade, the question in
    the app's words, and its two answers as the card's two halves — left is no
    and right is yes, the setup's halves its two setups — in Doji's emeralds
    rather than a win's teal and a loss's red, each brightening when clicked.
@@ -308,6 +308,7 @@ const gaze = [0, 0];
 let nextGlance = 0, nextBlink = 0, blinkAt = 0, blinking = false, level = 0, bright = 0, heard = 0, breath = 0;
 let cursor = null;           // where the cursor is in her pixels, when it is near
 let over = null;             // the half of the card the cursor is on
+let right = true;            // the card stands on his right of her
 
 function features() {
   const lid = V.open * V.lid, wide = 1 + 0.2 * V.wide;
@@ -434,7 +435,7 @@ function step(now, dt) {
   if (m === 'speaking')  { tMouth = level; tSmile = 0.9; glance = 0.4; }
   if (m === 'thinking')  { tOpen = 0.85; tSmile = 0.25; tDots = 1; fixed = pondering; }
   if (m === 'confused')  { tSmile = -0.35; tConfused = 1; fixed = [3, -2.5]; }
-  if (m === 'journal')   fixed = [over === null ? 0 : over ? 4 : -4, -LOOK_RANGE];
+  if (m === 'journal')   fixed = [(right ? 5 : -5) + (over === null ? 0 : over ? 1 : -1), 0];
   if (m === 'idle' && tucked) fixed = { left: [LOOK_RANGE, 0], right: [-LOOK_RANGE, 0], bottom: [0, -LOOK_RANGE] }[tucked];
   if (m === 'idle' && soon() && now % GLANCE_EVERY_MS < GLANCE_MS) fixed = [0, LOOK_RANGE];
   if (m === 'idle' && cursor) fixed = cursor;
@@ -530,15 +531,22 @@ function frame(now) {
 /* Her square at the bottom of the room, drawn at the screen's own density —
    which changes when the window moves to another screen, watched for once
    per density rather than once per resize. The card's em follows her side,
-   and the line sits above whichever is beneath it, her head or the card. */
+   and so does its width, which is the most the line is given; which side of
+   her the card stands on is asked of the screen she is on as it comes up. */
 let density = 0;
 function fit() {
   side = Math.round(innerHeight / ROOM.height);
   canvas.style.width = canvas.style.height = `${side}px`;
   canvas.width = canvas.height = Math.round(side * devicePixelRatio);
+  right = fitsRight({ x: screenX, width: innerWidth }, { x: screen.availLeft, width: screen.availWidth });
+  const wide = `${side * CARD - 12}px`, past = `${(innerWidth + side) / 2 + 4}px`;
   card.style.fontSize = `${side * CARD_EM}px`;
-  card.style.bottom = `${side + 4}px`;
-  said.style.bottom = `${side + (mode === 'journal' ? card.offsetHeight + 10 : 2)}px`;
+  card.style.width = said.style.maxWidth = wide;
+  card.style.bottom = `${side / 2}px`;
+  card.style.left = right ? past : '';
+  card.style.right = right ? '' : past;
+  card.classList.toggle('left', !right);
+  said.style.bottom = `${side + 2}px`;
   if (devicePixelRatio === density) return;
   density = devicePixelRatio;
   matchMedia(`(resolution: ${devicePixelRatio}dppx)`).addEventListener('change', fit, { once: true });
@@ -794,7 +802,7 @@ function write() {
 async function choose(x) {
   const j = journal;
   if (j.lit !== null || j.done || performance.now() - j.opened < SETTLE_MS) return;
-  const half = x >= innerWidth / 2 ? 1 : 0;
+  const half = halfAt(x);
   j.lit = half;
   write();
   const [got] = await Promise.all([window.doji.answer(j.trade.id, j.q, half), new Promise(r => setTimeout(r, FLASH_MS))]);
@@ -845,6 +853,10 @@ const onCard = (x, y) => {
   const r = card.getBoundingClientRect();
   return mode === 'journal' && x >= r.left && x < r.right && y >= r.top && y < r.bottom;
 };
+const halfAt = (x) => {
+  const r = card.getBoundingClientRect();
+  return Number(x >= (r.left + r.right) / 2);
+};
 const on = (x, y) => {
   if (onCard(x, y)) return true;
   const [u, v] = pixel(x, y).map(Math.round);
@@ -856,7 +868,7 @@ let solid = false, held = null, hinted = false, hint = 0;
 let pointer = null;          // where the cursor last was, in the window's pixels
 function feel() {
   const now = pointer !== null && on(...pointer);
-  over = pointer !== null && onCard(...pointer) ? Number(pointer[0] >= innerWidth / 2) : null;
+  over = pointer !== null && onCard(...pointer) ? halfAt(pointer[0]) : null;
   for (const [i, half] of halves.entries()) half.classList.toggle('over', over === i);
   if (now === solid) return;
   window.doji.solid(solid = now);
