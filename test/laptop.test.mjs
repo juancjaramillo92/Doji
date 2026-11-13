@@ -7,7 +7,8 @@
    fed the door's own bytes, from `laptopFrame`, cut at every place a network
    read can cut them; her voice played from its queue while it arrives late
    and unevenly, as a real stream does; where her window goes when a screen
-   is gone, and the edge she tucks behind; what her body decides — the
+   is gone, which side of her the card stands on and where the line does,
+   and the edge she tucks behind; what her body decides — the
    spring, a throw, the market's hours, when she sleeps; the journal's
    answers, read by Gladys's own boundary, the question a trade is asked
    first, and when the card turns to another; and the swap an update leaves behind,
@@ -137,8 +138,8 @@ test('the card stands on his right of her, and on his left where the screen ends
     assert.ok(shown(left) && shown(first), `a ${side}-point card is cropped in a corner`);
     // The last place the right still holds it, and the first it does not.
     const edge = main.width - Math.round(side * ROOM.width) + Math.round((Math.round(side * ROOM.width) - side) / 2);
-    assert.equal(fitsRight(room({ x: edge, y: 400, side }), main), true);
-    assert.equal(fitsRight(room({ x: edge + 1, y: 400, side }), main), false);
+    assert.equal(fitsRight(room({ x: edge, y: 400, side }), main), true, 'the card left his right while the screen still held it there');
+    assert.equal(fitsRight(room({ x: edge + 1, y: 400, side }), main), false, 'the card stayed on his right a point past where the screen holds it');
     assert.ok(shown(span({ x: edge, y: 400, side })) && shown(span({ x: edge + 1, y: 400, side })), 'the card is cropped where it changes sides');
   }
 });

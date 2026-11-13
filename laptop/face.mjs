@@ -7,7 +7,8 @@
    she listens; three dots over her head say she is thinking. Eyes and mouth
    are drawn on the same skin, so they stay on her. She sleeps when there is
    nothing to be awake for. Above her head, a line for what her face alone
-   cannot say, and the journal's card when a trade waits for its answers.
+   cannot say; beside her, the journal's card when a trade waits for its
+   answers.
 
    This page records him and plays her; the main process carries both to her
    door and back, and his answers to Gladys's, and owns the keys, the chart
