@@ -379,6 +379,9 @@ test('the laptop journals through the door, the keys and the answers Gladys read
   // A look at what waits restarts the card's minute only when the card turns; the page is driven by no suite, so the call is read.
   assert.match(bodyOf(LAPTOP_FACE, 'function waitsNow('), /else if \(turned\(journal\.trade, journal\.q, next\)\) ask\(next\);\s*else \{ journal\.trade = next; write\(\); \}/,
     'every look at what waits asks the question again, and the card never gives way');
+  // Which side the card stands on is decided in place.mjs and asked of the screen she is on; the page is driven by no suite, so the call is read.
+  assert.match(bodyOf(LAPTOP_FACE, 'function fit('), /right = fitsRight\(\{ x: screenX, width: innerWidth \}, \{ x: screen\.availLeft, width: screen\.availWidth \}\);[\s\S]*card\.style\.left = right \? past : '';\s*card\.style\.right = right \? '' : past;/,
+    'the card no longer stands on the side the screen has room for');
   // The card names the trade from the row her door hands over, and asks in the app's own words.
   const drawn = [...new Set([...LAPTOP_FACE.matchAll(/\bj\.trade\.(\w+)/g)].map(m => m[1]))];
   assert.ok(drawn.length >= 4, `the card reads only ${drawn.join(', ')} of the trade — the reader has gone blind`);

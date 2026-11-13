@@ -2,11 +2,13 @@
    it. Her place is her own square's — its corner and its side — and the
    window is built around that.
 
-   The window is wider and taller than she is, for the journal's card and the
-   line she shows above her head: ROOM is its size in hers, and she is its
-   bottom middle. It lets clicks through but where she is drawn, so the room
+   The window is wider and taller than she is, for the journal's card beside
+   her and the line she shows above her head: ROOM is its size in hers, CARD
+   the card's width, and she is its bottom middle, with a card's width to
+   either side. It lets clicks through but where she is drawn, so the room
    costs the chart beneath it nothing. */
-export const ROOM = { width: 1.8, height: 2.1 };
+export const CARD = 1.8;
+export const ROOM = { width: 1 + 2 * CARD, height: 2.1 };
 
 export function room(her) {
   const width = Math.round(her.side * ROOM.width), height = Math.round(her.side * ROOM.height);
@@ -14,6 +16,11 @@ export function room(her) {
 }
 
 export const within = (win, side) => ({ x: win.x + Math.round((win.width - side) / 2), y: win.y + win.height - side, side });
+
+/* The card stands on his right of her, and on his left only where the screen
+   ends before the card would. Her window reaches a card's width past her on
+   each side, so the card fits on the right where the window does. */
+export const fitsRight = (win, area) => win.x + win.width <= area.x + area.width;
 
 /* Where he left her, while that is still on a screen — her middle on any
    display's work area — or else the bottom-right corner of the main one. A
