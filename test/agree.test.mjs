@@ -382,6 +382,9 @@ test('the laptop journals through the door, the keys and the answers Gladys read
   // Which side the card stands on is decided in place.mjs and asked of the screen she is on; the page is driven by no suite, so the call is read.
   assert.match(bodyOf(LAPTOP_FACE, 'function fit('), /right = fitsRight\(\{ x: screenX, width: innerWidth \}, \{ x: screen\.availLeft, width: screen\.availWidth \}\);[\s\S]*card\.style\.left = right \? past : '';\s*card\.style\.right = right \? '' : past;/,
     'the card no longer stands on the side the screen has room for');
+  // Where the line stands is decided in place.mjs too, once its words are in it, since its width is theirs.
+  assert.match(bodyOf(LAPTOP_FACE, 'function say('), /said\.textContent = [^\n]+\n\s*said\.style\.left = `\$\{lineAt\(screenX \+ innerWidth \/ 2, said\.offsetWidth \+ 12, \{ x: screen\.availLeft, width: screen\.availWidth \}\) - screenX\}px`;/,
+    'the line is no longer kept whole where the screen ends');
   // The card names the trade from the row her door hands over, and asks in the app's own words.
   const drawn = [...new Set([...LAPTOP_FACE.matchAll(/\bj\.trade\.(\w+)/g)].map(m => m[1]))];
   assert.ok(drawn.length >= 4, `the card reads only ${drawn.join(', ')} of the trade — the reader has gone blind`);

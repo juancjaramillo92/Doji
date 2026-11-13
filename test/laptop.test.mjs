@@ -29,7 +29,7 @@ import { FRAME, LEAD, PCM_RATE, Queue, framer, sampler } from '../laptop/frames.
 import { marketOpen as pollerOpen } from '../supabase/functions/_shared/edge.ts';
 import { AWAY_MS, DOZE_MS, FLING, marketOpen, settle, sleeps, slide } from '../laptop/body.mjs';
 import { ANSWERS, SETUPS, asked, given, tap, turned } from '../laptop/journal.mjs';
-import { fitsRight, placed, room, tucked, within, CARD, ROOM } from '../laptop/place.mjs';
+import { fitsRight, lineAt, placed, room, tucked, within, CARD, ROOM } from '../laptop/place.mjs';
 import { BUNDLE, swapScript } from '../laptop/update.mjs';
 
 const bytes = (n, seed) => Uint8Array.from({ length: n }, (_, i) => (i * 31 + seed) & 255);
@@ -140,6 +140,26 @@ test('the card stands on his right of her, and on his left where the screen ends
     assert.equal(fitsRight(room({ x: edge, y: 400, side }), main), true);
     assert.equal(fitsRight(room({ x: edge + 1, y: 400, side }), main), false);
     assert.ok(shown(span({ x: edge, y: 400, side })) && shown(span({ x: edge + 1, y: 400, side })), 'the card is cropped where it changes sides');
+  }
+});
+
+/* The line is over her head wherever that leaves it whole, and otherwise as
+   near to there as the screen allows — and always inside her window, which
+   is all of her that can draw it. */
+test('the line stays over her head, and whole where the screen ends', () => {
+  const main = { x: 0, y: 25, width: 1512, height: 920 };
+  for (const side of [140, 200, 280]) {
+    const most = side * CARD;
+    for (const wide of [80, most]) {
+      for (const x of [-side / 2 + 1, 0, 656, 1512 - side, 1512 - side / 2 - 1]) {
+        const win = room({ x, y: 945 - side, side }), mid = x + side / 2, at = lineAt(mid, wide, main);
+        assert.ok(at - wide / 2 >= main.x && at + wide / 2 <= main.x + main.width, `a ${wide}-point line is cut by the screen with her at ${x}`);
+        assert.ok(at - wide / 2 >= win.x && at + wide / 2 <= win.x + win.width, `a ${wide}-point line leaves her window with her at ${x}`);
+        if (mid - wide / 2 >= main.x && mid + wide / 2 <= main.x + main.width) assert.equal(at, mid, 'a line with room over her head was moved');
+      }
+    }
+    assert.equal(lineAt(side / 2, most, main), most / 2, 'in the left corner the line is not against the edge');
+    assert.equal(lineAt(1512 - side / 2, most, main), 1512 - most / 2, 'in the right corner the line is not against the edge');
   }
 });
 

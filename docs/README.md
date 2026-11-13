@@ -2184,7 +2184,8 @@ colours, whose copies of the app's tokens `agree.test.mjs` holds to
 beneath. A click on her brings her app to the front, as a click on any app's
 window does; the talk key leaves TradingView there. She is the bottom middle
 of her window; the room above her head holds **a line she shows** when her
-face alone cannot say enough, and the room to either side the journal's card.
+face alone cannot say enough — over her head, and moved along only as far as
+keeps it whole where the screen ends (`lineAt`, in `laptop/place.mjs`) — and the room to either side the journal's card.
 
 **Her body is glass, and behaves like it.** **She breathes** (about 1.5% over
 4.6 seconds, from her base) **and floats** (a few pixels over 3.3 seconds, a
@@ -2472,6 +2473,9 @@ capture, the sound, the signature or the update — adds its line here.
   stands whole on her right, level with her, and she looks across at it;
   dragged against the right edge, the next card stands on her left; the
   chart takes clicks everywhere in her wider window but on her and the card.
+- **The line in a corner**: with her against the left edge a long line —
+  her hint, on a rested cursor — is whole, moved in from the edge; in the
+  middle of the screen it is over her head as before.
 - **Her body**: carried, she moves with the cursor and gives the other way
   without the window lagging; thrown, she comes back off the screen's edges
   — the Dock's and the menu bar's included — and stays where she stops
