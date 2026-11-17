@@ -54,7 +54,7 @@ export interface Bias {
   broken: boolean;
 }
 export interface Level {
-  price: number; sides: 'high' | 'low' | 'both'; periods: Period[]; at: number;
+  price: number; sides: 'high' | 'low' | 'both'; periods: Period[]; at: number; touches: number[];
   quarter: number | null; edge: 'top' | 'bottom' | null;
 }
 export interface Quarter { price: number; round: boolean; turned: boolean }
@@ -174,7 +174,11 @@ export function poolsOf(period: Period, bars: Candle[], r = READINGS): Pool[] {
 }
 
 /* Turns from the two level charts, newest first, merged where they are one
-   level; a high and a low on one price is a level that has flipped. */
+   level; a high and a low on one price is a level that has flipped. Each
+   reaction is kept, so a level says how many times price turned there: on 12
+   November she put both her losing calls down to a thin level, and had
+   counted 3850's one touch by hand. A 30m turn inside the hour of a 1H turn
+   is the same reaction seen twice. */
 function levelsOf(charts: Partial<Record<Period, Candle[]>>, now: number, price: number,
                   range: { high: Turn; low: Turn } | null, r: Readings): Level[] {
   const found = (['H_1', 'M_30'] as const).flatMap(p =>
@@ -187,11 +191,12 @@ function levelsOf(charts: Partial<Record<Period, Candle[]>>, now: number, price:
     if (same) {
       if (same.sides !== t.kind) same.sides = 'both';
       if (!same.periods.includes(t.period)) same.periods.push(t.period);
+      if (same.touches.every(at => Math.abs(at - t.at) >= msOf('H_1'))) same.touches.push(t.at);
       continue;
     }
     const quarter = Math.round(t.price / GRID) * GRID;
     levels.push({
-      price: t.price, sides: t.kind, periods: [t.period], at: t.at,
+      price: t.price, sides: t.kind, periods: [t.period], at: t.at, touches: [t.at],
       quarter: Math.abs(t.price - quarter) <= r.ON_GRID ? quarter : null,
       edge: !range ? null
         : Math.abs(t.price - range.high.price) <= r.EDGE ? 'top'

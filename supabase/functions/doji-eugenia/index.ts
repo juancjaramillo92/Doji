@@ -3816,7 +3816,8 @@ export function structureList(s: Structure, now = Date.now()): string {
   lines.push(`Where price has turned, on the 1H and 30m, within $${READINGS.REACH} of ${s.last.close}:`,
     ...(s.levels.length ? s.levels.map(l => `· ${l.price} — ` +
       (l.sides === 'both' ? "turned both ways, a level that has flipped" : `a ${l.sides}`) +
-      `, on the ${l.periods.map(name).join(" and ")}, newest ${when(l.at)}` +
+      `, on the ${l.periods.map(name).join(" and ")}, ` +
+      `${l.touches.length === 1 ? "one turn" : `${l.touches.length} turns`}, newest ${when(l.at)}` +
       (l.quarter === null ? "" : `; on the ${l.quarter} ${l.quarter % (2 * GRID) === 0 ? "round number" : "quarter"}`) +
       (l.edge ? `; at the ${l.edge} of the week's range` : s.range ? "; inside the range" : "")) : ["· none"]),
     ...(s.higher.length

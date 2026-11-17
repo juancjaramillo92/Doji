@@ -2566,6 +2566,8 @@ broker token stays in the poller, as for `get_market` — and `foldStructure` in
 - **Step 2, the level charts** — 1H and 30m: every turn within `REACH` ($60, a
   call's wait and its $30 target) of price, merged where two are within
   `ON_GRID` ($3), a high and a low on one price being a level that has flipped;
+  how many times price turned there (`touches`), a 30m turn inside the hour of
+  a 1H turn being the same reaction, so a level resting on one touch says so;
   the quarter it sits on, if one is within $3; and the `$25` grid beside them,
   00 and 50 round, where a turn on a quarter is §4's stronger level.
 - **The bigger charts' highs and lows** (`higher`): the previous day's and
@@ -2622,8 +2624,9 @@ reached is **held** when price went `HOLD` ($10) back to the side it came
 from before going $10 through, and **broken** the other way round, a bar
 doing both counted broken. Every whole dollar the session reached that sits
 clear of every mark is the same test by chance, and each kind of mark —
-levels, the bigger charts' highs and lows, pools, quarters, round numbers —
-is printed against it. A kind that holds no more often than a price nobody
+levels, split again into those price turned at once and twice or more, the
+bigger charts' highs and lows, pools, quarters, round numbers — is printed
+against it. A kind that holds no more often than a price nobody
 marked is drawn for nothing. It is research, never handed to her: a hold rate
 beside a level would be a forecast. It changes nothing; a reading worth
 changing is a behaviour change to `structure.ts` with the table in its commit.

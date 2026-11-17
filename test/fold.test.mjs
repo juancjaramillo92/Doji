@@ -1049,6 +1049,18 @@ const MAP_CHARTS = {
         candle(MAP_HOUR + 5 * 60_000, 4027, 4025, 4026)],
 };
 
+/* ONE REACTION, SEEN ON TWO CHARTS, IS ONE TURN. The 1H high at 4049 printed
+   in the same hour as a 30m high there; counted twice, a level resting on one
+   touch would read as tested. */
+test('a 30m turn inside the hour of a 1H turn is the same reaction', () => {
+  const highs = [4040, 4041, 4042, 4043, 4049, 4043, 4042, 4041, 4040, 4039, 4038, 4037];
+  const charts = { H_1: MAP_CHARTS.H_1, M_5: MAP_CHARTS.M_5,
+                   M_30: series(MAP_HOUR - 13 * HOUR, HOUR / 2, highs, highs.map(h => h - 5)) };
+  const level = foldStructure(charts, MAP_NOW).levels.find(l => l.price === 4049);
+  assert.deepEqual([...level.periods].sort(), ['H_1', 'M_30'], 'the fixture no longer puts a turn on both charts');
+  assert.equal(level.touches.length, 1, 'one reaction seen on two charts was counted as two turns');
+});
+
 test('the map reads his level charts in his words, off printed bars only', () => {
   const map = foldStructure(MAP_CHARTS, MAP_NOW);
   // The newest bar is the 5m still forming: where price was when the map was.
@@ -1064,6 +1076,9 @@ test('the map reads his level charts in his words, off printed bars only', () =>
     [3980, 'low', ['H_1'], null, 'bottom'],
   ]);
   assert.ok(!map.levels.some(l => l.price === 4100), `a turn more than $${READINGS.REACH} away is on the map`);
+  // 4023 is the 1H high five hours back and the 30m low two and a half: two reactions.
+  assert.deepEqual(map.levels.map(l => [l.price, l.touches.length]), [[4049, 1], [4023, 2], [3980, 1]],
+    'a level does not say how many times price turned there');
   assert.deepEqual(map.grid, [
     { price: 3975, round: false, turned: false }, { price: 4000, round: true, turned: false },
     { price: 4025, round: false, turned: true }, { price: 4050, round: true, turned: true },
@@ -1147,8 +1162,8 @@ test('the map is said as hers, with every price timed and nothing about what com
     highs: highs([4040, 4050]), lows: lows([4000, 4010]), close: 4005, broken: true }] }, MAP_NOW),
     /· 4H: highs[^\n]*— higher highs and higher lows\. Last close 4005, under the newest low, 4010: the sequence has broken and no turn says so yet\./);
   assert.match(out, /The week of hourly bars runs from 3980 \(02:00 ET\) to 4049 \(23:00 ET Wednesday 14 Oct\)/);
-  assert.match(out, /· 4049 — a high, on the 1H, newest 23:00 ET Wednesday 14 Oct; on the 4050 round number; at the top of the week's range/);
-  assert.match(out, /· 4023 — turned both ways, a level that has flipped, on the 30m and 1H, newest 07:30 ET; on the 4025 quarter; inside the range/);
+  assert.match(out, /· 4049 — a high, on the 1H, one turn, newest 23:00 ET Wednesday 14 Oct; on the 4050 round number; at the top of the week's range/);
+  assert.match(out, /· 4023 — turned both ways, a level that has flipped, on the 30m and 1H, 2 turns, newest 07:30 ET; on the 4025 quarter; inside the range/);
   assert.match(out, /4050 \(round, a turn sits on it\)/);
   assert.match(out, /On the bigger charts, within \$60[^\n]*\n· 4060 — the previous day's high, the session closing 17:00 ET Wednesday 14 Oct\n· 4000 — the previous day's low/);
   assert.match(out, /No wick through a turn closed back in the last day\./);
@@ -1277,13 +1292,16 @@ test('a mark holds when price goes back from it before going through, against ch
   // (the week's top) and 4050 (round) were run through; the 4060 previous-day
   // high, reached at the end, settles nothing.
   assert.deepEqual([got.levels, got.round, got.higher], [{ held: 1, broken: 1 }, { held: 0, broken: 1 }, { held: 0, broken: 0 }]);
+  // 4023 turned twice and held; 4049 turned once and broke.
+  assert.deepEqual([got['2+ turns'], got['one turn']], [{ held: 1, broken: 0 }, { held: 0, broken: 1 }],
+    'the levels are not split by how many times price turned there');
   assert.ok(got.chance.held + got.chance.broken > 0, 'no unmarked dollar was tested, so there is no chance to measure against');
   assert.equal(holds({ ...served, bars: [] }), null);
   const out = holdTable([got, got]);
   assert.match(out, /^2 sessions; a mark holds when price goes \$10 back before \$10 through/);
   assert.match(out, /levels {3}held 2 of 4 \(50%\)/);
   const zero = { held: 0, broken: 0 };
-  assert.match(holdTable([{ levels: { held: 3, broken: 1 }, higher: zero, pools: zero, quarter: zero, round: zero,
+  assert.match(holdTable([{ levels: { held: 3, broken: 1 }, 'one turn': zero, '2+ turns': zero, higher: zero, pools: zero, quarter: zero, round: zero,
                             chance: { held: 1, broken: 1 } }]), /levels {3}held 3 of 4 \(75%\) {2}against chance 1\.50×/);
 });
 
