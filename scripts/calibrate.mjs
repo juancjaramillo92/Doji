@@ -125,6 +125,9 @@ export function holds(served, r = READINGS) {
   const from = map.last.close;
   const kinds = {
     levels:  map.levels.map(l => l.price),
+    // Split by how many times price turned there, which the map now says.
+    'one turn': map.levels.filter(l => l.touches.length === 1).map(l => l.price),
+    '2+ turns': map.levels.filter(l => l.touches.length > 1).map(l => l.price),
     higher:  map.higher.map(m => m.price),
     pools:   map.pools.map(p => p.price),
     quarter: map.grid.filter(q => !q.round).map(q => q.price),
@@ -147,7 +150,7 @@ export function holdTable(sessions) {
   const rate = (t) => t.held + t.broken ? t.held / (t.held + t.broken) : null;
   const chance = rate(sum('chance'));
   return [`${sessions.length} sessions; a mark holds when price goes $${HOLD} back before $${HOLD} through`,
-    ...['levels', 'higher', 'pools', 'quarter', 'round', 'chance'].map(k => {
+    ...['levels', 'one turn', '2+ turns', 'higher', 'pools', 'quarter', 'round', 'chance'].map(k => {
       const t = sum(k), h = rate(t);
       return `  ${k.padEnd(8)} held ${t.held} of ${t.held + t.broken} (${pct(h)})` +
         (k === 'chance' || h === null || !chance ? '' : `  against chance ${(h / chance).toFixed(2)}×`);
