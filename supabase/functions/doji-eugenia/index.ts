@@ -3644,7 +3644,8 @@ export async function storeRates(): Promise<void> {
    close — the Friday daily bar closed with it — folds the finished week and
    the rest are skipped: they only emptied the 5m window and metered it as
    unread all weekend. The closure is 48 hours, so a copy read shut within that
-   was read in this one. */
+   was read in this one; the weekend the clocks go back it is 49, and the hour
+   before the open reads again and, nothing having printed, keeps the map. */
 const STRUCTURE_URL = `${SB_URL}/functions/v1/doji-mcp-sync?structure=1`;
 
 export async function storeStructure(now = new Date()): Promise<void> {

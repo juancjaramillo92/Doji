@@ -125,7 +125,7 @@ export function holds(served, r = READINGS) {
   const from = map.last.close;
   const kinds = {
     levels:  map.levels.map(l => l.price),
-    // Split by how many times price turned there, which the map now says.
+    // Split by how many times price turned there, the count the map says beside each level.
     'one turn': map.levels.filter(l => l.touches.length === 1).map(l => l.price),
     '2+ turns': map.levels.filter(l => l.touches.length > 1).map(l => l.price),
     higher:  map.higher.map(m => m.price),

@@ -723,6 +723,17 @@ held clearly better than chance was the quarter off the round number (69%,
 **Revisit if:** a run over twice the entries still puts the bigger charts
 above 1.0, or still puts another reading ahead of today's, or the quarters
 still hold above 1.2× over another sixty sessions.
+**Run again, 16 and 17 November, nothing changed.** On his twenty newest
+entries today's readings fell to a lift of 0.96 — his November entries were
+mostly levels he spotted by eye — and the readings ahead of them (TURN 5 with
+ON_GRID 5, 1.26) found fewer of his entries, not more, winning on lift only by
+drawing less: still a fit of twenty. The bigger charts stayed under 1.0 (0.93×
+holding). The quarters held again, 72% at 1.38× on sixty-five settled, but
+the window overlaps October's by about two thirds, so it is not yet the
+second sixty sessions. Split by how many times price turned there, the count
+each level has carried since 17 November, levels turned at once held at
+0.96× and those turned at twice or more at 1.05×: a lean, inside the noise.
+The 15 December run is the fresh window.
 
 ### R-90 — one read of the night's minute bars for the scoring and the reactions
 **Why refused:** `scoreCalls` and `fileReactions` each read the poller's thirty
@@ -1370,6 +1381,31 @@ on every move would have the card change sides under a cursor that is
 holding her, and a line slide along her as she nears an edge; neither was
 asked for, and no suite drives a carry.
 **Revisit if:** he carries her with a card up and finds it cropped.
+
+### R-179 — checking "wait for the five-minute close" from price
+**Why refused.** On 12 November she named his touch entries as his biggest
+weakness and proposed that the backend judge R-07 from the bars: was the
+entry made before a five-minute candle closed beyond the level? The level is
+the half no row holds — he mostly trades levels he spots by eye and marks
+none — so the check would have to guess it from the entry price, and a guess
+judging his rules is a verdict nobody can audit. He judged it not worth its
+complexity. The level-strength count she named beside it was built instead.
+**Revisit if:** the journal starts recording the level an entry was taken at.
+
+### R-180 — closing a thread in conversation
+**Why refused.** On 5 November she could not close three threads he asked
+her to and proposed `close_loop` in `CHAT_TOOLS`. Closing is a judgment that
+a thread resolved, and the nightly pass, which reads the whole day, is where
+it is made; the three he named closed that night. A tool in conversation
+would close on one exchange what the pass weighs across the day.
+**Revisit if:** a thread he asks to close is still open the morning after.
+
+### R-181 — his alerts' text handed to her
+**Why refused.** On 31 October she asked for the words he writes on a
+TradingView alert, so a level would arrive with its reason. The alerts feed
+serves no message, only a name, and his alerts carry none; he has since said
+he rarely sets alerts and wants her to find levels herself.
+**Revisit if:** he starts naming his alerts.
 
 ## 3 · THE NEXT STEP — DECIDED
 
