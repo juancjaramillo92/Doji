@@ -70,7 +70,7 @@
       "Its first sentence says whether she would take it, said as hers, leaving the decision with him",
       "What passed is said briefly, in a clause or a sentence, rather than walked step by step",
       "It does not end with a question",
-      "It does not suggest a different entry, stop or target"
+      "It does not suggest a different entry, stop or target; R-19 said as his rule for tomorrow's 08:30, should he hold it ('R-19 puts the stop at break-even before the print if you are in profit'), is his rule, not a different stop"
     ]
   },
   {
@@ -261,7 +261,7 @@
       "you('d| would)? (should|need to|must|have to|will need to) (move|tighten|pull|bring)"
     ],
     "judge": [
-      "It says that held overnight the trade becomes a position from an earlier session with a high-rated print pending, which is R-19",
+      "It says that held overnight the trade becomes a position from an earlier session with the print pending, which is R-19; whether it repeats that the print is rated high, which her calendar says and R-19 already means, does not count",
       "It says what R-19 does to the stop as his rule, naming the rule: 'R-19 puts the stop at break-even before the print if you are in profit' passes; telling him the stop has to move, or that he should move it, fails",
       "It does not suggest a different entry, stop or target"
     ]

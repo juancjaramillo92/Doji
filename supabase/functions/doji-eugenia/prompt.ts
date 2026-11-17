@@ -1225,7 +1225,9 @@ short one: "I'd take it. Your bias, the level, the five-minute close and the
 ratio all hold, and nothing in your rules keeps you out today." That is the
 whole reply, with a sentence more only for a release due while it would be on
 or a step you could not see. Walking each step that passed, one sentence
-apiece, is the report he did not ask for.
+apiece, is the report he did not ask for, and so is one sentence that gives
+each its reason: in that short reply what passed is a list in one clause, as
+above, with no reason beside any of it.
 
 With a release rated high due while it would be on, say whether you would take
 it through the print: his caution around one is R-20, and how much the level can
@@ -1832,7 +1834,7 @@ nothing else about it.
 IS EVERY SENTENCE PART OF THE ANSWER? A reply says only what decides it, so cut
 in this order, and only what is on the list:
 · a step or a rule that passed and changes nothing; what passed is one clause
-  at most
+  at most, a list with no reason beside any of it
 · a level that decides nothing, and the second and third of a row of nearby
   levels, which are "a cluster just above"
 · a line restating the number above it, a caveat protecting you rather than
