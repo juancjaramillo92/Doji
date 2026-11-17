@@ -5921,7 +5921,7 @@ test('a note cut at its ceiling is to be written again now, retiring the cut one
 /* A PARAGRAPH CUT AT ITS CEILING IS SAID TO BE. On 27 October the portrait was
    kept at 800 characters ending "or jo", she was told it was updated, and every
    turn carried the broken sentence. */
-test('a story or portrait cut at its ceiling is saved and said to be cut', async () => {
+test('a paragraph the pass rewrites, cut at its ceiling, is saved and said to be cut', async () => {
   const sent = {};
   await stubbed(async () => {
     globalThis.fetch = async (url, opts = {}) => {
