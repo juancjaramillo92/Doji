@@ -3,7 +3,7 @@
 -- ───────────────────────────────────────────────────────────────────────────
 -- The schema is applied by hand on purpose, which makes schema.sql a claim
 -- about the database. This tests the claim. It writes nothing: run the
--- whole file after any manual change and read the `ok` column — all 106 checks.
+-- whole file after any manual change and read the `ok` column — all 107 checks.
 --
 -- One statement, because a SQL editor shows only the last statement's result.
 -- The listings that say which object, grant or schedule are diagnose.sql.
@@ -520,6 +520,13 @@ from (values
    (select count(*)::text from information_schema.columns
      where table_schema = 'public' and table_name = 'tradingview_auth'
        and column_name = 'refreshing_until'),
+   '1'),
+
+  -- Without it every refusal on quota is asked again a quarter hour later.
+  ('tradingview_auth has its quota hold',
+   (select count(*)::text from information_schema.columns
+     where table_schema = 'public' and table_name = 'tradingview_auth'
+       and column_name = 'refused_until'),
    '1'),
 
   -- Without either column every filing is refused and the
