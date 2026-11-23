@@ -168,6 +168,7 @@ interface Auth {
   client_id: string; token_endpoint: string; resource: string;
   access_token: string | null; refresh_token: string | null; expires_at: string | null;
   pending_state: string | null; pending_verifier: string | null; refreshing_until: string | null;
+  refused_until: string | null;
 }
 
 async function readAuth(): Promise<Auth | null> {
@@ -315,7 +316,23 @@ const ALLOWED_TOOLS = [
 ] as const;
 type AllowedTool = typeof ALLOWED_TOOLS[number];
 
+/* ─── The quota ────────────────────────────────────────────────────────────
+   TradingView counts tool calls by the UTC day and refuses past its limit. From
+   16 November every refusal was asked again the next quarter hour, two dozen
+   calls a pass for six days, against its own warning that "if a large number of
+   calls continues, access to MCP may be suspended for one week". So the first
+   refusal on quota holds every call until the next 00:00 UTC, when the count
+   restarts — the 00:05 pass was served on the 18th and the 19th, between whole
+   days refused. In the row, so every instance holds it; here too, so the calls
+   a door has not yet asked are not asked. Any refusal on quota, since every
+   doubt is the account's. */
+let refusedUntil = 0;
+
+const held = () => `TradingView refused on quota; not asked again until ${new Date(refusedUntil).toISOString()}`;
+
 async function tvSession() {
+  refusedUntil = Date.parse((await readAuth())?.refused_until ?? "") || 0;
+  if (Date.now() < refusedUntil) throw new Error(held());
   return mcpInit(TV_URL, {
     Authorization: `Bearer ${await accessToken()}`,
     "Content-Type": "application/json",
@@ -331,6 +348,7 @@ let rpc = 1;
 async function tvPost(session: Record<string, string>, tool: AllowedTool,
                       args: Record<string, unknown>, signal?: AbortSignal): Promise<string> {
   if (!ALLOWED_TOOLS.includes(tool)) throw new Error(`Tool not permitted: ${tool}`);
+  if (Date.now() < refusedUntil) throw new Error(held());
   const res = await fetch(TV_URL, {
     method: "POST", headers: session, signal,
     body: JSON.stringify({ jsonrpc: "2.0", id: ++rpc, method: "tools/call", params: { name: tool, arguments: args } }),
@@ -361,10 +379,20 @@ export function unwrap(envelope: any, tool: string): any {
   return answer;
 }
 
-// What a tool answered, unwrapped — the read every folder starts from.
+// What a tool answered, unwrapped — the read every folder starts from. A
+// refusal on quota starts the hold, once, however many lanes it reached.
 const tvCall = async (session: Record<string, string>, tool: AllowedTool, args: Record<string, unknown>,
-                      signal?: AbortSignal) =>
-  unwrap(parseSse(await tvPost(session, tool, args, signal)), tool);
+                      signal?: AbortSignal) => {
+  try {
+    return unwrap(parseSse(await tvPost(session, tool, args, signal)), tool);
+  } catch (err) {
+    if (/TOOL_QUOTA_EXCEEDED/.test(why(err)) && Date.now() >= refusedUntil) {
+      refusedUntil = (Math.floor(Date.now() / 86_400_000) + 1) * 86_400_000;
+      await saveAuth({ refused_until: new Date(refusedUntil).toISOString() });
+    }
+    throw err;
+  }
+};
 
 /* What each long door may spend, so that it answers inside the
    READ_MS, 45 seconds, its caller waits, with what it has rather than with

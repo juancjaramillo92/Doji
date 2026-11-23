@@ -3362,7 +3362,13 @@ the market is open, the odds every other hour, and both on the pass before a
 briefing, whatever the hour, so Sunday's has them with the market shut: about
 seven hundred calls a weekday, the calendar's ninety-six and the weeks' and the
 flows' once a day included. A test walks a week of passes and counts them
-against 750. While the market is open the market copy is an hour old at most;
+against 750. **A refusal on quota holds every call until the next 00:00 UTC**,
+when TradingView's count restarts: `doji-tradingview` writes the hold to its
+sign-in row (`refused_until`) at the first refusal, asks nothing a door has not
+already sent, and refuses every door until the hold passes. From 16 November
+each refusal was asked again the next quarter hour, two dozen calls a pass for
+six days, under TradingView's warning that continued calls could suspend the
+account for a week. While the market is open the market copy is an hour old at most;
 the odds say when they were read and that nothing printed since is in them. **A
 symbol a pass misses keeps the line the last pass read** (`keptMarket`), with
 that pass's bar times on it, so one slow call leaves no gap; one never read is

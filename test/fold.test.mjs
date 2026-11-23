@@ -759,6 +759,46 @@ test('a TradingView that stops answering costs the symbols not reached, not the 
   }
 });
 
+/* THE QUOTA HOLDS EVERY CALL. Against a TradingView that refuses every call as
+   it did from 16 November, with the sign-in row kept as the table would keep
+   it: the door asks only what was already in flight, writes the hold to the
+   next 00:00 UTC, and the door after it asks nothing — until the row's hold
+   has passed. */
+test('a refusal on quota holds every TradingView call until the next 00:00 UTC', async () => {
+  const row = { id: 'current', access_token: 'A', expires_at: new Date(Date.now() + 3600_000).toISOString(),
+                refused_until: null };
+  let calls = 0;
+  const fetch = async (url, init = {}) => {
+    if (url.includes('/rest/v1/tradingview_auth')) {
+      if (init.method === 'POST') Object.assign(row, JSON.parse(init.body));
+      return Response.json([row]);
+    }
+    const body = JSON.parse(init.body);
+    if (body.method === 'initialize') return new Response('{}', { headers: { 'mcp-session-id': 's' } });
+    if (body.method !== 'tools/call') return new Response('', { status: 202 });
+    calls++;
+    await new Promise(r => setTimeout(r, 5));
+    return new Response(`data: ${JSON.stringify({ jsonrpc: '2.0', id: body.id, error: { message:
+      'tool_pre_invoke blocked by plugin ToolQuotaPlugin: TOOL_QUOTA_EXCEEDED - Tool call quota exceeded' } })}\n\n`);
+  };
+  const midnight = new Date((Math.floor(Date.now() / 86_400_000) + 1) * 86_400_000).toISOString();
+
+  const first = await stubbed(async () => { globalThis.fetch = fetch; return readMarket(); });
+  assert.equal(calls, 3, 'only the three lanes already in flight were asked');
+  assert.equal(row.refused_until, midnight);
+  assert.equal(first.market.length, 0);
+  assert.ok(first.missing.slice(3).every(m => m.error.startsWith('TradingView refused on quota')),
+    JSON.stringify(first.missing.slice(3)));
+
+  await assert.rejects(stubbed(async () => { globalThis.fetch = fetch; return readTrend(); }),
+    new RegExp(`not asked again until ${midnight}`));
+  assert.equal(calls, 3, 'a door after the refusal asked TradingView');
+
+  row.refused_until = new Date(Date.now() - 1000).toISOString();
+  await stubbed(async () => { globalThis.fetch = fetch; return readMarket(); });
+  assert.equal(calls, 6, 'a hold that has passed still held');
+});
+
 /* THREE AT A TIME, AND IN ORDER. A server whose calls finish out of order —
    each later symbol answered sooner — with its concurrency counted: one lane
    is the fourteen-call queue that outran the deadline, and an unbounded burst

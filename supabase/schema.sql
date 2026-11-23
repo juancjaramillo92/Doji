@@ -1551,6 +1551,10 @@ create table if not exists public.tradingview_auth (
   refreshing_until  timestamptz
 );
 
+-- Until when TradingView's quota holds every call: set by the first refusal,
+-- to the next 00:00 UTC, when its count restarts.
+alter table public.tradingview_auth add column if not exists refused_until timestamptz;
+
 alter table public.tradingview_auth enable row level security;
 
 -- Both public roles by name, for eugenia_search's reason: a row holding a credential
