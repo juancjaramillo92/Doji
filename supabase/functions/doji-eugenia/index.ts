@@ -3573,19 +3573,20 @@ export function keptMarket<T extends { symbol: string }>(fresh: { market: T[]; m
   };
 }
 
-/* TradingView's daily budget, which the job spends. From 18 October every UTC
-   day was refused by four in the morning New York, some thirty passes in at
-   thirty calls a pass, so each briefing after went without the odds and the
-   market. So the hourly bars are read once an hour, on the hour's last pass,
-   while the market is open; the odds every other hour, which ODDS_HOURS
-   allows; and both on the pass before a briefing, whatever the hour, so
-   Sunday's has them with the market still shut. About seven hundred calls a weekday, the
-   calendar's ninety-six and the weeks' and the flows' once a day included.
+/* TradingView's daily budget, which the job spends: five hundred calls a UTC
+   day and fifty a minute, on the AI add-on bought on 24 November after a week
+   of refusals at the plan's ten. So the hourly bars are read on the last pass
+   of every other hour while the market is open, the odds every fourth, which
+   ODDS_HOURS allows, and both on the pass before a briefing, whatever the
+   hour, so Sunday's has them with the market still shut. About four hundred
+   calls a weekday, the calendar's ninety-six and the weeks' and the flows'
+   once a day included, and no pass past forty; the rest is her conversation's.
    Pure, so a week of passes is walked and counted. */
 export function readsDue(now: Date): { market: boolean; rates: boolean } {
   if (now.getUTCMinutes() < 45) return { market: false, rates: false };
   const briefing = briefDue(new Date(now.getTime() + 15 * 60_000)) !== null;
-  return { market: briefing || marketOpen(now), rates: briefing || nyClock(now).hour % 2 === 1 };
+  const { hour } = nyClock(now);
+  return { market: briefing || (marketOpen(now) && hour % 2 === 1), rates: briefing || hour % 4 === 3 };
 }
 
 export async function storeMarket(): Promise<void> {
@@ -3900,11 +3901,11 @@ export function ratesList(answer: { meetings: Priced[]; unread: string[]; read_a
     `\n${lines.join("\n")}`;
 }
 
-/* Odds two hours old are not the morning's once anything has printed, and a
-   door that keeps refusing — a Fed date the table of meetings does not hold —
-   must not leave its last answer standing. The market's lines need no such
-   bound: each carries its own bar times. */
-const ODDS_HOURS = 2;
+/* Odds are read every fourth hour, so four hours is the oldest a read on
+   schedule can be; past it a door that keeps refusing — a Fed date the table
+   of meetings does not hold — would leave its last answer standing. The
+   market's lines need no such bound: each carries its own bar times. */
+const ODDS_HOURS = 4;
 
 export async function ratesBlock(now = Date.now()): Promise<string> {
   try {

@@ -3354,29 +3354,31 @@ once a day (`storeTrend`), and keeps the answers in `eugenia_market`, one row pe
 door; `aroundBlock`, `trendBlock` and `ratesBlock` read that row, so a briefing
 or a reply never waits on TradingView for them.
 
-**TradingView's daily quota decides how often** (`readsDue`). From 18 October
-every UTC day was refused by about four in the morning New York, some thirty
-passes in at thirty calls a pass, and each briefing after went without the odds
-and the market. So the hourly bars are read on the last pass of each hour while
-the market is open, the odds every other hour, and both on the pass before a
-briefing, whatever the hour, so Sunday's has them with the market shut: about
-seven hundred calls a weekday, the calendar's ninety-six and the weeks' and the
-flows' once a day included. A test walks a week of passes and counts them
-against 750. **A refusal on quota holds every call until the next 00:00 UTC**,
-when TradingView's count restarts: `doji-tradingview` writes the hold to its
-sign-in row (`refused_until`) at the first refusal, asks nothing a door has not
-already sent, and refuses every door until the hold passes. From 16 November
-each refusal was asked again the next quarter hour, two dozen calls a pass for
-six days, under TradingView's warning that continued calls could suspend the
-account for a week. While the market is open the market copy is an hour old at most;
-the odds say when they were read and that nothing printed since is in them. **A
-symbol a pass misses keeps the line the last pass read** (`keptMarket`), with
-that pass's bar times on it, so one slow call leaves no gap; one never read is
-still named. The odds are replaced whole once a pass prices a meeting, since a
-fold does not merge, and **odds read more than two hours ago are not handed to
-her** (`ODDS_HOURS`): each market line carries its own times, but the odds carry
-only when they were read, and a door that kept refusing would leave its last
-answer standing; a read every other hour fits inside it, and one that fails
+**TradingView's daily quota decides how often** (`readsDue`). The MCP server
+allows five hundred calls a UTC day and fifty a minute on the AI add-on, bought
+on 24 November; the plan alone allows ten, and from 17 November every day was
+refused at about ten calls in. So the hourly bars are read on the last pass of
+every other hour while the market is open, the odds every fourth hour, and both
+on the pass before a briefing, whatever the hour, so Sunday's has them with the
+market shut: about four hundred calls a weekday, the calendar's ninety-six and
+the weeks' and the flows' once a day included, leaving the rest to her
+conversation. A test walks a week of passes and counts them against 425 a day
+and 40 a pass, a minute's burst. **A refusal on quota holds every call until the
+next 00:00 UTC**, when TradingView's count restarts: `doji-tradingview` writes
+the hold to its sign-in row (`refused_until`) at the first refusal, asks nothing
+a door has not already sent, and refuses every door until the hold passes. From
+16 November each refusal was asked again the next quarter hour, two dozen calls
+a pass for six days, under TradingView's warning that continued calls could
+suspend the account for a week. While the market is open the market copy is two
+hours old at most; the odds say when they were read and that nothing printed
+since is in them. **A symbol a pass misses keeps the line the last pass read**
+(`keptMarket`), with that pass's bar times on it, so one slow call leaves no
+gap; one never read is still named. The odds are replaced whole once a pass
+prices a meeting, since a fold does not merge, and **odds read more than four
+hours ago are not handed to her** (`ODDS_HOURS`): each market line carries its
+own times, but the odds carry only when they were read, and a door that kept
+refusing would leave its last answer standing; a read every fourth hour fits
+inside it, and one that fails
 costs the odds until the next. A pass that fails leaves the copy as it was. Only
 the job writes the table, a quarter hour apart, so the market's read-then-write
 has no second writer. His charts ride the same pass (`storeStructure`) from the
