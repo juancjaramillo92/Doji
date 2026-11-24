@@ -1721,14 +1721,14 @@ test('the weeks are read once a New York day, and a symbol a pass misses keeps i
 /* THE ODDS AGE OUT; THE LINES DO NOT NEED TO. Each market line carries its bar
    times, but the odds carry only when they were read, and a door that keeps
    refusing would otherwise leave its last answer standing for good. */
-test('odds read more than two hours ago are not handed to her', async () => {
+test('odds read more than four hours ago are not handed to her', async () => {
   const world = marketWorld();
   const read_at = '2026-10-15T12:00:00.000Z';
   world.stored.set('rates', { door: 'rates', answer: { ok: true, ...RATES, missing: [] }, read_at });
   await stubbed(async () => {
     globalThis.fetch = world.fetch;
-    assert.match(await ratesBlock(Date.parse(read_at) + 2 * 3600_000), /08:00 ET, so nothing that printed after that is in them:\n· 28 Oct/);
-    assert.match(await ratesBlock(Date.parse(read_at) + 2 * 3600_000 + 1), /could not be read just now/);
+    assert.match(await ratesBlock(Date.parse(read_at) + 4 * 3600_000), /08:00 ET, so nothing that printed after that is in them:\n· 28 Oct/);
+    assert.match(await ratesBlock(Date.parse(read_at) + 4 * 3600_000 + 1), /could not be read just now/);
   });
   assert.equal(world.rows.length, 1, 'odds too old to hand her left no row');
 });
@@ -2532,7 +2532,9 @@ test('the timetable holds its New York hours in winter too', () => {
    briefing went without the odds. Walked over a week of the job's passes as
    cron fires them, counting what each door costs as the doors are written: the
    calendar every pass, the weeks and the flows once a New York day, the market
-   list and the contracts when readsDue says. */
+   list and the contracts when readsDue says. The add-on allows five hundred a
+   UTC day and fifty a minute; the job keeps under 425, leaving the rest to her
+   conversation, and a pass, a minute's burst, under 40. */
 const TV_SOURCE = readFileSync(new URL('../supabase/functions/doji-tradingview/index.ts', import.meta.url), 'utf8');
 const EUGENIA_SOURCE = readFileSync(new URL('../supabase/functions/doji-eugenia/index.ts', import.meta.url), 'utf8');
 
@@ -2548,6 +2550,7 @@ test('the job spends TradingView\'s daily budget, and the pass before a briefing
     const firstOfDay = nyClock(at).hour === 0 && at.getUTCMinutes() === 5;
     const spent = 1 + (firstOfDay ? symbols + 1 + 1 + RESERVES.length : 0) + (due.market ? symbols : 0) +
       (due.rates ? contractMonths(nyDate(at)).length + 1 : 0);
+    assert.ok(spent <= 40, `${at.toISOString()} spends ${spent} TradingView calls in one pass`);
     const day = at.toISOString().slice(0, 10);
     calls.set(day, (calls.get(day) ?? 0) + spent);
     if (due.rates) rates = at;
@@ -2556,7 +2559,7 @@ test('the job spends TradingView\'s daily budget, and the pass before a briefing
     }
     if (rates) assert.ok(at - rates <= oddsHours * 3_600_000, `${at.toISOString()}: the odds outlive ODDS_HOURS`);
   }
-  for (const [day, n] of calls) assert.ok(n <= 750, `${day} spends ${n} TradingView calls`);
+  for (const [day, n] of calls) assert.ok(n <= 425, `${day} spends ${n} TradingView calls`);
   // The weekend reads no market but before Sunday's briefing.
   assert.equal(readsDue(new Date('2026-08-22T18:50:00Z')).market, false, 'a shut market is read on Saturday');
   assert.deepEqual(readsDue(new Date('2026-08-16T20:50:00Z')), { market: true, rates: true },
