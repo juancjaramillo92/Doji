@@ -4,6 +4,9 @@ This file is subordinate to `docs/README.md`. The README is the contract for how
 app behaves; this file is how to work on it, and holds only what the README does
 not. Where the two disagree, the README wins and you say so.
 
+**Resuming after a pause:** the README's last section, *For Claude: where the
+work stands*, is what was still open when work stopped. Read it first.
+
 `docs/REFACTOR.md` is the register: every move considered and REFUSED, with the
 reasoning that decided it, what no test reaches, and what was deferred. Read it
 before proposing a simplification — most of what looks like duplication here
