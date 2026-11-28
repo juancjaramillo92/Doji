@@ -4350,3 +4350,168 @@ five columns of one table.
 the database reads `doji_cron_secret` from Vault — the three calling jobs and
 the two trigger functions that present it, `trades_telegram` and
 `trades_eugenia_on_event`. `verify.sql` asks for all five.
+
+## For Claude: where the work stands
+
+Written on 28 November 2026, when work on Doji paused and Eugenia might be
+switched off for a while. This section replaces the conversation it came from:
+a session that resumes reads it first, does what is still due, and deletes each
+line as it closes. No reminder outlives that conversation, so the dates below
+are the only ones there are.
+
+**Where things were left.** Everything is merged and deployed from `main`; no
+branch holds unmerged work.
+
+- **TradingView.** The Essential plan allows ten MCP calls a day. From 17
+  November every day was refused about ten calls in, and her briefings went
+  without the dollar, the yields, the Fed odds and the flows; she said so in
+  each. On 24 November he bought the AI Copilot + MCP add-on, $10 a month, which
+  TradingView's refusal says allows 500 calls a UTC day and 50 a minute. Two
+  changes followed: a refusal on quota now holds every call until the next
+  00:00 UTC (`refused_until`, #362), and `readsDue` spends about 400 a weekday,
+  no pass over 31 (#363). If the add-on is cancelled, the job is ten calls a day
+  again and the hold is all that stands between it and the week's suspension
+  TradingView warned of.
+- **The briefing's length.** Sunday 22 November's was 134 words before the
+  week's review, 103 without its line about what was broken, against the
+  100-word ceiling, and three of its sentences explained PCE, where nothing is
+  built in a briefing. The 15 November Sunday briefing was 106. No eval case
+  counts a briefing's words.
+
+**Still to do, oldest first.**
+
+1. **Whether the add-on's budget holds** (due 25 November, not yet run). Expect
+   no "SUSPENDED", "daily limit" or "cooldown" rows after 24 November 19:00 New
+   York, and briefings that name the dollar, the yields and the odds again:
+
+   ```sql
+   select date(at at time zone 'America/New_York') as day, caller, ok,
+          case when detail ~ 'raised suspicion' then 'SUSPENDED (suspicion)'
+               when detail ~ 'daily usage limit' then 'daily limit'
+               when detail ~ 'cooldown is currently active' then 'cooldown'
+               when ok then null
+               else left(detail, 200) end as why,
+          count(*) as n,
+          min(at at time zone 'America/New_York')::time(0) as first,
+          max(at at time zone 'America/New_York')::time(0) as last
+   from public.eugenia_runs
+   where at >= now() - interval '8 days'
+   group by 1, 2, 3, 4
+   order by 1, 6;
+   ```
+
+   A week of everything she said and filed, for reading her output; the SQL
+   editor shows a hundred rows, which is why the runs are grouped above and left
+   out here:
+
+   ```sql
+   select at_ny, source, words, text from (
+     select created_at at time zone 'America/New_York' as at_ny,
+            case role when 'assistant' then 'her' else 'you' end as source,
+            array_length(regexp_split_to_array(trim(content), '\s+'), 1) as words, content as text
+     from public.eugenia_turns where created_at >= now() - interval '7 days'
+     union all
+     select created_at at time zone 'America/New_York',
+            'note:' || kind || case when superseded_by is not null then ' (retired)' else '' end, null, note
+     from public.eugenia_notes where created_at >= now() - interval '7 days'
+     union all
+     select created_at at time zone 'America/New_York', 'read:' || verdict, null,
+            format('%s | test: %s | evidence: %s | lesson: %s', reading, test, evidence, lesson)
+     from public.eugenia_reads where created_at >= now() - interval '7 days'
+     union all
+     select made_at at time zone 'America/New_York', 'call:' || coalesce(outcome, 'pending'), null,
+            format('%s at %s, stop %s, target %s | %s | result %s | withdrawn: %s | misread: %s | lesson: %s',
+                   direction, entry, stop, target, condition, result, withdrawn, misread, lesson)
+     from public.eugenia_calls where made_at >= now() - interval '7 days' or closed_at >= now() - interval '7 days'
+     union all
+     select created_at at time zone 'America/New_York',
+            'loop:' || kind || case when closed_on is not null then ' (closed ' || closed_on || ')' else '' end,
+            null, body || coalesce(' | ' || resolution, '')
+     from public.eugenia_loops where created_at >= now() - interval '7 days' or closed_on >= current_date - 7
+     union all
+     select created_at at time zone 'America/New_York', 'feedback', null, on_day || ': ' || verdict
+     from public.eugenia_feedback where created_at >= now() - interval '7 days'
+   ) x
+   order by at_ny;
+   ```
+
+2. **Whether the broker's session high and low match its price.** On Sunday 22
+   November she said they did not, with the market shut, so it may be the
+   weekend's. If she says it again on a weekday, trace `foldSpot` and
+   `quoteLine`.
+3. **A word count in the briefing's eval cases** (planned for 30 November). Add
+   the count to the briefing cases in `test/fixtures/eval-cases.json`, see it
+   fail under `--plant`, then run the eval. A full run costs about $2.80; he
+   holds eval runs until he has credits, so ask before running.
+4. **The 9 December Fed decision in her calendar** (from 7 December). One row
+   is expected, 9 December 14:00, high, and it needs the calendar job running:
+
+   ```sql
+   select at at time zone 'America/New_York' as at_ny, country, name, importance
+   from public.eugenia_calendar
+   where at >= '2026-12-07' and at < '2026-12-14' and name = 'Interest Rate' and country = 'US';
+   ```
+
+5. **R-89's baselines** (from 15 December). Run `calibrate` and `replay` on a
+   fresh window. Quarters holding above 1.2× chance again is the case for
+   weighting quarters on her map; read the repeat-turn levels against the
+   one-turn ones; today's readings should be back above about 1.0, and the
+   bigger charts still below it. Both scripts read the poller and call the model
+   directly, so they may run with her Telegram side switched off; confirm that
+   first.
+
+**Parked: take or pass at the moment the setup prints.** Not started, nothing
+built. The aim is to judge the one setup better, not to watch more ticks.
+
+- **Why.** She files at most one paper call, at 08:00 New York, and has to
+  guess the setup hours before it exists; the quarter-hourly look can withdraw
+  a call and never make one (`make_call` is in `CHAT_TOOLS` alone). So her
+  record grades forecasting, not judging the setup in front of her. More
+  watching or more calls is not the goal: R-12 stays one entry a session, and
+  more chances to act are more chances to overtrade.
+- **The design.**
+  1. The trigger is the replay baseline's own rule (`baseline` in
+     `scripts/replay.mjs`): the first 5m candle after 08:00 to reach a mark on
+     her map, a level or a quarter, and close off it. That is R-07 done in code,
+     with no model.
+  2. When it fires she is woken once with what printed: the candle, the bigger
+     charts at that moment, what landed on the calendar, and how price behaved
+     at that level earlier. One decision: take (file the call, its confirmation
+     already met) or pass, with why.
+  3. Both are scored. A take as calls are now (`scoreCall`); a pass as the trade
+     the baseline took, kept beside it as `spared` is for a withdrawal. Her skill
+     is the gap between what she took and what she passed. Losses taken and
+     winners passed both go to `explain_call` (bias, level, candle or none) and
+     on into `eugenia_craft`.
+  4. Level reactions counted in code: every touch of a mark, by kind (a turn, a
+     quarter, which chart's high or low), with whether it held and by how much,
+     as base rates for the look and the nightly pass.
+- **The order, offline before live.**
+  - Step 0: run the replay as it is (Actions → replay, about 21 days,
+    `--runs 3`, a few dollars), to see where her 08:00 calls stand against the
+    baseline today.
+  - Step 1: extend the replay to the trigger's moment: for each past session,
+    find the baseline's trigger candle and ask take or pass with the map as it
+    stood at that candle. First check whether `doji-mcp-sync?replay=N` can build
+    the map at any minute or only at 08:00; that is unchecked, and likely the
+    main new code.
+  - Step 2: judge it honestly. `CLEAN_FROM` leaves about five months, some 100
+    triggers: enough to see a large edge, not a small one. Tune on half the
+    days and judge on the other half, with `--runs 3` so a pass that flips to a
+    take on the same chart counts as noise.
+  - Step 3: only if step 2 shows her filter adds something, build it live: a
+    one-minute watch in code (pg_cron's floor; the closest job today runs every
+    two minutes), waking Opus only on a trigger, at an estimated (not measured)
+    $15–40 a month. Check the poller's extra broker reads against cTrader's
+    limits first.
+- **His to decide.** Whether a session keeps one call (R-12); recommended, so
+  her record stays comparable to his. Whether the 08:00 call stays: if it files,
+  it takes the session's slot and the trigger cannot add another, so either the
+  morning names the levels she is watching and the trigger files, or the
+  trigger fills only an empty slot. Whether he is told of a take; recommended
+  as for a withdrawal, two sentences only while he is flat, filed and unsent
+  while he holds a position.
+- **The rules it would change**, each held by `agree.test.mjs` and changed with
+  its test, never around it: "`make_call` is in `CHAT_TOOLS` and in no other
+  set"; "she never watches the market move"; the look's withdraw-only tools
+  (`LOOK_TOOLS`); and this README's sections on her own calls and the replay.
